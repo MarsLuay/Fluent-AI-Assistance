@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tecan-project-reader"
-version = "0.1.0"
+version = "0.1.1"
 description = "Local ZEIA/XSCR project reader for Codex-assisted Tecan analysis"
 readme = "README.md"
 license = {text = "PolyForm-Noncommercial-1.0.0"}

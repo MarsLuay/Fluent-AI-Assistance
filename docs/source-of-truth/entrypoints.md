@@ -26,7 +26,7 @@
 
 Media conversion helpers (`convert_video_to_gif`, `normalize_worktable_gif`, `compare_xscr_minimal_edit`) are **library APIs** under `media_convert.py` / `minimal_edit.py`. They are not separate CLI verbs. Prefer `process-media` or call the Python helpers directly.
 
-## MCP tools (24)
+## MCP tools (25)
 
 `fluent_status`, `fluent_agent_brief`, `fluent_resolve_brief_mode`, `fluent_bootstrap_status`, `fluent_list_projects`, `fluent_import_project`, `fluent_inspect_project`, `fluent_project_query`, `fluent_inspect_script`, `fluent_find_external_command`, `fluent_diagnose`, `fluent_parse_fluent_log`, `fluent_create_request_spec`, `fluent_validate_request_spec`, `fluent_generate_protocol`, `fluent_plan_repair`, `fluent_apply_repair`, `fluent_verify_bundle`, `fluent_process_media`, `fluent_verify_archive`, `fluent_list_capabilities`, `fluent_run_safe_cli`, `fluent_run_opt_in_cli`, `fluent_worktable_diff`, `fluent_summarize_simulation`
 

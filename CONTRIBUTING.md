@@ -1,15 +1,19 @@
 # Contributing
 
-## Development setup
+## Development
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install\install.ps1
+.\scripts\test\test-fast.ps1      # reader/worklist + protocol-builder + fluentcoder
+.\scripts\test\test-mcp.ps1       # MCP gateway, self-test, smoke
+.\scripts\test\test-simulator.ps1 # FluentControl-gated simulator suite
+.\scripts\test\test-all.ps1       # everything above
 ```
 
-Run `.\scripts\test-fast.ps1` before opening a pull request. Use
-`.\scripts\test-mcp.ps1`, `.\scripts\test-simulator.ps1`, or
-`.\scripts\test-all.ps1` when your change touches those areas or needs a full
-sweep.
+Run `test-fast` before opening a pull request. Use the MCP, simulator, or all
+suites when your change touches those areas.
+
+Layout and interfaces: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Design rules
 

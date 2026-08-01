@@ -2,9 +2,10 @@
 
 ## AI-assisted installation
 
-Paste the prompt in [`README.md`](../README.md) (also
-[`AI_INSTALL_PROMPT.md`](AI_INSTALL_PROMPT.md)) into an AI client that can run
-local commands and configure MCP.
+Paste the minimal prompt from [`AI_INSTALL_PROMPT.md`](AI_INSTALL_PROMPT.md)
+(also shown in [`README.md`](../README.md)) into an AI client that can run local
+commands and configure MCP. The AI should open that file in the clone and follow
+its steps.
 
 That installs the **full repository**. MCP is the adapter the installer wires
 into the client; the CLI and Python API come with the same checkout.
@@ -33,8 +34,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install\install.ps1
 ```
 
 Merge the generated `.mcp/server-config.json` entry into the MCP configuration
-used by the client, reload that client, then call `fluent_status` and
-`fluent_bootstrap_status`.
+used by the client, then reload that client. The installer already ran
+`fluent_status` / `fluent_bootstrap_status` during setup; call them again only
+if you want to confirm MCP wiring after the reload.
 
 ## Credentials
 

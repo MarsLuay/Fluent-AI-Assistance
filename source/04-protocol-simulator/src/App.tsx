@@ -1415,7 +1415,7 @@ export default function App() {
                 aria-label="Script title"
               />
             ) : (
-              <button className="script-title-button" type="button" onClick={beginTitleEdit} title="Rename script">
+              <button className="script-title-button" type="button" onClick={beginTitleEdit} title="Rename script" aria-label="Rename script">
                 <h1>{model.name}</h1>
               </button>
             )}
@@ -1442,15 +1442,15 @@ export default function App() {
             </select>
           </label>
 
-          <button className="icon-button with-label" type="button" onClick={handleSave} title="Save renamed script" disabled={!artifacts.length}>
+          <button className="icon-button with-label" type="button" onClick={handleSave} title="Save renamed script" aria-label="Save renamed script" disabled={!artifacts.length}>
             <Save size={18} />
             <span>Save</span>
           </button>
-          <button className="icon-button with-label" type="button" onClick={() => fileInputRef.current?.click()} title="Import artifacts" disabled={loading}>
+          <button className="icon-button with-label" type="button" onClick={() => fileInputRef.current?.click()} title="Import artifacts" aria-label="Import artifacts" disabled={loading}>
             <Upload size={18} />
             <span>{loading ? "Importing" : "Import"}</span>
           </button>
-          <button className="icon-button with-label" type="button" onClick={handleExport} title="Export simulator project package" disabled={!artifacts.length}>
+          <button className="icon-button with-label" type="button" onClick={handleExport} title="Export simulator project package" aria-label="Export simulator project package" disabled={!artifacts.length}>
             <FileArchive size={18} />
             <span>Export</span>
           </button>
@@ -1460,9 +1460,10 @@ export default function App() {
             type="file"
             multiple
             accept={ACCEPTED_ARTIFACT_EXTENSIONS}
+            aria-label="Import artifact files"
             onChange={handleFileSelection}
           />
-          <input ref={assetImageInputRef} className="hidden-input" type="file" accept="image/*" onChange={handleAssetImageSelection} />
+          <input ref={assetImageInputRef} className="hidden-input" type="file" accept="image/*" aria-label="Import asset image" onChange={handleAssetImageSelection} />
         </div>
       </header>
 
@@ -1999,7 +2000,7 @@ function ScriptEditorPanel({
           <span>issues</span>
         </div>
         <div className="script-editor-actions">
-          <button className="icon-button" type="button" onClick={onAdd} title="Add command">
+          <button className="icon-button" type="button" onClick={onAdd} title="Add command" aria-label="Add command">
             <Plus size={16} />
           </button>
         </div>
@@ -2044,10 +2045,10 @@ function ScriptEditorPanel({
                   <label className="script-command-toggle" title={command.enabled ? "Disable command" : "Enable command"}>
                     <input type="checkbox" checked={command.enabled} onChange={(event) => onUpdate(command.id, { enabled: event.target.checked })} />
                   </label>
-                  <button className="icon-button" type="button" onClick={() => onDuplicate(command.id)} title="Duplicate command">
+                  <button className="icon-button" type="button" onClick={() => onDuplicate(command.id)} title="Duplicate command" aria-label="Duplicate command">
                     <Copy size={15} />
                   </button>
-                  <button className="icon-button" type="button" onClick={() => onDelete(command.id)} title="Delete command">
+                  <button className="icon-button" type="button" onClick={() => onDelete(command.id)} title="Delete command" aria-label="Delete command">
                     <Trash2 size={15} />
                   </button>
                 </div>
@@ -2199,6 +2200,7 @@ function CompactWellInput({ wells, onChange }: { wells: string[]; onChange: (wel
       onBlur={handleBlur}
       placeholder="A1, A2, B1"
       title={fullValue || "No wells specified"}
+      aria-label="Well list"
     />
   );
 }
@@ -2313,7 +2315,7 @@ function ZeiaContextPanel({
       ))}
       <div className="image-override-actions">
         <span>{overrideCount.toLocaleString()} replacement image{overrideCount === 1 ? "" : "s"}</span>
-        <button className="icon-button with-label" type="button" onClick={onExportImageBundle} disabled={!overrideCount} title="Export replacement images as a generated asset bundle">
+        <button className="icon-button with-label" type="button" onClick={onExportImageBundle} disabled={!overrideCount} title="Export replacement images as a generated asset bundle" aria-label="Export replacement images as a generated asset bundle">
           <Download size={15} />
           <span>Bundle</span>
         </button>
@@ -2787,7 +2789,7 @@ function DevConsole({ logs, onClose, onCopy }: { logs: DevLogEntry[]; onClose: (
           <button className="icon-button with-label" type="button" onClick={onCopy}>
             <span>Copy logs</span>
           </button>
-          <button className="icon-button" type="button" onClick={onClose} title="Close dev mode">
+          <button className="icon-button" type="button" onClick={onClose} title="Close dev mode" aria-label="Close dev mode">
             ×
           </button>
         </div>

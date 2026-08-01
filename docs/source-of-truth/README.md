@@ -15,7 +15,7 @@
 | Function pages | 15 | All `fluent_pipeline` public (+ significant private) symbols clustered |
 | Type pages | 8+ | Classes per cluster; LC schema deep page retained |
 | `fluent_pipeline` files | 156/156 | Every `.py` file assigned to a cluster |
-| Entrypoints | updated | CLI (49), MCP (24 tools), bootstrap, sibling packages |
+| Entrypoints | updated | CLI (49), MCP (25 tools), bootstrap, sibling packages |
 | Conflicts | see `conflicts.md` | |
 
 ## How to read
@@ -58,5 +58,13 @@
 
 ## Related non-SOT docs
 
-- `docs/ARCHITECTURE.md`, `docs/MCP_TOOLS.md`, `docs/INSTALLATION.md`, `AGENTS.md`, nested `source/*/AGENTS.md`
-- Domain canvas (debt tracker): vault `zeia-lab-agnostic-debt.canvas.tsx` , not a substitute for this tree
+Product / operator docs (README points here; not symbol inventory):
+
+- [../CAPABILITIES.md](../CAPABILITIES.md): file types, artifacts, inspect rules behind README bullets
+- [../ARCHITECTURE.md](../ARCHITECTURE.md): stack, interfaces, repo layout
+- [../AI_INSTALL_PROMPT.md](../AI_INSTALL_PROMPT.md), [../INSTALLATION.md](../INSTALLATION.md)
+- [../AGENT_BRIEF.md](../AGENT_BRIEF.md), [../MCP_TOOLS.md](../MCP_TOOLS.md), [../SAFETY.md](../SAFETY.md)
+- `AGENTS.md`, nested `source/*/AGENTS.md`, [../../CONTRIBUTING.md](../../CONTRIBUTING.md)
+
+Domain canvas (debt tracker): vault `zeia-lab-agnostic-debt.canvas.tsx`, not a
+substitute for this tree.

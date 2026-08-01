@@ -6,7 +6,7 @@ Prefer this over pasting full AGENTS.md into a chat.
 
 When the Fluent MCP server is connected:
 
-1. `fluent_bootstrap_status` — doctor + list-projects, returns `next_step`
+1. `fluent_bootstrap_status`: doctor + list-projects, returns `next_step`
    (`allowed_tools` / `blocked_tools` / `unlock_generate_after`)
 2. After inspect: `fluent_bootstrap_status(inspected=true)` to unlock generate
 3. Mode pick: `fluent_resolve_brief_mode(intent=...)` or
