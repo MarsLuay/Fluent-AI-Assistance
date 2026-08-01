@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VxData>
+  <Payload>
+    <ObjectName>Synthetic Liquid Class 10</ObjectName>
+    <PayloadData>
+      <PipettingDeviceType>Fca</PipettingDeviceType>
+      <PipettingDeviceType>Mca96</PipettingDeviceType>
+    </PayloadData>
+  </Payload>
+</VxData>

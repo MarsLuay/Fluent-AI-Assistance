@@ -1,0 +1,105 @@
+# Example fluentcoder generation config — copy and customize for your site.
+#
+#   cp generation.yaml.example generation.yaml
+#   # edit workspace GUID/name, AvailableID paths, and liquid_class.guid
+#
+# The Renderer also accepts an explicit config_path= when constructing compile
+# tooling in Python.
+#
+# Fields you must replace on a real FluentControl system:
+#   worktable.guid / worktable.name  — from your workspace catalog
+#   device.available_id              — USB:TECAN,FLUENT,<serial>/MCA384:1
+#   cga_device.available_id            — same serial, CGA device path
+#   liha_device.available_id           — same serial, LIHA device path
+# liquid_class.name / guid / mix_name — from target FC install or ZEIA .xlqc.
+# Leave empty in product defaults; do not invent AcidExtract or other lab LCs.
+#
+# The checked-in generation.yaml ships empty liquid_class and neutral USB
+# placeholders for public release / offline CI. Examples and tests pass
+# liquid-class names explicitly (or overlay a local generation.yaml).
+
+worktable:
+  guid: "11111111-1234-aaaa-ffff-000000000222"
+  name: "780_Empty"
+  type_id: "WorktableWorkspace"
+
+device:
+  alias: "Instrument=1/Device=MCA384:1"
+  available_id: "USB:TECAN,FLUENT,0000000000/MCA384:1"
+  adapter_labware: "Teleshake Adapter Plate"
+  tip_columns: 24
+  tip_rows: 16
+
+cga_device:
+  alias: "Instrument=1/Device=CGA:1"
+  available_id: "USB:TECAN,FLUENT,0000000000/CGA:1"
+  get_fingers_labware: "Centric"
+  drop_fingers_labware: "FES Centric Nest"
+
+liha_device:
+  alias: "Instrument=1/Device=LIHA:1"
+  available_id: "USB:TECAN,FLUENT,0000000000/LIHA:1"
+  num_channels: 8
+  diti_type: "TOOLTYPE:LiHa.TecanDiTi/TOOLNAME:FCA, 1000ul SBS"
+  waste_labware: "FCA Thru Deck Waste Chute"
+
+liquid_class:
+  name: ""
+  guid: ""
+  mix_name: ""
+
+script:
+  version: "2.0"
+  data_version: "1"
+  expected_duration: 12000000000
+
+validation:
+  warn_on_unknown_labware: true
+  warn_on_state_mismatch: true
+  strict_mode: false
+  strict_workspace_binding: false
+
+labware_placement:
+  tip_boxes:
+    MCA96:
+      valid_locations: ["Nest61mm_Pos"]
+      invalid_locations: ["MCA384_Diti_ActiveNest"]
+      typical_positions: [11, 12]
+    MCA384:
+      valid_locations: ["MCA384_Diti_ActiveNest"]
+      typical_positions: [1, 2]
+  plates:
+    96_well:
+      valid_locations: ["Nest61mm_Pos", "NestCooled_Pos_1", "HotelDWP_Pos"]
+      typical_positions: [1, 2, 3, 4, 5, 6, 7, 8]
+    magnet:
+      valid_locations: ["RGA", "Nest61mm_Pos"]
+
+paths:
+  reference: "reference/commands.yaml"
+  templates: "templates"
+  output: "protocols"
+
+grounding_defaults:
+  labware:
+    plate_96: "96 Well Flat"
+    plate_384: "384 Well"
+    magnet_plate_96: "24 Magnet Plate"
+    waste_reservoir: "100ml Trough 156mm"
+    reservoir_standard: "25ml_short"
+    reservoir_ethanol: "25ml_short"
+    fca_tipbox_small: "FCA, 200ul SBS"
+    fca_tipbox_large: "FCA, 1000ul SBS"
+    mca96_tipbox_small: "MCA96, 100ul, Box"
+    mca96_tipbox_medium: "MCA96, 100ul, Box"
+    mca96_tipbox_large: "MCA96, 100ul, Box"
+  reservoir_labware_by_operation:
+    ADD_WASH: "25ml_short"
+  layout:
+    sample_plate: { location: "Site", site: 1 }
+    final_plate: { location: "Site", site: 2 }
+    magnet_plate: { location: "Site", site: 3 }
+    mca_tips: { location: "Site", site: 4 }
+    waste: { location: "Site", site: 5 }
+    fca_tips: { location: "Site", site: 6 }
+    reservoir_start: { location: "Site", site: 7 }

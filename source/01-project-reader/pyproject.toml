@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tecan-project-reader"
+version = "0.1.0"
+description = "Local ZEIA/XSCR project reader for Codex-assisted Tecan analysis"
+readme = "README.md"
+license = {text = "PolyForm-Noncommercial-1.0.0"}
+requires-python = ">=3.11"
+dependencies = [
+  "tecan-common @ file:../00-shared",
+]
+
+[project.scripts]
+project-reader = "tecan_reader.cli:main"
+tecan-reader = "tecan_reader.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["tecan_reader*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["../00-shared"]

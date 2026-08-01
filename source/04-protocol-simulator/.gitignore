@@ -1,0 +1,7 @@
+node_modules/
+dist/
+verification/
+.code-analysis/
+tmp/
+.cache/
+.DS_Store

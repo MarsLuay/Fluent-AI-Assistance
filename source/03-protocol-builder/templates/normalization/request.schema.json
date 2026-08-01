@@ -1,0 +1,69 @@
+{
+  "$id": "https://fluent-ai-assistance.local/templates/normalization/request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "request": {
+      "properties": {
+        "intent": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "intent"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "tecan.request_spec.v1"
+    },
+    "template": {
+      "properties": {
+        "name": {
+          "const": "normalization"
+        },
+        "parameters": {
+          "properties": {
+            "concentration_map": {
+              "type": "string"
+            },
+            "final_volume_ul": {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            "liquid_class": {
+              "type": "string"
+            },
+            "target_concentration": {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            "target_units": {
+              "default": "ng/uL",
+              "type": "string"
+            }
+          },
+          "required": [
+            "target_concentration",
+            "final_volume_ul",
+            "concentration_map",
+            "liquid_class"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "parameters"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "request",
+    "template"
+  ],
+  "title": "Normalization Template Request",
+  "type": "object"
+}

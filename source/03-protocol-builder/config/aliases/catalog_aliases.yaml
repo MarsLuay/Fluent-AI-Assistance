@@ -1,0 +1,17 @@
+# Generic instance → type aliases only (vendor tip boxes, waste, common nests).
+# Site labware type strings (Falcon runners, CapHolder, etc.) come from the
+# imported ZEIA labware_catalog.json under the local context, not from these
+# repo defaults. Overlay via load_alias_maps_with_context_catalog.
+catalog_aliases:
+  "EVA[001]": "EVA"
+  "Plexiglas Pane[002]": "Plexiglas Pane"
+  "MCA96, 100ul, Box[001]": "MCA96, 100ul, Box"
+  "MCA384, 50ul, Box[001]": "MCA384, 50ul, Box"
+  "DiTi 1000ul LiHa[001]": "DiTi 1000ul LiHa"
+  "Centric[001]": "Centric"
+  "Eccentric[001]": "Eccentric"
+  "FES Centric Nest[001]": "FES Centric Nest"
+  "FES Centric Nest[002]": "FES Centric Nest"
+  "FES Eccentric Nest[001]": "FES Eccentric Nest"
+  "FES Eccentric Nest[002]": "FES Eccentric Nest"
+  "Tube[001]": "Tube"

@@ -1,0 +1,38 @@
+{
+  "commands": [
+    {
+      "device_alias": "MCA384",
+      "id": "Mca384AspirateScriptCommandDataV2",
+      "labware": "WorklistSource",
+      "liquid_class": "Water Free Single",
+      "volume": 12
+    },
+    {
+      "device_alias": "MCA384",
+      "id": "Mca384DispenseScriptCommandDataV2",
+      "labware": "WorklistDestination",
+      "liquid_class": "Water Free Single",
+      "volume": 12
+    }
+  ],
+  "labware": [
+    {
+      "label": "WorklistSource",
+      "position": 6,
+      "type": "96 Well Flat"
+    },
+    {
+      "label": "WorklistDestination",
+      "position": 7,
+      "type": "96 Well Flat"
+    }
+  ],
+  "script_name": "Worklist Import",
+  "worklists": {
+    "transfer.gwl": [
+      "A;WorklistSource;;96 Well Flat;1;;12;Water Free Single;;;",
+      "D;WorklistDestination;;96 Well Flat;1;;12;Water Free Single;;;"
+    ]
+  },
+  "worktable": "Worklist Worktable"
+}

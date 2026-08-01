@@ -1,0 +1,42 @@
+{
+  "commands": [
+    {
+      "device_alias": "MCA384",
+      "id": "Mca384PickUpTipsScriptCommandDataV5",
+      "labware": "MCA384TipBox"
+    },
+    {
+      "device_alias": "MCA384",
+      "id": "Mca384AspirateScriptCommandDataV2",
+      "labware": "SourcePlate",
+      "liquid_class": "Water Free Single",
+      "volume": 25
+    },
+    {
+      "device_alias": "MCA384",
+      "id": "Mca384DispenseScriptCommandDataV2",
+      "labware": "DestinationPlate",
+      "liquid_class": "Water Free Single",
+      "volume": 25
+    }
+  ],
+  "labware": [
+    {
+      "label": "MCA384TipBox",
+      "position": 3,
+      "type": "MCA384, 50ul, Box"
+    },
+    {
+      "label": "SourcePlate",
+      "position": 8,
+      "type": "384 Well Plate"
+    },
+    {
+      "label": "DestinationPlate",
+      "position": 9,
+      "type": "384 Well Plate"
+    }
+  ],
+  "script_name": "MCA384 Transfer",
+  "worktable": "MCA384 Worktable"
+}

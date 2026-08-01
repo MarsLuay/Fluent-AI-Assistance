@@ -1,0 +1,294 @@
+{
+  "dependencies": [
+    {
+      "kind": "template",
+      "name": "serial_dilution",
+      "required": false
+    }
+  ],
+  "id": "template_serial_dilution",
+  "ir_version": "tecan.protocol_ir.v2",
+  "labware": [
+    {
+      "catalog": "96 Well Flat",
+      "id": "source_plate",
+      "label": "SourcePlate",
+      "location": "Site",
+      "position": 1,
+      "python_class": "Plate96",
+      "role": "source"
+    },
+    {
+      "catalog": "96 Well Flat",
+      "id": "dilution_plate",
+      "label": "DilutionPlate",
+      "location": "Site",
+      "position": 2,
+      "python_class": "Plate96",
+      "role": "destination"
+    },
+    {
+      "catalog": "Reagent Reservoir",
+      "id": "diluent_reservoir",
+      "label": "DiluentReservoir",
+      "location": "Site",
+      "position": 3,
+      "python_class": "Plate96",
+      "role": "reagent_source"
+    },
+    {
+      "catalog": "MCA96, 100ul, Box",
+      "id": "tips",
+      "label": "Tips",
+      "location": "Site",
+      "position": 4,
+      "python_class": "MCA100Box",
+      "role": "tips"
+    }
+  ],
+  "liquid_classes": [
+    {
+      "name": "Water Free Single",
+      "role": "pipetting"
+    }
+  ],
+  "protocol": {
+    "comment": "Template shape for a column-wise serial dilution.",
+    "name": "Template Serial Dilution",
+    "schema_intent": "canonical reusable template shape"
+  },
+  "reagents": [
+    {
+      "id": "sample",
+      "name": "Sample",
+      "role": "sample"
+    },
+    {
+      "id": "diluent",
+      "name": "Diluent",
+      "role": "diluent"
+    }
+  ],
+  "safety_assumptions": [
+    {
+      "id": "template_requires_review",
+      "text": "Confirm dilution factor, dead volume, source wells, destination wells, mix cycles, and tip reuse strategy before use."
+    },
+    {
+      "id": "manual_validation_required",
+      "text": "Generated artifacts must be reviewed, simulated, and validated in FluentControl before instrument use."
+    }
+  ],
+  "source": {
+    "format": "template_protocol",
+    "path": "templates/serial_dilution/template.ir.json",
+    "template": "serial_dilution"
+  },
+  "steps": [
+    {
+      "group": "Setup",
+      "id": "step_001",
+      "index": 1,
+      "name": "Add Source Plate",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "SourcePlate",
+        "labware_type": "96 Well Flat",
+        "location": "Site",
+        "position": 1
+      },
+      "target_labware": "SourcePlate"
+    },
+    {
+      "group": "Setup",
+      "id": "step_002",
+      "index": 2,
+      "name": "Add Dilution Plate",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "DilutionPlate",
+        "labware_type": "96 Well Flat",
+        "location": "Site",
+        "position": 2
+      },
+      "target_labware": "DilutionPlate"
+    },
+    {
+      "group": "Setup",
+      "id": "step_003",
+      "index": 3,
+      "name": "Add Diluent Reservoir",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "DiluentReservoir",
+        "labware_type": "Reagent Reservoir",
+        "location": "Site",
+        "position": 3
+      },
+      "target_labware": "DiluentReservoir"
+    },
+    {
+      "group": "Setup",
+      "id": "step_004",
+      "index": 4,
+      "name": "Add Tip Box",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "Tips",
+        "labware_type": "MCA96, 100ul, Box",
+        "location": "Site",
+        "position": 4
+      },
+      "target_labware": "Tips"
+    },
+    {
+      "group": "Dilution",
+      "id": "step_005",
+      "index": 5,
+      "name": "Pick Up Tips",
+      "operation": "pick_up_tips",
+      "parameters": {
+        "tip_strategy": "new_tips_per_series"
+      },
+      "target_labware": "Tips"
+    },
+    {
+      "group": "Dilution",
+      "id": "step_006",
+      "index": 6,
+      "liquid_class": "Water Free Single",
+      "name": "Add Diluent",
+      "operation": "aspirate",
+      "parameters": {
+        "source_well": "A1"
+      },
+      "source_labware": "DiluentReservoir",
+      "target_labware": "DiluentReservoir",
+      "volume_ul": 90
+    },
+    {
+      "destination_labware": "DilutionPlate",
+      "group": "Dilution",
+      "id": "step_007",
+      "index": 7,
+      "liquid_class": "Water Free Single",
+      "name": "Dispense Diluent Into First Column",
+      "operation": "dispense",
+      "parameters": {
+        "destination_well": "A1"
+      },
+      "target_labware": "DilutionPlate",
+      "volume_ul": 90
+    },
+    {
+      "group": "Dilution",
+      "id": "step_008",
+      "index": 8,
+      "liquid_class": "Water Free Single",
+      "name": "Aspirate Sample",
+      "operation": "aspirate",
+      "parameters": {
+        "source_well": "A1"
+      },
+      "source_labware": "SourcePlate",
+      "target_labware": "SourcePlate",
+      "volume_ul": 10
+    },
+    {
+      "destination_labware": "DilutionPlate",
+      "group": "Dilution",
+      "id": "step_009",
+      "index": 9,
+      "liquid_class": "Water Free Single",
+      "name": "Dispense Sample Into First Column",
+      "operation": "dispense",
+      "parameters": {
+        "destination_well": "A1"
+      },
+      "target_labware": "DilutionPlate",
+      "volume_ul": 10
+    },
+    {
+      "group": "Dilution",
+      "id": "step_010",
+      "index": 10,
+      "liquid_class": "Water Free Single",
+      "name": "Mix First Dilution",
+      "operation": "mca384_mix",
+      "parameters": {
+        "cycles": 8,
+        "well": "A1"
+      },
+      "target_labware": "DilutionPlate",
+      "volume_ul": 50
+    },
+    {
+      "group": "Dilution",
+      "id": "step_011",
+      "index": 11,
+      "liquid_class": "Water Free Single",
+      "name": "Carry Forward Dilution",
+      "operation": "aspirate",
+      "parameters": {
+        "source_well": "A1"
+      },
+      "source_labware": "DilutionPlate",
+      "target_labware": "DilutionPlate",
+      "volume_ul": 10
+    },
+    {
+      "destination_labware": "DilutionPlate",
+      "group": "Dilution",
+      "id": "step_012",
+      "index": 12,
+      "liquid_class": "Water Free Single",
+      "name": "Dispense Into Next Dilution",
+      "operation": "dispense",
+      "parameters": {
+        "destination_well": "A2"
+      },
+      "target_labware": "DilutionPlate",
+      "volume_ul": 10
+    },
+    {
+      "group": "Cleanup",
+      "id": "step_013",
+      "index": 13,
+      "name": "Return Tips",
+      "operation": "set_tips_back",
+      "parameters": {
+        "tip_strategy": "return_to_source"
+      },
+      "target_labware": "Tips"
+    }
+  ],
+  "template": {
+    "description": "Column-wise serial dilution with diluent addition, sample addition, mix, and carry-forward transfer.",
+    "name": "serial_dilution",
+    "request_schema": "request.schema.json",
+    "version": 1
+  },
+  "variables": [
+    {
+      "default": 10,
+      "name": "sample_volume_ul",
+      "type": "number"
+    },
+    {
+      "default": 90,
+      "name": "diluent_volume_ul",
+      "type": "number"
+    },
+    {
+      "default": 8,
+      "name": "mix_cycles",
+      "type": "integer"
+    }
+  ],
+  "worklists": [],
+  "worktable": {
+    "auto_place": false,
+    "guid": "",
+    "name": "Template Worktable"
+  }
+}

@@ -1,0 +1,478 @@
+{
+  "dependencies": [
+    {
+      "kind": "template",
+      "name": "bead_cleanup",
+      "required": false
+    }
+  ],
+  "id": "template_bead_cleanup",
+  "ir_version": "tecan.protocol_ir.v2",
+  "labware": [
+    {
+      "catalog": "96 Well Flat",
+      "id": "sample_plate",
+      "label": "SamplePlate",
+      "location": "Site",
+      "position": 1,
+      "python_class": "Plate96",
+      "role": "sample"
+    },
+    {
+      "catalog": "Reagent Reservoir",
+      "id": "bead_reservoir",
+      "label": "BeadReservoir",
+      "location": "Site",
+      "position": 2,
+      "python_class": "Plate96",
+      "role": "beads"
+    },
+    {
+      "catalog": "Reagent Reservoir",
+      "id": "wash_reservoir",
+      "label": "WashReservoir",
+      "location": "Site",
+      "position": 3,
+      "python_class": "Plate96",
+      "role": "wash"
+    },
+    {
+      "catalog": "Reagent Reservoir",
+      "id": "elution_buffer_reservoir",
+      "label": "ElutionBufferReservoir",
+      "location": "Site",
+      "position": 5,
+      "python_class": "Plate96",
+      "role": "elution_buffer"
+    },
+    {
+      "catalog": "96 Well Flat",
+      "id": "elution_plate",
+      "label": "ElutionPlate",
+      "location": "Site",
+      "position": 6,
+      "python_class": "Plate96",
+      "role": "destination"
+    },
+    {
+      "catalog": "Waste",
+      "id": "waste_reservoir",
+      "label": "WasteReservoir",
+      "location": "Site",
+      "position": 7,
+      "python_class": "Plate96",
+      "role": "waste"
+    },
+    {
+      "catalog": "MCA96, 100ul, Box",
+      "id": "tips",
+      "label": "Tips",
+      "location": "Site",
+      "position": 4,
+      "python_class": "MCA100Box",
+      "role": "tips"
+    }
+  ],
+  "liquid_classes": [
+    {
+      "name": "Water Free Single",
+      "role": "pipetting"
+    }
+  ],
+  "protocol": {
+    "comment": "Template shape for magnetic bead cleanup with bind, wash, dry, elute, and transfer phases.",
+    "name": "Template Bead Cleanup",
+    "schema_intent": "canonical reusable template shape"
+  },
+  "reagents": [
+    {
+      "id": "beads",
+      "name": "Magnetic Beads",
+      "role": "beads"
+    },
+    {
+      "id": "wash_buffer",
+      "name": "Wash Buffer",
+      "role": "wash"
+    },
+    {
+      "id": "elution_buffer",
+      "name": "Elution Buffer",
+      "role": "elution"
+    }
+  ],
+  "safety_assumptions": [
+    {
+      "id": "template_requires_review",
+      "text": "Magnet positions, incubation times, dry times, residual volume, and bead disturbance limits must be reviewed against the validated assay."
+    },
+    {
+      "id": "manual_validation_required",
+      "text": "Generated artifacts must be reviewed, simulated, and validated in FluentControl before instrument use."
+    }
+  ],
+  "source": {
+    "format": "template_protocol",
+    "path": "templates/bead_cleanup/template.ir.json",
+    "template": "bead_cleanup"
+  },
+  "steps": [
+    {
+      "group": "Setup",
+      "id": "step_001",
+      "index": 1,
+      "name": "Add Sample Plate",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "SamplePlate",
+        "labware_type": "96 Well Flat",
+        "location": "Site",
+        "position": 1
+      },
+      "target_labware": "SamplePlate"
+    },
+    {
+      "group": "Setup",
+      "id": "step_002",
+      "index": 2,
+      "name": "Add Bead Reservoir",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "BeadReservoir",
+        "labware_type": "Reagent Reservoir",
+        "location": "Site",
+        "position": 2
+      },
+      "target_labware": "BeadReservoir"
+    },
+    {
+      "group": "Setup",
+      "id": "step_003",
+      "index": 3,
+      "name": "Add Wash Reservoir",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "WashReservoir",
+        "labware_type": "Reagent Reservoir",
+        "location": "Site",
+        "position": 3
+      },
+      "target_labware": "WashReservoir"
+    },
+    {
+      "group": "Setup",
+      "id": "step_004",
+      "index": 4,
+      "name": "Add Tip Box",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "Tips",
+        "labware_type": "MCA96, 100ul, Box",
+        "location": "Site",
+        "position": 4
+      },
+      "target_labware": "Tips"
+    },
+    {
+      "group": "Setup",
+      "id": "step_005",
+      "index": 5,
+      "name": "Add Elution Buffer Reservoir",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "ElutionBufferReservoir",
+        "labware_type": "Reagent Reservoir",
+        "location": "Site",
+        "position": 5
+      },
+      "target_labware": "ElutionBufferReservoir"
+    },
+    {
+      "group": "Setup",
+      "id": "step_006",
+      "index": 6,
+      "name": "Add Elution Plate",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "ElutionPlate",
+        "labware_type": "96 Well Flat",
+        "location": "Site",
+        "position": 6
+      },
+      "target_labware": "ElutionPlate"
+    },
+    {
+      "group": "Setup",
+      "id": "step_007",
+      "index": 7,
+      "name": "Add Waste Reservoir",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "WasteReservoir",
+        "labware_type": "Waste",
+        "location": "Site",
+        "position": 7
+      },
+      "target_labware": "WasteReservoir"
+    },
+    {
+      "group": "Bind",
+      "id": "step_008",
+      "index": 8,
+      "name": "Confirm Beads Resuspended",
+      "operation": "prompt_user",
+      "parameters": {
+        "prompt": "Confirm bead reservoir is mixed and ready."
+      }
+    },
+    {
+      "group": "Bind",
+      "id": "step_009",
+      "index": 9,
+      "name": "Pick Up Tips",
+      "operation": "pick_up_tips",
+      "parameters": {
+        "tip_strategy": "new_tips"
+      },
+      "target_labware": "Tips"
+    },
+    {
+      "group": "Bind",
+      "id": "step_010",
+      "index": 10,
+      "liquid_class": "Water Free Single",
+      "name": "Aspirate Beads",
+      "operation": "aspirate",
+      "parameters": {
+        "source_well": "A1"
+      },
+      "source_labware": "BeadReservoir",
+      "target_labware": "BeadReservoir",
+      "volume_ul": 20
+    },
+    {
+      "destination_labware": "SamplePlate",
+      "group": "Bind",
+      "id": "step_011",
+      "index": 11,
+      "liquid_class": "Water Free Single",
+      "name": "Dispense Beads",
+      "operation": "dispense",
+      "parameters": {
+        "destination_well": "A1"
+      },
+      "target_labware": "SamplePlate",
+      "volume_ul": 20
+    },
+    {
+      "group": "Bind",
+      "id": "step_012",
+      "index": 12,
+      "liquid_class": "Water Free Single",
+      "name": "Mix Binding Reaction",
+      "operation": "mca384_mix",
+      "parameters": {
+        "cycles": 10,
+        "well": "A1"
+      },
+      "target_labware": "SamplePlate",
+      "volume_ul": 50
+    },
+    {
+      "group": "Separate",
+      "id": "step_013",
+      "index": 13,
+      "name": "Engage Magnet",
+      "operation": "prompt_user",
+      "parameters": {
+        "prompt": "Move SamplePlate to magnet or engage magnet module, then wait for clearing."
+      }
+    },
+    {
+      "group": "Separate",
+      "id": "step_014",
+      "index": 14,
+      "liquid_class": "Water Free Single",
+      "name": "Remove Supernatant",
+      "operation": "aspirate",
+      "parameters": {
+        "source_well": "A1"
+      },
+      "source_labware": "SamplePlate",
+      "target_labware": "SamplePlate",
+      "volume_ul": 100
+    },
+    {
+      "destination_labware": "WasteReservoir",
+      "group": "Separate",
+      "id": "step_015",
+      "index": 15,
+      "liquid_class": "Water Free Single",
+      "name": "Dispense Supernatant To Waste",
+      "operation": "dispense",
+      "parameters": {
+        "destination_well": "A1"
+      },
+      "target_labware": "WasteReservoir",
+      "volume_ul": 100
+    },
+    {
+      "group": "Wash",
+      "id": "step_016",
+      "index": 16,
+      "liquid_class": "Water Free Single",
+      "name": "Aspirate Wash Buffer",
+      "operation": "aspirate",
+      "parameters": {
+        "source_well": "A1"
+      },
+      "source_labware": "WashReservoir",
+      "target_labware": "WashReservoir",
+      "volume_ul": 150
+    },
+    {
+      "destination_labware": "SamplePlate",
+      "group": "Wash",
+      "id": "step_017",
+      "index": 17,
+      "liquid_class": "Water Free Single",
+      "name": "Dispense Wash Buffer",
+      "operation": "dispense",
+      "parameters": {
+        "destination_well": "A1"
+      },
+      "target_labware": "SamplePlate",
+      "volume_ul": 150
+    },
+    {
+      "group": "Wash",
+      "id": "step_018",
+      "index": 18,
+      "name": "Remove Wash And Dry",
+      "operation": "prompt_user",
+      "parameters": {
+        "prompt": "Remove wash to waste, then dry beads for the validated time."
+      }
+    },
+    {
+      "group": "Elute",
+      "id": "step_019",
+      "index": 19,
+      "liquid_class": "Water Free Single",
+      "name": "Aspirate Elution Buffer",
+      "operation": "aspirate",
+      "parameters": {
+        "source_well": "A1"
+      },
+      "source_labware": "ElutionBufferReservoir",
+      "target_labware": "ElutionBufferReservoir",
+      "volume_ul": 30
+    },
+    {
+      "destination_labware": "SamplePlate",
+      "group": "Elute",
+      "id": "step_020",
+      "index": 20,
+      "liquid_class": "Water Free Single",
+      "name": "Dispense Elution Buffer",
+      "operation": "dispense",
+      "parameters": {
+        "destination_well": "A1"
+      },
+      "target_labware": "SamplePlate",
+      "volume_ul": 30
+    },
+    {
+      "group": "Elute",
+      "id": "step_021",
+      "index": 21,
+      "liquid_class": "Water Free Single",
+      "name": "Mix Elution",
+      "operation": "mca384_mix",
+      "parameters": {
+        "cycles": 10,
+        "well": "A1"
+      },
+      "target_labware": "SamplePlate",
+      "volume_ul": 25
+    },
+    {
+      "group": "Elute",
+      "id": "step_022",
+      "index": 22,
+      "name": "Re-engage Magnet",
+      "operation": "prompt_user",
+      "parameters": {
+        "prompt": "Engage magnet and wait for eluate to clear."
+      }
+    },
+    {
+      "group": "Elute",
+      "id": "step_023",
+      "index": 23,
+      "liquid_class": "Water Free Single",
+      "name": "Aspirate Eluate",
+      "operation": "aspirate",
+      "parameters": {
+        "source_well": "A1"
+      },
+      "source_labware": "SamplePlate",
+      "target_labware": "SamplePlate",
+      "volume_ul": 25
+    },
+    {
+      "destination_labware": "ElutionPlate",
+      "group": "Elute",
+      "id": "step_024",
+      "index": 24,
+      "liquid_class": "Water Free Single",
+      "name": "Transfer Eluate",
+      "operation": "dispense",
+      "parameters": {
+        "destination_well": "A1"
+      },
+      "target_labware": "ElutionPlate",
+      "volume_ul": 25
+    },
+    {
+      "group": "Cleanup",
+      "id": "step_025",
+      "index": 25,
+      "name": "Drop Tips",
+      "operation": "mca384_drop_tips",
+      "parameters": {
+        "tip_strategy": "drop_to_waste"
+      },
+      "target_labware": "WasteReservoir"
+    }
+  ],
+  "template": {
+    "description": "Magnetic bead cleanup skeleton covering bind, separate, wash, dry, elute, and eluate transfer phases.",
+    "name": "bead_cleanup",
+    "request_schema": "request.schema.json",
+    "version": 1
+  },
+  "variables": [
+    {
+      "default": 20,
+      "name": "bead_volume_ul",
+      "type": "number"
+    },
+    {
+      "default": 150,
+      "name": "wash_volume_ul",
+      "type": "number"
+    },
+    {
+      "default": 30,
+      "name": "elution_volume_ul",
+      "type": "number"
+    }
+  ],
+  "worklists": [],
+  "worktable": {
+    "auto_place": false,
+    "guid": "",
+    "name": "Template Worktable"
+  }
+}

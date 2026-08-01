@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VxData>
+  <Payload>
+    <ObjectName>Caller Script</ObjectName>
+    <Comment />
+    <Reference>
+      <Guid>11111111-1234-aaaa-ffff-000000000222</Guid>
+      <TypeId>WorktableWorkspace</TypeId>
+      <ObjectName>780_Empty</ObjectName>
+    </Reference>
+    <ScriptGroup>
+      <Objects>
+        <Object Type="Tecan.Core.Scripting.SubRoutineStatement">
+          <SubRoutineStatement>
+            <SubRoutine>"TEST\SUB_Minimal_v1"</SubRoutine>
+            <Mode>
+              <ExecutionMode>JoinSubroutine</ExecutionMode>
+            </Mode>
+            <VariableMappingsStart>
+              <Object Type="Tecan.Core.Scripting.VariableMapping">
+                <VariableMapping>
+                  <Target>cycles</Target>
+                  <Source>"3"</Source>
+                </VariableMapping>
+              </Object>
+            </VariableMappingsStart>
+            <VariableMappingsEnd />
+          </SubRoutineStatement>
+        </Object>
+        <Object Type="Tecan.Core.Scripting.WaitStatement">
+          <WaitStatement>
+            <Duration>1</Duration>
+          </WaitStatement>
+        </Object>
+      </Objects>
+      <Name>Steps</Name>
+    </ScriptGroup>
+  </Payload>
+</VxData>

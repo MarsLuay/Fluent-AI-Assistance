@@ -1,0 +1,20 @@
+              <Object Type="Tecan.Core.Scripting.ScriptGroupDataV1">
+                <ScriptGroupDataV1>
+                  <Name>{{group_name}}</Name>
+                  <Data Type="Tecan.Core.Scripting.Helpers.ScriptGroupBaseDataV1">
+                    <ScriptGroupBaseDataV1>
+                      <Data Type="Tecan.Core.Scripting.Helpers.ScriptStatementBaseDataV1">
+                        <ScriptStatementBaseDataV1>
+                          <IsBreakpoint>False</IsBreakpoint>
+                          <IsDisabledForExecution>False</IsDisabledForExecution>
+                          <GroupLineNumber>0</GroupLineNumber>
+                          <LineNumber>{{group_line_number}}</LineNumber>
+                        </ScriptStatementBaseDataV1>
+                      </Data>
+                      <Statements>
+{{statements}}
+                      </Statements>
+                    </ScriptGroupBaseDataV1>
+                  </Data>
+                </ScriptGroupDataV1>
+              </Object>

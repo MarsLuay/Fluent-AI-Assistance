@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "fluent-ai-assistance": {
+      "command": "<REPOSITORY>\\.venv\\Scripts\\python.exe",
+      "args": [
+        "-m",
+        "fluent_pipeline.mcp_server"
+      ],
+      "cwd": "<REPOSITORY>\\source\\03-protocol-builder",
+      "env": {
+        "PYTHONUTF8": "1"
+      }
+    }
+  }
+}

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VxData xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Payload>
+    <ObjectName>Wash Station Cleaner Back Tube Rotator</ObjectName>
+    <PayloadData>
+      <CarrierOrLabwareTemplate>
+        <GUID>a6924eb1-2903-5f9d-8826-a92c853c0292</GUID>
+        <Dimension><X>127.76</X><Y>85.48</Y><Z>14.35</Z></Dimension>
+        <FunctionalGroup>Carrier.Device</FunctionalGroup>
+        <Arrangements>
+          <ArrangementTemplate>
+            <SitesInX>1</SitesInX>
+            <SitesInY>1</SitesInY>
+            <SitesInZ>1</SitesInZ>
+            <SiteSpacingInX>0</SiteSpacingInX>
+            <SiteSpacingInY>0</SiteSpacingInY>
+            <SiteSpacingInZ>0</SiteSpacingInZ>
+            <PositionInParent><X>0</X><Y>0</Y><Z>0</Z></PositionInParent>
+          </ArrangementTemplate>
+        </Arrangements>
+
+      </CarrierOrLabwareTemplate>
+    </PayloadData>
+  </Payload>
+</VxData>

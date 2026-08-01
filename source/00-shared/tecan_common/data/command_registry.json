@@ -1,0 +1,1652 @@
+{
+  "schema_version": "tecan.command_registry.v2",
+  "description": "Internal registry for mapping FluentControl command ids and aliases to canonical protocol IR operations. Each fluentcontrol_name carries fluentcontrol_name_source and confidence so UI titles are traceable.",
+  "commands": {
+    "AddLabwareDataV1": {
+      "operation": "add_labware",
+      "fluentcontrol_name": "Add Labware",
+      "pattern_type": "load_labware",
+      "family": "Worktable",
+      "requires": [
+        "labware"
+      ],
+      "aliases": [
+        "AddLabware",
+        "AddLabwareCommand",
+        "LoadLabware",
+        "LoadLabwareDataV1",
+        "LoadLabwareCommand"
+      ],
+      "field_aliases": {
+        "labware": [
+          "LabwareLable",
+          "LabwareLabel",
+          "LabwareName",
+          "RackLabel"
+        ],
+        "labware_type": [
+          "LabwareType",
+          "RackType"
+        ],
+        "location": [
+          "Location"
+        ],
+        "position": [
+          "Position"
+        ]
+      },
+      "manual_step": "Load labware {labware}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "Mca384PickUpTipsScriptCommandDataV5": {
+      "operation": "pick_up_tips",
+      "fluentcontrol_name": "Get Tips",
+      "pattern_type": "pick_up_tips",
+      "family": "MCA384",
+      "requires": [
+        "labware"
+      ],
+      "aliases": [
+        "Mca384PickUpTipsScriptCommand",
+        "Mca384PickUpTipsCommand",
+        "Mca384GetTipsScriptCommandDataV5",
+        "Mca384GetTipsCommand",
+        "MCA96PickUpTips",
+        "MCA96GetTips",
+        "pick_up",
+        "pick_up_tips",
+        "head.pick_up"
+      ],
+      "field_aliases": {
+        "labware": [
+          "LabwareName",
+          "TipLabwareName",
+          "RackLabel"
+        ]
+      },
+      "manual_step": "Pick up tips from {labware}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "Mca384DropTipsScriptCommandDataV5": {
+      "operation": "mca384_drop_tips",
+      "fluentcontrol_name": "Drop Tips",
+      "pattern_type": "drop_tips",
+      "family": "MCA384",
+      "requires": [
+        "labware"
+      ],
+      "aliases": [
+        "Mca384DropTipsScriptCommand",
+        "Mca384DropTipsCommand",
+        "MCA96DropTips",
+        "DropTips",
+        "drop_tips",
+        "head.drop_tips"
+      ],
+      "field_aliases": {
+        "labware": [
+          "LabwareName",
+          "WasteLabwareName",
+          "RackLabel"
+        ]
+      },
+      "manual_step": "Drop tips at {labware}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "Mca384SetTipsBackScriptCommandDataV5": {
+      "operation": "set_tips_back",
+      "fluentcontrol_name": "Set Tips Back",
+      "pattern_type": "drop_tips",
+      "family": "MCA384",
+      "requires": [
+        "labware"
+      ],
+      "aliases": [
+        "Mca384SetTipsBackScriptCommand",
+        "Mca384SetTipsBackCommand",
+        "SetTipsBack",
+        "ReturnTips",
+        "return_tips",
+        "head.return_tips"
+      ],
+      "field_aliases": {
+        "labware": [
+          "LabwareName",
+          "TipLabwareName",
+          "RackLabel"
+        ]
+      },
+      "manual_step": "Return tips to {labware}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "Mca384AspirateScriptCommandDataV2": {
+      "operation": "aspirate",
+      "fluentcontrol_name": "Aspirate",
+      "pattern_type": "aspirate",
+      "family": "MCA384",
+      "requires": [
+        "labware",
+        "volume_ul",
+        "liquid_class"
+      ],
+      "aliases": [
+        "Mca384AspirateScriptCommandDataV5",
+        "Mca384AspirateScriptCommand",
+        "Mca384AspirateCommand",
+        "Mca384Aspirate",
+        "MCA96Aspirate",
+        "Mca96AspirateScriptCommandDataV1",
+        "AspirateDataV1",
+        "AspirateCommand",
+        "head.aspirate",
+        "aspirate"
+      ],
+      "field_aliases": {
+        "labware": [
+          "LabwareName",
+          "RackLabel"
+        ],
+        "volume_ul": [
+          "Volume",
+          "AspirationVolume",
+          "AspirateVolume",
+          "volumes"
+        ],
+        "liquid_class": [
+          "LiquidClassNameBySelection",
+          "LiquidClassName",
+          "AspirationLiquidClass",
+          "LiquidClass"
+        ]
+      },
+      "manual_step": "Aspirate {volume_ul} uL from {labware} using {liquid_class}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "Mca384DispenseScriptCommandDataV2": {
+      "operation": "dispense",
+      "fluentcontrol_name": "Dispense",
+      "pattern_type": "dispense",
+      "family": "MCA384",
+      "requires": [
+        "labware",
+        "volume_ul",
+        "liquid_class"
+      ],
+      "aliases": [
+        "Mca384DispenseScriptCommandDataV5",
+        "Mca384DispenseScriptCommand",
+        "Mca384DispenseCommand",
+        "Mca384Dispense",
+        "MCA96Dispense",
+        "Mca96DispenseScriptCommandDataV1",
+        "DispenseDataV1",
+        "DispenseCommand",
+        "head.dispense",
+        "dispense"
+      ],
+      "field_aliases": {
+        "labware": [
+          "LabwareName",
+          "RackLabel"
+        ],
+        "volume_ul": [
+          "Volume",
+          "DispenseVolume",
+          "volumes"
+        ],
+        "liquid_class": [
+          "LiquidClassNameBySelection",
+          "LiquidClassName",
+          "DispenseLiquidClass",
+          "LiquidClass"
+        ]
+      },
+      "manual_step": "Dispense {volume_ul} uL into {labware} using {liquid_class}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "Mca384MixScriptCommandDataV2": {
+      "operation": "mca384_mix",
+      "fluentcontrol_name": "Mix",
+      "pattern_type": "mix",
+      "family": "MCA384",
+      "requires": [
+        "labware",
+        "volume_ul",
+        "liquid_class"
+      ],
+      "aliases": [
+        "Mca384MixScriptCommandDataV5",
+        "Mca384MixScriptCommand",
+        "Mca384MixCommand",
+        "Mca384Mix",
+        "MCA96Mix",
+        "MixDataV1",
+        "MixCommand",
+        "head.mix",
+        "mix"
+      ],
+      "field_aliases": {
+        "labware": [
+          "LabwareName",
+          "RackLabel"
+        ],
+        "volume_ul": [
+          "Volume",
+          "MixVolume",
+          "volumes"
+        ],
+        "liquid_class": [
+          "LiquidClassNameBySelection",
+          "LiquidClassName",
+          "LiquidClass"
+        ],
+        "cycles": [
+          "Cycles",
+          "MixCycles",
+          "NumberOfMixes"
+        ]
+      },
+      "manual_step": "Mix {volume_ul} uL in {labware} using {liquid_class}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "LihaAspirateScriptCommandDataV5": {
+      "operation": "liha_aspirate",
+      "fluentcontrol_name": "Aspirate",
+      "pattern_type": "aspirate",
+      "family": "LiHa/FCA",
+      "requires": [
+        "labware",
+        "volume_ul",
+        "liquid_class"
+      ],
+      "aliases": [
+        "LihaAspirateScriptCommand",
+        "LihaAspirateCommand",
+        "LiHaAspirate",
+        "FcaAspirate",
+        "FCAAspirate"
+      ],
+      "field_aliases": {
+        "labware": [
+          "LabwareName",
+          "RackLabel"
+        ],
+        "volume_ul": [
+          "Volume",
+          "AspirationVolume",
+          "AspirateVolume"
+        ],
+        "liquid_class": [
+          "LiquidClassNameBySelection",
+          "LiquidClassName",
+          "AspirationLiquidClass",
+          "LiquidClass"
+        ]
+      },
+      "manual_step": "LiHa aspirate {volume_ul} uL from {labware} using {liquid_class}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "LihaDispenseScriptCommandDataV5": {
+      "operation": "liha_dispense",
+      "fluentcontrol_name": "Dispense",
+      "pattern_type": "dispense",
+      "family": "LiHa/FCA",
+      "requires": [
+        "labware",
+        "volume_ul",
+        "liquid_class"
+      ],
+      "aliases": [
+        "LihaDispenseScriptCommand",
+        "LihaDispenseCommand",
+        "LiHaDispense",
+        "FcaDispense",
+        "FCADispense"
+      ],
+      "field_aliases": {
+        "labware": [
+          "LabwareName",
+          "RackLabel"
+        ],
+        "volume_ul": [
+          "Volume",
+          "DispenseVolume"
+        ],
+        "liquid_class": [
+          "LiquidClassNameBySelection",
+          "LiquidClassName",
+          "DispenseLiquidClass",
+          "LiquidClass"
+        ]
+      },
+      "manual_step": "LiHa dispense {volume_ul} uL into {labware} using {liquid_class}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "LihaMixScriptCommandDataV5": {
+      "operation": "liha_mix",
+      "fluentcontrol_name": "Mix",
+      "pattern_type": "mix",
+      "family": "LiHa/FCA",
+      "requires": [
+        "labware",
+        "volume_ul",
+        "liquid_class"
+      ],
+      "aliases": [
+        "LihaMixScriptCommand",
+        "LihaMixCommand",
+        "LiHaMix",
+        "FcaMix",
+        "FCAMix"
+      ],
+      "field_aliases": {
+        "labware": [
+          "LabwareName",
+          "RackLabel"
+        ],
+        "volume_ul": [
+          "Volume",
+          "MixVolume"
+        ],
+        "liquid_class": [
+          "LiquidClassNameBySelection",
+          "LiquidClassName",
+          "LiquidClass"
+        ],
+        "cycles": [
+          "Cycles",
+          "MixCycles",
+          "NumberOfMixes"
+        ]
+      },
+      "manual_step": "LiHa mix {volume_ul} uL in {labware} using {liquid_class}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "LihaGetTipsScriptCommandDataV5": {
+      "operation": "liha_get_tips",
+      "fluentcontrol_name": "Get Tips",
+      "pattern_type": "pick_up_tips",
+      "family": "LiHa/FCA",
+      "requires": [
+        "labware"
+      ],
+      "aliases": [
+        "LihaGetTipsScriptCommand",
+        "LihaGetTipsCommand",
+        "LiHaGetTips",
+        "LihaPickUpTips",
+        "FcaGetTips"
+      ],
+      "field_aliases": {
+        "labware": [
+          "LabwareName",
+          "TipLabwareName",
+          "RackLabel"
+        ]
+      },
+      "manual_step": "LiHa get tips from {labware}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "LihaDropTipsScriptCommandDataV5": {
+      "operation": "liha_drop_tips",
+      "fluentcontrol_name": "Drop Tips",
+      "pattern_type": "drop_tips",
+      "family": "LiHa/FCA",
+      "requires": [
+        "labware"
+      ],
+      "aliases": [
+        "LihaDropTipsScriptCommand",
+        "LihaDropTipsCommand",
+        "LiHaDropTips",
+        "FcaDropTips"
+      ],
+      "field_aliases": {
+        "labware": [
+          "LabwareName",
+          "WasteLabwareName",
+          "RackLabel"
+        ]
+      },
+      "manual_step": "LiHa drop tips at {labware}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "LihaWashScriptCommandDataV1": {
+      "operation": "wash",
+      "fluentcontrol_name": "Wash Tips",
+      "pattern_type": "wash",
+      "family": "LiHa/FCA",
+      "requires": [],
+      "aliases": [
+        "LihaWashScriptCommand",
+        "LihaWashCommand",
+        "LiHaWash",
+        "FcaWash",
+        "FCAWash",
+        "LihaFlushCommand"
+      ],
+      "field_aliases": {
+        "labware": [
+          "LabwareName",
+          "WashStationName",
+          "WasteLabwareName"
+        ],
+        "device_alias": [
+          "DeviceAlias",
+          "AvailableID"
+        ]
+      },
+      "manual_step": "LiHa wash or flush device {device_alias}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "Mca384WashScriptCommandDataV1": {
+      "operation": "wash",
+      "fluentcontrol_name": "Wash Tips",
+      "pattern_type": "wash",
+      "family": "MCA384",
+      "requires": [],
+      "aliases": [
+        "WashScriptCommandDataV1",
+        "WashCommand",
+        "FlushCommand",
+        "CleanCommand",
+        "DecontaminateCommand"
+      ],
+      "field_aliases": {
+        "labware": [
+          "LabwareName",
+          "WashStationName"
+        ],
+        "device_alias": [
+          "DeviceAlias"
+        ]
+      },
+      "manual_step": "Wash or flush device",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "ReadWorklistScriptCommandDataV1": {
+      "operation": "read_worklist",
+      "fluentcontrol_name": "Read Worklist",
+      "pattern_type": "read_worklist",
+      "family": "Worklist",
+      "requires": [
+        "worklist"
+      ],
+      "aliases": [
+        "ReadWorklist",
+        "ReadWorklistCommand",
+        "ExecuteWorklist",
+        "ImportWorklist",
+        "WorklistCommand"
+      ],
+      "field_aliases": {
+        "worklist": [
+          "WorklistName",
+          "FileName",
+          "Path"
+        ],
+        "labware": [
+          "LabwareName",
+          "RackLabel"
+        ]
+      },
+      "manual_step": "Read or execute worklist {worklist}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "MovePlateScriptCommandDataV1": {
+      "operation": "move_plate",
+      "fluentcontrol_name": "Move Labware (Transfer Labware)",
+      "pattern_type": "move_plate",
+      "family": "RGA/CGA",
+      "requires": [
+        "labware"
+      ],
+      "aliases": [
+        "MovePlate",
+        "MovePlateCommand",
+        "MoveLabware",
+        "MoveLabwareCommand",
+        "GripperMoveCommand",
+        "RgaMovePlate",
+        "CgaMovePlate"
+      ],
+      "field_aliases": {
+        "labware": [
+          "LabwareName",
+          "RackLabel"
+        ],
+        "source_location": [
+          "SourceLocation",
+          "FromLocation"
+        ],
+        "destination_location": [
+          "DestinationLocation",
+          "ToLocation"
+        ]
+      },
+      "manual_step": "Move {labware}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "InitializeDeviceScriptCommandDataV1": {
+      "operation": "initialize_device",
+      "fluentcontrol_name": "Initialize",
+      "pattern_type": "initialize_device",
+      "family": "Device",
+      "requires": [],
+      "aliases": [
+        "InitializeDevice",
+        "InitDevice",
+        "HomeDevice",
+        "ResetDevice",
+        "PrimeDevice",
+        "InitializeCommand",
+        "HomeCommand",
+        "ResetCommand",
+        "PrimeCommand"
+      ],
+      "field_aliases": {
+        "device_alias": [
+          "DeviceAlias",
+          "AvailableID",
+          "Name"
+        ]
+      },
+      "manual_step": "Initialize device {device_alias}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "InteriorLightOffStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Interior Light Off",
+      "pattern_type": "hardware_utility",
+      "family": "Device",
+      "requires": [],
+      "aliases": [
+        "InteriorLightOff"
+      ],
+      "passthrough_reason": "System interior deck-light side effect; preserve XML until light control is modeled in protocol IR. Runtime equivalent: RuntimeController.InteriorLight(false).",
+      "manual_step": "Turn interior light off",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "InteriorLightOnStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Interior Light On",
+      "pattern_type": "hardware_utility",
+      "family": "Device",
+      "requires": [],
+      "aliases": [
+        "InteriorLightOn"
+      ],
+      "passthrough_reason": "System interior deck-light side effect; preserve XML until light control is modeled in protocol IR. Runtime equivalent: RuntimeController.InteriorLight(true).",
+      "manual_step": "Turn interior light on",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "QueryVariableStatement": {
+      "operation": "query_variable",
+      "fluentcontrol_name": "Query Variable",
+      "pattern_type": "query_variable",
+      "family": "Variables",
+      "requires": [],
+      "aliases": [
+        "QueryVariable",
+        "QueryVariableCommand",
+        "QueryAtStartupVariable"
+      ],
+      "field_aliases": {
+        "prompt": [
+          "QueryPrompt",
+          "Comment",
+          "Name"
+        ],
+        "variable": [
+          "Name",
+          "VariableName"
+        ],
+        "minimum": [
+          "MinimumText"
+        ],
+        "maximum": [
+          "MaximumText"
+        ]
+      },
+      "manual_step": "Query FluentControl variable {variable}: {prompt}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "LoopGroupDataV1": {
+      "operation": "loop_over_wells",
+      "fluentcontrol_name": "Loop",
+      "pattern_type": "loop_over_wells",
+      "family": "Control flow",
+      "requires": [],
+      "aliases": [
+        "LoopGroup",
+        "LoopCommand",
+        "ForEachWell",
+        "LoopOverWells",
+        "NumberOfLoops"
+      ],
+      "field_aliases": {
+        "loop_variable": [
+          "LoopVariable",
+          "Name"
+        ],
+        "loop_count": [
+          "NumberOfLoops"
+        ]
+      },
+      "manual_step": "Loop over wells or repeated commands",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "CommentStatement": {
+      "operation": "comment",
+      "fluentcontrol_name": "Comment",
+      "pattern_type": "comment",
+      "family": "User/script flow",
+      "requires": [],
+      "aliases": [
+        "CommentCommand",
+        "Comment"
+      ],
+      "field_aliases": {
+        "comment": [
+          "Comment",
+          "Name"
+        ]
+      },
+      "manual_step": "Comment: {comment}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "GetHeadAdapterScriptCommandDataV1": {
+      "operation": "get_head_adapter",
+      "fluentcontrol_name": "Get Head Adapter",
+      "pattern_type": "initialize_device",
+      "family": "MCA384",
+      "requires": [],
+      "aliases": [
+        "Mca384GetHeadAdapterScriptCommandDataV1",
+        "GetHeadAdapter",
+        "MountHeadAdapter",
+        "MountAdapter",
+        "head.mount_adapter"
+      ],
+      "field_aliases": {
+        "device_alias": [
+          "DeviceAlias",
+          "AvailableID"
+        ]
+      },
+      "manual_step": "Mount head adapter",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "DropHeadAdapterScriptCommandDataV1": {
+      "operation": "drop_head_adapter",
+      "fluentcontrol_name": "Drop Head Adapter",
+      "pattern_type": "initialize_device",
+      "family": "MCA384",
+      "requires": [],
+      "aliases": [
+        "Mca384DropHeadAdapterScriptCommandDataV1",
+        "DropHeadAdapter",
+        "DropAdapter",
+        "head.drop_adapter"
+      ],
+      "field_aliases": {
+        "device_alias": [
+          "DeviceAlias",
+          "AvailableID"
+        ]
+      },
+      "manual_step": "Drop head adapter",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "AlternateGroup": {
+      "operation": "default_branch",
+      "fluentcontrol_name": "Else / Alternate",
+      "pattern_type": "control_flow",
+      "family": "Control flow",
+      "requires": [],
+      "aliases": [
+        "AlternateGroupDataV1",
+        "ElseGroup",
+        "ElseBranch"
+      ],
+      "field_aliases": {
+        "branch_name": [
+          "Name"
+        ],
+        "line_number": [
+          "LineNumber"
+        ]
+      },
+      "manual_step": "Run default/alternate control-flow branch",
+      "fluentcontrol_name_source": "fluentcontrol_script_palette",
+      "confidence": "medium"
+    },
+    "ConditionalGroup": {
+      "operation": "conditional_branch",
+      "fluentcontrol_name": "If / Conditional",
+      "pattern_type": "control_flow",
+      "family": "Control flow",
+      "requires": [],
+      "aliases": [
+        "ConditionalGroupDataV1",
+        "IfGroup",
+        "IfBranch",
+        "ConditionGroup"
+      ],
+      "field_aliases": {
+        "condition": [
+          "Condition"
+        ],
+        "branch_name": [
+          "Name"
+        ],
+        "line_number": [
+          "LineNumber"
+        ]
+      },
+      "manual_step": "Run conditional control-flow branch",
+      "fluentcontrol_name_source": "fluentcontrol_script_palette",
+      "confidence": "medium"
+    },
+    "LeaveStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Leave",
+      "pattern_type": "control_flow",
+      "family": "Control flow",
+      "requires": [],
+      "aliases": [
+        "Leave",
+        "BreakStatement",
+        "ExitLoopStatement"
+      ],
+      "passthrough_reason": "FluentControl loop/control-flow exit statement; not currently represented as an editable protocol IR operation.",
+      "manual_step": "Preserve control-flow exit",
+      "fluentcontrol_name_source": "manual_curated",
+      "confidence": "medium"
+    },
+    "SetVariableStatement": {
+      "operation": "set_variable",
+      "fluentcontrol_name": "Set Variable",
+      "pattern_type": "variables",
+      "family": "Variables",
+      "requires": [],
+      "aliases": [
+        "SetVariable",
+        "AssignVariableStatement",
+        "VariableSetStatement"
+      ],
+      "field_aliases": {
+        "variable": [
+          "Name",
+          "VariableName"
+        ],
+        "value": [
+          "Value"
+        ]
+      },
+      "manual_step": "Set FluentControl variable {variable} to {value}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "VariableMapping": {
+      "support_status": "approved_non_command",
+      "fluentcontrol_name": "Variable Mapping",
+      "pattern_type": "variables",
+      "family": "Variables",
+      "requires": [],
+      "aliases": [
+        "VariableMappingData",
+        "VariableMap"
+      ],
+      "passthrough_reason": "FluentControl variable metadata object referenced by statements; not an executable robot command.",
+      "manual_step": "Preserve variable mapping metadata",
+      "fluentcontrol_name_source": "ir_operation_label",
+      "confidence": "low"
+    },
+    "RUPVariableStatement": {
+      "operation": "runtime_variable_prompt",
+      "fluentcontrol_name": "RUP Variable",
+      "pattern_type": "variables",
+      "family": "RUP/runtime",
+      "requires": [],
+      "aliases": [
+        "RUPVariable",
+        "RuntimeVariableStatement"
+      ],
+      "field_aliases": {
+        "prompt": [
+          "RUPScreenTitle"
+        ],
+        "timeout": [
+          "RUPTimeOut"
+        ]
+      },
+      "manual_step": "Display runtime variable prompt",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "Int32": {
+      "support_status": "approved_non_command",
+      "pattern_type": "typed_literal",
+      "family": "Runtime values",
+      "requires": [],
+      "aliases": [
+        "System.Int32",
+        "Integer",
+        "Int"
+      ],
+      "passthrough_reason": "Typed integer literal used inside FluentControl statement data; not an executable robot command.",
+      "manual_step": "Preserve integer literal"
+    },
+    "String": {
+      "support_status": "approved_non_command",
+      "pattern_type": "typed_literal",
+      "family": "Runtime values",
+      "requires": [],
+      "aliases": [
+        "System.String"
+      ],
+      "passthrough_reason": "Typed string literal used inside FluentControl statement data; not an executable robot command.",
+      "manual_step": "Preserve string literal"
+    },
+    "SubRoutineStatement": {
+      "operation": "call_subroutine",
+      "fluentcontrol_name": "Subroutine",
+      "pattern_type": "runtime_integration",
+      "family": "User/script flow",
+      "requires": [],
+      "aliases": [
+        "SubroutineStatement",
+        "SubRoutine",
+        "CallSubRoutineStatement"
+      ],
+      "field_aliases": {
+        "subroutine": [
+          "SubRoutine",
+          "Subroutine",
+          "Name"
+        ],
+        "execution_mode": [
+          "ExecutionMode"
+        ]
+      },
+      "manual_step": "Call FluentControl subroutine {subroutine}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "ExecuteApplicationStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Execute Application",
+      "pattern_type": "runtime_integration",
+      "family": "External application",
+      "requires": [],
+      "aliases": [
+        "ExecuteApplication",
+        "RunApplicationStatement"
+      ],
+      "field_aliases": {
+        "path": [
+          "Path",
+          "Application",
+          "FileName",
+          "CommandLine"
+        ]
+      },
+      "passthrough_reason": "External application execution side effect; preserve XML until external runtime hooks are modeled in protocol IR.",
+      "manual_step": "Execute external application",
+      "fluentcontrol_name_source": "manual_curated",
+      "confidence": "medium"
+    },
+    "ExecuteVbScriptStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Execute VBScript",
+      "pattern_type": "runtime_integration",
+      "family": "External script",
+      "requires": [],
+      "aliases": [
+        "ExecuteVBScriptStatement",
+        "ExecuteVbScript",
+        "RunVbScriptStatement",
+        "VBScriptStatement"
+      ],
+      "field_aliases": {
+        "script": [
+          "Script",
+          "ScriptText",
+          "Path",
+          "FileName"
+        ]
+      },
+      "passthrough_reason": "VBScript runtime hook; preserve XML until script execution side effects are modeled in protocol IR.",
+      "manual_step": "Execute VBScript",
+      "fluentcontrol_name_source": "manual_curated",
+      "confidence": "medium"
+    },
+    "ApplicationDriverMacro": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Run application driver macro",
+      "pattern_type": "runtime_integration",
+      "family": "Application driver",
+      "requires": [],
+      "aliases": [
+        "ApplicationDriverMacroStatement",
+        "AppDriverMacro"
+      ],
+      "passthrough_reason": "Application-driver macro call; preserve XML until driver macro semantics are modeled in protocol IR.",
+      "manual_step": "Run application driver macro",
+      "fluentcontrol_name_source": "manual_curated",
+      "confidence": "medium"
+    },
+    "MoveAxisCommandScriptStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Move Axis",
+      "pattern_type": "hardware_motion",
+      "family": "Application driver",
+      "requires": [],
+      "aliases": [
+        "MoveAxisCommand",
+        "MoveAxisStatement",
+        "DriverMoveAxisCommand"
+      ],
+      "field_aliases": {
+        "device_alias": [
+          "DeviceAlias",
+          "AvailableID",
+          "Name"
+        ],
+        "axis": [
+          "Axis",
+          "AxisName",
+          "Name"
+        ],
+        "position": [
+          "Position",
+          "TargetPosition"
+        ]
+      },
+      "passthrough_reason": "Low-level axis movement statement; preserve XML until hardware-driver motion semantics are modeled in protocol IR.",
+      "manual_step": "Run configured axis movement",
+      "fluentcontrol_name_source": "manual_curated",
+      "confidence": "medium"
+    },
+    "StartMoveCommandScriptStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Start Move",
+      "pattern_type": "hardware_motion",
+      "family": "Application driver",
+      "requires": [],
+      "aliases": [
+        "StartMoveCommand",
+        "StartMoveStatement",
+        "DriverStartMoveCommand"
+      ],
+      "field_aliases": {
+        "device_alias": [
+          "DeviceAlias",
+          "AvailableID",
+          "Name"
+        ],
+        "axis": [
+          "Axis",
+          "AxisName",
+          "Name"
+        ],
+        "position": [
+          "Position",
+          "TargetPosition"
+        ]
+      },
+      "passthrough_reason": "Low-level asynchronous hardware movement statement; preserve XML until hardware-driver motion semantics are modeled in protocol IR.",
+      "manual_step": "Start configured hardware movement",
+      "fluentcontrol_name_source": "manual_curated",
+      "confidence": "medium"
+    },
+    "WaitForAsyncResponseScriptStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Wait For Async Response",
+      "pattern_type": "hardware_motion",
+      "family": "Application driver",
+      "requires": [],
+      "aliases": [
+        "WaitForAsyncResponse",
+        "WaitAsyncResponse",
+        "DriverWaitForAsyncResponse"
+      ],
+      "field_aliases": {
+        "device_alias": [
+          "DeviceAlias",
+          "AvailableID",
+          "Name"
+        ],
+        "timeout": [
+          "Timeout",
+          "TimeOut"
+        ]
+      },
+      "passthrough_reason": "Waits for an asynchronous hardware-driver response; preserve XML until driver response semantics are modeled in protocol IR.",
+      "manual_step": "Wait for hardware async response",
+      "fluentcontrol_name_source": "manual_curated",
+      "confidence": "medium"
+    },
+    "TeGioSetPWMOutputStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Set PWM Output",
+      "pattern_type": "hardware_io",
+      "family": "Application driver",
+      "requires": [],
+      "aliases": [
+        "TeGioSetPWMOutput",
+        "SetPWMOutputStatement",
+        "SetGioPWMOutput"
+      ],
+      "field_aliases": {
+        "device_alias": [
+          "DeviceAlias",
+          "AvailableID",
+          "Name"
+        ],
+        "pin": [
+          "PinNumber",
+          "Pin",
+          "OutputPin"
+        ],
+        "value": [
+          "Value",
+          "PWMValue",
+          "DutyCycle"
+        ]
+      },
+      "passthrough_reason": "Sets a TeGIO hardware PWM output pin; preserve XML and require physical pin verification before instrument use.",
+      "manual_step": "Set TeGIO PWM output pin",
+      "fluentcontrol_name_source": "manual_curated",
+      "confidence": "medium"
+    },
+    "LegacyDriverMacro": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Run legacy driver macro",
+      "pattern_type": "runtime_integration",
+      "family": "Legacy driver",
+      "requires": [],
+      "aliases": [
+        "LegacyDriverMacroStatement",
+        "DriverMacro"
+      ],
+      "passthrough_reason": "Legacy-driver macro call; preserve XML until driver macro semantics are modeled in protocol IR.",
+      "manual_step": "Run legacy driver macro",
+      "fluentcontrol_name_source": "manual_curated",
+      "confidence": "medium"
+    },
+    "RUPWorktableStatement": {
+      "operation": "prompt_user",
+      "fluentcontrol_name": "RUP Worktable",
+      "pattern_type": "worktable_runtime",
+      "family": "RUP/runtime",
+      "requires": [],
+      "aliases": [
+        "RUPWorktable",
+        "RuntimeWorktableStatement"
+      ],
+      "field_aliases": {
+        "prompt": [
+          "LabwareDescriptionGui",
+          "MessageText",
+          "Instructions"
+        ],
+        "timeout": [
+          "RUPTimeOut",
+          "Timeout",
+          "TimeOut"
+        ],
+        "screen_title": [
+          "RUPScreenTitle"
+        ],
+        "image_path": [
+          "CustomDetailImageFilePath",
+          "SelectedImagePath"
+        ],
+        "labware": [
+          "LabwareName"
+        ]
+      },
+      "passthrough_reason": "TouchTools worktable-bound runtime prompt (RUPWorktableStatement) with labware binding and CustomDetailImageFilePath; treated as prompt_user for XSCR roundtrip and inventory gates.",
+      "manual_step": "RUP Worktable: {prompt}",
+      "fluentcontrol_name_source": "manual_curated",
+      "confidence": "high"
+    },
+    "RUPStandardStatement": {
+      "operation": "prompt_user",
+      "fluentcontrol_name": "RUP Standard",
+      "pattern_type": "prompt_user",
+      "family": "RUP/runtime",
+      "requires": [],
+      "aliases": [
+        "RUPStandard",
+        "RuntimeStandardStatement"
+      ],
+      "field_aliases": {
+        "prompt": [
+          "MessageText",
+          "Message",
+          "Text",
+          "QueryPrompt"
+        ],
+        "timeout": [
+          "RUPTimeOut",
+          "Timeout",
+          "TimeOut"
+        ],
+        "screen_title": [
+          "RUPScreenTitle"
+        ],
+        "image_path": [
+          "SelectedImagePath"
+        ],
+        "sound_file": [
+          "SelectedSoundPath",
+          "SoundFile"
+        ],
+        "repeat_sound": [
+          "RepeatValue",
+          "RepeatSound"
+        ],
+        "change_status_light_color": [
+          "ChangeStatusLightColor"
+        ],
+        "status_light_color": [
+          "StatusLightColorString"
+        ]
+      },
+      "passthrough_reason": "Standalone TouchTools runtime user prompt (RUPStandardStatement) carrying MessageText/SelectedImagePath; treated as a user prompt so post-compile re-inspection and roundtrip recognize it as prompt_user.",
+      "manual_step": "Prompt user: {prompt}",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "GenerateReportStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Generate Report",
+      "pattern_type": "reporting",
+      "family": "Reporting",
+      "requires": [],
+      "aliases": [
+        "GenerateReport",
+        "ReportStatement",
+        "CreateReportStatement"
+      ],
+      "passthrough_reason": "Report-generation side effect; preserve XML until reporting is modeled in protocol IR.",
+      "manual_step": "Generate report",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "RaiseErrorStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Raise Error",
+      "pattern_type": "error_handling",
+      "family": "User/script flow",
+      "requires": [],
+      "aliases": [
+        "RaiseError",
+        "ThrowErrorStatement",
+        "ErrorStatement"
+      ],
+      "field_aliases": {
+        "message": [
+          "Message",
+          "Text",
+          "Comment"
+        ]
+      },
+      "passthrough_reason": "FluentControl error/abort statement; preserve XML until explicit error handling is modeled in protocol IR.",
+      "manual_step": "Raise FluentControl error",
+      "fluentcontrol_name_source": "manual_curated",
+      "confidence": "medium"
+    },
+    "UserPromptStatement": {
+      "operation": "prompt_user",
+      "fluentcontrol_name": "User Prompt",
+      "default_for_operation": true,
+      "pattern_type": "prompt_user",
+      "family": "User/script flow",
+      "requires": [],
+      "aliases": [
+        "UserPrompt",
+        "PromptUserStatement",
+        "PromptUserCommand",
+        "ConfirmationPromptStatement"
+      ],
+      "field_aliases": {
+        "prompt": [
+          "Prompt",
+          "Message",
+          "Text",
+          "Comment",
+          "Name"
+        ],
+        "variable": [
+          "VariableName",
+          "Name"
+        ],
+        "timeout": [
+          "Timeout"
+        ],
+        "auto_close": [
+          "AutoClose"
+        ],
+        "sound_file": [
+          "SoundFile"
+        ],
+        "repeat_sound": [
+          "RepeatSound"
+        ],
+        "change_status_light_color": [
+          "ChangeStatusLightColor"
+        ],
+        "status_light_color": [
+          "StatusLightColorString"
+        ]
+      },
+      "manual_step": "Prompt user: {prompt}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "LihaDetectLiquidScriptCommand": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Detect Liquid",
+      "pattern_type": "liquid_detection",
+      "family": "LiHa/FCA",
+      "requires": [
+        "labware"
+      ],
+      "aliases": [
+        "LihaDetectLiquidScriptCommandDataV1",
+        "LihaDetectLiquidScriptCommandDataV5",
+        "LiHaDetectLiquid",
+        "FcaDetectLiquid",
+        "FCADetectLiquid"
+      ],
+      "field_aliases": {
+        "labware": [
+          "LabwareName",
+          "RackLabel"
+        ],
+        "liquid_class": [
+          "LiquidClassNameBySelection",
+          "LiquidClassName",
+          "LiquidClass"
+        ]
+      },
+      "passthrough_reason": "LiHa liquid detection is a hardware sensing operation not yet represented in protocol IR.",
+      "manual_step": "LiHa detect liquid in {labware}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "CgaDropFingersScriptCommand": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Drop Fingers",
+      "pattern_type": "gripper",
+      "family": "RGA/CGA",
+      "requires": [],
+      "aliases": [
+        "CgaDropFingersScriptCommandDataV1",
+        "CgaDropFingersScriptCommandDataV5",
+        "CgaDropFingers",
+        "DropFingers"
+      ],
+      "passthrough_reason": "CGA finger-release action is a gripper hardware operation not yet represented in protocol IR.",
+      "manual_step": "CGA drop fingers",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "CgaGetFingersScriptCommandDataV1": {
+      "operation": "cga_get_fingers",
+      "fluentcontrol_name": "Get Fingers",
+      "pattern_type": "gripper",
+      "family": "RGA/CGA",
+      "requires": [],
+      "aliases": [
+        "CgaGetFingersScriptCommand",
+        "CgaGetFingers",
+        "GetFingers"
+      ],
+      "field_aliases": {
+        "labware": [
+          "LabwareName"
+        ],
+        "device_alias": [
+          "DeviceAlias",
+          "AvailableID"
+        ]
+      },
+      "manual_step": "CGA get fingers for {labware}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "RemoveLabwareDataV1": {
+      "operation": "remove_labware",
+      "fluentcontrol_name": "Remove Labware",
+      "pattern_type": "load_labware",
+      "family": "Worktable",
+      "requires": [
+        "labware"
+      ],
+      "aliases": [
+        "RemoveLabwareStatement",
+        "RemoveLabware",
+        "UnloadLabware"
+      ],
+      "field_aliases": {
+        "labware": [
+          "LabwareName",
+          "LabwareLable",
+          "LabwareLabel"
+        ]
+      },
+      "manual_step": "Remove labware {labware}",
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
+    },
+    "ImportVariableStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Import Variable",
+      "pattern_type": "variables",
+      "family": "Variables",
+      "requires": [],
+      "passthrough_reason": "Variable import statement observed in the full export; preserve source XML until variable import/export is modeled in protocol IR.",
+      "manual_step": "Import FluentControl variable",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "ExportVariableStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Export Variable",
+      "pattern_type": "variables",
+      "family": "Variables",
+      "requires": [],
+      "passthrough_reason": "Variable export statement observed in the full export; preserve source XML until variable import/export is modeled in protocol IR.",
+      "manual_step": "Export FluentControl variable",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "EndScriptStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "End Script",
+      "pattern_type": "control_flow",
+      "family": "Control flow",
+      "requires": [],
+      "passthrough_reason": "Script termination statement observed in the full export; preserve XML until explicit end-script semantics are modeled in protocol IR.",
+      "manual_step": "End script",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "WaitStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Wait",
+      "pattern_type": "timing",
+      "family": "Control flow",
+      "requires": [],
+      "passthrough_reason": "Timing wait statement observed in the full export; preserve XML until wait timing is modeled in protocol IR.",
+      "manual_step": "Wait",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "DelayStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Delay",
+      "pattern_type": "timing",
+      "family": "Control flow",
+      "requires": [],
+      "passthrough_reason": "Delay statement observed in the full export; preserve XML until delay timing is modeled in protocol IR.",
+      "manual_step": "Delay",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "StartTimerStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Start Timer",
+      "pattern_type": "timing",
+      "family": "Control flow",
+      "requires": [],
+      "passthrough_reason": "Timer start statement observed in the full export; preserve XML until timer control is modeled in protocol IR.",
+      "manual_step": "Start timer",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "WaitForTimerStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Wait For Timer",
+      "pattern_type": "timing",
+      "family": "Control flow",
+      "requires": [],
+      "passthrough_reason": "Timer wait statement observed in the full export; preserve XML until timer control is modeled in protocol IR.",
+      "manual_step": "Wait for timer",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "LoadWorklistStatementDataV4": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Load Worklist",
+      "pattern_type": "read_worklist",
+      "family": "Worklist",
+      "requires": [],
+      "passthrough_reason": "Worklist load statement observed in the full export; preserve XML until this Worklist v4 schema is modeled.",
+      "manual_step": "Load worklist",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "WorklistImportStatementDataV2": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Import Worklist",
+      "pattern_type": "read_worklist",
+      "family": "Worklist",
+      "requires": [],
+      "passthrough_reason": "Worklist import statement observed in the full export; preserve XML until this Worklist v2 schema is modeled.",
+      "manual_step": "Import worklist",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "ExecuteWorklistStatementDataV1": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Execute Worklist",
+      "pattern_type": "read_worklist",
+      "family": "Worklist",
+      "requires": [],
+      "passthrough_reason": "Worklist execution statement observed in the full export; preserve XML until this Worklist v1 schema is modeled.",
+      "manual_step": "Execute worklist",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "LihaEmptyTipsScriptCommandDataV4": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Empty Tips",
+      "pattern_type": "liquid_handling",
+      "family": "LiHa/FCA",
+      "requires": [],
+      "passthrough_reason": "LiHa empty-tip-content operation observed in the full export; preserve XML until the operation is modeled.",
+      "manual_step": "LiHa empty tips",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "LihaFlushScriptCommandDataV3": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Flush",
+      "pattern_type": "wash",
+      "family": "LiHa/FCA",
+      "requires": [],
+      "passthrough_reason": "LiHa flush operation observed in the full export; preserve XML until this command schema is modeled.",
+      "manual_step": "LiHa flush",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "LihaMoveArmScriptCommandDataV3": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Move Arm",
+      "pattern_type": "hardware_motion",
+      "family": "LiHa/FCA",
+      "requires": [],
+      "passthrough_reason": "LiHa arm movement observed in the full export; preserve XML until hardware-motion semantics are modeled.",
+      "manual_step": "LiHa move arm",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "LihaSampleTransferSmartCommand": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Sample Transfer",
+      "pattern_type": "smart_command",
+      "family": "LiHa/FCA",
+      "requires": [],
+      "passthrough_reason": "LiHa smart sample-transfer command observed in the full export; preserve XML until smart-command expansion is modeled.",
+      "manual_step": "LiHa sample transfer smart command",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "LihaReagentDistributionSmartCommand": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Reagent Distribution",
+      "pattern_type": "smart_command",
+      "family": "LiHa/FCA",
+      "requires": [],
+      "passthrough_reason": "LiHa smart reagent-distribution command observed in the full export; preserve XML until smart-command expansion is modeled.",
+      "manual_step": "LiHa reagent distribution smart command",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "LihaRetractPiercingNeedleScriptCommand": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Retract Piercing Needle",
+      "pattern_type": "hardware_motion",
+      "family": "LiHa/FCA",
+      "requires": [],
+      "passthrough_reason": "LiHa piercing-needle movement observed in the full export; preserve XML until this hardware command is modeled.",
+      "manual_step": "LiHa retract piercing needle",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "LihaInlineFilterCheckScriptCommandDataV1": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Inline Filter Check",
+      "pattern_type": "hardware_utility",
+      "family": "LiHa/FCA",
+      "requires": [],
+      "passthrough_reason": "LiHa inline filter check observed in the full export; preserve XML until this hardware check is modeled.",
+      "manual_step": "LiHa inline filter check",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "LihaClldSelfTestScriptCommandDataV1": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "cLLD Self Test",
+      "pattern_type": "hardware_utility",
+      "family": "LiHa/FCA",
+      "requires": [],
+      "passthrough_reason": "LiHa cLLD self-test command observed in the full export; preserve XML until this hardware check is modeled.",
+      "manual_step": "LiHa cLLD self test",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "LihaSetTipsBackScriptCommandDataV1": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "Set Tips Back",
+      "pattern_type": "drop_tips",
+      "family": "LiHa/FCA",
+      "requires": [],
+      "passthrough_reason": "LiHa set-tips-back command observed in the full export; preserve XML until this command schema is modeled.",
+      "manual_step": "LiHa set tips back",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "RUPIfStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "RUP If",
+      "pattern_type": "control_flow",
+      "family": "RUP/runtime",
+      "requires": [],
+      "passthrough_reason": "TouchTools RUP conditional statement observed in the full export; preserve XML until RUP flow control is modeled.",
+      "manual_step": "RUP conditional branch",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "RUPSelectWellsStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "RUP Select Wells",
+      "pattern_type": "worktable_runtime",
+      "family": "RUP/runtime",
+      "requires": [],
+      "passthrough_reason": "TouchTools well-selection statement observed in the full export; preserve XML until selection UI is modeled.",
+      "manual_step": "RUP select wells",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "RUPVerificationStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "RUP Verification",
+      "pattern_type": "worktable_runtime",
+      "family": "RUP/runtime",
+      "requires": [],
+      "passthrough_reason": "TouchTools verification statement observed in the full export; preserve XML until this RUP statement is modeled.",
+      "manual_step": "RUP verification",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "RUPGetFileStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "RUP Get File",
+      "pattern_type": "runtime_integration",
+      "family": "RUP/runtime",
+      "requires": [],
+      "passthrough_reason": "TouchTools file-pick statement observed in the full export; preserve XML until file selection is modeled.",
+      "manual_step": "RUP get file",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    },
+    "RUPReportStatement": {
+      "support_status": "approved_passthrough",
+      "fluentcontrol_name": "RUP Report",
+      "pattern_type": "reporting",
+      "family": "RUP/runtime",
+      "requires": [],
+      "passthrough_reason": "TouchTools report statement observed in the full export; preserve XML until RUP reporting is modeled.",
+      "manual_step": "RUP report",
+      "fluentcontrol_name_source": "source_script_observed",
+      "confidence": "high"
+    }
+  },
+  "name_provenance_schema": {
+    "fluentcontrol_name_source": {
+      "fluentcontrol_control_bar": "Exact Control Bar command title observed in FluentControl UI.",
+      "fluentcontrol_script_palette": "Script Editor palette / grouped statement label.",
+      "source_script_observed": "Observed in decompiled FluentControl project scripts.",
+      "connector_display_name": "Connector capability DisplayName from FluentControl install metadata.",
+      "manual_curated": "Human-curated descriptive title; not necessarily the exact UI string.",
+      "ir_operation_label": "Derived from canonical IR operation or structural metadata label."
+    },
+    "confidence": {
+      "verified": "Human-verified against FluentControl UI.",
+      "high": "Strong documentary evidence (source scripts, connector metadata).",
+      "medium": "Reasonable curated title; not UI-verified.",
+      "low": "Structural / placeholder label only."
+    }
+  }
+}

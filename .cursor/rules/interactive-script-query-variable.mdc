@@ -1,0 +1,25 @@
+---
+description: Use Query Variable steps for interactive operator scripts that collect answers
+globs: source/03-protocol-builder/**
+alwaysApply: false
+---
+
+# Interactive scripts use Query Variable
+
+When the user asks to **generate** or **make** a script where the operator
+**interacts**, **answers questions**, or **enters values**:
+
+1. Use FluentControl **Query Variable** (`query_variable` / `QueryVariableStatement`), not `User Prompt` (`prompt_user`).
+2. Set `generation.interactive: true` in `request.spec.yaml` when authoring the spec.
+3. For each question:
+   - Declare the variable under `verification_recipe.variables` (`name`, `type`, optional `default_value`, `minimum`, `maximum`).
+   - Add a `query_variable` recipe step with `variable` + `prompt`.
+4. Add `simulation_values` for each queried variable when simulation must run unattended.
+
+Keep `prompt_user` only for:
+- Photo/video verification (`deck_presence_check`, media prompts)
+- Simple acknowledge/continue steps (`plain_prompt: true`)
+
+Multi-field TouchTools forms: `runtime_variable_prompt` with structured `variables`.
+
+See `source/03-protocol-builder/AGENTS.md` — **Interactive Operator Scripts**.

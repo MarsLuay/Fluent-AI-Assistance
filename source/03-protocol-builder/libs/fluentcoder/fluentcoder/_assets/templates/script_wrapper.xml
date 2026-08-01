@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sd:VxData xmlns:sd="http://www.tecan.com/TSCC/VisionX/VX/DataStore/VxData" dataStoreVersion="4">
+  <Payload>
+    <ObjectName>{{script_name}}</ObjectName>
+    <Comment>{{comment}}</Comment>
+    <Tags></Tags>
+    <ObjectAttributes>
+      <SingleAttribute>
+        <ObjAttrName>ParentProcessId</ObjAttrName>
+        <ObjAttrValue>00000000-0000-0000-0000-000000000000</ObjAttrValue>
+      </SingleAttribute>
+    </ObjectAttributes>
+    <Reference>
+      <Guid>{{worktable_guid}}</Guid>
+      <TypeId>WorktableWorkspace</TypeId>
+      <ObjectName>{{worktable_name}}</ObjectName>
+    </Reference>
+    <Reference>
+      <Guid>{{liquid_class_guid}}</Guid>
+      <TypeId>LiquidClass</TypeId>
+      <ObjectName>{{liquid_class_name}}</ObjectName>
+    </Reference>
+    <PayloadData>
+      <Script version="{{script_version}}" contentIsDeepSave="False" contentIsApproved="False" dataVersion="{{data_version}}">
+        <Properties>
+          <IsProcessScript>False</IsProcessScript>
+          <ExpectedDuration>{{expected_duration}}</ExpectedDuration>
+          <VxWorkspaceData xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.datacontract.org/2004/07/Tecan.VisionX.SharedGlobal">
+            <BaseWorkspaceName>{{worktable_guid}}</BaseWorkspaceName>
+            <CameraView>&lt;WorktableCameraPosition xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.datacontract.org/2004/07/Tecan.VisionX.Worktable.Core"&gt;
+  &lt;vLook xmlns:d2p1="http://schemas.datacontract.org/2004/07/System.Windows.Media.Media3D"&gt;
+    &lt;d2p1:_x&gt;0&lt;/d2p1:_x&gt;
+    &lt;d2p1:_y&gt;0&lt;/d2p1:_y&gt;
+    &lt;d2p1:_z&gt;-1&lt;/d2p1:_z&gt;
+  &lt;/vLook&gt;
+  &lt;vPos xmlns:d2p1="http://schemas.datacontract.org/2004/07/System.Windows.Media.Media3D"&gt;
+    &lt;d2p1:_x&gt;1084.0525&lt;/d2p1:_x&gt;
+    &lt;d2p1:_y&gt;304.92265&lt;/d2p1:_y&gt;
+    &lt;d2p1:_z&gt;3177.4006185195694&lt;/d2p1:_z&gt;
+  &lt;/vPos&gt;
+  &lt;vUp xmlns:d2p1="http://schemas.datacontract.org/2004/07/System.Windows.Media.Media3D"&gt;
+    &lt;d2p1:_x&gt;0&lt;/d2p1:_x&gt;
+    &lt;d2p1:_y&gt;1&lt;/d2p1:_y&gt;
+    &lt;d2p1:_z&gt;0&lt;/d2p1:_z&gt;
+  &lt;/vUp&gt;
+&lt;/WorktableCameraPosition&gt;</CameraView>
+            <WorkspaceDeltas xmlns:d2p1="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+              <d2p1:string>&lt;VxWorkspaceDelta xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.datacontract.org/2004/07/Tecan.VisionX.Worktable.Core"&gt;
+  &lt;Identifier&gt;{{workspace_delta_guid}}&lt;/Identifier&gt;
+  &lt;Jobs xmlns:d2p1="http://schemas.datacontract.org/2004/07/Tecan.VisionX.Worktable.Core.Update" /&gt;
+&lt;/VxWorkspaceDelta&gt;</d2p1:string>
+            </WorkspaceDeltas>
+          </VxWorkspaceData>
+          <VariableDeclarations>
+            <VariableDeclarations xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.datacontract.org/2004/07/Tecan.VisionX.Scripting.Engine">
+              <VariableDeclarations xmlns:d2p1="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+{{variable_declarations}}
+              </VariableDeclarations>
+            </VariableDeclarations>
+          </VariableDeclarations>
+        </Properties>
+        <Commands>
+          <!--This is necessary for XmlWriter to close the 'Commands' immediately.-->
+            <ScriptGroup>
+               <Objects>
+{{groups}}
+                </Objects>
+              </ScriptGroup>
+        </Commands>
+      </Script>
+    </PayloadData>
+  </Payload>
+  <Checksum></Checksum>
+</sd:VxData>

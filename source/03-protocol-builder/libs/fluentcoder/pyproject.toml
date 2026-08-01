@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fluentcoder"
+version = "0.1.0"
+description = "fluentcoder authoring/simulation/compiler for the Fluent AI-Assistance fluent-pipeline"
+readme = "README.md"
+license = {text = "PolyForm-Noncommercial-1.0.0"}
+requires-python = ">=3.11"
+dependencies = [
+  "pydantic>=2,<3",
+  "PyYAML>=6,<7",
+  "tecan-common",
+]
+
+[project.optional-dependencies]
+dev = [
+  "build>=1,<2",
+  "pytest>=9.0.3,<10",
+]
+
+[project.scripts]
+fluentcoder = "fluentcoder.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+fluentcoder = [
+  "_assets/templates/*.xml",
+  "_assets/reference/*.yaml",
+  "_assets/reference/*.txt",
+  "_assets/config/*.yaml",
+  "_assets/config/*.yaml.example",
+  "catalog/*.db",
+]
+
+[tool.setuptools.packages.find]
+include = ["fluentcoder*"]
+
+[tool.pytest.ini_options]
+markers = [
+  "fluentcontrol_shell: requires a running FluentControl UI and shell XSCR",
+]

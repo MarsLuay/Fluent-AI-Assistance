@@ -1,0 +1,35 @@
+schema_version: tecan.request_spec.v1
+request:
+  intent: Perform magnetic bead cleanup with 20 uL beads, two 150 uL washes, and 30 uL elution.
+  protocol_name: Bead cleanup example
+  status: draft
+template:
+  name: bead_cleanup
+  parameters:
+    bead_volume_ul: 20
+    wash_volume_ul: 150
+    wash_count: 2
+    elution_volume_ul: 30
+    magnet_settle_time_min: 5
+    dry_time_min: 3
+source:
+  context: null
+  context_kind: null
+  contexts: []
+  project_archives: []
+  collection: null
+  source_scripts: []
+  pattern_refs: []
+generation:
+  simulate: false
+  compile_xscr: false
+  apply_modeling: false
+review:
+  state: needs_review
+  required_before_final_generation: true
+  decisions: []
+  unresolved_questions: []
+acceptance:
+  validation_diff_required: true
+  ready_to_import_bundle_required: true
+  ready_gates: all_configured

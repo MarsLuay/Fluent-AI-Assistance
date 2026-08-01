@@ -1,0 +1,1 @@
+"""Shared FluentCoder test fixtures."""

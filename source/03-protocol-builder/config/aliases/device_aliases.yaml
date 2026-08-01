@@ -1,0 +1,6 @@
+device_aliases:
+  "Instrument=1/Device=MCA384:1": "MCA384"
+  "MCA384[001]": "MCA384"
+  "MCA96[001]": "MCA96"
+  "LiHa[001]": "LiHa"
+  "RoMa[001]": "RoMa"

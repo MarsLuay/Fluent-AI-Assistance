@@ -1,0 +1,8 @@
+# Optional catalog ObjectName -> category overrides.
+# Copy to category_overrides.toml in this directory, or set
+# FLUENTCODER_CATEGORY_OVERRIDES to an absolute path.
+#
+# Categories: plate, trough, tip_box, magnet_rack, tube_rack,
+# wash_station, waste_chute, hotel, adapter, fixed_deck
+#
+# "My Misclassified Runner" = "tube_rack"

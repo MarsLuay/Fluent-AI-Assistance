@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VxData>
+  <Payload>
+    <ObjectName>SUB_Minimal_v1</ObjectName>
+    <ObjectSubfolderPath>TEST</ObjectSubfolderPath>
+    <Comment />
+    <Reference>
+      <Guid>11111111-1234-aaaa-ffff-000000000222</Guid>
+      <TypeId>WorktableWorkspace</TypeId>
+      <ObjectName>780_Empty</ObjectName>
+    </Reference>
+    <ScriptGroup>
+      <Objects>
+        <Object Type="Tecan.Core.Scripting.CommentStatement">
+          <CommentStatement>
+            <Text>Subroutine body comment</Text>
+          </CommentStatement>
+        </Object>
+        <Object Type="Tecan.Core.Scripting.WaitStatement">
+          <WaitStatement>
+            <Duration>2</Duration>
+          </WaitStatement>
+        </Object>
+      </Objects>
+      <Name>Steps</Name>
+    </ScriptGroup>
+  </Payload>
+</VxData>

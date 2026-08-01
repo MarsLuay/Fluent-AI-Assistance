@@ -1,0 +1,196 @@
+{
+  "dependencies": [
+    {
+      "kind": "template",
+      "name": "plate_transfer",
+      "required": false
+    }
+  ],
+  "id": "template_plate_transfer",
+  "ir_version": "tecan.protocol_ir.v2",
+  "labware": [
+    {
+      "catalog": "96 Well Flat",
+      "id": "source_plate",
+      "label": "SourcePlate",
+      "location": "Site",
+      "position": 1,
+      "python_class": "Plate96",
+      "role": "source"
+    },
+    {
+      "catalog": "96 Well Flat",
+      "id": "destination_plate",
+      "label": "DestinationPlate",
+      "location": "Site",
+      "position": 2,
+      "python_class": "Plate96",
+      "role": "destination"
+    },
+    {
+      "catalog": "MCA96, 100ul, Box",
+      "id": "tips",
+      "label": "Tips",
+      "location": "Site",
+      "position": 4,
+      "python_class": "MCA100Box",
+      "role": "tips"
+    }
+  ],
+  "liquid_classes": [
+    {
+      "name": "Water Free Single",
+      "role": "pipetting"
+    }
+  ],
+  "protocol": {
+    "comment": "Template shape for moving a fixed volume from one plate to another.",
+    "name": "Template Plate Transfer",
+    "schema_intent": "canonical reusable template shape"
+  },
+  "reagents": [
+    {
+      "id": "transfer_liquid",
+      "name": "Transfer Liquid",
+      "role": "sample"
+    }
+  ],
+  "safety_assumptions": [
+    {
+      "id": "template_requires_review",
+      "text": "Template defaults must be replaced with site-specific labware, wells, volumes, liquid classes, and source patterns before instrument use."
+    },
+    {
+      "id": "manual_validation_required",
+      "text": "Generated artifacts must be reviewed, simulated, and validated in FluentControl before instrument use."
+    }
+  ],
+  "source": {
+    "format": "template_protocol",
+    "path": "templates/plate_transfer/template.ir.json",
+    "template": "plate_transfer"
+  },
+  "steps": [
+    {
+      "group": "Setup",
+      "id": "step_001",
+      "index": 1,
+      "name": "Add Source Plate",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "SourcePlate",
+        "labware_type": "96 Well Flat",
+        "location": "Site",
+        "position": 1
+      },
+      "target_labware": "SourcePlate"
+    },
+    {
+      "group": "Setup",
+      "id": "step_002",
+      "index": 2,
+      "name": "Add Destination Plate",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "DestinationPlate",
+        "labware_type": "96 Well Flat",
+        "location": "Site",
+        "position": 2
+      },
+      "target_labware": "DestinationPlate"
+    },
+    {
+      "group": "Setup",
+      "id": "step_003",
+      "index": 3,
+      "name": "Add Tip Box",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "Tips",
+        "labware_type": "MCA96, 100ul, Box",
+        "location": "Site",
+        "position": 4
+      },
+      "target_labware": "Tips"
+    },
+    {
+      "group": "Transfer",
+      "id": "step_004",
+      "index": 4,
+      "name": "Pick Up Tips",
+      "operation": "pick_up_tips",
+      "parameters": {
+        "tip_strategy": "new_tips"
+      },
+      "target_labware": "Tips"
+    },
+    {
+      "group": "Transfer",
+      "id": "step_005",
+      "index": 5,
+      "liquid_class": "Water Free Single",
+      "name": "Aspirate From Source",
+      "operation": "aspirate",
+      "parameters": {
+        "source_well": "A1"
+      },
+      "source_labware": "SourcePlate",
+      "target_labware": "SourcePlate",
+      "volume_ul": 20
+    },
+    {
+      "destination_labware": "DestinationPlate",
+      "group": "Transfer",
+      "id": "step_006",
+      "index": 6,
+      "liquid_class": "Water Free Single",
+      "name": "Dispense Into Destination",
+      "operation": "dispense",
+      "parameters": {
+        "destination_well": "A1"
+      },
+      "target_labware": "DestinationPlate",
+      "volume_ul": 20
+    },
+    {
+      "group": "Cleanup",
+      "id": "step_007",
+      "index": 7,
+      "name": "Return Tips",
+      "operation": "set_tips_back",
+      "parameters": {
+        "tip_strategy": "return_to_source"
+      },
+      "target_labware": "Tips"
+    }
+  ],
+  "template": {
+    "description": "Plate-to-plate transfer with explicit source, destination, volume, liquid class, and tip strategy.",
+    "name": "plate_transfer",
+    "request_schema": "request.schema.json",
+    "version": 1
+  },
+  "variables": [
+    {
+      "default": 20,
+      "name": "transfer_volume_ul",
+      "type": "number"
+    },
+    {
+      "default": "A1",
+      "name": "source_well",
+      "type": "well"
+    },
+    {
+      "default": "A1",
+      "name": "destination_well",
+      "type": "well"
+    }
+  ],
+  "worklists": [],
+  "worktable": {
+    "auto_place": false,
+    "guid": "",
+    "name": "Template Worktable"
+  }
+}

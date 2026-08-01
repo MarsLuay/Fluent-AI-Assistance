@@ -1,0 +1,33 @@
+schema_version: tecan.request_spec.v1
+request:
+  intent: Test fresh tips, returned tips, reuse, waste drop, and standard wash with 10 uL water moves.
+  protocol_name: Tip strategy test example
+  status: draft
+template:
+  name: tip_strategy_test
+  parameters:
+    test_volume_ul: 10
+    tip_strategy: return_for_reuse
+    allow_tip_reuse: true
+    wash_scheme: standard_wash
+source:
+  context: null
+  context_kind: null
+  contexts: []
+  project_archives: []
+  collection: null
+  source_scripts: []
+  pattern_refs: []
+generation:
+  simulate: false
+  compile_xscr: false
+  apply_modeling: false
+review:
+  state: needs_review
+  required_before_final_generation: true
+  decisions: []
+  unresolved_questions: []
+acceptance:
+  validation_diff_required: true
+  ready_to_import_bundle_required: true
+  ready_gates: all_configured

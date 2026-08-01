@@ -1,0 +1,18 @@
+# Local build and test artifacts
+build/
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+**/.pytest_cache/
+
+# Per-context catalog cache (protocol-builder)
+.fluentcoder_catalog/
+
+# Machine-local catalog indexes (default + per-install keyed DBs)
+fluentcoder/catalog/install_index.db
+fluentcoder/catalog/indexes/*.db
+catalog/indexes/*.db
+
+# Generated XSCR scratch from local compile/simulate runs
+scratch/
+**/*.scratch.xscr

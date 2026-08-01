@@ -1,0 +1,34 @@
+schema_version: tecan.request_spec.v1
+request:
+  intent: Normalize samples to 10 ng/uL in 50 uL final volume using DiluentReservoir.
+  protocol_name: Normalization example
+  status: draft
+template:
+  name: normalization
+  parameters:
+    target_concentration: 10
+    target_units: ng/uL
+    final_volume_ul: 50
+    concentration_map: concentrations.csv
+    liquid_class: Water Free Single
+source:
+  context: null
+  context_kind: null
+  contexts: []
+  project_archives: []
+  collection: null
+  source_scripts: []
+  pattern_refs: []
+generation:
+  simulate: false
+  compile_xscr: false
+  apply_modeling: false
+review:
+  state: needs_review
+  required_before_final_generation: true
+  decisions: []
+  unresolved_questions: []
+acceptance:
+  validation_diff_required: true
+  ready_to_import_bundle_required: true
+  ready_gates: all_configured

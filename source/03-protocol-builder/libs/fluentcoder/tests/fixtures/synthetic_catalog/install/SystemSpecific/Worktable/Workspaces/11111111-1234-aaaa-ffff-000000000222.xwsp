@@ -1,0 +1,358 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VxData>
+  <Payload>
+    <ObjectName>780_Empty</ObjectName>
+    <PayloadData>
+      <Worktables>
+        <KeyValueOfstringWorktable>
+          <Value>
+            <Frame>
+              <Arrangements>
+                <Arrangement>
+                  <Sites>
+                    <KeyValueOfintSite>
+                      <Key>0</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>1</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>2</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>3</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>4</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>5</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>6</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>7</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>8</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>9</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>10</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>11</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>12</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>13</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>14</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>15</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>16</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>17</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>18</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>19</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>20</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>21</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>22</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>23</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>24</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>25</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>26</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>27</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>28</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>29</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>30</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>31</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>32</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>33</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>34</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>35</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>36</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>37</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>38</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>39</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>40</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>41</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>42</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>43</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>44</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>45</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>46</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>47</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>48</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>49</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>50</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>51</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>52</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>53</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>54</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                    <KeyValueOfintSite>
+                      <Key>55</Key>
+                      <Value>
+                        
+                      </Value>
+                    </KeyValueOfintSite>
+                  </Sites>
+                </Arrangement>
+              </Arrangements>
+            </Frame>
+          </Value>
+        </KeyValueOfstringWorktable>
+      </Worktables>
+    </PayloadData>
+  </Payload>
+</VxData>

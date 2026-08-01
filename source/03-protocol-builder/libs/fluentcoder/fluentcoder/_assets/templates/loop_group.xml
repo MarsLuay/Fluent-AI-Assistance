@@ -1,0 +1,18 @@
+<Object Type="Tecan.Core.Scripting.LoopGroup">
+  <LoopGroup>
+    <Objects>
+{{LoopStatements}}
+    </Objects>
+    <ParentIteration>
+      <Object Type="System.Int32">
+        <int>1</int>
+      </Object>
+    </ParentIteration>
+    <Name>{{LoopName}}</Name>
+    <LoopVariable>{{LoopVariable}}</LoopVariable>
+    <NumberOfLoops>{{NumberOfLoops}}</NumberOfLoops>
+    <LineNumber>{{LineNumber}}</LineNumber>
+    <IsBreakpoint>{{IsBreakpoint}}</IsBreakpoint>
+    <IsDisabledForExecution>{{IsDisabledForExecution}}</IsDisabledForExecution>
+  </LoopGroup>
+</Object>

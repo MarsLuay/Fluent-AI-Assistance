@@ -1,0 +1,77 @@
+{
+  "$id": "https://fluent-ai-assistance.local/templates/bead_cleanup/request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "request": {
+      "properties": {
+        "intent": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "intent"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "tecan.request_spec.v1"
+    },
+    "template": {
+      "properties": {
+        "name": {
+          "const": "bead_cleanup"
+        },
+        "parameters": {
+          "properties": {
+            "bead_volume_ul": {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            "dry_time_min": {
+              "minimum": 0,
+              "type": "number"
+            },
+            "elution_volume_ul": {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            "magnet_settle_time_min": {
+              "minimum": 0,
+              "type": "number"
+            },
+            "wash_count": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "wash_volume_ul": {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "bead_volume_ul",
+            "wash_volume_ul",
+            "wash_count",
+            "elution_volume_ul",
+            "magnet_settle_time_min",
+            "dry_time_min"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "parameters"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "request",
+    "template"
+  ],
+  "title": "Bead Cleanup Template Request",
+  "type": "object"
+}

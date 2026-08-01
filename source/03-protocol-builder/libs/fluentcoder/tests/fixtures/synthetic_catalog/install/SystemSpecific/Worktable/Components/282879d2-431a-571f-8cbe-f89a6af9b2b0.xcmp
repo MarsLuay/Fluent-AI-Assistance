@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VxData xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Payload>
+    <ObjectName>Stacker Right</ObjectName>
+    <PayloadData>
+      <CarrierOrLabwareTemplate>
+        <GUID>282879d2-431a-571f-8cbe-f89a6af9b2b0</GUID>
+        <Dimension><X>127.76</X><Y>85.48</Y><Z>14.35</Z></Dimension>
+        <FunctionalGroup>Carrier.Grid Segment</FunctionalGroup>
+        <Arrangements>
+          <ArrangementTemplate>
+            <SitesInX>1</SitesInX>
+            <SitesInY>1</SitesInY>
+            <SitesInZ>1</SitesInZ>
+            <SiteSpacingInX>0</SiteSpacingInX>
+            <SiteSpacingInY>0</SiteSpacingInY>
+            <SiteSpacingInZ>0</SiteSpacingInZ>
+            <PositionInParent><X>0</X><Y>0</Y><Z>0</Z></PositionInParent>
+          </ArrangementTemplate>
+        </Arrangements>
+
+      </CarrierOrLabwareTemplate>
+    </PayloadData>
+  </Payload>
+</VxData>

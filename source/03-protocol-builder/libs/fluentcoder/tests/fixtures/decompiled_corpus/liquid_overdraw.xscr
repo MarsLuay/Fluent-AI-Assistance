@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VxData>
+  <Payload>
+    <ObjectName>Liquid Overdraw</ObjectName>
+    <Comment />
+    <Reference>
+      <Guid>11111111-1234-aaaa-ffff-000000000222</Guid>
+      <TypeId>WorktableWorkspace</TypeId>
+      <ObjectName>780_Empty</ObjectName>
+    </Reference>
+    <ScriptGroup>
+      <Objects>
+        <Object Type="Tecan.Core.Scripting.Worktable.Data.AddLabwareDataV1">
+          <AddLabwareDataV1>
+            <LabwareType>96 Well Flat</LabwareType>
+            <LabwareLable>SourcePlate</LabwareLable>
+            <Location>Site</Location>
+            <Position>1</Position>
+          </AddLabwareDataV1>
+        </Object>
+        <Object Type="Tecan.Core.Instrument.Devices.LiHa.Scripting.LihaPickUpScriptCommandDataV1">
+          <LihaPickUpScriptCommandDataV1>
+            <LabwareName>Tips1000</LabwareName>
+          </LihaPickUpScriptCommandDataV1>
+        </Object>
+        <Object Type="Tecan.Core.Instrument.Devices.LiHa.Scripting.LihaAspirateScriptCommandDataV5">
+          <LihaAspirateScriptCommandDataV5>
+            <Data>
+              <LihaPipettingWithVolumesScriptCommandDataV7>
+                <Volumes><Object Type="System.String"><string>250</string></Object></Volumes>
+                <LiquidClassName>Water Free Single</LiquidClassName>
+                <LabwareName>SourcePlate</LabwareName>
+                <SelectedWellsString>A1 - H1</SelectedWellsString>
+                <SerializedWellIndexes>0&gt;1&gt;7;</SerializedWellIndexes>
+              </LihaPipettingWithVolumesScriptCommandDataV7>
+            </Data>
+          </LihaAspirateScriptCommandDataV5>
+        </Object>
+      </Objects>
+      <Name>Steps</Name>
+    </ScriptGroup>
+  </Payload>
+</VxData>

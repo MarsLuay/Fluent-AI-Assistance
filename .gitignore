@@ -1,0 +1,40 @@
+.DS_Store
+Thumbs.db
+__pycache__/
+*.py[cod]
+*.egg-info/
+**/catalog/install_index.db
+.pytest_cache/
+.venv/
+.mcp/server-config.json
+# Safety net if setuptools/build runs without setup.cfg build-base / --outdir
+build/
+dist/
+source/**/build/
+source/**/dist/
+ready-to-import/*
+!ready-to-import/README.md
+source/03-protocol-builder/.venv/
+source/03-protocol-builder/libs/fluentcoder/.venv/
+source/03-protocol-builder/libs/fluentcoder/fluentcoder/catalog/*.db-journal
+source/04-protocol-simulator/dist/
+source/04-protocol-simulator/node_modules/
+
+# Host-derived Fluent meshes / textures / registry / connector (local install only — never ship as product defaults)
+source/04-protocol-simulator/public/models/fluent/local/**
+!source/04-protocol-simulator/public/models/fluent/local/.gitkeep
+!source/04-protocol-simulator/public/models/fluent/local/README.md
+source/04-protocol-simulator/dist/models/fluent/local/**
+# Legacy textures/ tree — rebuild into local/textures/ instead (keep README/.gitkeep only)
+source/04-protocol-simulator/public/models/fluent/textures/**
+!source/04-protocol-simulator/public/models/fluent/textures/README.md
+!source/04-protocol-simulator/public/models/fluent/textures/.gitkeep
+source/04-protocol-simulator/dist/models/fluent/textures/**
+# Do not re-track host GLBs / mesh manifest at the fluent models root
+source/04-protocol-simulator/public/models/fluent/*.glb
+source/04-protocol-simulator/public/models/fluent/manifest.json
+source/04-protocol-simulator/public/models/fluent/manifest.sim.bak.json
+source/04-protocol-simulator/public/models/fluent/merge-report.json
+source/04-protocol-simulator/public/models/fluent/merge-report.md
+source/04-protocol-simulator/dist/models/fluent/*.glb
+source/04-protocol-simulator/dist/models/fluent/manifest.json

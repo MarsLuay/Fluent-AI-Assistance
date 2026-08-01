@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VxData>
+  <Payload>
+    <ObjectName>Water Free Single</ObjectName>
+    <PayloadData>
+      <PipettingDeviceType>Fca</PipettingDeviceType>
+      <Tecan.Core.Pipetting.LiquidClassDetectionAndPositioningSet>
+        <DeviceType><PipettingDeviceType>Fca</PipettingDeviceType></DeviceType>
+        <SectionName><PipettingSectionName>Aspirate</PipettingSectionName></SectionName>
+        <DiTiTypeGroup>Standard Fixed Tip</DiTiTypeGroup>
+        <Submerge>
+          <LiquidClassValueVariableNamePair>
+            <Value>1</Value>
+            <VariableName>submergeDepth</VariableName>
+          </LiquidClassValueVariableNamePair>
+        </Submerge>
+      </Tecan.Core.Pipetting.LiquidClassDetectionAndPositioningSet>
+      <Tecan.Core.Pipetting.LiquidClassEquationSet>
+        <DiTiTypeGroup>Standard Fixed Tip</DiTiTypeGroup>
+        <SectionName><PipettingSectionName>Aspirate</PipettingSectionName></SectionName>
+        <AspiratePipettingSpeed>100</AspiratePipettingSpeed>
+        <DispensePipettingSpeed>200</DispensePipettingSpeed>
+      </Tecan.Core.Pipetting.LiquidClassEquationSet>
+      <Tecan.Core.Pipetting.LiquidSubClass>
+        <DeviceType><PipettingDeviceType>Fca</PipettingDeviceType></DeviceType>
+        <DiTiTypeGroup>default</DiTiTypeGroup>
+        <Name>_Fca_default</Name>
+        <MicroScriptSection>
+          <Objects>
+            <Object Type="Tecan.Core.Instrument.Devices.Pipetting.MoveValveMicroCommandDataV1">
+              <MoveValveMicroCommandDataV1/>
+            </Object>
+            <Object Type="Tecan.Core.Instrument.Devices.Pipetting.AspirateAirMicroCommandDataV2">
+              <AspirateAirMicroCommandDataV2/>
+            </Object>
+            <Object Type="Tecan.Core.Scripting.ConditionalGroup">
+              <ConditionalGroup>
+                <Objects>
+                  <Object Type="Tecan.Core.Instrument.Devices.Pipetting.AspirateLiquidMicroCommandDataV2">
+                    <AspirateLiquidMicroCommandDataV2/>
+                  </Object>
+                </Objects>
+              </ConditionalGroup>
+            </Object>
+            <Object Type="Tecan.Core.Instrument.Devices.Pipetting.RetractTipMicroCommandDataV1">
+              <RetractTipMicroCommandDataV1/>
+            </Object>
+          </Objects>
+          <Name>Aspirate</Name>
+        </MicroScriptSection>
+        <MicroScriptSection>
+          <Objects>
+            <Object Type="Tecan.Core.Instrument.Devices.Pipetting.DispenseLiquidMicroCommandDataV2">
+              <DispenseLiquidMicroCommandDataV2/>
+            </Object>
+          </Objects>
+          <Name>Dispense</Name>
+        </MicroScriptSection>
+      </Tecan.Core.Pipetting.LiquidSubClass>
+    </PayloadData>
+  </Payload>
+</VxData>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VxData xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Payload>
+    <ObjectName>Teleshake Adapter Plate</ObjectName>
+    <PayloadData>
+      <CarrierOrLabwareTemplate>
+        <GUID>ba10e14e-f48a-543a-b6a3-3fb084b42bfe</GUID>
+        <Dimension><X>127.76</X><Y>85.48</Y><Z>15.0</Z></Dimension>
+        <FunctionalGroup>Labware.Miscellaneous</FunctionalGroup>
+        <Arrangements>
+          <ArrangementTemplate>
+            <SitesInX>1</SitesInX>
+            <SitesInY>1</SitesInY>
+            <SitesInZ>1</SitesInZ>
+            <SiteSpacingInX>0</SiteSpacingInX>
+            <SiteSpacingInY>0</SiteSpacingInY>
+            <SiteSpacingInZ>0</SiteSpacingInZ>
+            <PositionInParent><X>0</X><Y>0</Y><Z>0</Z></PositionInParent>
+          </ArrangementTemplate>
+        </Arrangements>
+        <Pipettable>
+          <XNumberOfWells>12</XNumberOfWells>
+          <YNumberOfWells>8</YNumberOfWells>
+          <XSpacing>9.0</XSpacing>
+          <YSpacing>9.0</YSpacing>
+          <PositionOfFirstWell><X>14.38</X><Y>11.24</Y><Z>0</Z></PositionOfFirstWell>
+          <Cavity>
+            <CavityShape xsi:type="TruncatedCone">
+              <Height>11.26</Height>
+              <DiameterTop>6.96</DiameterTop>
+              <DiameterBottom>6.35</DiameterBottom>
+            </CavityShape>
+          </Cavity>
+        </Pipettable>
+      </CarrierOrLabwareTemplate>
+    </PayloadData>
+  </Payload>
+</VxData>

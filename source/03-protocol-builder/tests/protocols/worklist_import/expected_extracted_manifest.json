@@ -1,0 +1,14 @@
+{
+  "labware_names": [
+    "WorklistDestination",
+    "WorklistSource"
+  ],
+  "liquid_classes": [
+    "Water Free Single"
+  ],
+  "script_count": 1,
+  "worklist_paths": [
+    "Worklists/transfer.gwl"
+  ],
+  "workspace_count": 1
+}

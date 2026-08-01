@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sd:VxData xmlns:sd="http://www.tecan.com/TSCC/VisionX/VX/DataStore/VxData" dataStoreVersion="3">
+  <Payload>
+    <ObjectName>Generated connector for c0a22689-32b3-4ff6-a6d2-79807846b757(Worktable_Segment_WorktablePin_MiddleFront) and 326ece41-56eb-4264-9577-3c87c7158a57(15 Microplate Passive Stack) with orientation Phi=0, Theta=0, Psi=0. 8804dca1-4846-4f31-a33b-a7c249503c9d</ObjectName>
+    <Comment></Comment>
+    <Tags></Tags>
+    <PayloadData>
+      <WorktableConnector version="1" contentIsDeepSave="False" contentIsApproved="False" dataVersion="2">
+        <ConnectorTemplate xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.datacontract.org/2004/07/Tecan.VisionX.Worktable.Core">
+          <ComponentGuid>326ece41-56eb-4264-9577-3c87c7158a57</ComponentGuid>
+          <Description>Generated connector for c0a22689-32b3-4ff6-a6d2-79807846b757(Worktable_Segment_WorktablePin_MiddleFront) and 326ece41-56eb-4264-9577-3c87c7158a57(15 Microplate Passive Stack) with orientation Phi=0, Theta=0, Psi=0. 8804dca1-4846-4f31-a33b-a7c249503c9d</Description>
+          <GUID>1931bff4-102c-4934-949e-6f974fa50e53</GUID>
+          <IsDefaultConnector>true</IsDefaultConnector>
+          <Orientation xmlns:d2p1="http://schemas.datacontract.org/2004/07/Tecan.VisionX.Worktable.Core.ThreeD">
+            <d2p1:Matrix xmlns:d3p1="http://schemas.datacontract.org/2004/07/Tecan.VisionX.Worktable.Core.ThreeD.Rotation">
+              <d3p1:Mat xmlns:d4p1="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+                <d4p1:ArrayOfdouble>
+                  <d4p1:double>1</d4p1:double>
+                  <d4p1:double>0</d4p1:double>
+                  <d4p1:double>0</d4p1:double>
+                </d4p1:ArrayOfdouble>
+                <d4p1:ArrayOfdouble>
+                  <d4p1:double>0</d4p1:double>
+                  <d4p1:double>1</d4p1:double>
+                  <d4p1:double>-0</d4p1:double>
+                </d4p1:ArrayOfdouble>
+                <d4p1:ArrayOfdouble>
+                  <d4p1:double>0</d4p1:double>
+                  <d4p1:double>0</d4p1:double>
+                  <d4p1:double>1</d4p1:double>
+                </d4p1:ArrayOfdouble>
+              </d3p1:Mat>
+            </d2p1:Matrix>
+          </Orientation>
+          <PositionInParent xmlns:d2p1="http://schemas.datacontract.org/2004/07/Tecan.VisionX.Worktable.Core.ThreeD">
+            <d2p1:X>5.2</d2p1:X>
+            <d2p1:Y>-13</d2p1:Y>
+            <d2p1:Z>0</d2p1:Z>
+          </PositionInParent>
+          <SiteGuid>c0a22689-32b3-4ff6-a6d2-79807846b757</SiteGuid>
+        </ConnectorTemplate>
+      </WorktableConnector>
+    </PayloadData>
+  </Payload>
+  <Checksum>9F481F91D61F83381110CE47B31D9841</Checksum>
+</sd:VxData>

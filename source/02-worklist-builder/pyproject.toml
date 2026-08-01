@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tecan-worklist-builder"
+version = "0.1.0"
+description = "Local, dependency-free Tecan Gemini/Fluent .gwl worklist builder"
+readme = "README.md"
+license = {text = "PolyForm-Noncommercial-1.0.0"}
+requires-python = ">=3.11"
+dependencies = [
+  "tecan-common @ file:../00-shared",
+]
+
+[project.scripts]
+worklist-builder = "tecan_worklist.cli:main"
+tecan-worklist = "tecan_worklist.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["tecan_worklist*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["../00-shared"]

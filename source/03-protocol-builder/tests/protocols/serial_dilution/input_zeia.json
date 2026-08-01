@@ -1,0 +1,39 @@
+{
+  "commands": [
+    {
+      "device_alias": "MCA384",
+      "id": "Mca384AspirateScriptCommandDataV2",
+      "labware": "SourcePlate",
+      "liquid_class": "Water Free Single",
+      "volume": 10
+    },
+    {
+      "device_alias": "MCA384",
+      "id": "Mca384DispenseScriptCommandDataV2",
+      "labware": "DilutionPlate",
+      "liquid_class": "Water Free Single",
+      "volume": 10
+    },
+    {
+      "device_alias": "MCA384",
+      "id": "Mca384MixScriptCommandDataV2",
+      "labware": "DilutionPlate",
+      "liquid_class": "Water Free Single",
+      "volume": 15
+    }
+  ],
+  "labware": [
+    {
+      "label": "SourcePlate",
+      "position": 1,
+      "type": "96 Well Flat"
+    },
+    {
+      "label": "DilutionPlate",
+      "position": 2,
+      "type": "96 Well Flat"
+    }
+  ],
+  "script_name": "Serial Dilution",
+  "worktable": "Dilution Worktable"
+}

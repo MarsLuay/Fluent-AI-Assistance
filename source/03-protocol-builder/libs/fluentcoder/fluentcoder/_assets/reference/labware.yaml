@@ -1,0 +1,1942 @@
+# OPTIONAL REFERENCE DUMP — not product law.
+# Renderer loads this only when FLUENTCODER_USE_LABWARE_YAML=1.
+# Prefer ZEIA labware_catalog.json / Components .xcmp for names, wells, category.
+# Do not treat Falcon/Resolvex rows here as invent defaults for other labs.
+
+labware:
+- category: reservoir
+  functional_group: Labware.Trough
+  name: 100ml
+  wells: 1
+- category: reservoir
+  functional_group: Labware.Trough
+  name: 25ml
+  wells: 1
+- category: reservoir
+  functional_group: Labware.Trough
+  name: 25ml_short
+  wells: 1
+- category: reservoir
+  functional_group: Labware.Trough
+  name: 300ml SBS
+  wells: 1
+- category: plate
+  functional_group: Labware.Microplate
+  name: FCA, 1000ul SBS
+  wells: 96
+- category: plate
+  functional_group: Labware.Microplate
+  name: FCA, 10ul SBS
+  wells: 96
+- category: plate
+  functional_group: Labware.Microplate
+  name: FCA, 200ul SBS
+  wells: 96
+- category: plate
+  functional_group: Labware.Microplate
+  name: FCA, 50ul SBS
+  wells: 96
+- category: plate
+  functional_group: Labware.Microplate
+  name: MCA384, 15ul
+  wells: 384
+- category: plate
+  functional_group: Labware.Microplate
+  name: MCA384, 50ul
+  wells: 384
+- category: plate
+  functional_group: Labware.Microplate
+  name: MCA96, 200ul, Box
+  wells: 96
+- category: plate
+  functional_group: Labware.Microplate
+  name: MCA96, 50ul, Box
+  wells: 96
+other:
+  types:
+  - name: 3 Grid
+    wells: null
+    functional_group: Carrier.Grid Segment
+  - name: 4 Landscape 61mm Nest Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Holder Evaporator Manifold i300
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 3 Landscape Downholder RightAccess
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 1x26 16mm Tubes 100mm barcode
+    wells: null
+    functional_group: Carrier.Runner
+  - name: Test Plate 450G
+    wells: 1
+    functional_group: Tool.Service
+  - name: 1x27 13mm Tubes Empty barcode
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 9 Position Base Plate
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: Carousel Left Tower 128mm 4 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: BioShake 3000 ELM
+    wells: null
+    functional_group: Carrier.Device
+  - name: Spacer TeVacs 16,5
+    wells: null
+    functional_group: Labware.Miscellaneous
+  - name: 96 Nozzle Separator i300
+    wells: null
+    functional_group: Carrier.Nest
+  - name: FCA Channel Gripper Nest
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 1x24 Tube Rack 13mm
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 1x24 13mm Tube Runner No Tubes
+    wells: null
+    functional_group: Carrier.Runner
+  - name: Shaker Heating Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: 24 Evaporator Manifold i300
+    wells: null
+    functional_group: Tool.i300
+  - name: DiTiAndGripperAdapter
+    wells: null
+    functional_group: Tool.XCA
+  - name: 4 Landscape 7mm Nest Thru Deck Waste
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 24 Eppendorf Adapter
+    wells: null
+    functional_group: Carrier.Nest
+  - name: BackWall 780 RightSide
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: 1080 Base Unit
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: 9 Nest Hotel
+    wells: null
+    functional_group: Carrier.Hotel
+  - name: 1x16 16x125mm Tube Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 1x24 13x75mm Tube Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 8 Grid
+    wells: null
+    functional_group: Carrier.Grid Segment
+  - name: 7mm Nest
+    wells: null
+    functional_group: Carrier.Nest
+  - name: MCA Nest Base Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Wash Station Thru Deck Waste
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: FCA Thru Deck Waste Chute
+    wells: 1
+    functional_group: Labware.Wash and Waste
+  - name: Wash Station Trough Nest
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Wash Station Shallow Cleaner
+    wells: 8
+    functional_group: Labware.Wash and Waste
+  - name: Wash Station Waste
+    wells: 1
+    functional_group: Labware.Wash and Waste
+  - name: Wash Station Deep Cleaner
+    wells: 8
+    functional_group: Labware.Wash and Waste
+  - name: Landscape Nest Base Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 61mm Nest
+    wells: null
+    functional_group: Carrier.Nest
+  - name: MCA96 Wash Station
+    wells: 96
+    functional_group: Labware.Wash and Waste
+  - name: MCA Trough
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Teach block MCA96
+    wells: null
+    functional_group: Tool.Service
+  - name: MCA96 Tipblock Nest
+    wells: null
+    functional_group: Carrier.Nest
+  - name: FCA DiTi Nest
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Lid_6mm
+    wells: null
+    functional_group: Labware.Lid
+  - name: 4 Landscape Nests Cooled
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 4 Landscape Nests with Positioning Clips
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: FrameSideWall
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: 2 Grid Right 87mm
+    wells: null
+    functional_group: Carrier.Grid Segment
+  - name: 2 Grid Left 87mm
+    wells: null
+    functional_group: Carrier.Grid Segment
+  - name: MCA384 Adapter Nest
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Teach block MCA384
+    wells: null
+    functional_group: Tool.Service
+  - name: BackWall 1080 BothSides
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: FES Eccentric Nest
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Centric
+    wells: null
+    functional_group: Tool.RGA
+  - name: Eccentric
+    wells: null
+    functional_group: Tool.RGA
+  - name: Tube
+    wells: null
+    functional_group: Tool.RGA
+  - name: MCA384 DiTi Active Nest
+    wells: null
+    functional_group: Carrier.Nest
+  - name: PMP Test Block
+    wells: null
+    functional_group: Tool.Service
+  - name: FES Centric Nest
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Stacker Right
+    wells: null
+    functional_group: Carrier.Device
+  - name: Reference Plate
+    wells: null
+    functional_group: Tool.Service
+  - name: Teaching TRO
+    wells: null
+    functional_group: Tool.Service
+  - name: 480 Base Unit
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: 780 Base Unit
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: FixedTip Standard
+    wells: null
+    functional_group: Tool.FCA
+  - name: 5 Nest Hotel_1
+    wells: null
+    functional_group: Carrier.Hotel
+  - name: Resolvex i300
+    wells: null
+    functional_group: Carrier.Device
+  - name: BackWall 780 LeftSide
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: Fluent ID Left 5 Grid
+    wells: null
+    functional_group: Carrier.Device
+  - name: 1080 Extension Right
+    wells: null
+    functional_group: Carrier.Deck Extension
+  - name: Carousel Left Tower 172mm 3 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: TeChrom Downholder, Short RoboColumns
+    wells: null
+    functional_group: Carrier.Miscellaneous
+  - name: RGA Eccentric
+    wells: null
+    functional_group: Tool.RGA
+  - name: Raptor Teach Tool
+    wells: null
+    functional_group: Tool.Service
+  - name: Carousel Left Tower 19mm 25 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: 7mm Regrip Nest
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Tevacs cap low Maldi
+    wells: null
+    functional_group: Labware.Miscellaneous
+  - name: RoboColumns_Short
+    wells: 96
+    functional_group: Labware.Miscellaneous
+  - name: MCA Passive Nest 44mm
+    wells: null
+    functional_group: Carrier.Nest
+  - name: BackWall 480 BothSides
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: BackWall 480 RightSide
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: Hydrospeed
+    wells: null
+    functional_group: Carrier.Device
+  - name: Infinite M500
+    wells: null
+    functional_group: Carrier.Device
+  - name: 4x24 13x100mm Tube Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: Inheco CPAC with 96 PCR Adapter
+    wells: null
+    functional_group: Carrier.Device
+  - name: Carousel Left Tower 83mm 6 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: Lid_DiTi384
+    wells: null
+    functional_group: Labware.Lid
+  - name: 1x16 16x100mm Tube Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 1x32 10mm Tubes 75mm barcode
+    wells: null
+    functional_group: Carrier.Runner
+  - name: ColdPlate
+    wells: null
+    functional_group: Carrier.Device
+  - name: 4 Landscape 61mm Nest Thru Deck Waste
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Stacker Tower Left 40 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: Piercing Tip
+    wells: null
+    functional_group: Tool.FCA
+  - name: BackWall 480 LeftSide
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: Tube Rotator Wash Station
+    wells: null
+    functional_group: Carrier.Device
+  - name: 1x32 13mm Tubes 100mm barcode
+    wells: null
+    functional_group: Carrier.Runner
+  - name: Teleshake Adapter Plate
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Production Cart 1080
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: 1x32 13mm Tubes Empty barcode
+    wells: null
+    functional_group: Carrier.Runner
+  - name: MCA Passive Nest 25mm
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 15 Microplate Passive Stack
+    wells: null
+    functional_group: Carrier.Hotel
+  - name: FixedTip Low Volume
+    wells: null
+    functional_group: Tool.FCA
+  - name: Carousel Right Tower 69mm 7 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: Raptor Head Adapter
+    wells: null
+    functional_group: Tool.MCA384
+  - name: Front Wall 780
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: 4 Landscape 61mm Nest
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Carousel Left 253mm Transfer
+    wells: null
+    functional_group: Carrier.Device
+  - name: Deck Segment Resolvex i300
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Lower 6 Grid
+    wells: null
+    functional_group: Carrier.Grid Segment
+  - name: 1x24 16mm Tubes 100mm barcode
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 24x 16x100mm Tube in Holder i300
+    wells: 24
+    functional_group: Labware.Extraction
+  - name: 1x27 10mm Tubes Empty barcode
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 4x24 13mm Tube Runner no Tubes
+    wells: null
+    functional_group: Carrier.Runner
+  - name: Fluent ID Left 3 Grid
+    wells: null
+    functional_group: Carrier.Device
+  - name: EVA
+    wells: null
+    functional_group: Tool.MCA384
+  - name: 6mm Distance Block
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 3 Nest Hotel Slots 1, 8, 15
+    wells: null
+    functional_group: Carrier.Hotel
+  - name: 300 Shelf Right
+    wells: null
+    functional_group: Carrier.Deck Extension
+  - name: 6x16 16x100mm Tube Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: Tevacs cap low
+    wells: null
+    functional_group: Labware.Miscellaneous
+  - name: BackWall 780 BothSides
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: Infinite F50
+    wells: null
+    functional_group: Carrier.Device
+  - name: 61mm Nest_1
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Spacer TeVacs 7,5
+    wells: null
+    functional_group: Labware.Miscellaneous
+  - name: 4 FCA DiTi Nest Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: Fixed Plate Fingers, Centric
+    wells: null
+    functional_group: Tool.RGA
+  - name: Raptor Adapter Segment
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 384 Tips
+    wells: null
+    functional_group: Tool.MCA384
+  - name: Barcode Plate
+    wells: 96
+    functional_group: Tool.Service
+  - name: 4 FCA DiTi Nest Off Deck Waste
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Wash Station Cleaner Front Tube Rotator
+    wells: 8
+    functional_group: Labware.Wash and Waste
+  - name: ODTC Below WT
+    wells: null
+    functional_group: Carrier.Device
+  - name: Holder Force Measurement Nest
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Inheco ThermoShake with 96 PCR Adapter
+    wells: null
+    functional_group: Carrier.Device
+  - name: Carousel Right Tower 23mm 21 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: Stacker Tower 16 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: Production Cart 780
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: Carousel Right Tower 19mm 25 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: ODTC 384
+    wells: null
+    functional_group: Carrier.Device
+  - name: 61mm Nest_FCA calibrated
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Sunrise
+    wells: null
+    functional_group: Carrier.Device
+  - name: BackWall 480 NoSide
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: RGA ReferencePin
+    wells: null
+    functional_group: Tool.Service
+  - name: BackWall 780 NoSide
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: TeVacs_Park_Pos
+    wells: null
+    functional_group: Carrier.Device
+  - name: 2 Grid
+    wells: null
+    functional_group: Carrier.Grid Segment
+  - name: Raptor Head Adapter
+    wells: null
+    functional_group: Tool.MCA384
+  - name: Wash Station Thru Deck Waste RL 07
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Infinite M1000
+    wells: null
+    functional_group: Carrier.Device
+  - name: 5 Landscape 61mm Nest
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 9 Grid Cutout
+    wells: null
+    functional_group: Carrier.Grid Segment
+  - name: Lid_DiTiFCA
+    wells: null
+    functional_group: Labware.Lid
+  - name: Stacker Slide Right
+    wells: null
+    functional_group: Carrier.Device
+  - name: 1x32 13mm Tubes 75mm barcode
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 384 Tips Combo
+    wells: null
+    functional_group: Tool.MCA384
+  - name: 9 Position Base Unit
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: TeChrom MTP Spacer 29.9mm
+    wells: null
+    functional_group: Carrier.Miscellaneous
+  - name: 8 Grid EVO pins
+    wells: null
+    functional_group: Carrier.Grid Segment
+  - name: FrameSideWallRight
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: 1x24 10mm Tube Runner no Tubes
+    wells: null
+    functional_group: Carrier.Runner
+  - name: Shaker Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: Carousel Right 253mm Transfer
+    wells: null
+    functional_group: Carrier.Device
+  - name: 6 Position Base Plate
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: Fixed Plate Fingers, Eccentric
+    wells: null
+    functional_group: Tool.RGA
+  - name: 340 Extension Right
+    wells: null
+    functional_group: Carrier.Deck Extension
+  - name: 6.5mm Nest Spacer i300
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Carousel Left Tower 23mm 21 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: 1 61mm 3 7mm Nest Landscape Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: FCA Gripper Nest
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 1x32 Safe Lock Tubes Empty barcode
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 2 MCA384 DiTi Active Nest Front
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Force Measurement GSV2TDS
+    wells: 96
+    functional_group: Tool.Service
+  - name: Portrait Nest Base Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: TeChrom Drain
+    wells: null
+    functional_group: Carrier.Miscellaneous
+  - name: Tube Rotator Wash Station Carrier
+    wells: null
+    functional_group: Carrier.Device
+  - name: 6_Trough_Carrier_Reservoir_1
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Fluent ID Middle
+    wells: null
+    functional_group: Carrier.Device
+  - name: Mettler OWS 1 Base
+    wells: null
+    functional_group: Carrier.Device
+  - name: 96 MCA384 Tips
+    wells: null
+    functional_group: Tool.MCA384
+  - name: 5 Nest Hotel
+    wells: null
+    functional_group: Carrier.Hotel
+  - name: ODTC96
+    wells: null
+    functional_group: Carrier.Hotel
+  - name: TeChrom Shuttle
+    wells: null
+    functional_group: Carrier.Miscellaneous
+  - name: 4 Landscape 7mm Nest Y Spaced
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 1x32 10mm Tubes Empty barcode
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 6 Nest Incubator Shaking
+    wells: null
+    functional_group: Carrier.Device
+  - name: Wash Station Cleaner Back 160mm
+    wells: 8
+    functional_group: Labware.Wash and Waste
+  - name: TeChrom Base Segment
+    wells: null
+    functional_group: Carrier.Miscellaneous
+  - name: FixedTipAir Reference
+    wells: null
+    functional_group: Tool.Service
+  - name: 5 Landscape 7mm Nest
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 3x32 10mm Tube Runner no Tubes
+    wells: null
+    functional_group: Carrier.Runner
+  - name: Mettler OWS 2 Base
+    wells: null
+    functional_group: Carrier.Device
+  - name: 300 Shelf Left
+    wells: null
+    functional_group: Carrier.Deck Extension
+  - name: Raptor Teach Tool
+    wells: null
+    functional_group: Tool.Service
+  - name: BackWall 1080 RightSide
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: BioShake D30T ELM 96 PCR
+    wells: null
+    functional_group: Carrier.Device
+  - name: TeChrom Downholder, Tall RoboColumns
+    wells: null
+    functional_group: Carrier.Miscellaneous
+  - name: Carousel Right Std Transfer
+    wells: null
+    functional_group: Carrier.Device
+  - name: Tevacs cap low Wash
+    wells: null
+    functional_group: Labware.Miscellaneous
+  - name: Wash Station RL 03
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: MCA384 Wash Station
+    wells: 384
+    functional_group: Labware.Wash and Waste
+  - name: Hydroflex Shelf Adapter
+    wells: null
+    functional_group: Carrier.Deck Extension
+  - name: 4x24 10x100mm Tube Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: ODTC 2 front
+    wells: null
+    functional_group: Carrier.Device
+  - name: 4 FCA DiTi Nest
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Tevacs cap high
+    wells: null
+    functional_group: Labware.Miscellaneous
+  - name: 4 Landscape Cooled
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 4 Landscape 61mm Nest Right
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Landscape Nest Base Segment Y Spaced
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Multipurpose Base Segment 30126013
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: MCA Off Deck Waste Chute
+    wells: 1
+    functional_group: Labware.Wash and Waste
+  - name: 2 Grid Left 147mm
+    wells: null
+    functional_group: Carrier.Grid Segment
+  - name: CPAC 96 PCR
+    wells: null
+    functional_group: Carrier.3rd Party Devices
+  - name: 6 Landscape 7mm Nest
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Spacer TeVacs 3,5
+    wells: null
+    functional_group: Labware.Miscellaneous
+  - name: 61mm Nest_2
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Carousel Right 383mm Transfer
+    wells: null
+    functional_group: Carrier.Device
+  - name: Error Tube Holder
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 4x24 10mm Tube Runner no Tubes
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 5 Landscape 61mm Nest FRIDA Reader
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 4 Nest Incubator Shaking
+    wells: null
+    functional_group: Carrier.Device
+  - name: 12 Microplate Passive Stack
+    wells: null
+    functional_group: Carrier.Hotel
+  - name: Front Wall 480
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: MCA96 Eccentric
+    wells: null
+    functional_group: Tool.MCA96
+  - name: Position Measuring
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Landscape Nest Base Segment Thru Deck Waste
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 61mm Nest_holdlid
+    wells: null
+    functional_group: Carrier.Nest
+  - name: ODTC Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Carousel Right Tower 172mm 3 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: Tube Rotator Middle with Wash Station
+    wells: null
+    functional_group: Carrier.Device
+  - name: MCA Distance Block
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 1080 Extension Left
+    wells: null
+    functional_group: Carrier.Deck Extension
+  - name: 4 Landscape 7mm Nest Off Deck Waste
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Carousel Right Tower 83mm 6 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: 3x32 10x100mm Tube Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: FCA Off Deck Waste Chute
+    wells: 1
+    functional_group: Labware.Wash and Waste
+  - name: 4 Position Base Unit
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: Landscape Nest Lower Deck Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 5 Landscape 7mm Nest Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 96 MCA96 Tips
+    wells: null
+    functional_group: Tool.MCA384
+  - name: 3 Portrait 61mm Nest
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Shaker x 3 Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 6 Nest Incubator
+    wells: null
+    functional_group: Carrier.Device
+  - name: 11 Grid Segment
+    wells: null
+    functional_group: Carrier.Grid Segment
+  - name: 3 Landscape 7mm Nest Teleshake Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 1x22 16mm Tubes Empty barcode
+    wells: null
+    functional_group: Carrier.Runner
+  - name: MCA96 Head Adapter
+    wells: null
+    functional_group: Tool.MCA96
+  - name: Tipblock, 96 tips, 125ul
+    wells: null
+    functional_group: Tool.MCA384
+  - name: 1x26 16mm Tubes Empty barcode
+    wells: null
+    functional_group: Carrier.Runner
+  - name: Shaker
+    wells: null
+    functional_group: Carrier.Device
+  - name: Symbio
+    wells: null
+    functional_group: Carrier.Device
+  - name: 3 Landscape 7mm Nest Short Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 61mm Nest_MCA calibrated
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Stacker Tower 40 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: FCA Gripper
+    wells: null
+    functional_group: Tool.FCA
+  - name: BackWall 1080 LeftSide
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: 24 Nozzle Separator i300
+    wells: null
+    functional_group: Carrier.Nest
+  - name: CPAC Thermoshake Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Spacer TeVacs 36,2
+    wells: null
+    functional_group: Labware.Miscellaneous
+  - name: MCA Off Deck Waste Chute with Tip Drop Guide
+    wells: 1
+    functional_group: Labware.Wash and Waste
+  - name: 2 Grid Right 147mm
+    wells: null
+    functional_group: Carrier.Grid Segment
+  - name: MCA96 Teach Tool
+    wells: null
+    functional_group: Tool.Service
+  - name: 6 Landscape 61mm Nest
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: ODTC 96
+    wells: null
+    functional_group: Carrier.Device
+  - name: Wash Station Cleaner Back Tube Rotator
+    wells: 8
+    functional_group: Labware.Wash and Waste
+  - name: Wash Station Cleaner Front 160mm
+    wells: 8
+    functional_group: Labware.Wash and Waste
+  - name: Tube Rotator Left
+    wells: null
+    functional_group: Carrier.Device
+  - name: TeChrom RoboColumns Tray
+    wells: null
+    functional_group: Carrier.Miscellaneous
+  - name: Carousel Right 103mm Transfer
+    wells: null
+    functional_group: Carrier.Device
+  - name: 6_Trough_Carrier_Reservoir
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Landscape Nest Base Segment_1
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Lid_Labcyte
+    wells: null
+    functional_group: Labware.Lid
+  - name: MCA Thru Deck Waste Chute
+    wells: 1
+    functional_group: Labware.Wash and Waste
+  - name: 1x24 16mm Tube Rotator Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: Lid_9mm
+    wells: null
+    functional_group: Labware.Lid
+  - name: Teleshake 95 AC
+    wells: null
+    functional_group: Carrier.Device
+  - name: 4 FCA DiTi Nest Thru Deck Waste
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Piercing Needle
+    wells: null
+    functional_group: Tool.FCA
+  - name: Tipblock, 384 tips, 15ul
+    wells: null
+    functional_group: Tool.MCA384
+  - name: TroughWaste
+    wells: 1
+    functional_group: Labware.Wash and Waste
+  - name: 780 Extension Left
+    wells: null
+    functional_group: Carrier.Deck Extension
+  - name: Hydroflex
+    wells: null
+    functional_group: Carrier.Device
+  - name: Tipblock, 96 tips, 15ul
+    wells: null
+    functional_group: Tool.MCA384
+  - name: Carousel Left 103mm Transfer
+    wells: null
+    functional_group: Carrier.Device
+  - name: QC Tube Rotator Middle with Wash Station
+    wells: null
+    functional_group: Carrier.Device
+  - name: FCA Channel Gripper
+    wells: null
+    functional_group: Tool.XCA
+  - name: 1x24 13x75mm BD Tube Rotator Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: Stacker Tower Left 16 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: MCA Thru Deck Waste Chute with Tip Drop Guide
+    wells: 1
+    functional_group: Labware.Wash and Waste
+  - name: 1x24 Eppendorf Tube Runner no Tubes
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 2 MCA384 DiTi Active Nest
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Carousel Left 383mm Transfer
+    wells: null
+    functional_group: Carrier.Device
+  - name: Loading ID Left 5 Grid
+    wells: null
+    functional_group: Carrier.Device
+  - name: CPAC flat bottom
+    wells: null
+    functional_group: Carrier.Device
+  - name: Wash Station Waste Tube Rotator
+    wells: 1
+    functional_group: Labware.Wash and Waste
+  - name: Tube Rotator Middle
+    wells: null
+    functional_group: Carrier.Device
+  - name: 480 Extension Left
+    wells: null
+    functional_group: Carrier.Deck Extension
+  - name: 4 Landscape 7mm Nest
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Service Tube 100G
+    wells: 1
+    functional_group: Tool.Service
+  - name: 7mm Nest trick for trash
+    wells: null
+    functional_group: Carrier.Nest
+  - name: FRIDA Reader
+    wells: 1
+    functional_group: Labware.Miscellaneous
+  - name: MCA96 Adapter Segment
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 5 Grid Segment
+    wells: null
+    functional_group: Carrier.Grid Segment
+  - name: Fluent ID Left 4 Grid
+    wells: null
+    functional_group: Carrier.Device
+  - name: Spark
+    wells: null
+    functional_group: Carrier.Device
+  - name: CPAC Axygen 450ul Adapter
+    wells: null
+    functional_group: Carrier.3rd Party Devices
+  - name: Inheco ThermoShake
+    wells: null
+    functional_group: Carrier.Device
+  - name: 4 Landscape 7mm Nest Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 780 Extension Right
+    wells: null
+    functional_group: Carrier.Deck Extension
+  - name: Stacker Slide Left
+    wells: null
+    functional_group: Carrier.Device
+  - name: Base Plate Balance SAG28501 WXS205SDU
+    wells: null
+    functional_group: Carrier.Device
+  - name: TeVacs
+    wells: null
+    functional_group: Carrier.Device
+  - name: Front Wall 1080
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: 6x16 16mm Tube Runner no Tubes
+    wells: null
+    functional_group: Carrier.Runner
+  - name: Mettler OWS 1.0
+    wells: null
+    functional_group: Carrier.Device
+  - name: 4 Position Base Plate
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: Spacer TeVacs 10,5
+    wells: null
+    functional_group: Labware.Miscellaneous
+  - name: Lid_DiTi96
+    wells: null
+    functional_group: Labware.Lid
+  - name: Plexiglas Pane
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: 61mm Regrip Nest
+    wells: null
+    functional_group: Carrier.Nest
+  - name: ODTC 1 rear
+    wells: null
+    functional_group: Carrier.Device
+  - name: Fluent ID Left
+    wells: null
+    functional_group: Carrier.Device
+  - name: Tipblock, 384 tips, 125ul
+    wells: null
+    functional_group: Tool.MCA384
+  - name: Cytomat Base
+    wells: null
+    functional_group: Carrier.Device
+  - name: FCA, Transfer Tool
+    wells: null
+    functional_group: Labware.FCA Transfer Tool
+  - name: Inheco ThermoShaker
+    wells: null
+    functional_group: Carrier.Device
+  - name: MCA96 FES Eccentric Nest
+    wells: null
+    functional_group: Carrier.Nest
+  - name: DiTiAdapter
+    wells: null
+    functional_group: Tool.XCA
+  - name: 1x24 10x100mm Tube Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 2 x 4 Tip Waste Through Deck
+    wells: 8
+    functional_group: Labware.Wash and Waste
+  - name: Fixed Plate Fingers, Eccentric Long
+    wells: null
+    functional_group: Tool.RGA
+  - name: Tube Rotator Trough Nest
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Spacer TeVacs 33,5
+    wells: null
+    functional_group: Labware.Miscellaneous
+  - name: FixedTip TePS
+    wells: null
+    functional_group: Tool.FCA
+  - name: Carousel Left Std Transfer
+    wells: null
+    functional_group: Carrier.Device
+  - name: 480 Extension Right
+    wells: null
+    functional_group: Carrier.Deck Extension
+  - name: 4 Landscape 7mm Nest Lower Deck Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: FixedTip Reference
+    wells: null
+    functional_group: Tool.Service
+  - name: DiTi Adapter
+    wells: null
+    functional_group: Tool.FCA
+  - name: FrameSideWallLeft
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: 4 Nest Hotel
+    wells: null
+    functional_group: Carrier.Hotel
+  - name: 3 Landscape Downholder LeftAccess
+    wells: null
+    functional_group: Carrier.Runner
+  - name: Mettler OWS 2.0
+    wells: null
+    functional_group: Carrier.Device
+  - name: Base Plate Balance SAG28501 WXS205SDU_DR
+    wells: null
+    functional_group: Carrier.Device
+  - name: 96 Evaporator Manifold i300
+    wells: null
+    functional_group: Tool.i300
+  - name: 6 Nest Hotel
+    wells: null
+    functional_group: Carrier.Hotel
+  - name: Centrifuge
+    wells: null
+    functional_group: Carrier.Device
+  - name: 3 Nest Hotel Slots 1, 7, 13
+    wells: null
+    functional_group: Carrier.Hotel
+  - name: 340 Extension Left
+    wells: null
+    functional_group: Carrier.Deck Extension
+  - name: Carousel Left Tower 50mm 10 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: Infinite M200
+    wells: null
+    functional_group: Carrier.Device
+  - name: Production Cart 480
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: Landscape Nest Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 4 Landscape 61mm Nest Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 1x24 13x100mm Greiner Tube Rotator Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: Carousel Right Tower 50mm 10 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: BackWall 1080 NoSide
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: Downholder Nest Passive
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 20 Grid Back Extension
+    wells: null
+    functional_group: Carrier.Grid Segment
+  - name: Wash Station Waste 160mm
+    wells: 1
+    functional_group: Labware.Wash and Waste
+  - name: 1x24 13x100mm BD Tube Rotator Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 3 Landscape 7mm Nest Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Raptor Adapter Segment
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 2 Nest Hotel Slots 1, 10
+    wells: null
+    functional_group: Carrier.Hotel
+  - name: Stacker Left
+    wells: null
+    functional_group: Carrier.Device
+  - name: 4 Landscape 61mm Nest Off Deck Waste
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Eccentric Long
+    wells: null
+    functional_group: Tool.RGA
+  - name: 6 Position Base Unit
+    wells: null
+    functional_group: Carrier.Base Unit
+  - name: Spacer TeVacs 26,5
+    wells: null
+    functional_group: Labware.Miscellaneous
+  - name: 24x 12x75mm Tube in Holder  i300
+    wells: 24
+    functional_group: Labware.Extraction
+  - name: TOOL TEACH REFERENCE
+    wells: null
+    functional_group: Tool.Service
+  - name: Landscape Nest Base Segment Right
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 1x24 16mm Tubes Empty barcode
+    wells: null
+    functional_group: Carrier.Runner
+  - name: Carousel Left Tower 69mm 7 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: 61mm Nest_Original Copy
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Carousel Right Tower 128mm 4 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: 2 Portrait 61mm Nest Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: Wash Station Carrier 160mm
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Fixed Tube Fingers, Centric
+    wells: null
+    functional_group: Tool.RGA
+  - name: 6 Grid
+    wells: null
+    functional_group: Carrier.Grid Segment
+  - name: 2 Landscape 7mm Nest CPAC Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: Barcode Scanner
+    wells: null
+    functional_group: Carrier.Device
+  - name: Cytomat Tower 50mm 10 Nest
+    wells: null
+    functional_group: Carrier.Device
+  - name: 1x16 16mm Tube Runner No Tubes
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 1x24 13x75mm Greiner Tube Rotator Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: RoboColumns_Tall
+    wells: 96
+    functional_group: Labware.Miscellaneous
+  - name: Downholder Nest Active
+    wells: null
+    functional_group: Carrier.Nest
+plates:
+  types:
+  - name: 96 Deep Well 0.5ml
+    wells: 96
+    functional_group: Labware.Deep Well
+  - name: MagniFlex DiTiDropStation OnDeck
+    wells: 8
+    functional_group: Labware.Wash and Waste
+  - name: 96 Well Skirted PCR
+    wells: 96
+    functional_group: Labware.Microplate
+  - name: I.DOT HT plate
+    wells: 384
+    functional_group: Labware.Microplate
+  - name: 96 Well Flat
+    wells: 96
+    functional_group: Labware.Microplate
+  - name: 384 Well
+    wells: 384
+    functional_group: Labware.Microplate
+  - name: 24 Well Flat
+    wells: 24
+    functional_group: Labware.Microplate
+  - name: 48 Well Flat
+    wells: 48
+    functional_group: Labware.Microplate
+  - name: 96 Well Crystal Quick
+    wells: 96
+    functional_group: Labware.Microplate
+  - name: 61mm Nest
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 96 FA sample plate
+    wells: 96
+    functional_group: Labware.Microplate
+  - name: 96 Deep Well 1.2ml for Column Holder i300
+    wells: 96
+    functional_group: Labware.Extraction
+  - name: 384 Well PCR
+    wells: 384
+    functional_group: Labware.Microplate
+  - name: Landscape Nest Magnet Teleshake Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 96 Deep Well 2ml ThermoFisher
+    wells: 96
+    functional_group: Labware.Deep Well
+  - name: 6 Well Flat 2_1_1
+    wells: 24
+    functional_group: Labware.Microplate
+  - name: 96 Well PCR Plate DPNGS_for_FCA
+    wells: 96
+    functional_group: Labware.Microplate
+  - name: 384 Well LowVol LoBase
+    wells: 384
+    functional_group: Labware.Microplate
+  - name: 96 Deep Well 2ml
+    wells: 96
+    functional_group: Labware.Deep Well
+  - name: 24 Deep Well 10ml i300
+    wells: 24
+    functional_group: Labware.Extraction
+  - name: 384 deep well IDT
+    wells: 384
+    functional_group: Labware.Microplate
+  - name: 24 Eppendorf Adapter Magniflex
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 384 Well_1
+    wells: 384
+    functional_group: Labware.Microplate
+  - name: Eppendorf_140ul
+    wells: 384
+    functional_group: Labware.Deep Well
+  - name: 96_DW_IDT_primer
+    wells: 96
+    functional_group: Labware.Deep Well
+  - name: 384 Well LowVol Round Corning
+    wells: 384
+    functional_group: Labware.Microplate
+  - name: 384 Deep Well_IVAN
+    wells: 384
+    functional_group: Labware.Deep Well
+  - name: 24 Magnet Plate
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 384 Deep Well
+    wells: 384
+    functional_group: Labware.Deep Well
+  - name: 96 Deep Well 1.2ml for Column Plate i300
+    wells: 96
+    functional_group: Labware.Extraction
+  - name: 6 Well Flat
+    wells: 6
+    functional_group: Labware.Microplate
+  - name: 96 Well Round
+    wells: 96
+    functional_group: Labware.Microplate
+  - name: 96_ABgene_SuperPlate_Thermo_AB2800
+    wells: 96
+    functional_group: Labware.Microplate
+  - name: 96 Well PCR Plate DPNGS_for_MCA
+    wells: 96
+    functional_group: Labware.Microplate
+  - name: 7mm Nest
+    wells: null
+    functional_group: Carrier.Nest
+  - name: Echo_384LDV
+    wells: 384
+    functional_group: Labware.Microplate
+  - name: PCR Adapter 96 Well
+    wells: 96
+    functional_group: Labware.Microplate
+  - name: 96 Well Flat_2
+    wells: 96
+    functional_group: Labware.Microplate
+  - name: 1536 Well
+    wells: 1536
+    functional_group: Labware.Microplate
+  - name: LV_Alpaqua_A000350_1
+    wells: 96
+    functional_group: Labware.Microplate
+  - name: 384 Well QC Kit
+    wells: 384
+    functional_group: Labware.Microplate
+  - name: 96 Deep Well 1ml
+    wells: 96
+    functional_group: Labware.Deep Well
+  - name: 6 Well Flat 2_1_Omni
+    wells: 8
+    functional_group: Labware.Microplate
+  - name: LV_Alpaqua_A000350
+    wells: 96
+    functional_group: Labware.Microplate
+  - name: 96 Well TeVacs Filterplate
+    wells: 96
+    functional_group: Labware.Microplate
+  - name: 96 Well TeVacs Filterplate High
+    wells: 96
+    functional_group: Labware.Microplate
+  - name: LV_Alpaqua_384
+    wells: 384
+    functional_group: Labware.Microplate
+  - name: MagniFlex 6 Grid Base Plate
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 384_twin.tec_Eppendorf_00301285nn
+    wells: 384
+    functional_group: Labware.Microplate
+  - name: Lid_6 Well Flat
+    wells: null
+    functional_group: Labware.Lid
+  - name: FA 96 well plate
+    wells: 96
+    functional_group: Labware.Microplate
+  - name: 6 Well Flat 2_1
+    wells: 6
+    functional_group: Labware.Microplate
+  - name: 96 T3 QC well plate
+    wells: 96
+    functional_group: Labware.Microplate
+  - name: 384 Well LowVol HiBase
+    wells: 384
+    functional_group: Labware.Microplate
+  - name: 2 Landscape 7mm Nest Magnet Teleshake Segment
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 96 Deep Well 1ml_completly_overfilled
+    wells: 96
+    functional_group: Labware.Deep Well
+  - name: 384_Echo_PP
+    wells: 384
+    functional_group: Labware.Microplate
+  - name: 6 Well Flat 2
+    wells: 6
+    functional_group: Labware.Microplate
+  - name: 96 Well Flat_1
+    wells: 96
+    functional_group: Labware.Microplate
+  - name: 12 Well Flat
+    wells: 12
+    functional_group: Labware.Microplate
+  - name: 6 Well Flat 2_1_Omni_BIG
+    wells: 32
+    functional_group: Labware.Microplate
+  - name: 384 deep well IDT_right shift
+    wells: 384
+    functional_group: Labware.Microplate
+  - name: Nunc 96 black flat bottom
+    wells: 96
+    functional_group: Labware.Microplate
+reservoirs:
+  types:
+  - name: 1x4 100ml Trough Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: Mettler OWS Container
+    wells: 1
+    functional_group: Labware.Trough
+  - name: 100ml Trough 156mm
+    wells: 1
+    functional_group: Labware.Trough
+  - name: 1x4 100ml Trough Runner no Trough
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 25ml_short_EtOH
+    wells: 1
+    functional_group: Labware.Trough
+  - name: 100ml
+    wells: 1
+    functional_group: Labware.Trough
+  - name: MCA96 250ml
+    wells: 1
+    functional_group: Labware.Trough
+  - name: MCA96 125ml
+    wells: 1
+    functional_group: Labware.Trough
+  - name: SAG285
+    wells: 1
+    functional_group: Labware.Trough
+  - name: 600ml Trough Holder
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 24x 6ml Column in Holder i300
+    wells: 24
+    functional_group: Labware.Extraction
+  - name: 1x16 15ml Falcon Tube Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 25ml
+    wells: 1
+    functional_group: Labware.Trough
+  - name: MCA384 250ml
+    wells: 1
+    functional_group: Labware.Trough
+  - name: 3x100ml Trough Holder i300
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 300ml SBS
+    wells: 1
+    functional_group: Labware.Trough
+  - name: 5 Pos 100ml Trough Rack
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 1x24 2ml Eppendorf Tube Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 25ml_short
+    wells: 1
+    functional_group: Labware.Trough
+  - name: Segment Waste Thru Trough 8x100ml RL 00
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 1x3 320ml Trough Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 5 Pos 2ml Tube Adapter
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 1000ml Trough Runner no Trough
+    wells: null
+    functional_group: Carrier.Runner
+  - name: MCA384 125ml
+    wells: 1
+    functional_group: Labware.Trough
+  - name: 5 Pos 1.5ml Tube Adapter
+    wells: null
+    functional_group: Carrier.Nest
+  - name: 100ml Trough Double
+    wells: 2
+    functional_group: Labware.Trough
+  - name: 1x16 15ml Falcon Tube Runner no Tubes
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 96 Column Plate 1ml NBE i300
+    wells: 96
+    functional_group: Labware.Extraction
+  - name: MCA96 200ml
+    wells: 1
+    functional_group: Labware.Trough
+  - name: Waste Thru Trough 8x100ml RL 00
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 1x24 15ml Falcon Tube Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 1000ml Trough Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: WXS205_Septum
+    wells: 1
+    functional_group: Labware.Trough
+  - name: Waste Thru Trough 8x100ml
+    wells: null
+    functional_group: Carrier.Deck Segment
+  - name: 24x 3ml Column in Holder i300
+    wells: 24
+    functional_group: Labware.Extraction
+  - name: 96x 1ml Atlas Column in Holder i300
+    wells: 96
+    functional_group: Labware.Extraction
+  - name: WXS205
+    wells: 1
+    functional_group: Labware.Trough
+  - name: 60ml SBS MCA96
+    wells: 1
+    functional_group: Labware.Trough
+  - name: 320ml
+    wells: 1
+    functional_group: Labware.Trough
+  - name: 1x3 320ml Trough Runner no Trough
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 1x32 Safe Lock Tubes 2ml barcode
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 1000ml
+    wells: 1
+    functional_group: Labware.Trough
+  - name: Mettler_toledo
+    wells: 1
+    functional_group: Labware.Trough
+  - name: 1x10 50ml Falcon Tube Runner no Tubes
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 600ml
+    wells: 1
+    functional_group: Labware.Trough
+  - name: 1x10 50ml Falcon Tube Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 1x24 1.5ml Eppendorf Tube Runner
+    wells: null
+    functional_group: Carrier.Runner
+  - name: 60ml SBS
+    wells: 1
+    functional_group: Labware.Trough
+  - name: 96x 1ml NBE Column in Holder i300
+    wells: 96
+    functional_group: Labware.Extraction
+  - name: 300ml SBS_1
+    wells: 1
+    functional_group: Labware.Trough
+  - name: 25ml_short_strip_tubes
+    wells: 1
+    functional_group: Labware.Trough
+  - name: 1x24 15ml Falcon Tube Runner no Tubes
+    wells: null
+    functional_group: Carrier.Runner
+  - name: MCA384 200ml
+    wells: 1
+    functional_group: Labware.Trough
+tube_racks:
+  types:
+  - name: 16x125mm
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 10 mL Glass Cell Free DNA BCT
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 16x100mm BD Vacutainer with septum
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 16x100mm
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 13x100mm
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 15ml Falcon
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 50ml Falcon
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 16x100mm Greiner Vacuette with septum
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 13x100mm BD Vacutainer
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 16x100mm BD Vacutainer
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 13x75mm Greiner Vacuette
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 1.5ml Eppendorf
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 0.5ml Sarstedt
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 2ml Sarstedt
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 16x100mm Greiner Vacuette
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 12x75mm
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 13x75mm Greiner Vacuette with septum
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 10x100mm
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 13x75mm BD Vacutainer
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 10x75mm
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 13x75mm
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 13x100mm BD Vacutainer with septum
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 16x75mm
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 13x100mm Greiner Vacuette with septum
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 15ml Falcon_VWR
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 0.5ml Eppendorf
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 13x100mm Greiner Vacuette
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 2ml Eppendorf
+    wells: 1
+    functional_group: Labware.Tube
+  - name: 13x75mm BD Vacutainer with septum
+    wells: 1
+    functional_group: Labware.Tube
+tip_boxes:
+  types:
+  - name: MCA96, 50ul, Box_new
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: MCA96, 10ul Filtered SBS Stack5
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: FCA, 10ul Filtered Nested
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA96, 200ul Nested
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: MCA96, 200ul DiTi Base
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: MCA384, 50ul
+    wells: null
+    functional_group: Labware.MCA384 DiTi
+  - name: MCA96, 50ul Nested
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: FCA, 200ul Filtered
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA96, 100ul Nested
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: Tipblock, 200ul
+    wells: null
+    functional_group: Tool.MCA96 Tipblocks
+  - name: FCA, 1000ul Filtered
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA384, 125ul
+    wells: null
+    functional_group: Labware.MCA384 DiTi
+  - name: FCA, 200ul Filtered SBS
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA384, 50ul_Light_1
+    wells: null
+    functional_group: Labware.MCA384 DiTi
+  - name: MCA96, 500ul DiTi Base
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: MCA96, 100ul DiTi Base
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: MCA96, 1000ul Filtered SBS
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: MCA96, 200ul
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: FCA, 10ul Nested
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: FCA, 5000ul Filtered SBS
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: FCA, 350ul SBS
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: FCA, 50ul Filtered SBS
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA96, 350ul SBS
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: MCA96, 200ul Filtered SBS
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: MCA96, 100ul Filtered
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: MCA96, 150ul Filtered
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: MCA96, 1000ul Filtered Wide Bore SBS
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: MCA96, 1000ul SBS
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: FCA, 50ul Filtered
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: FCA, 50ul Filtered Short
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA96, 200ul, Box
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: FCA, 10ul Filtered SBS
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: FCA, 50ul Filtered Clear
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA96, 200ul, Box_new
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: FCA, 200ul Clear
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: FCA, 10ul Filtered SBS Stack5
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: FCA, 200ul SBS_1
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: FCA, 200ul Filtered Clear
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: FCA, 1000ul Filtered Wide Bore
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA96, 50ul
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: MCA96, 10ul Filtered Nested
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: MCA96, 10ul SBS
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: FCA, 1000ul SBS
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA96, 50ul Filtered
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: MCA96, 10ul Nested
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: MCA96, 350ul Nested
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: MCA96, 10ul SBS Stack5
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: MCA96, 200ul Wide, Box
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: FCA, 10ul Filtered
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA96, 200ul Wide Filtered
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: FCA, 350ul Nested
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA96, 50ul Nested, Stack8
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: FCA, 50ul Clear
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA96, 100ul, Box
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: MCA96, 100ul Nested, Stack8
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: FCA, 1000ul Clear
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: FCA, 1000ul
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: FCA, 200ul SBS
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: FCA, 1000ul Filtered Wide Bore SBS
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA96, 200ul Wide
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: MCA96, 50ul Filtered SBS
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: MCA384, 125ul Filtered
+    wells: null
+    functional_group: Labware.MCA384 DiTi
+  - name: MCA96, 200ul Wide Filtered, Box
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: MCA96, 100ul Filtered, Box
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: FCA, 10ul SBS Stack5
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA384, 125ul_1
+    wells: null
+    functional_group: Labware.MCA384 DiTi
+  - name: FCA, 50ul SBS
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: FCA, 200ul
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: FCA, 50ul
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA96, 150ul Filtered, Box
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: Tipblock, 50ul
+    wells: null
+    functional_group: Tool.MCA96 Tipblocks
+  - name: MCA96, 100ul
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: FCA, 1000ul Filtered Clear
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA96, 50ul Filtered, Box
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: MCA96, 200ul SBS
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: FCA, 350ul SBS, Stack5
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA96, 500ul, Box
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: MCA384, 50ul_new
+    wells: null
+    functional_group: Labware.MCA384 DiTi
+  - name: MCA96, 10ul Filtered SBS
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: MCA96, 350ul SBS Stack5
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: MCA96, 200ul Nested, Stack8
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: MCA96, 500ul Filtered, Box
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: MCA96, 500ul Filtered
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: FCA, 10ul SBS_1
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA384, 15ul Filtered
+    wells: null
+    functional_group: Labware.MCA384 DiTi
+  - name: MCA384, 50ul_Light
+    wells: null
+    functional_group: Labware.MCA384 DiTi
+  - name: FCA, 1000ul Filtered SBS
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA96, 500ul
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: MCA384, 50ul Filtered
+    wells: null
+    functional_group: Labware.MCA384 DiTi
+  - name: MCA96, 200ul, Box_Fake
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: FCA, 5000ul SBS
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: FCA, 10ul SBS
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA96, 50ul DiTi Base
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi
+  - name: FCA, 10ul
+    wells: null
+    functional_group: Labware.FCA DiTi
+  - name: MCA96, 50ul SBS
+    wells: null
+    functional_group: Labware.MCA96 DiTi
+  - name: MCA384, 15ul
+    wells: null
+    functional_group: Labware.MCA384 DiTi
+  - name: MCA96, 50ul, Box
+    wells: null
+    functional_group: Labware.MCA96 Adapter DiTi

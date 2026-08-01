@@ -1,0 +1,25 @@
+{
+  "labware": [
+    {
+      "label": "TipBox"
+    },
+    {
+      "label": "Waste"
+    }
+  ],
+  "liquid_classes": [],
+  "steps": [
+    {
+      "operation": "add_labware"
+    },
+    {
+      "operation": "add_labware"
+    },
+    {
+      "operation": "pick_up_tips"
+    },
+    {
+      "operation": "mca384_drop_tips"
+    }
+  ]
+}

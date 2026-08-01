@@ -1,0 +1,38 @@
+{
+  "labware": [
+    {
+      "label": "MCA384TipBox"
+    },
+    {
+      "label": "SourcePlate"
+    },
+    {
+      "label": "DestinationPlate"
+    }
+  ],
+  "liquid_classes": [
+    {
+      "name": "Water Free Single"
+    }
+  ],
+  "steps": [
+    {
+      "operation": "add_labware"
+    },
+    {
+      "operation": "add_labware"
+    },
+    {
+      "operation": "add_labware"
+    },
+    {
+      "operation": "pick_up_tips"
+    },
+    {
+      "operation": "aspirate"
+    },
+    {
+      "operation": "dispense"
+    }
+  ]
+}

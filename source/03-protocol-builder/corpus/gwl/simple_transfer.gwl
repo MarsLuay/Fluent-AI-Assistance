@@ -1,0 +1,14 @@
+C;Simple 4-well transfer
+A;SourcePlate;;96 Well Flat;1;;20;Water Free Single;;;
+D;DestPlate;;96 Well Flat;1;;20;Water Free Single;;;
+W;
+A;SourcePlate;;96 Well Flat;2;;20;Water Free Single;;;
+D;DestPlate;;96 Well Flat;2;;20;Water Free Single;;;
+W;
+A;SourcePlate;;96 Well Flat;3;;20;Water Free Single;;;
+D;DestPlate;;96 Well Flat;3;;20;Water Free Single;;;
+W;
+A;SourcePlate;;96 Well Flat;4;;20;Water Free Single;;;
+D;DestPlate;;96 Well Flat;4;;20;Water Free Single;;;
+W;
+B;

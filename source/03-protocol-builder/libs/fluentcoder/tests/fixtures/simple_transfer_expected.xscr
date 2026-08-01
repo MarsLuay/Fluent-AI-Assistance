@@ -1,0 +1,585 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sd:VxData xmlns:sd="http://www.tecan.com/TSCC/VisionX/VX/DataStore/VxData" dataStoreVersion="4">
+  <Payload>
+    <ObjectName>Simple transfer</ObjectName>
+    <Comment>Move liquid from one plate to another</Comment>
+    <Tags></Tags>
+    <ObjectAttributes>
+      <SingleAttribute>
+        <ObjAttrName>ParentProcessId</ObjAttrName>
+        <ObjAttrValue>00000000-0000-0000-0000-000000000000</ObjAttrValue>
+      </SingleAttribute>
+    </ObjectAttributes>
+    <Reference>
+      <Guid><NORMALIZED></Guid>
+      <TypeId>WorktableWorkspace</TypeId>
+      <ObjectName><NORMALIZED></ObjectName>
+    </Reference>
+    <Reference>
+      <Guid>e80ad9f8-534b-41b7-96fb-c2c81cfc5c03</Guid>
+      <TypeId>LiquidClass</TypeId>
+      <ObjectName>Water Free Single</ObjectName>
+    </Reference>
+    <PayloadData>
+      <Script version="2.0" contentIsDeepSave="False" contentIsApproved="False" dataVersion="1">
+        <Properties>
+          <IsProcessScript>False</IsProcessScript>
+          <ExpectedDuration>12000000000</ExpectedDuration>
+          <VxWorkspaceData xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.datacontract.org/2004/07/Tecan.VisionX.SharedGlobal">
+            <BaseWorkspaceName><NORMALIZED></BaseWorkspaceName>
+            <CameraView>&lt;WorktableCameraPosition xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.datacontract.org/2004/07/Tecan.VisionX.Worktable.Core"&gt;
+  &lt;vLook xmlns:d2p1="http://schemas.datacontract.org/2004/07/System.Windows.Media.Media3D"&gt;
+    &lt;d2p1:_x&gt;0&lt;/d2p1:_x&gt;
+    &lt;d2p1:_y&gt;0&lt;/d2p1:_y&gt;
+    &lt;d2p1:_z&gt;-1&lt;/d2p1:_z&gt;
+  &lt;/vLook&gt;
+  &lt;vPos xmlns:d2p1="http://schemas.datacontract.org/2004/07/System.Windows.Media.Media3D"&gt;
+    &lt;d2p1:_x&gt;1084.0525&lt;/d2p1:_x&gt;
+    &lt;d2p1:_y&gt;304.92265&lt;/d2p1:_y&gt;
+    &lt;d2p1:_z&gt;3177.4006185195694&lt;/d2p1:_z&gt;
+  &lt;/vPos&gt;
+  &lt;vUp xmlns:d2p1="http://schemas.datacontract.org/2004/07/System.Windows.Media.Media3D"&gt;
+    &lt;d2p1:_x&gt;0&lt;/d2p1:_x&gt;
+    &lt;d2p1:_y&gt;1&lt;/d2p1:_y&gt;
+    &lt;d2p1:_z&gt;0&lt;/d2p1:_z&gt;
+  &lt;/vUp&gt;
+&lt;/WorktableCameraPosition&gt;</CameraView>
+            <WorkspaceDeltas xmlns:d2p1="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+              <d2p1:string>&lt;VxWorkspaceDelta xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.datacontract.org/2004/07/Tecan.VisionX.Worktable.Core"&gt;
+  &lt;Identifier&gt;<NORMALIZED>&lt;/Identifier&gt;
+  &lt;Jobs xmlns:d2p1="http://schemas.datacontract.org/2004/07/Tecan.VisionX.Worktable.Core.Update" /&gt;
+&lt;/VxWorkspaceDelta&gt;</d2p1:string>
+            </WorkspaceDeltas>
+          </VxWorkspaceData>
+          <VariableDeclarations>
+            <VariableDeclarations xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.datacontract.org/2004/07/Tecan.VisionX.Scripting.Engine">
+              <VariableDeclarations xmlns:d2p1="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+
+              </VariableDeclarations>
+            </VariableDeclarations>
+          </VariableDeclarations>
+        </Properties>
+        <Commands>
+          <!--This is necessary for XmlWriter to close the 'Commands' immediately.-->
+            <ScriptGroup>
+               <Objects>
+              <Object Type="Tecan.Core.Scripting.ScriptGroupDataV1">
+                <ScriptGroupDataV1>
+                  <Name>Setup</Name>
+                  <Data Type="Tecan.Core.Scripting.Helpers.ScriptGroupBaseDataV1">
+                    <ScriptGroupBaseDataV1>
+                      <Data Type="Tecan.Core.Scripting.Helpers.ScriptStatementBaseDataV1">
+                        <ScriptStatementBaseDataV1>
+                          <IsBreakpoint>False</IsBreakpoint>
+                          <IsDisabledForExecution>False</IsDisabledForExecution>
+                          <GroupLineNumber>0</GroupLineNumber>
+                          <LineNumber>1</LineNumber>
+                        </ScriptStatementBaseDataV1>
+                      </Data>
+                      <Statements>
+                        <Object Type="Tecan.Core.Scripting.Worktable.Data.AddLabwareDataV1">
+                          <AddLabwareDataV1>
+                            <LabwareType>96 Well Flat</LabwareType>
+                            <LabwareLable>SourcePlate</LabwareLable>
+                            <Location>Site</Location>
+                            <Position>1</Position>
+                            <Rotation>0</Rotation>
+                            <HasLid>False</HasLid>
+                            <Data Type="Tecan.Core.Scripting.Programming.ProgrammingStatementBaseDataV1">
+                              <ProgrammingStatementBaseDataV1>
+                                <IsBreakpoint>False</IsBreakpoint>
+                                <IsDisabledForExecution>False</IsDisabledForExecution>
+                                <LineNumber>2</LineNumber>
+                              </ProgrammingStatementBaseDataV1>
+                            </Data>
+                          </AddLabwareDataV1>
+                        </Object>
+                        <Object Type="Tecan.Core.Scripting.Worktable.Data.AddLabwareDataV1">
+                          <AddLabwareDataV1>
+                            <LabwareType>96 Well Flat</LabwareType>
+                            <LabwareLable>DestPlate</LabwareLable>
+                            <Location>Site</Location>
+                            <Position>2</Position>
+                            <Rotation>0</Rotation>
+                            <HasLid>False</HasLid>
+                            <Data Type="Tecan.Core.Scripting.Programming.ProgrammingStatementBaseDataV1">
+                              <ProgrammingStatementBaseDataV1>
+                                <IsBreakpoint>False</IsBreakpoint>
+                                <IsDisabledForExecution>False</IsDisabledForExecution>
+                                <LineNumber>3</LineNumber>
+                              </ProgrammingStatementBaseDataV1>
+                            </Data>
+                          </AddLabwareDataV1>
+                        </Object>
+                        <Object Type="Tecan.Core.Scripting.Worktable.Data.AddLabwareDataV1">
+                          <AddLabwareDataV1>
+                            <LabwareType>MCA96, 100ul, Box</LabwareType>
+                            <LabwareLable>Tips</LabwareLable>
+                            <Location>Site</Location>
+                            <Position>4</Position>
+                            <Rotation>0</Rotation>
+                            <HasLid>False</HasLid>
+                            <Data Type="Tecan.Core.Scripting.Programming.ProgrammingStatementBaseDataV1">
+                              <ProgrammingStatementBaseDataV1>
+                                <IsBreakpoint>False</IsBreakpoint>
+                                <IsDisabledForExecution>False</IsDisabledForExecution>
+                                <LineNumber>4</LineNumber>
+                              </ProgrammingStatementBaseDataV1>
+                            </Data>
+                          </AddLabwareDataV1>
+                        </Object>
+                      </Statements>
+                    </ScriptGroupBaseDataV1>
+                  </Data>
+                </ScriptGroupDataV1>
+              </Object>
+
+              <Object Type="Tecan.Core.Scripting.ScriptGroupDataV1">
+                <ScriptGroupDataV1>
+                  <Name>Transfer</Name>
+                  <Data Type="Tecan.Core.Scripting.Helpers.ScriptGroupBaseDataV1">
+                    <ScriptGroupBaseDataV1>
+                      <Data Type="Tecan.Core.Scripting.Helpers.ScriptStatementBaseDataV1">
+                        <ScriptStatementBaseDataV1>
+                          <IsBreakpoint>False</IsBreakpoint>
+                          <IsDisabledForExecution>False</IsDisabledForExecution>
+                          <GroupLineNumber>0</GroupLineNumber>
+                          <LineNumber>5</LineNumber>
+                        </ScriptStatementBaseDataV1>
+                      </Data>
+                      <Statements>
+                        <Object Type="Tecan.Core.Instrument.Devices.Mca._384.Scripting.Mca384GetHeadAdapterScriptCommandDataV1">
+                          <Mca384GetHeadAdapterScriptCommandDataV1>
+                            <BlowoutAirgap>0</BlowoutAirgap>
+                            <Data Type="Tecan.Core.Instrument.Helpers.Scripting.ScriptCommandCommonDataV2">
+                              <ScriptCommandCommonDataV2>
+                                <LabwareName>EVA[001]</LabwareName>
+                                <LiquidClassVariablesNames />
+                                <LiquidClassVariablesValues />
+                                <Data Type="Tecan.Core.Instrument.Helpers.Scripting.DeviceAliasStatementBaseDataV1">
+                                  <DeviceAliasStatementBaseDataV1>
+                                    <Alias Type="Tecan.Core.Instrument.DeviceAlias.DeviceAlias">
+                                      <DeviceAlias>Instrument=1/Device=MCA384:1</DeviceAlias>
+                                    </Alias>
+                                    <ID>
+                                      <AvailableID>USB:TECAN,FLUENT,2203009762/MCA384:1</AvailableID>
+                                    </ID>
+                                    <Data Type="Tecan.Core.Scripting.Helpers.ScriptStatementBaseDataV1">
+                                      <ScriptStatementBaseDataV1>
+                                        <IsBreakpoint>False</IsBreakpoint>
+                                        <IsDisabledForExecution>False</IsDisabledForExecution>
+                                        <GroupLineNumber>0</GroupLineNumber>
+                                        <LineNumber>6</LineNumber>
+                                      </ScriptStatementBaseDataV1>
+                                    </Data>
+                                  </DeviceAliasStatementBaseDataV1>
+                                </Data>
+                              </ScriptCommandCommonDataV2>
+                            </Data>
+                          </Mca384GetHeadAdapterScriptCommandDataV1>
+                        </Object>
+                        <Object Type="Tecan.Core.Instrument.Devices.Mca.Mca384.Scripting.Mca384PickUpTipsScriptCommandDataV2">
+                          <Mca384PickUpTipsScriptCommandDataV2>
+                            <BlowoutAirgap>0</BlowoutAirgap>
+                            <Data Type="Tecan.Core.Instrument.Devices.Mca.Mca384.Scripting.Mca384PartialTipCommandBaseDataV2">
+                              <Mca384PartialTipCommandBaseDataV2>
+                                <PartialColumns>24</PartialColumns>
+                                <PartialRows>16</PartialRows>
+                                <PartialColumnOffset>0</PartialColumnOffset>
+                                <PartialRowsOffset>0</PartialRowsOffset>
+                                <HeadPosition>
+                                  <HeadPositions>Left</HeadPositions>
+                                </HeadPosition>
+                                <RemoveRack>False</RemoveRack>
+                                <WasteForDitis />
+                                <Data Type="Tecan.Core.Instrument.Devices.Mca._384.Scripting.Data.Mca384ScriptCommandUsingWellSelectionBaseDataV6">
+                                  <Mca384ScriptCommandUsingWellSelectionBaseDataV6>
+                                    <Data Type="Tecan.Core.Instrument.Helpers.Scripting.ScriptCommandCommonDataV2">
+                                      <ScriptCommandCommonDataV2>
+                                        <LabwareName>Tips</LabwareName>
+                                        <LiquidClassVariablesNames />
+                                        <LiquidClassVariablesValues />
+                                        <Data Type="Tecan.Core.Instrument.Helpers.Scripting.DeviceAliasStatementBaseDataV1">
+                                          <DeviceAliasStatementBaseDataV1>
+                                            <Alias Type="Tecan.Core.Instrument.DeviceAlias.DeviceAlias">
+                                              <DeviceAlias>Instrument=1/Device=MCA384:1</DeviceAlias>
+                                            </Alias>
+                                            <ID>
+                                              <AvailableID>USB:TECAN,FLUENT,2203009762/MCA384:1</AvailableID>
+                                            </ID>
+                                            <Data Type="Tecan.Core.Scripting.Helpers.ScriptStatementBaseDataV1">
+                                              <ScriptStatementBaseDataV1>
+                                                <IsBreakpoint>False</IsBreakpoint>
+                                                <IsDisabledForExecution>False</IsDisabledForExecution>
+                                                <GroupLineNumber>0</GroupLineNumber>
+                                                <LineNumber>7</LineNumber>
+                                              </ScriptStatementBaseDataV1>
+                                            </Data>
+                                          </DeviceAliasStatementBaseDataV1>
+                                        </Data>
+                                      </ScriptCommandCommonDataV2>
+                                    </Data>
+                                    <WellOffset>0</WellOffset>
+                                    <PositionFirstTip>
+                                      <Point>
+                                        <X>0</X>
+                                        <Y>0</Y>
+                                      </Point>
+                                    </PositionFirstTip>
+                                    <Compartment>1</Compartment>
+                                    <AdapterPlate>
+                                      <AdapterData>
+                                        <Name>EVA (Extended Volume)</Name>
+                                        <Type>DiTiAdapter</Type>
+                                        <CanMountTecanDiTis>true</CanMountTecanDiTis>
+                                        <XCount>12</XCount>
+                                        <YCount>8</YCount>
+                                        <XSpacing>9</XSpacing>
+                                        <YSpacing>9</YSpacing>
+                                        <ID>TOOLTYPE:Mca384.Adapter/TOOLNAME:DiTi96.ExtVol</ID>
+                                        <UsableTips>
+                                          <UsableTips>All</UsableTips>
+                                        </UsableTips>
+                                        <SortNumber>50</SortNumber>
+                                        <MountColumnRowWise>false</MountColumnRowWise>
+                                      </AdapterData>
+                                    </AdapterPlate>
+                                    <UsedTip>
+                                      <UsableTips>All</UsableTips>
+                                    </UsedTip>
+                                    <FirstTipXPosition>1</FirstTipXPosition>
+                                    <FirstTipYPosition>1</FirstTipYPosition>
+                                    <LastTipXPosition>12</LastTipXPosition>
+                                    <LastTipYPosition>8</LastTipYPosition>
+                                    <Column>0</Column>
+                                    <Row>0</Row>
+                                    <RowOffset>0</RowOffset>
+                                    <ColumnOffset>0</ColumnOffset>
+                                    <OrientationPhi>0</OrientationPhi>
+                                    <OrientationPsi>0</OrientationPsi>
+                                    <OrientationTheta>0</OrientationTheta>
+                                    <SelectedRowsOrColumns />
+                                    <SubsequentPipettingDirectionIsRow>False</SubsequentPipettingDirectionIsRow>
+                                    <LiquidClassVariablesNames />
+                                    <LiquidClassVariablesValues />
+                                  </Mca384ScriptCommandUsingWellSelectionBaseDataV6>
+                                </Data>
+                              </Mca384PartialTipCommandBaseDataV2>
+                            </Data>
+                          </Mca384PickUpTipsScriptCommandDataV2>
+                        </Object>
+                        <Object Type="Tecan.Core.Scripting.Commands.Mca384.Mca384AspirateScriptCommandDataV2">
+                          <Mca384AspirateScriptCommandDataV2>
+                            <Data Type="Tecan.Core.Instrument.Devices.Mca.Mca384.Scripting.Mca384PipettingWithVolumesScriptCommandDataV2">
+                              <Mca384PipettingWithVolumesScriptCommandDataV2>
+                                <LiquidClassName>Water Free Single</LiquidClassName>
+                                <Volume>20</Volume>
+                                <IsLiquidClassNameByExpressionEnabled>False</IsLiquidClassNameByExpressionEnabled>
+                                <LiquidClassNameBySelection>Water Free Single</LiquidClassNameBySelection>
+                                <LiquidClassNameByExpression />
+                                <OffsetX>0</OffsetX>
+                                <OffsetY>0</OffsetY>
+                                <Data Type="Tecan.Core.Instrument.Devices.Mca._384.Scripting.Data.Mca384ScriptCommandUsingWellSelectionBaseDataV6">
+                                  <Mca384ScriptCommandUsingWellSelectionBaseDataV6>
+                                    <Data Type="Tecan.Core.Instrument.Helpers.Scripting.ScriptCommandCommonDataV2">
+                                      <ScriptCommandCommonDataV2>
+                                        <LabwareName>SourcePlate</LabwareName>
+                                        <LiquidClassVariablesNames />
+                                        <LiquidClassVariablesValues />
+                                        <Data Type="Tecan.Core.Instrument.Helpers.Scripting.DeviceAliasStatementBaseDataV1">
+                                          <DeviceAliasStatementBaseDataV1>
+                                            <Alias Type="Tecan.Core.Instrument.DeviceAlias.DeviceAlias">
+                                              <DeviceAlias>Instrument=1/Device=MCA384:1</DeviceAlias>
+                                            </Alias>
+                                            <ID>
+                                              <AvailableID>USB:TECAN,FLUENT,2203009762/MCA384:1</AvailableID>
+                                            </ID>
+                                            <Data Type="Tecan.Core.Scripting.Helpers.ScriptStatementBaseDataV1">
+                                              <ScriptStatementBaseDataV1>
+                                                <IsBreakpoint>False</IsBreakpoint>
+                                                <IsDisabledForExecution>False</IsDisabledForExecution>
+                                                <GroupLineNumber>0</GroupLineNumber>
+                                                <LineNumber>8</LineNumber>
+                                              </ScriptStatementBaseDataV1>
+                                            </Data>
+                                          </DeviceAliasStatementBaseDataV1>
+                                        </Data>
+                                      </ScriptCommandCommonDataV2>
+                                    </Data>
+                                    <WellOffset>0</WellOffset>
+                                    <PositionFirstTip>
+                                      <Point>
+                                        <X>0</X>
+                                        <Y>0</Y>
+                                      </Point>
+                                    </PositionFirstTip>
+                                    <Compartment>1</Compartment>
+                                    <AdapterPlate>
+                                      <AdapterData>
+                                        <Name>EVA (Extended Volume)</Name>
+                                        <Type>DiTiAdapter</Type>
+                                        <CanMountTecanDiTis>true</CanMountTecanDiTis>
+                                        <XCount>12</XCount>
+                                        <YCount>8</YCount>
+                                        <XSpacing>9</XSpacing>
+                                        <YSpacing>9</YSpacing>
+                                        <ID>TOOLTYPE:Mca384.Adapter/TOOLNAME:DiTi96.ExtVol</ID>
+                                        <UsableTips>
+                                          <UsableTips>All</UsableTips>
+                                        </UsableTips>
+                                        <SortNumber>50</SortNumber>
+                                        <MountColumnRowWise>false</MountColumnRowWise>
+                                      </AdapterData>
+                                    </AdapterPlate>
+                                    <UsedTip>
+                                      <UsableTips>All</UsableTips>
+                                    </UsedTip>
+                                    <FirstTipXPosition>1</FirstTipXPosition>
+                                    <FirstTipYPosition>1</FirstTipYPosition>
+                                    <LastTipXPosition>12</LastTipXPosition>
+                                    <LastTipYPosition>8</LastTipYPosition>
+                                    <Column>0</Column>
+                                    <Row>0</Row>
+                                    <RowOffset>0</RowOffset>
+                                    <ColumnOffset>0</ColumnOffset>
+                                    <OrientationPhi>0</OrientationPhi>
+                                    <OrientationPsi>0</OrientationPsi>
+                                    <OrientationTheta>0</OrientationTheta>
+                                    <SelectedRowsOrColumns />
+                                    <SubsequentPipettingDirectionIsRow>False</SubsequentPipettingDirectionIsRow>
+                                    <LiquidClassVariablesNames />
+                                    <LiquidClassVariablesValues />
+                                  </Mca384ScriptCommandUsingWellSelectionBaseDataV6>
+                                </Data>
+                              </Mca384PipettingWithVolumesScriptCommandDataV2>
+                            </Data>
+                          </Mca384AspirateScriptCommandDataV2>
+                        </Object>
+                        <Object Type="Tecan.Core.Scripting.Commands.Mca384.Mca384DispenseScriptCommandDataV2">
+                          <Mca384DispenseScriptCommandDataV2>
+                            <Data Type="Tecan.Core.Instrument.Devices.Mca.Mca384.Scripting.Mca384PipettingWithVolumesScriptCommandDataV2">
+                              <Mca384PipettingWithVolumesScriptCommandDataV2>
+                                <LiquidClassName>Water Free Single</LiquidClassName>
+                                <Volume>20</Volume>
+                                <IsLiquidClassNameByExpressionEnabled>False</IsLiquidClassNameByExpressionEnabled>
+                                <LiquidClassNameBySelection>Water Free Single</LiquidClassNameBySelection>
+                                <LiquidClassNameByExpression />
+                                <OffsetX>0</OffsetX>
+                                <OffsetY>0</OffsetY>
+                                <Data Type="Tecan.Core.Instrument.Devices.Mca._384.Scripting.Data.Mca384ScriptCommandUsingWellSelectionBaseDataV6">
+                                  <Mca384ScriptCommandUsingWellSelectionBaseDataV6>
+                                    <Data Type="Tecan.Core.Instrument.Helpers.Scripting.ScriptCommandCommonDataV2">
+                                      <ScriptCommandCommonDataV2>
+                                        <LabwareName>DestPlate</LabwareName>
+                                        <LiquidClassVariablesNames />
+                                        <LiquidClassVariablesValues />
+                                        <Data Type="Tecan.Core.Instrument.Helpers.Scripting.DeviceAliasStatementBaseDataV1">
+                                          <DeviceAliasStatementBaseDataV1>
+                                            <Alias Type="Tecan.Core.Instrument.DeviceAlias.DeviceAlias">
+                                              <DeviceAlias>Instrument=1/Device=MCA384:1</DeviceAlias>
+                                            </Alias>
+                                            <ID>
+                                              <AvailableID>USB:TECAN,FLUENT,2203009762/MCA384:1</AvailableID>
+                                            </ID>
+                                            <Data Type="Tecan.Core.Scripting.Helpers.ScriptStatementBaseDataV1">
+                                              <ScriptStatementBaseDataV1>
+                                                <IsBreakpoint>False</IsBreakpoint>
+                                                <IsDisabledForExecution>False</IsDisabledForExecution>
+                                                <GroupLineNumber>0</GroupLineNumber>
+                                                <LineNumber>9</LineNumber>
+                                              </ScriptStatementBaseDataV1>
+                                            </Data>
+                                          </DeviceAliasStatementBaseDataV1>
+                                        </Data>
+                                      </ScriptCommandCommonDataV2>
+                                    </Data>
+                                    <WellOffset>0</WellOffset>
+                                    <PositionFirstTip>
+                                      <Point>
+                                        <X>0</X>
+                                        <Y>0</Y>
+                                      </Point>
+                                    </PositionFirstTip>
+                                    <Compartment>1</Compartment>
+                                    <AdapterPlate>
+                                      <AdapterData>
+                                        <Name>EVA (Extended Volume)</Name>
+                                        <Type>DiTiAdapter</Type>
+                                        <CanMountTecanDiTis>true</CanMountTecanDiTis>
+                                        <XCount>12</XCount>
+                                        <YCount>8</YCount>
+                                        <XSpacing>9</XSpacing>
+                                        <YSpacing>9</YSpacing>
+                                        <ID>TOOLTYPE:Mca384.Adapter/TOOLNAME:DiTi96.ExtVol</ID>
+                                        <UsableTips>
+                                          <UsableTips>All</UsableTips>
+                                        </UsableTips>
+                                        <SortNumber>50</SortNumber>
+                                        <MountColumnRowWise>false</MountColumnRowWise>
+                                      </AdapterData>
+                                    </AdapterPlate>
+                                    <UsedTip>
+                                      <UsableTips>All</UsableTips>
+                                    </UsedTip>
+                                    <FirstTipXPosition>1</FirstTipXPosition>
+                                    <FirstTipYPosition>1</FirstTipYPosition>
+                                    <LastTipXPosition>12</LastTipXPosition>
+                                    <LastTipYPosition>8</LastTipYPosition>
+                                    <Column>0</Column>
+                                    <Row>0</Row>
+                                    <RowOffset>0</RowOffset>
+                                    <ColumnOffset>0</ColumnOffset>
+                                    <OrientationPhi>0</OrientationPhi>
+                                    <OrientationPsi>0</OrientationPsi>
+                                    <OrientationTheta>0</OrientationTheta>
+                                    <SelectedRowsOrColumns />
+                                    <SubsequentPipettingDirectionIsRow>False</SubsequentPipettingDirectionIsRow>
+                                    <LiquidClassVariablesNames />
+                                    <LiquidClassVariablesValues />
+                                  </Mca384ScriptCommandUsingWellSelectionBaseDataV6>
+                                </Data>
+                              </Mca384PipettingWithVolumesScriptCommandDataV2>
+                            </Data>
+                          </Mca384DispenseScriptCommandDataV2>
+                        </Object>
+                        <Object Type="Tecan.Core.Instrument.Devices.Mca.Mca384.Scripting.Mca384SetTipsBackScriptCommandDataV2">
+                          <Mca384SetTipsBackScriptCommandDataV2>
+                            <UseSourceAsBackPosition>
+                              <Backs>BackToPosition</Backs>
+                            </UseSourceAsBackPosition>
+                            <Data Type="Tecan.Core.Instrument.Devices.Mca.Mca384.Scripting.Mca384PartialTipCommandBaseDataV2">
+                              <Mca384PartialTipCommandBaseDataV2>
+                                <PartialColumns>24</PartialColumns>
+                                <PartialRows>16</PartialRows>
+                                <PartialColumnOffset>0</PartialColumnOffset>
+                                <PartialRowsOffset>0</PartialRowsOffset>
+                                <HeadPosition>
+                                  <HeadPositions>Left</HeadPositions>
+                                </HeadPosition>
+                                <RemoveRack>False</RemoveRack>
+                                <WasteForDitis />
+                                <Data Type="Tecan.Core.Instrument.Devices.Mca._384.Scripting.Data.Mca384ScriptCommandUsingWellSelectionBaseDataV6">
+                                  <Mca384ScriptCommandUsingWellSelectionBaseDataV6>
+                                    <Data Type="Tecan.Core.Instrument.Helpers.Scripting.ScriptCommandCommonDataV2">
+                                      <ScriptCommandCommonDataV2>
+                                        <LabwareName>Tips</LabwareName>
+                                        <LiquidClassVariablesNames />
+                                        <LiquidClassVariablesValues />
+                                        <Data Type="Tecan.Core.Instrument.Helpers.Scripting.DeviceAliasStatementBaseDataV1">
+                                          <DeviceAliasStatementBaseDataV1>
+                                            <Alias Type="Tecan.Core.Instrument.DeviceAlias.DeviceAlias">
+                                              <DeviceAlias>Instrument=1/Device=MCA384:1</DeviceAlias>
+                                            </Alias>
+                                            <ID>
+                                              <AvailableID>USB:TECAN,FLUENT,2203009762/MCA384:1</AvailableID>
+                                            </ID>
+                                            <Data Type="Tecan.Core.Scripting.Helpers.ScriptStatementBaseDataV1">
+                                              <ScriptStatementBaseDataV1>
+                                                <IsBreakpoint>False</IsBreakpoint>
+                                                <IsDisabledForExecution>False</IsDisabledForExecution>
+                                                <GroupLineNumber>0</GroupLineNumber>
+                                                <LineNumber>10</LineNumber>
+                                              </ScriptStatementBaseDataV1>
+                                            </Data>
+                                          </DeviceAliasStatementBaseDataV1>
+                                        </Data>
+                                      </ScriptCommandCommonDataV2>
+                                    </Data>
+                                    <WellOffset>0</WellOffset>
+                                    <PositionFirstTip>
+                                      <Point>
+                                        <X>0</X>
+                                        <Y>0</Y>
+                                      </Point>
+                                    </PositionFirstTip>
+                                    <Compartment>1</Compartment>
+                                    <AdapterPlate>
+                                      <AdapterData>
+                                        <Name>EVA (Extended Volume)</Name>
+                                        <Type>DiTiAdapter</Type>
+                                        <CanMountTecanDiTis>true</CanMountTecanDiTis>
+                                        <XCount>12</XCount>
+                                        <YCount>8</YCount>
+                                        <XSpacing>9</XSpacing>
+                                        <YSpacing>9</YSpacing>
+                                        <ID>TOOLTYPE:Mca384.Adapter/TOOLNAME:DiTi96.ExtVol</ID>
+                                        <UsableTips>
+                                          <UsableTips>All</UsableTips>
+                                        </UsableTips>
+                                        <SortNumber>50</SortNumber>
+                                        <MountColumnRowWise>false</MountColumnRowWise>
+                                      </AdapterData>
+                                    </AdapterPlate>
+                                    <UsedTip>
+                                      <UsableTips>All</UsableTips>
+                                    </UsedTip>
+                                    <FirstTipXPosition>1</FirstTipXPosition>
+                                    <FirstTipYPosition>1</FirstTipYPosition>
+                                    <LastTipXPosition>12</LastTipXPosition>
+                                    <LastTipYPosition>8</LastTipYPosition>
+                                    <Column>0</Column>
+                                    <Row>0</Row>
+                                    <RowOffset>0</RowOffset>
+                                    <ColumnOffset>0</ColumnOffset>
+                                    <OrientationPhi>0</OrientationPhi>
+                                    <OrientationPsi>0</OrientationPsi>
+                                    <OrientationTheta>0</OrientationTheta>
+                                    <SelectedRowsOrColumns />
+                                    <SubsequentPipettingDirectionIsRow>False</SubsequentPipettingDirectionIsRow>
+                                    <LiquidClassVariablesNames />
+                                    <LiquidClassVariablesValues />
+                                  </Mca384ScriptCommandUsingWellSelectionBaseDataV6>
+                                </Data>
+                              </Mca384PartialTipCommandBaseDataV2>
+                            </Data>
+                          </Mca384SetTipsBackScriptCommandDataV2>
+                        </Object>
+                        <Object Type="Tecan.Core.Instrument.Devices.Mca.Mca384.Scripting.Mca384DropHeadAdapterScriptCommandDataV1">
+                          <Mca384DropHeadAdapterScriptCommandDataV1>
+                            <GetLabwareName />
+                            <BlowoutAirgap>0</BlowoutAirgap>
+                            <UseSourceAsBackPosition>
+                              <Backs>BackToSource</Backs>
+                            </UseSourceAsBackPosition>
+                            <AdapterAfterDrop>False</AdapterAfterDrop>
+                            <Data Type="Tecan.Core.Instrument.Helpers.Scripting.ScriptCommandCommonDataV2">
+                              <ScriptCommandCommonDataV2>
+                                <LabwareName>EVA[001]</LabwareName>
+                                <LiquidClassVariablesNames />
+                                <LiquidClassVariablesValues />
+                                <Data Type="Tecan.Core.Instrument.Helpers.Scripting.DeviceAliasStatementBaseDataV1">
+                                  <DeviceAliasStatementBaseDataV1>
+                                    <Alias Type="Tecan.Core.Instrument.DeviceAlias.DeviceAlias">
+                                      <DeviceAlias>Instrument=1/Device=MCA384:1</DeviceAlias>
+                                    </Alias>
+                                    <ID>
+                                      <AvailableID>USB:TECAN,FLUENT,2203009762/MCA384:1</AvailableID>
+                                    </ID>
+                                    <Data Type="Tecan.Core.Scripting.Helpers.ScriptStatementBaseDataV1">
+                                      <ScriptStatementBaseDataV1>
+                                        <IsBreakpoint>False</IsBreakpoint>
+                                        <IsDisabledForExecution>False</IsDisabledForExecution>
+                                        <GroupLineNumber>0</GroupLineNumber>
+                                        <LineNumber>11</LineNumber>
+                                      </ScriptStatementBaseDataV1>
+                                    </Data>
+                                  </DeviceAliasStatementBaseDataV1>
+                                </Data>
+                              </ScriptCommandCommonDataV2>
+                            </Data>
+                          </Mca384DropHeadAdapterScriptCommandDataV1>
+                        </Object>
+                      </Statements>
+                    </ScriptGroupBaseDataV1>
+                  </Data>
+                </ScriptGroupDataV1>
+              </Object>
+
+                </Objects>
+              </ScriptGroup>
+        </Commands>
+      </Script>
+    </PayloadData>
+  </Payload>
+  <Checksum></Checksum>
+</sd:VxData>

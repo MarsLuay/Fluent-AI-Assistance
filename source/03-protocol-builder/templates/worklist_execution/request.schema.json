@@ -1,0 +1,69 @@
+{
+  "$id": "https://fluent-ai-assistance.local/templates/worklist_execution/request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "request": {
+      "properties": {
+        "intent": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "intent"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "tecan.request_spec.v1"
+    },
+    "template": {
+      "properties": {
+        "name": {
+          "const": "worklist_execution"
+        },
+        "parameters": {
+          "properties": {
+            "destination_plate": {
+              "type": "string"
+            },
+            "liquid_class": {
+              "type": "string"
+            },
+            "source_plate": {
+              "type": "string"
+            },
+            "worklist_format": {
+              "enum": [
+                "gwl"
+              ],
+              "type": "string"
+            },
+            "worklist_path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "worklist_path",
+            "worklist_format",
+            "source_plate",
+            "destination_plate"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "parameters"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "request",
+    "template"
+  ],
+  "title": "Worklist Execution Template Request",
+  "type": "object"
+}

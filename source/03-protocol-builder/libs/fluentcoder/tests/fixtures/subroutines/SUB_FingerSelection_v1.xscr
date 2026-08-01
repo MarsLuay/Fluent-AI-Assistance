@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VxData>
+  <Payload>
+    <ObjectName>SUB_FingerSelection_v1</ObjectName>
+    <ObjectSubfolderPath>TEST</ObjectSubfolderPath>
+    <Comment />
+    <Reference>
+      <Guid>11111111-1234-aaaa-ffff-000000000555</Guid>
+      <TypeId>WorktableWorkspace</TypeId>
+      <ObjectName>780_Empty</ObjectName>
+    </Reference>
+    <ScriptGroup>
+      <Objects>
+        <Object Type="Tecan.Core.Scripting.LoopGroup">
+          <LoopGroup>
+            <Name>Finger selection loops</Name>
+            <LoopVariable>FingerSelection</LoopVariable>
+            <NumberOfLoops>FingerSelection</NumberOfLoops>
+            <Objects>
+              <Object Type="Tecan.Core.Scripting.CommentStatement">
+                <CommentStatement>
+                  <Text>finger iteration</Text>
+                </CommentStatement>
+              </Object>
+            </Objects>
+          </LoopGroup>
+        </Object>
+      </Objects>
+      <Name>Steps</Name>
+    </ScriptGroup>
+  </Payload>
+</VxData>

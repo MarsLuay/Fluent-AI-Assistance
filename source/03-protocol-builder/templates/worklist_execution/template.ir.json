@@ -1,0 +1,169 @@
+{
+  "dependencies": [
+    {
+      "kind": "template",
+      "name": "worklist_execution",
+      "required": false
+    }
+  ],
+  "id": "template_worklist_execution",
+  "ir_version": "tecan.protocol_ir.v2",
+  "labware": [
+    {
+      "catalog": "96 Well Flat",
+      "id": "source_plate",
+      "label": "SourcePlate",
+      "location": "Site",
+      "position": 1,
+      "python_class": "Plate96",
+      "role": "source"
+    },
+    {
+      "catalog": "96 Well Flat",
+      "id": "destination_plate",
+      "label": "DestinationPlate",
+      "location": "Site",
+      "position": 2,
+      "python_class": "Plate96",
+      "role": "destination"
+    },
+    {
+      "catalog": "MCA96, 100ul, Box",
+      "id": "tips",
+      "label": "Tips",
+      "location": "Site",
+      "position": 4,
+      "python_class": "MCA100Box",
+      "role": "tips"
+    }
+  ],
+  "liquid_classes": [
+    {
+      "name": "Water Free Single",
+      "role": "pipetting"
+    }
+  ],
+  "protocol": {
+    "comment": "Template shape for executing a generated or user-provided worklist with explicit context labware.",
+    "name": "Template Worklist Execution",
+    "schema_intent": "canonical reusable template shape"
+  },
+  "reagents": [],
+  "safety_assumptions": [
+    {
+      "id": "template_requires_review",
+      "text": "Confirm worklist file path, rack labels, rack types, liquid classes, and FluentControl worklist import settings before use."
+    },
+    {
+      "id": "manual_validation_required",
+      "text": "Generated artifacts must be reviewed, simulated, and validated in FluentControl before instrument use."
+    }
+  ],
+  "source": {
+    "format": "template_protocol",
+    "path": "templates/worklist_execution/template.ir.json",
+    "template": "worklist_execution"
+  },
+  "steps": [
+    {
+      "group": "Setup",
+      "id": "step_001",
+      "index": 1,
+      "name": "Add Source Plate",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "SourcePlate",
+        "labware_type": "96 Well Flat",
+        "location": "Site",
+        "position": 1
+      },
+      "target_labware": "SourcePlate"
+    },
+    {
+      "group": "Setup",
+      "id": "step_002",
+      "index": 2,
+      "name": "Add Destination Plate",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "DestinationPlate",
+        "labware_type": "96 Well Flat",
+        "location": "Site",
+        "position": 2
+      },
+      "target_labware": "DestinationPlate"
+    },
+    {
+      "group": "Setup",
+      "id": "step_003",
+      "index": 3,
+      "name": "Add Tip Box",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "Tips",
+        "labware_type": "MCA96, 100ul, Box",
+        "location": "Site",
+        "position": 4
+      },
+      "target_labware": "Tips"
+    },
+    {
+      "group": "Worklist",
+      "id": "step_004",
+      "index": 4,
+      "name": "Confirm Worklist File",
+      "operation": "prompt_user",
+      "parameters": {
+        "prompt": "Confirm the worklist file is present and approved for this run."
+      }
+    },
+    {
+      "group": "Worklist",
+      "id": "step_005",
+      "index": 5,
+      "name": "Read Worklist",
+      "operation": "read_worklist",
+      "parameters": {
+        "path": "generated_worklist.gwl",
+        "worklist_name": "GeneratedWorklist"
+      },
+      "target_labware": "DestinationPlate"
+    },
+    {
+      "group": "Cleanup",
+      "id": "step_006",
+      "index": 6,
+      "name": "Worklist Complete",
+      "operation": "comment",
+      "parameters": {
+        "text": "Review FluentControl worklist execution logs before release."
+      }
+    }
+  ],
+  "template": {
+    "description": "Worklist execution skeleton with explicit labware context and request-time worklist path.",
+    "name": "worklist_execution",
+    "request_schema": "request.schema.json",
+    "version": 1
+  },
+  "variables": [
+    {
+      "default": "generated_worklist.gwl",
+      "name": "worklist_path",
+      "type": "path"
+    }
+  ],
+  "worklists": [
+    {
+      "format": "gwl",
+      "name": "GeneratedWorklist",
+      "path": "generated_worklist.gwl",
+      "required": true
+    }
+  ],
+  "worktable": {
+    "auto_place": false,
+    "guid": "",
+    "name": "Template Worktable"
+  }
+}

@@ -1,0 +1,297 @@
+{
+  "dependencies": [
+    {
+      "kind": "template",
+      "name": "tip_strategy_test",
+      "required": false
+    }
+  ],
+  "id": "template_tip_strategy_test",
+  "ir_version": "tecan.protocol_ir.v2",
+  "labware": [
+    {
+      "catalog": "Reagent Reservoir",
+      "id": "water_reservoir",
+      "label": "WaterReservoir",
+      "location": "Site",
+      "position": 1,
+      "python_class": "Plate96",
+      "role": "source"
+    },
+    {
+      "catalog": "96 Well Flat",
+      "id": "test_plate",
+      "label": "TestPlate",
+      "location": "Site",
+      "position": 2,
+      "python_class": "Plate96",
+      "role": "destination"
+    },
+    {
+      "catalog": "MCA96, 100ul, Box",
+      "id": "tip_box",
+      "label": "TipBox",
+      "location": "Site",
+      "position": 3,
+      "python_class": "MCA100Box",
+      "role": "tips"
+    },
+    {
+      "catalog": "MCA96, 100ul, Box",
+      "id": "return_tip_box",
+      "label": "ReturnTipBox",
+      "location": "Site",
+      "position": 4,
+      "python_class": "MCA100Box",
+      "role": "tips"
+    },
+    {
+      "catalog": "Waste",
+      "id": "waste",
+      "label": "Waste",
+      "location": "Site",
+      "position": 5,
+      "python_class": "Plate96",
+      "role": "waste"
+    }
+  ],
+  "liquid_classes": [
+    {
+      "name": "Water Free Single",
+      "role": "pipetting"
+    }
+  ],
+  "protocol": {
+    "comment": "Template shape for testing tip pickup, return, reuse, drop, and wash behavior.",
+    "name": "Template Tip Strategy Test",
+    "schema_intent": "canonical reusable template shape"
+  },
+  "reagents": [
+    {
+      "id": "water",
+      "name": "Water",
+      "role": "test_liquid"
+    }
+  ],
+  "safety_assumptions": [
+    {
+      "id": "template_requires_review",
+      "text": "Use this only as a dry-run/simulation-oriented shape until tip reuse and wash behavior are validated on the target method."
+    },
+    {
+      "id": "manual_validation_required",
+      "text": "Generated artifacts must be reviewed, simulated, and validated in FluentControl before instrument use."
+    }
+  ],
+  "source": {
+    "format": "template_protocol",
+    "path": "templates/tip_strategy_test/template.ir.json",
+    "template": "tip_strategy_test"
+  },
+  "steps": [
+    {
+      "group": "Setup",
+      "id": "step_001",
+      "index": 1,
+      "name": "Add Water Reservoir",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "WaterReservoir",
+        "labware_type": "Reagent Reservoir",
+        "location": "Site",
+        "position": 1
+      },
+      "target_labware": "WaterReservoir"
+    },
+    {
+      "group": "Setup",
+      "id": "step_002",
+      "index": 2,
+      "name": "Add Test Plate",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "TestPlate",
+        "labware_type": "96 Well Flat",
+        "location": "Site",
+        "position": 2
+      },
+      "target_labware": "TestPlate"
+    },
+    {
+      "group": "Setup",
+      "id": "step_003",
+      "index": 3,
+      "name": "Add Tip Box",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "TipBox",
+        "labware_type": "MCA96, 100ul, Box",
+        "location": "Site",
+        "position": 3
+      },
+      "target_labware": "TipBox"
+    },
+    {
+      "group": "Setup",
+      "id": "step_004",
+      "index": 4,
+      "name": "Add Return Tip Box",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "ReturnTipBox",
+        "labware_type": "MCA96, 100ul, Box",
+        "location": "Site",
+        "position": 4
+      },
+      "target_labware": "ReturnTipBox"
+    },
+    {
+      "group": "Setup",
+      "id": "step_005",
+      "index": 5,
+      "name": "Add Waste",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "Waste",
+        "labware_type": "Waste",
+        "location": "Site",
+        "position": 5
+      },
+      "target_labware": "Waste"
+    },
+    {
+      "group": "Tip Strategy",
+      "id": "step_006",
+      "index": 6,
+      "name": "Pick Up Fresh Tips",
+      "operation": "pick_up_tips",
+      "parameters": {
+        "tip_strategy": "fresh"
+      },
+      "target_labware": "TipBox"
+    },
+    {
+      "group": "Tip Strategy",
+      "id": "step_007",
+      "index": 7,
+      "liquid_class": "Water Free Single",
+      "name": "Aspirate Test Liquid",
+      "operation": "aspirate",
+      "parameters": {
+        "source_well": "A1"
+      },
+      "source_labware": "WaterReservoir",
+      "target_labware": "WaterReservoir",
+      "volume_ul": 10
+    },
+    {
+      "destination_labware": "TestPlate",
+      "group": "Tip Strategy",
+      "id": "step_008",
+      "index": 8,
+      "liquid_class": "Water Free Single",
+      "name": "Dispense Test Liquid",
+      "operation": "dispense",
+      "parameters": {
+        "destination_well": "A1"
+      },
+      "target_labware": "TestPlate",
+      "volume_ul": 10
+    },
+    {
+      "group": "Tip Strategy",
+      "id": "step_009",
+      "index": 9,
+      "name": "Return Tips",
+      "operation": "set_tips_back",
+      "parameters": {
+        "tip_strategy": "return_for_reuse"
+      },
+      "target_labware": "ReturnTipBox"
+    },
+    {
+      "group": "Tip Strategy",
+      "id": "step_010",
+      "index": 10,
+      "name": "Pick Up Returned Tips",
+      "operation": "pick_up_tips",
+      "parameters": {
+        "tip_strategy": "reuse_returned"
+      },
+      "target_labware": "ReturnTipBox"
+    },
+    {
+      "group": "Tip Strategy",
+      "id": "step_011",
+      "index": 11,
+      "liquid_class": "Water Free Single",
+      "name": "Aspirate Reuse Test Liquid",
+      "operation": "aspirate",
+      "parameters": {
+        "source_well": "A1"
+      },
+      "source_labware": "WaterReservoir",
+      "target_labware": "WaterReservoir",
+      "volume_ul": 10
+    },
+    {
+      "destination_labware": "TestPlate",
+      "group": "Tip Strategy",
+      "id": "step_012",
+      "index": 12,
+      "liquid_class": "Water Free Single",
+      "name": "Dispense Reuse Test Liquid",
+      "operation": "dispense",
+      "parameters": {
+        "destination_well": "B1"
+      },
+      "target_labware": "TestPlate",
+      "volume_ul": 10
+    },
+    {
+      "group": "Cleanup",
+      "id": "step_013",
+      "index": 13,
+      "name": "Drop Tips To Waste",
+      "operation": "mca384_drop_tips",
+      "parameters": {
+        "tip_strategy": "drop_to_waste"
+      },
+      "target_labware": "Waste"
+    },
+    {
+      "group": "Cleanup",
+      "id": "step_014",
+      "index": 14,
+      "name": "Run Wash",
+      "operation": "wash",
+      "parameters": {
+        "scheme": "standard_wash"
+      }
+    }
+  ],
+  "template": {
+    "description": "Tip strategy test covering fresh tips, returned tips, reuse, drop-to-waste, and wash.",
+    "name": "tip_strategy_test",
+    "request_schema": "request.schema.json",
+    "version": 1
+  },
+  "variables": [
+    {
+      "default": 10,
+      "name": "test_volume_ul",
+      "type": "number"
+    },
+    {
+      "default": "return_for_reuse",
+      "name": "tip_strategy",
+      "type": "string"
+    }
+  ],
+  "worklists": [],
+  "worktable": {
+    "auto_place": false,
+    "guid": "",
+    "name": "Template Worktable"
+  }
+}

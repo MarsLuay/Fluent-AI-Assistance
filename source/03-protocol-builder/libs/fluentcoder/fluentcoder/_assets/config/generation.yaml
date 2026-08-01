@@ -1,0 +1,119 @@
+# Public-release defaults for fluentcoder compile/render fallbacks.
+# Copy to a local override or edit for your FluentControl install:
+# workspace name/GUID, USB AvailableID paths, and deck labware instance names
+# must match the target instrument before importing generated scripts.
+
+# Worktable — leave empty in shipped product. Protocol/ZEIA must supply
+# worktable_guid + worktable_name (Worktable.from_workspace(...)). When both are
+# unset, renderer fails closed (RenderError) even if strict_workspace_binding is
+# false — same fail-closed pattern as empty device/liquid_class below. Site/CI
+# overlays may set a local fallback; never bake 780_Empty / placeholder GUIDs.
+worktable:
+  guid: ""
+  name: ""
+  type_id: "WorktableWorkspace"
+
+# Default device settings — leave empty in shipped product. Site/CI overlays or
+# ZEIA-mined source scripts must supply alias + AvailableID for the target instrument.
+# Never bake USB:…/0000000000 placeholders as product defaults.
+# Renderer fails closed on device-bearing steps when both are unset (no soft empty emit,
+# no DeviceAlias→AvailableID cross-fill).
+device:
+  alias: ""
+  available_id: ""
+  adapter_labware: ""
+  tip_columns: 24
+  tip_rows: 16
+
+# CGA (Channel Gripper Arm) — empty until ZEIA/install provides bindings.
+cga_device:
+  alias: ""
+  available_id: ""
+  get_fingers_labware: ""
+  drop_fingers_labware: ""
+
+# LiHa / FCA — empty until ZEIA/install provides bindings.
+liha_device:
+  alias: ""
+  available_id: ""
+  num_channels: 8
+  diti_type: ""
+  waste_labware: ""
+
+# Default liquid class — leave empty in shipped product. Site/CI overlays set
+# name+guid from the target FluentControl install or imported ZEIA .xlqc /
+# liquid_classes.json catalog. Never bake lab-specific names here.
+liquid_class:
+  name: ""
+  guid: ""
+  mix_name: ""
+
+# Script defaults
+script:
+  version: "2.0"
+  data_version: "1"
+  expected_duration: 12000000000  # nanoseconds
+
+# Validation settings
+validation:
+  warn_on_unknown_labware: true
+  warn_on_state_mismatch: true
+  strict_mode: false  # If true, errors instead of warnings
+  strict_workspace_binding: false  # If true, fail when Protocol lacks worktable_guid/name. Empty shipped worktable: also fails closed when unbound.
+
+# Labware placement rules
+# Specifies valid locations for different labware types
+labware_placement:
+  tip_boxes:
+    # MCA96 tip boxes (96-well format) go on standard nests, NOT active nests
+    MCA96:
+      valid_locations: ["Nest61mm_Pos"]
+      invalid_locations: ["MCA384_Diti_ActiveNest"]
+      typical_positions: [11, 12]
+      notes: "96-well tip boxes cannot be placed on MCA384 active nests"
+    # MCA384 tip boxes (384-well format) go on active nests
+    MCA384:
+      valid_locations: ["MCA384_Diti_ActiveNest"]
+      typical_positions: [1, 2]
+      notes: "384-well tip boxes use active nests for MCA384 access"
+  plates:
+    # Standard 96-well plates
+    96_well:
+      valid_locations: ["Nest61mm_Pos", "NestCooled_Pos_1", "HotelDWP_Pos"]
+      typical_positions: [1, 2, 3, 4, 5, 6, 7, 8]
+    # Magnet plates
+    magnet:
+      valid_locations: ["RGA", "Nest61mm_Pos"]
+      notes: "Magnet plates often have dedicated positions"
+
+# Paths (relative to repo root)
+paths:
+  reference: "reference/commands.yaml"
+  templates: "templates"
+  output: "protocols"
+
+# Generic deterministic grounding defaults used by the DSL orchestrator.
+# Names must match the target install / ZEIA catalog — leave tip boxes empty in
+# shipped product (site overlay or recipe fills them). Soft SBS plate aliases only.
+grounding_defaults:
+  labware:
+    plate_96: "96 Well Flat"
+    plate_384: "384 Well"
+    magnet_plate_96: ""
+    waste_reservoir: ""
+    reservoir_standard: ""
+    reservoir_ethanol: ""
+    fca_tipbox_small: ""
+    fca_tipbox_large: ""
+    mca96_tipbox_small: ""
+    mca96_tipbox_medium: ""
+    mca96_tipbox_large: ""
+  reservoir_labware_by_operation: {}
+  layout:
+    sample_plate: { location: "Site", site: 1 }
+    final_plate: { location: "Site", site: 2 }
+    magnet_plate: { location: "Site", site: 3 }
+    mca_tips: { location: "Site", site: 4 }
+    waste: { location: "Site", site: 5 }
+    fca_tips: { location: "Site", site: 6 }
+    reservoir_start: { location: "Site", site: 7 }

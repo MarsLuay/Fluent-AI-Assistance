@@ -1,0 +1,5 @@
+comment,source_label,source_type,source_position,dest_label,dest_type,dest_position,volume_ul,liquid_class,wash_after,break_after
+Simple 4-well transfer,SourcePlate,96 Well Flat,A1,DestPlate,96 Well Flat,A1,20,Water Free Single,yes,no
+,SourcePlate,96 Well Flat,B1,DestPlate,96 Well Flat,B1,20,Water Free Single,yes,no
+,SourcePlate,96 Well Flat,C1,DestPlate,96 Well Flat,C1,20,Water Free Single,yes,no
+,SourcePlate,96 Well Flat,D1,DestPlate,96 Well Flat,D1,20,Water Free Single,yes,yes

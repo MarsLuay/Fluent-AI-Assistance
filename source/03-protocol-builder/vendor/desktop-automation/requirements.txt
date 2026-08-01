@@ -1,0 +1,7 @@
+pywinauto
+comtypes
+psutil
+pyautogui
+mss
+pillow
+pyperclip

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VxData xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Payload>
+    <ObjectName>6_Trough_Carrier_Reservoir</ObjectName>
+    <PayloadData>
+      <CarrierOrLabwareTemplate>
+        <GUID>a82e129c-c3d4-46fc-8985-7c78d63ac0cb</GUID>
+        <Dimension><X>156.0</X><Y>85.0</Y><Z>44.0</Z></Dimension>
+        <FunctionalGroup>Carrier.Grid Segment</FunctionalGroup>
+        <Arrangements>
+          <ArrangementTemplate>
+            <SitesInX>1</SitesInX>
+            <SitesInY>1</SitesInY>
+            <SitesInZ>1</SitesInZ>
+            <SiteSpacingInX>0</SiteSpacingInX>
+            <SiteSpacingInY>0</SiteSpacingInY>
+            <SiteSpacingInZ>0</SiteSpacingInZ>
+            <PositionInParent><X>0</X><Y>0</Y><Z>0</Z></PositionInParent>
+            <SiteTemplateIdentifiers>
+            <KeyValueOfintstring>
+              <Key>0</Key>
+              <Value>5513f1ae-ae66-570e-a557-aa81178330c1</Value>
+            </KeyValueOfintstring>
+            <KeyValueOfintstring>
+              <Key>1</Key>
+              <Value>f4742429-eb54-51b4-bd5f-b014e3f876cd</Value>
+            </KeyValueOfintstring>
+            <KeyValueOfintstring>
+              <Key>2</Key>
+              <Value>ad4d1449-ccbe-5756-a8aa-0389653d4803</Value>
+            </KeyValueOfintstring>
+            <KeyValueOfintstring>
+              <Key>3</Key>
+              <Value>ef0f8520-d445-50cc-b324-12d0a5c14344</Value>
+            </KeyValueOfintstring>
+            <KeyValueOfintstring>
+              <Key>4</Key>
+              <Value>7ba8e765-f642-5ee5-89f9-d09373384dbe</Value>
+            </KeyValueOfintstring>
+            <KeyValueOfintstring>
+              <Key>5</Key>
+              <Value>bcd91a62-6d15-5fab-8467-8b7751a84785</Value>
+            </KeyValueOfintstring>
+            </SiteTemplateIdentifiers>
+          </ArrangementTemplate>
+        </Arrangements>
+
+      </CarrierOrLabwareTemplate>
+    </PayloadData>
+  </Payload>
+</VxData>

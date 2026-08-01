@@ -1,0 +1,45 @@
+[project]
+name = "tecan-protocol-builder"
+version = "0.1.0"
+description = "Local Codex-friendly FluentControl protocol builder around fluentcoder."
+readme = "README.md"
+license = {text = "PolyForm-Noncommercial-1.0.0"}
+requires-python = ">=3.11"
+dependencies = [
+  "fluentcoder",
+  "Pillow>=12.3.0,<13",
+  "tecan-common",
+]
+
+[project.optional-dependencies]
+mcp = [
+  "mcp>=1.27,<2",
+]
+dev = [
+  "mcp>=1.27,<2",
+  "pytest>=9.0.3,<10",
+]
+
+[project.scripts]
+protocol-builder = "fluent_pipeline.cli.runtime:main"
+tecan-ai-mcp = "fluent_pipeline.mcp_server:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+fluent_pipeline = ["data/*.json"]
+
+[tool.setuptools.packages.find]
+include = ["fluent_pipeline*", "tools*"]
+
+[tool.pytest.ini_options]
+python_files = ["test_*.py"]
+pythonpath = ["."]
+markers = [
+  "fluentcontrol_shell: requires a Windows FluentControl install, native backend, or shell XSCR",
+]

@@ -1,0 +1,39 @@
+---
+description: Hard start gate — bootstrap/brief before protocol work; section-gated AGENTS.md
+alwaysApply: true
+---
+
+# Hard start gate
+
+Before exploring the repo, editing generation code for a user ZEIA job, or
+calling generate/import/inspect/repair MCP tools:
+
+1. Prefer MCP: `fluent_bootstrap_status`
+2. Else CLI from `source/03-protocol-builder`:
+
+```bash
+python -m fluent_pipeline.cli bootstrap-status
+```
+
+3. Follow `next_step` (`tool` if MCP, `cli` if shell). Honor
+   `allowed_tools` / `blocked_tools`. Do not call tools in `blocked_tools`
+   (especially `fluent_generate_protocol`) until import + inspect are done.
+   After inspect, re-call bootstrap with `inspected=true` / `--inspected`.
+4. After brief: open **only** the `##` sections in
+   `source/03-protocol-builder/AGENTS.md` named under the brief's
+   `NEED MORE` / `CONTRACT`. Do not read that file top-to-bottom.
+5. After inspect: mine names with `fluent_project_query` / `project-find`.
+   Do not read full `manifest.json` into chat.
+Exceptions (no bootstrap required):
+
+- Pure doc/grammar edits with no protocol run
+- User explicitly says skip bootstrap / already ran it this session
+- `install` / `simulator` only (use `fluent_agent_brief` or
+  `scripts/agent/agent-brief.py --mode …` instead)
+
+If doctor fails: re-run with install confirmation
+(`install_missing` + `confirm_install`, or CLI
+`--install-missing --confirm-install`). Doctor also auto-heals an empty
+global fluentcoder catalog by copying/refreshing from the active ZEIA
+DataStore or `FLUENTCODER_FC_INSTALL`. That fixes local deps / catalog only
+— not full `scripts/install/install.ps1`.

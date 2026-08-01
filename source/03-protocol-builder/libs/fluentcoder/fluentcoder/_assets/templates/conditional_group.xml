@@ -1,0 +1,12 @@
+<Object Type="Tecan.Core.Scripting.ConditionalGroup">
+  <ConditionalGroup>
+    <Objects>
+{{ThenStatements}}
+    </Objects>
+    <Condition>{{Condition}}</Condition>
+    <Name>{{ConditionName}}</Name>
+    <LineNumber>{{LineNumber}}</LineNumber>
+    <IsBreakpoint>{{IsBreakpoint}}</IsBreakpoint>
+    <IsDisabledForExecution>{{IsDisabledForExecution}}</IsDisabledForExecution>
+  </ConditionalGroup>
+</Object>

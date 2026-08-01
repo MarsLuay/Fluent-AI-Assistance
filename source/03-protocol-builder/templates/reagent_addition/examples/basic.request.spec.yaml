@@ -1,0 +1,35 @@
+schema_version: tecan.request_spec.v1
+request:
+  intent: Add 25 uL reagent from ReagentReservoir to all selected AssayPlate wells and mix.
+  protocol_name: Reagent addition example
+  status: draft
+template:
+  name: reagent_addition
+  parameters:
+    reagent_name: Master Mix
+    reagent_reservoir: ReagentReservoir
+    destination_plate: AssayPlate
+    reagent_volume_ul: 25
+    mix_after_addition: true
+    liquid_class: Water Free Single
+source:
+  context: null
+  context_kind: null
+  contexts: []
+  project_archives: []
+  collection: null
+  source_scripts: []
+  pattern_refs: []
+generation:
+  simulate: false
+  compile_xscr: false
+  apply_modeling: false
+review:
+  state: needs_review
+  required_before_final_generation: true
+  decisions: []
+  unresolved_questions: []
+acceptance:
+  validation_diff_required: true
+  ready_to_import_bundle_required: true
+  ready_gates: all_configured

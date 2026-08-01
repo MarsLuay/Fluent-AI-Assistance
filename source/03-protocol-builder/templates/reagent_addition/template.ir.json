@@ -1,0 +1,205 @@
+{
+  "dependencies": [
+    {
+      "kind": "template",
+      "name": "reagent_addition",
+      "required": false
+    }
+  ],
+  "id": "template_reagent_addition",
+  "ir_version": "tecan.protocol_ir.v2",
+  "labware": [
+    {
+      "catalog": "Reagent Reservoir",
+      "id": "reagent_reservoir",
+      "label": "ReagentReservoir",
+      "location": "Site",
+      "position": 1,
+      "python_class": "Plate96",
+      "role": "reagent_source"
+    },
+    {
+      "catalog": "96 Well Flat",
+      "id": "assay_plate",
+      "label": "AssayPlate",
+      "location": "Site",
+      "position": 2,
+      "python_class": "Plate96",
+      "role": "destination"
+    },
+    {
+      "catalog": "MCA96, 100ul, Box",
+      "id": "tips",
+      "label": "Tips",
+      "location": "Site",
+      "position": 4,
+      "python_class": "MCA100Box",
+      "role": "tips"
+    }
+  ],
+  "liquid_classes": [
+    {
+      "name": "Water Free Single",
+      "role": "pipetting"
+    }
+  ],
+  "protocol": {
+    "comment": "Template shape for adding reagent from a reservoir to an assay plate.",
+    "name": "Template Reagent Addition",
+    "schema_intent": "canonical reusable template shape"
+  },
+  "reagents": [
+    {
+      "id": "reagent",
+      "name": "Reagent",
+      "role": "reagent"
+    }
+  ],
+  "safety_assumptions": [
+    {
+      "id": "template_requires_review",
+      "text": "Confirm reagent reservoir geometry, destination wells, dead volume, and whether post-addition mixing is allowed."
+    },
+    {
+      "id": "manual_validation_required",
+      "text": "Generated artifacts must be reviewed, simulated, and validated in FluentControl before instrument use."
+    }
+  ],
+  "source": {
+    "format": "template_protocol",
+    "path": "templates/reagent_addition/template.ir.json",
+    "template": "reagent_addition"
+  },
+  "steps": [
+    {
+      "group": "Setup",
+      "id": "step_001",
+      "index": 1,
+      "name": "Add Reagent Reservoir",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "ReagentReservoir",
+        "labware_type": "Reagent Reservoir",
+        "location": "Site",
+        "position": 1
+      },
+      "target_labware": "ReagentReservoir"
+    },
+    {
+      "group": "Setup",
+      "id": "step_002",
+      "index": 2,
+      "name": "Add Assay Plate",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "AssayPlate",
+        "labware_type": "96 Well Flat",
+        "location": "Site",
+        "position": 2
+      },
+      "target_labware": "AssayPlate"
+    },
+    {
+      "group": "Setup",
+      "id": "step_003",
+      "index": 3,
+      "name": "Add Tip Box",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "Tips",
+        "labware_type": "MCA96, 100ul, Box",
+        "location": "Site",
+        "position": 4
+      },
+      "target_labware": "Tips"
+    },
+    {
+      "group": "Addition",
+      "id": "step_004",
+      "index": 4,
+      "name": "Pick Up Tips",
+      "operation": "pick_up_tips",
+      "parameters": {
+        "tip_strategy": "new_tips"
+      },
+      "target_labware": "Tips"
+    },
+    {
+      "group": "Addition",
+      "id": "step_005",
+      "index": 5,
+      "liquid_class": "Water Free Single",
+      "name": "Aspirate Reagent",
+      "operation": "aspirate",
+      "parameters": {
+        "source_well": "A1"
+      },
+      "source_labware": "ReagentReservoir",
+      "target_labware": "ReagentReservoir",
+      "volume_ul": 25
+    },
+    {
+      "destination_labware": "AssayPlate",
+      "group": "Addition",
+      "id": "step_006",
+      "index": 6,
+      "liquid_class": "Water Free Single",
+      "name": "Dispense Reagent",
+      "operation": "dispense",
+      "parameters": {
+        "destination_well": "A1"
+      },
+      "target_labware": "AssayPlate",
+      "volume_ul": 25
+    },
+    {
+      "group": "Addition",
+      "id": "step_007",
+      "index": 7,
+      "liquid_class": "Water Free Single",
+      "name": "Mix After Addition",
+      "operation": "mca384_mix",
+      "parameters": {
+        "cycles": 5,
+        "well": "A1"
+      },
+      "target_labware": "AssayPlate",
+      "volume_ul": 20
+    },
+    {
+      "group": "Cleanup",
+      "id": "step_008",
+      "index": 8,
+      "name": "Return Tips",
+      "operation": "set_tips_back",
+      "parameters": {
+        "tip_strategy": "return_to_source"
+      },
+      "target_labware": "Tips"
+    }
+  ],
+  "template": {
+    "description": "Reservoir-to-plate reagent addition with optional mix after dispense.",
+    "name": "reagent_addition",
+    "request_schema": "request.schema.json",
+    "version": 1
+  },
+  "variables": [
+    {
+      "default": 25,
+      "name": "reagent_volume_ul",
+      "type": "number"
+    },
+    {
+      "default": 5,
+      "name": "mix_cycles",
+      "type": "integer"
+    }
+  ],
+  "worklists": [],
+  "worktable": {
+    "auto_place": false,
+    "guid": "",
+    "name": "Template Worktable"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "labware_names": [
+    "CopyPlate",
+    "TemplatePlate"
+  ],
+  "liquid_classes": [
+    "Serum Single"
+  ],
+  "script_count": 1,
+  "worklist_paths": [],
+  "workspace_count": 1
+}

@@ -1,0 +1,44 @@
+{
+  "name": "tecan-protocol-simulator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --open",
+    "dev:no-open": "vite",
+    "extract:fluent-meshes": "python3 ../tools/simulator/extract_fluent_meshes.py",
+    "build:zeia-sample-cache": "tsx scripts/cache/build-zeia-sample-cache.ts",
+    "test": "npm run test:worktables && npm run test:mesh-archive-selection && npm run test:readiness && npm run test:protocol-ir-contract && npm run test:hardware-profile",
+    "test:worktables": "tsx scripts/test/test-worktable-geometry.ts",
+    "test:mesh-archive-selection": "tsx scripts/test/test-mesh-archive-selection.ts",
+    "test:readiness": "tsx scripts/test/test-readiness-parsing.ts",
+    "test:protocol-ir-contract": "tsx scripts/test/test-protocol-ir-contract.ts",
+    "test:hardware-profile": "tsx scripts/test/test-hardware-profile-zeia.ts",
+    "build": "tsc && vite build",
+    "preview": "vite preview --open",
+    "preview:no-open": "vite preview"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.171.0"
+  },
+  "devDependencies": {
+    "@xmldom/xmldom": "^0.8.11",
+    "@types/node": "^22.10.1",
+    "@types/pngjs": "^6.0.5",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/three": "^0.171.0",
+    "jsdom": "^29.1.1",
+    "playwright-core": "^1.60.0",
+    "pngjs": "^7.0.0",
+    "tsx": "^4.22.4",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.1"
+  },
+  "description": "tecan-protocol-simulator project."
+}

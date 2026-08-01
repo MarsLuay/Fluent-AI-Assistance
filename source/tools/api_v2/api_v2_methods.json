@@ -1,0 +1,830 @@
+[
+    {
+        "Type":  "Tecan.VisionX.API.V2.CEDNotification",
+        "Method":  "BeginInvoke",
+        "Signature":  "IAsyncResult BeginInvoke(ICedInfo cedInfo, Int32\u0026 buttonIndex, AsyncCallback callback, Object object)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.CEDNotification",
+        "Method":  "EndInvoke",
+        "Signature":  "Void EndInvoke(Int32\u0026 buttonIndex, IAsyncResult result)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.CEDNotification",
+        "Method":  "Invoke",
+        "Signature":  "Void Invoke(ICedInfo cedInfo, Int32\u0026 buttonIndex)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.ChannelChange",
+        "Method":  "BeginInvoke",
+        "Signature":  "IAsyncResult BeginInvoke(IExecutionChannel openedChannel, AsyncCallback callback, Object object)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.ChannelChange",
+        "Method":  "EndInvoke",
+        "Signature":  "Void EndInvoke(IAsyncResult result)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.ChannelChange",
+        "Method":  "Invoke",
+        "Signature":  "Void Invoke(IExecutionChannel openedChannel)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.AddLabware",
+        "Method":  "ToString",
+        "Signature":  "String ToString()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.AddLabware",
+        "Method":  "ToXML",
+        "Signature":  "String ToXML()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.AddLabware",
+        "Method":  "Validate",
+        "Signature":  "Void Validate()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.DropFingers",
+        "Method":  "ToString",
+        "Signature":  "String ToString()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.DropFingers",
+        "Method":  "ToXML",
+        "Signature":  "String ToXML()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.DropFingers",
+        "Method":  "Validate",
+        "Signature":  "Void Validate()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.GenericCommand",
+        "Method":  "ToString",
+        "Signature":  "String ToString()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.GenericCommand",
+        "Method":  "ToXML",
+        "Signature":  "String ToXML()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.GenericCommand",
+        "Method":  "Validate",
+        "Signature":  "Void Validate()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.GetFingers",
+        "Method":  "ToString",
+        "Signature":  "String ToString()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.GetFingers",
+        "Method":  "ToXML",
+        "Signature":  "String ToXML()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.GetFingers",
+        "Method":  "Validate",
+        "Signature":  "Void Validate()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.ICommand",
+        "Method":  "ToXML",
+        "Signature":  "String ToXML()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.ICommand",
+        "Method":  "Validate",
+        "Signature":  "Void Validate()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.SetLocation",
+        "Method":  "ToString",
+        "Signature":  "String ToString()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.SetLocation",
+        "Method":  "ToXML",
+        "Signature":  "String ToXML()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.SetLocation",
+        "Method":  "Validate",
+        "Signature":  "Void Validate()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.Subroutine",
+        "Method":  "ToString",
+        "Signature":  "String ToString()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.Subroutine",
+        "Method":  "ToXML",
+        "Signature":  "String ToXML()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.Subroutine",
+        "Method":  "Validate",
+        "Signature":  "Void Validate()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.TransferLabware",
+        "Method":  "ToString",
+        "Signature":  "String ToString()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.TransferLabware",
+        "Method":  "ToXML",
+        "Signature":  "String ToXML()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.TransferLabware",
+        "Method":  "Validate",
+        "Signature":  "Void Validate()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.UserPrompt",
+        "Method":  "ToString",
+        "Signature":  "String ToString()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.UserPrompt",
+        "Method":  "ToXML",
+        "Signature":  "String ToXML()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Commands.UserPrompt",
+        "Method":  "Validate",
+        "Signature":  "Void Validate()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.DeckCheckDiscrepancyDetected",
+        "Method":  "BeginInvoke",
+        "Signature":  "IAsyncResult BeginInvoke(String description, DeckCheckValidationCameraResult[] deckCheckValidationCameraResults, AsyncCallback callback, Object object)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.DeckCheckDiscrepancyDetected",
+        "Method":  "EndInvoke",
+        "Signature":  "Void EndInvoke(IAsyncResult result)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.DeckCheckDiscrepancyDetected",
+        "Method":  "Invoke",
+        "Signature":  "Void Invoke(String description, DeckCheckValidationCameraResult[] deckCheckValidationCameraResults)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.ExecutionChannel",
+        "Method":  "AbortExecution",
+        "Signature":  "Void AbortExecution()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.ExecutionChannel",
+        "Method":  "Dispose",
+        "Signature":  "Void Dispose()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.ExecutionChannel",
+        "Method":  "ExecuteCommand",
+        "Signature":  "Void ExecuteCommand(ICommand command)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.ExecutionChannel",
+        "Method":  "FinishExecution",
+        "Signature":  "Void FinishExecution()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.FluentControl",
+        "Method":  "Dispose",
+        "Signature":  "Void Dispose()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.FluentControl",
+        "Method":  "ForceShutdown",
+        "Signature":  "Void ForceShutdown(Int32 timeout)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.FluentControl",
+        "Method":  "GetRuntime",
+        "Signature":  "IRuntimeController GetRuntime()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.FluentControl",
+        "Method":  "IsAttached",
+        "Signature":  "Boolean IsAttached()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.FluentControl",
+        "Method":  "IsRunning",
+        "Signature":  "Boolean IsRunning()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.FluentControl",
+        "Method":  "Shutdown",
+        "Signature":  "Boolean Shutdown(Int32 timeout)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.FluentControl",
+        "Method":  "StartAndLogin",
+        "Signature":  "Void StartAndLogin(String username, String password, StartupOptions startupOptions)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.FluentControl",
+        "Method":  "StartInSimulationMode",
+        "Signature":  "Void StartInSimulationMode()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.FluentControl",
+        "Method":  "StartIntegrationMode",
+        "Signature":  "Void StartIntegrationMode()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.FluentControl",
+        "Method":  "StartOrAttach",
+        "Signature":  "Void StartOrAttach()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.FluentProcessException",
+        "Method":  "ToString",
+        "Signature":  "String ToString()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.HelperClasses.HelperAPI",
+        "Method":  "GenerateServiceEndpoint",
+        "Signature":  "ServiceEndpoint GenerateServiceEndpoint()",
+        "IsStatic":  true
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.HelperClasses.HelperAPI",
+        "Method":  "ParseStateMachineStates",
+        "Signature":  "StateMachineStates ParseStateMachineStates(String fluentStateString)",
+        "IsStatic":  true
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IExecutionChannel",
+        "Method":  "AbortExecution",
+        "Signature":  "Void AbortExecution()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IExecutionChannel",
+        "Method":  "ExecuteCommand",
+        "Signature":  "Void ExecuteCommand(ICommand command)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IExecutionChannel",
+        "Method":  "FinishExecution",
+        "Signature":  "Void FinishExecution()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IFluentControl",
+        "Method":  "ForceShutdown",
+        "Signature":  "Void ForceShutdown(Int32 timeout)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IFluentControl",
+        "Method":  "GetRuntime",
+        "Signature":  "IRuntimeController GetRuntime()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IFluentControl",
+        "Method":  "IsAttached",
+        "Signature":  "Boolean IsAttached()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IFluentControl",
+        "Method":  "IsRunning",
+        "Signature":  "Boolean IsRunning()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IFluentControl",
+        "Method":  "Shutdown",
+        "Signature":  "Boolean Shutdown(Int32 timeout)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IFluentControl",
+        "Method":  "StartAndLogin",
+        "Signature":  "Void StartAndLogin(String username, String password, StartupOptions startupOptions)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IFluentControl",
+        "Method":  "StartInSimulationMode",
+        "Signature":  "Void StartInSimulationMode()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IFluentControl",
+        "Method":  "StartIntegrationMode",
+        "Signature":  "Void StartIntegrationMode()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IFluentControl",
+        "Method":  "StartOrAttach",
+        "Signature":  "Void StartOrAttach()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IFluentControlEvents",
+        "Method":  "Notify",
+        "Signature":  "Void Notify(String message)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IFluentControlEvents",
+        "Method":  "RuntimeIsAvailable",
+        "Signature":  "Void RuntimeIsAvailable()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Implementation.Commands.RemoveLabware",
+        "Method":  "ToString",
+        "Signature":  "String ToString()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Implementation.Commands.RemoveLabware",
+        "Method":  "ToXML",
+        "Signature":  "String ToXML()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Implementation.Commands.RemoveLabware",
+        "Method":  "Validate",
+        "Signature":  "Void Validate()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "CloseMethod",
+        "Signature":  "Void CloseMethod()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "CloseQueryAtStartUpDialog",
+        "Signature":  "Void CloseQueryAtStartUpDialog(Boolean acceptValues)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "GetAllMaintenanceMethods",
+        "Signature":  "String[] GetAllMaintenanceMethods()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "GetAllRunnableMethods",
+        "Signature":  "String[] GetAllRunnableMethods()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "GetAllUserNames",
+        "Signature":  "String[] GetAllUserNames()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "GetCurrentUserName",
+        "Signature":  "String GetCurrentUserName()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "GetFluentStatus",
+        "Signature":  "StateMachineStates GetFluentStatus()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "GetProgress",
+        "Signature":  "Int32 GetProgress()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "GetProgressInitialization",
+        "Signature":  "Int32 GetProgressInitialization()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "GetQueryVariableNames",
+        "Signature":  "String[] GetQueryVariableNames()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "GetStateAsString",
+        "Signature":  "String GetStateAsString(StateMachineStates input)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "GetVariableNames",
+        "Signature":  "String[] GetVariableNames()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "GetVariableValue",
+        "Signature":  "String GetVariableValue(String name)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "InitializeInstrument",
+        "Signature":  "Void InitializeInstrument(WorkspaceSelection type, String workspaceOrMethodName)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "InteriorLight",
+        "Signature":  "Void InteriorLight(Boolean onOff)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "IsReady",
+        "Signature":  "Boolean IsReady()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "LoginUser",
+        "Signature":  "Boolean LoginUser(String username, String password)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "PauseRun",
+        "Signature":  "Void PauseRun()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "PrepareMethod",
+        "Signature":  "Void PrepareMethod(String toPrepare)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "ReportEnvironmentalData",
+        "Signature":  "Void ReportEnvironmentalData(String sensorName, String moduleName, ISensorMeasurement[] sensorMeasurements, String sensorType, String unit)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "ResolveExpression",
+        "Signature":  "String ResolveExpression(String expression)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "ResumeRun",
+        "Signature":  "Void ResumeRun()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "RunMethod",
+        "Signature":  "Void RunMethod()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "SetVariableValue",
+        "Signature":  "Void SetVariableValue(String name, String value)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "StopMethod",
+        "Signature":  "Void StopMethod()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeController",
+        "Method":  "ValidateUser",
+        "Signature":  "Boolean ValidateUser(String username, String password)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeControllerEvents",
+        "Method":  "ChannelCloses",
+        "Signature":  "Void ChannelCloses(IExecutionChannel closedChannel)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeControllerEvents",
+        "Method":  "ChannelOpens",
+        "Signature":  "Void ChannelOpens(IExecutionChannel openedChannel)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeControllerEvents",
+        "Method":  "CommonErrorDialog",
+        "Signature":  "Void CommonErrorDialog(ICedInfo cedInfo, Int32\u0026 buttonIndex)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeControllerEvents",
+        "Method":  "EnterReadyMode",
+        "Signature":  "Void EnterReadyMode()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeControllerEvents",
+        "Method":  "Error",
+        "Signature":  "Void Error(String message)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeControllerEvents",
+        "Method":  "ModeChanged",
+        "Signature":  "Void ModeChanged(StateMachineStates old, StateMachineStates current)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.IRuntimeControllerEvents",
+        "Method":  "ProgressChanged",
+        "Signature":  "Void ProgressChanged(Int32 value)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.ModeSwitch",
+        "Method":  "BeginInvoke",
+        "Signature":  "IAsyncResult BeginInvoke(StateMachineStates old, StateMachineStates current, AsyncCallback callback, Object object)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.ModeSwitch",
+        "Method":  "EndInvoke",
+        "Signature":  "Void EndInvoke(IAsyncResult result)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.ModeSwitch",
+        "Method":  "Invoke",
+        "Signature":  "Void Invoke(StateMachineStates old, StateMachineStates current)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Notification",
+        "Method":  "BeginInvoke",
+        "Signature":  "IAsyncResult BeginInvoke(String message, AsyncCallback callback, Object object)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Notification",
+        "Method":  "EndInvoke",
+        "Signature":  "Void EndInvoke(IAsyncResult result)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Notification",
+        "Method":  "Invoke",
+        "Signature":  "Void Invoke(String message)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Progress",
+        "Method":  "BeginInvoke",
+        "Signature":  "IAsyncResult BeginInvoke(Int32 value, AsyncCallback callback, Object object)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Progress",
+        "Method":  "EndInvoke",
+        "Signature":  "Void EndInvoke(IAsyncResult result)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.Progress",
+        "Method":  "Invoke",
+        "Signature":  "Void Invoke(Int32 value)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "CloseMethod",
+        "Signature":  "Void CloseMethod()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "CloseQueryAtStartUpDialog",
+        "Signature":  "Void CloseQueryAtStartUpDialog(Boolean acceptValues)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "Dispose",
+        "Signature":  "Void Dispose()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "GetAllMaintenanceMethods",
+        "Signature":  "String[] GetAllMaintenanceMethods()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "GetAllRunnableMethods",
+        "Signature":  "String[] GetAllRunnableMethods()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "GetAllUserNames",
+        "Signature":  "String[] GetAllUserNames()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "GetCurrentUserName",
+        "Signature":  "String GetCurrentUserName()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "GetFluentStatus",
+        "Signature":  "StateMachineStates GetFluentStatus()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "GetProgress",
+        "Signature":  "Int32 GetProgress()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "GetProgressInitialization",
+        "Signature":  "Int32 GetProgressInitialization()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "GetQueryVariableNames",
+        "Signature":  "String[] GetQueryVariableNames()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "GetStateAsString",
+        "Signature":  "String GetStateAsString(StateMachineStates input)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "GetVariableNames",
+        "Signature":  "String[] GetVariableNames()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "GetVariableValue",
+        "Signature":  "String GetVariableValue(String name)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "InitializeInstrument",
+        "Signature":  "Void InitializeInstrument(WorkspaceSelection type, String workspaceOrMethodName)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "InteriorLight",
+        "Signature":  "Void InteriorLight(Boolean onOff)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "IsReady",
+        "Signature":  "Boolean IsReady()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "LoginUser",
+        "Signature":  "Boolean LoginUser(String username, String password)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "PauseRun",
+        "Signature":  "Void PauseRun()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "PrepareMethod",
+        "Signature":  "Void PrepareMethod(String toPrepare)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "ReportEnvironmentalData",
+        "Signature":  "Void ReportEnvironmentalData(String sensorName, String moduleName, ISensorMeasurement[] sensorMeasurements, String sensorType, String unit)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "ResolveExpression",
+        "Signature":  "String ResolveExpression(String expression)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "ResumeRun",
+        "Signature":  "Void ResumeRun()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "RunMethod",
+        "Signature":  "Void RunMethod()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "SetVariableValue",
+        "Signature":  "Void SetVariableValue(String name, String value)",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "StopMethod",
+        "Signature":  "Void StopMethod()",
+        "IsStatic":  false
+    },
+    {
+        "Type":  "Tecan.VisionX.API.V2.RuntimeController",
+        "Method":  "ValidateUser",
+        "Signature":  "Boolean ValidateUser(String username, String password)",
+        "IsStatic":  false
+    }
+]

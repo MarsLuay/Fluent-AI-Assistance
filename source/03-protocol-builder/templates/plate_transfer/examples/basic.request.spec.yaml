@@ -1,0 +1,36 @@
+schema_version: tecan.request_spec.v1
+request:
+  intent: Transfer 20 uL from SourcePlate A1 to DestinationPlate A1 using Water Free Single.
+  protocol_name: Plate transfer example
+  status: draft
+template:
+  name: plate_transfer
+  parameters:
+    source_plate: SourcePlate
+    destination_plate: DestinationPlate
+    source_well: A1
+    destination_well: A1
+    transfer_volume_ul: 20
+    liquid_class: Water Free Single
+    tip_box: Tips
+source:
+  context: null
+  context_kind: null
+  contexts: []
+  project_archives: []
+  collection: null
+  source_scripts: []
+  pattern_refs: []
+generation:
+  simulate: false
+  compile_xscr: false
+  apply_modeling: false
+review:
+  state: needs_review
+  required_before_final_generation: true
+  decisions: []
+  unresolved_questions: []
+acceptance:
+  validation_diff_required: true
+  ready_to_import_bundle_required: true
+  ready_gates: all_configured

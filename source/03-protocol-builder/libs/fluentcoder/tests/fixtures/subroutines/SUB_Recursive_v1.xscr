@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VxData>
+  <Payload>
+    <ObjectName>SUB_Recursive_v1</ObjectName>
+    <ObjectSubfolderPath>TEST</ObjectSubfolderPath>
+    <Comment />
+    <Reference>
+      <Guid>11111111-1234-aaaa-ffff-000000000555</Guid>
+      <TypeId>WorktableWorkspace</TypeId>
+      <ObjectName>780_Empty</ObjectName>
+    </Reference>
+    <ScriptGroup>
+      <Objects>
+        <Object Type="Tecan.Core.Scripting.SubRoutineStatement">
+          <SubRoutineStatement>
+            <SubRoutine>"TEST\SUB_Recursive_v1"</SubRoutine>
+            <Mode>
+              <ExecutionMode>Synchronous</ExecutionMode>
+            </Mode>
+            <VariableMappingsStart />
+            <VariableMappingsEnd />
+          </SubRoutineStatement>
+        </Object>
+      </Objects>
+      <Name>Steps</Name>
+    </ScriptGroup>
+  </Payload>
+</VxData>

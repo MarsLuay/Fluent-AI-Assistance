@@ -1,0 +1,79 @@
+{
+  "$id": "https://fluent-ai-assistance.local/templates/plate_transfer/request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "request": {
+      "properties": {
+        "intent": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "protocol_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "intent"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "tecan.request_spec.v1"
+    },
+    "template": {
+      "properties": {
+        "name": {
+          "const": "plate_transfer"
+        },
+        "parameters": {
+          "properties": {
+            "destination_plate": {
+              "type": "string"
+            },
+            "destination_well": {
+              "type": "string"
+            },
+            "liquid_class": {
+              "type": "string"
+            },
+            "source_plate": {
+              "type": "string"
+            },
+            "source_well": {
+              "type": "string"
+            },
+            "tip_box": {
+              "type": "string"
+            },
+            "transfer_volume_ul": {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "source_plate",
+            "destination_plate",
+            "transfer_volume_ul",
+            "liquid_class"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "parameters"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "request",
+    "template"
+  ],
+  "title": "Plate Transfer Template Request",
+  "type": "object"
+}

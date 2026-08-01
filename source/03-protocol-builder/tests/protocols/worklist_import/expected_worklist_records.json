@@ -1,0 +1,10 @@
+[
+  {
+    "operation": "aspirate",
+    "rack_label": "WorklistSource"
+  },
+  {
+    "operation": "dispense",
+    "rack_label": "WorklistDestination"
+  }
+]

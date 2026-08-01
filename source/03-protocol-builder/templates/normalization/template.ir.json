@@ -1,0 +1,271 @@
+{
+  "dependencies": [
+    {
+      "kind": "template",
+      "name": "normalization",
+      "required": false
+    }
+  ],
+  "id": "template_normalization",
+  "ir_version": "tecan.protocol_ir.v2",
+  "labware": [
+    {
+      "catalog": "96 Well Flat",
+      "id": "input_plate",
+      "label": "InputPlate",
+      "location": "Site",
+      "position": 1,
+      "python_class": "Plate96",
+      "role": "source"
+    },
+    {
+      "catalog": "96 Well Flat",
+      "id": "normalized_plate",
+      "label": "NormalizedPlate",
+      "location": "Site",
+      "position": 2,
+      "python_class": "Plate96",
+      "role": "destination"
+    },
+    {
+      "catalog": "Reagent Reservoir",
+      "id": "diluent_reservoir",
+      "label": "DiluentReservoir",
+      "location": "Site",
+      "position": 3,
+      "python_class": "Plate96",
+      "role": "diluent"
+    },
+    {
+      "catalog": "MCA96, 100ul, Box",
+      "id": "tips",
+      "label": "Tips",
+      "location": "Site",
+      "position": 4,
+      "python_class": "MCA100Box",
+      "role": "tips"
+    }
+  ],
+  "liquid_classes": [
+    {
+      "name": "Water Free Single",
+      "role": "pipetting"
+    }
+  ],
+  "protocol": {
+    "comment": "Template shape for normalizing samples to a target concentration with diluent.",
+    "name": "Template Normalization",
+    "schema_intent": "canonical reusable template shape"
+  },
+  "reagents": [
+    {
+      "id": "sample",
+      "name": "Sample",
+      "role": "sample"
+    },
+    {
+      "id": "diluent",
+      "name": "Diluent",
+      "role": "diluent"
+    }
+  ],
+  "safety_assumptions": [
+    {
+      "id": "template_requires_review",
+      "text": "Compute per-sample transfer and diluent volumes from measured concentrations before generating final IR."
+    },
+    {
+      "id": "manual_validation_required",
+      "text": "Generated artifacts must be reviewed, simulated, and validated in FluentControl before instrument use."
+    }
+  ],
+  "source": {
+    "format": "template_protocol",
+    "path": "templates/normalization/template.ir.json",
+    "template": "normalization"
+  },
+  "steps": [
+    {
+      "group": "Setup",
+      "id": "step_001",
+      "index": 1,
+      "name": "Add Input Plate",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "InputPlate",
+        "labware_type": "96 Well Flat",
+        "location": "Site",
+        "position": 1
+      },
+      "target_labware": "InputPlate"
+    },
+    {
+      "group": "Setup",
+      "id": "step_002",
+      "index": 2,
+      "name": "Add Normalized Plate",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "NormalizedPlate",
+        "labware_type": "96 Well Flat",
+        "location": "Site",
+        "position": 2
+      },
+      "target_labware": "NormalizedPlate"
+    },
+    {
+      "group": "Setup",
+      "id": "step_003",
+      "index": 3,
+      "name": "Add Diluent Reservoir",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "DiluentReservoir",
+        "labware_type": "Reagent Reservoir",
+        "location": "Site",
+        "position": 3
+      },
+      "target_labware": "DiluentReservoir"
+    },
+    {
+      "group": "Setup",
+      "id": "step_004",
+      "index": 4,
+      "name": "Add Tip Box",
+      "operation": "add_labware",
+      "parameters": {
+        "label": "Tips",
+        "labware_type": "MCA96, 100ul, Box",
+        "location": "Site",
+        "position": 4
+      },
+      "target_labware": "Tips"
+    },
+    {
+      "group": "Normalize",
+      "id": "step_005",
+      "index": 5,
+      "name": "Pick Up Tips",
+      "operation": "pick_up_tips",
+      "parameters": {
+        "tip_strategy": "new_tips"
+      },
+      "target_labware": "Tips"
+    },
+    {
+      "group": "Normalize",
+      "id": "step_006",
+      "index": 6,
+      "liquid_class": "Water Free Single",
+      "name": "Aspirate Sample Volume",
+      "operation": "aspirate",
+      "parameters": {
+        "source_well": "A1"
+      },
+      "source_labware": "InputPlate",
+      "target_labware": "InputPlate",
+      "volume_ul": 5
+    },
+    {
+      "destination_labware": "NormalizedPlate",
+      "group": "Normalize",
+      "id": "step_007",
+      "index": 7,
+      "liquid_class": "Water Free Single",
+      "name": "Dispense Sample",
+      "operation": "dispense",
+      "parameters": {
+        "destination_well": "A1"
+      },
+      "target_labware": "NormalizedPlate",
+      "volume_ul": 5
+    },
+    {
+      "group": "Normalize",
+      "id": "step_008",
+      "index": 8,
+      "liquid_class": "Water Free Single",
+      "name": "Aspirate Diluent",
+      "operation": "aspirate",
+      "parameters": {
+        "source_well": "A1"
+      },
+      "source_labware": "DiluentReservoir",
+      "target_labware": "DiluentReservoir",
+      "volume_ul": 45
+    },
+    {
+      "destination_labware": "NormalizedPlate",
+      "group": "Normalize",
+      "id": "step_009",
+      "index": 9,
+      "liquid_class": "Water Free Single",
+      "name": "Dispense Diluent",
+      "operation": "dispense",
+      "parameters": {
+        "destination_well": "A1"
+      },
+      "target_labware": "NormalizedPlate",
+      "volume_ul": 45
+    },
+    {
+      "group": "Normalize",
+      "id": "step_010",
+      "index": 10,
+      "liquid_class": "Water Free Single",
+      "name": "Mix Normalized Sample",
+      "operation": "mca384_mix",
+      "parameters": {
+        "cycles": 8,
+        "well": "A1"
+      },
+      "target_labware": "NormalizedPlate",
+      "volume_ul": 35
+    },
+    {
+      "group": "Cleanup",
+      "id": "step_011",
+      "index": 11,
+      "name": "Return Tips",
+      "operation": "set_tips_back",
+      "parameters": {
+        "tip_strategy": "return_to_source"
+      },
+      "target_labware": "Tips"
+    }
+  ],
+  "template": {
+    "description": "Sample normalization workflow with calculated sample volume, diluent fill, and mix.",
+    "name": "normalization",
+    "request_schema": "request.schema.json",
+    "version": 1
+  },
+  "variables": [
+    {
+      "default": 10,
+      "name": "target_concentration_ng_ul",
+      "type": "number"
+    },
+    {
+      "default": 50,
+      "name": "final_volume_ul",
+      "type": "number"
+    },
+    {
+      "default": 5,
+      "name": "sample_volume_ul",
+      "type": "number"
+    },
+    {
+      "default": 45,
+      "name": "diluent_volume_ul",
+      "type": "number"
+    }
+  ],
+  "worklists": [],
+  "worktable": {
+    "auto_place": false,
+    "guid": "",
+    "name": "Template Worktable"
+  }
+}

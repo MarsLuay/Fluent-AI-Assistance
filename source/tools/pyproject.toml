@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tecan-tools"
+version = "0.1.0"
+description = "Repository-level Tecan asset and diagnostic tooling"
+readme = "README.md"
+license = {text = "PolyForm-Noncommercial-1.0.0"}
+requires-python = ">=3.11"
+dependencies = [
+  "fluentcoder",
+  "tecan-protocol-builder",
+]
+
+[project.scripts]
+tecan-prompt-builder = "tecan_tools.prompt.tecan_prompt_builder_app:main"
+
+[tool.setuptools]
+packages = [
+  "tecan_tools",
+  "tecan_tools.common",
+  "tecan_tools.simulator",
+  "tecan_tools.api_v2",
+  "tecan_tools.connectors",
+  "tecan_tools.registry",
+  "tecan_tools.prompt",
+]
+
+[tool.setuptools.package-dir]
+tecan_tools = "."
+"tecan_tools.common" = "common"
+"tecan_tools.simulator" = "simulator"
+"tecan_tools.api_v2" = "api_v2"
+"tecan_tools.connectors" = "connectors"
+"tecan_tools.registry" = "registry"
+"tecan_tools.prompt" = "prompt"
+
+[tool.setuptools.package-data]
+"tecan_tools.api_v2" = ["api_v2_methods.json", "API_V2_AGENT_ROSTER.md"]

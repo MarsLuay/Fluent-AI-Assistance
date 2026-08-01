@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VxData>
+  <Payload>
+    <PayloadData>
+      <SiteTemplate>
+        <GUID>f4742429-eb54-51b4-bd5f-b014e3f876cd</GUID>
+        <LocationGroupName>TroughMP_2</LocationGroupName>
+        <TypeName>TroughMP</TypeName>
+      </SiteTemplate>
+    </PayloadData>
+  </Payload>
+</VxData>

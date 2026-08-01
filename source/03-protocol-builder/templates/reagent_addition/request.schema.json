@@ -1,0 +1,70 @@
+{
+  "$id": "https://fluent-ai-assistance.local/templates/reagent_addition/request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "request": {
+      "properties": {
+        "intent": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "intent"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "tecan.request_spec.v1"
+    },
+    "template": {
+      "properties": {
+        "name": {
+          "const": "reagent_addition"
+        },
+        "parameters": {
+          "properties": {
+            "destination_plate": {
+              "type": "string"
+            },
+            "liquid_class": {
+              "type": "string"
+            },
+            "mix_after_addition": {
+              "type": "boolean"
+            },
+            "reagent_name": {
+              "type": "string"
+            },
+            "reagent_reservoir": {
+              "type": "string"
+            },
+            "reagent_volume_ul": {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "reagent_name",
+            "reagent_volume_ul",
+            "destination_plate",
+            "liquid_class"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "parameters"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "request",
+    "template"
+  ],
+  "title": "Reagent Addition Template Request",
+  "type": "object"
+}

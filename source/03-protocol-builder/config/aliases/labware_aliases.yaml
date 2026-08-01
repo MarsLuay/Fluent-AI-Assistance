@@ -1,0 +1,19 @@
+# Generic instance → type aliases only (vendor tip boxes, waste, common nests).
+# Falcon / CapHolder / tube-runner / other site labware names come from an
+# imported full ZEIA via ready-to-import/<context>/temp_files/labware_catalog.json
+# (gitignored), overlaid by load_alias_maps_with_context_catalog — not from
+# committed repo defaults. Fluent [001]-style suffixes also strip automatically
+# in resolve_alias when no explicit map entry matches.
+labware_aliases:
+  "EVA[001]": "EVA"
+  "MCA384TipBox[001]": "MCA384TipBox"
+  "MCA96TipBox[001]": "MCA96TipBox"
+  "Plexiglas Pane[002]": "Plexiglas Pane"
+  "DiTiWaste[001]": "DiTiWaste"
+  "Centric[001]": "Centric"
+  "Eccentric[001]": "Eccentric"
+  "FES Centric Nest[001]": "FES Centric Nest"
+  "FES Centric Nest[002]": "FES Centric Nest"
+  "FES Eccentric Nest[001]": "FES Eccentric Nest"
+  "FES Eccentric Nest[002]": "FES Eccentric Nest"
+  "Tube[001]": "Tube"

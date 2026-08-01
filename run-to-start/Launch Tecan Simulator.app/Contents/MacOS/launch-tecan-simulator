@@ -1,0 +1,21 @@
+#!/bin/zsh
+set -u
+
+CONTENTS_DIR="${0:A:h:h}"
+RUNNER="${CONTENTS_DIR}/Resources/run-tecan-simulator.zsh"
+
+if [[ ! -x "$RUNNER" ]]; then
+  chmod +x "$RUNNER" 2>/dev/null || true
+fi
+
+if [[ ! -x "$RUNNER" ]]; then
+  osascript -e 'display dialog "The Tecan simulator app runner was not found or is not executable." buttons {"OK"} default button "OK" with icon caution' >/dev/null
+  exit 1
+fi
+
+osascript <<OSA >/dev/null
+tell application "Terminal"
+  activate
+  do script quoted form of "$RUNNER"
+end tell
+OSA

@@ -1,0 +1,28 @@
+{
+  "commands": [
+    {
+      "device_alias": "MCA384",
+      "id": "Mca384PickUpTipsScriptCommandDataV5",
+      "labware": "TipBox"
+    },
+    {
+      "device_alias": "MCA384",
+      "id": "Mca384DropTipsScriptCommandDataV5",
+      "labware": "Waste"
+    }
+  ],
+  "labware": [
+    {
+      "label": "TipBox",
+      "position": 3,
+      "type": "MCA96, 100ul, Box"
+    },
+    {
+      "label": "Waste",
+      "position": 10,
+      "type": "DiTi Waste"
+    }
+  ],
+  "script_name": "Tip Pickup Cleanup",
+  "worktable": "Tip Cleanup Worktable"
+}

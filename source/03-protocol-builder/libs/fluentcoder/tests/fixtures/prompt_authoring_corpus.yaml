@@ -1,0 +1,79 @@
+- id: simple_transfer
+  prompt: "Transfer 20 uL from a 96-well source plate to a 96-well destination plate across all wells."
+  clarification_expected: false
+  expected_outcome: success
+  expected_workspace:
+    name: "SAT_Fluent_780_Rev3"
+    guid: "291ba293-6361-4f8f-aa8d-7c2643d3f096"
+  expected_labware_families:
+    - "plate_96"
+    - "mca_tipbox_small"
+  expected_locations:
+    - "Nest61mm_Pos"
+
+- id: plate_normalization
+  prompt: "Normalize a 96-well plate by transferring 30 uL sample into a new destination plate and adding 20 uL buffer to each well."
+  clarification_expected: false
+  expected_outcome: success
+  expected_workspace:
+    name: "SAT_Fluent_780_Rev3"
+    guid: "291ba293-6361-4f8f-aa8d-7c2643d3f096"
+  expected_labware_families:
+    - "plate_96"
+    - "mca_tipbox_small"
+  expected_locations:
+    - "Nest61mm_Pos"
+
+- id: wash_workflow
+  prompt: "Run a 3 cycle wash on a 96-well plate using 40 uL wash buffer each cycle and discard to waste."
+  clarification_expected: false
+  expected_outcome: success
+  expected_workspace:
+    name: "SAT_Fluent_780_Rev3"
+    guid: "291ba293-6361-4f8f-aa8d-7c2643d3f096"
+  expected_labware_families:
+    - "plate_96"
+    - "mca_tipbox_small"
+  expected_locations:
+    - "Nest61mm_Pos"
+
+- id: loop_conditional
+  prompt: "Repeat a 10 uL wash for 3 cycles on a 96-well plate, and if pH is at least 7 add an extra 5 uL rinse each cycle."
+  clarification_expected: false
+  expected_outcome: success
+  expected_workspace:
+    name: "SAT_Fluent_780_Rev3"
+    guid: "291ba293-6361-4f8f-aa8d-7c2643d3f096"
+  expected_labware_families:
+    - "plate_96"
+    - "mca_tipbox_small"
+  expected_locations:
+    - "Nest61mm_Pos"
+
+- id: bead_cleanup
+  prompt: "Perform a bead cleanup on a 96-well plate: bind on magnet, remove 100 uL supernatant, then add 50 uL wash buffer."
+  clarification_expected: false
+  expected_outcome: success
+  expected_workspace:
+    name: "SAT_Fluent_780_Rev3"
+    guid: "291ba293-6361-4f8f-aa8d-7c2643d3f096"
+  expected_labware_families:
+    - "plate_96"
+    - "magnet_plate_96"
+    - "mca_tipbox_small"
+  expected_locations:
+    - "Nest61mm_Pos"
+
+- id: missing_details
+  prompt: "Transfer from source plate to destination plate."
+  clarification_expected: true
+  expected_outcome: clarification_required
+  expected_question_keys:
+    - "plate_format"
+    - "transfer_volume_ul"
+
+- id: unsupported_capability
+  prompt: "Heat a plate to 60 C and shake for 10 minutes."
+  clarification_expected: false
+  expected_outcome: failure
+  expected_failure_category: "unsupported_capability"

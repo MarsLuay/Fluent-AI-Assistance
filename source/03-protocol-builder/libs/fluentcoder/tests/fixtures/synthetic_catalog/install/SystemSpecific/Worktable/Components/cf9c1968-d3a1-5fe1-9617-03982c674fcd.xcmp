@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VxData xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Payload>
+    <ObjectName>Landscape Nest Magnet Teleshake Segment</ObjectName>
+    <PayloadData>
+      <CarrierOrLabwareTemplate>
+        <GUID>cf9c1968-d3a1-5fe1-9617-03982c674fcd</GUID>
+        <Dimension><X>127.76</X><Y>85.48</Y><Z>14.35</Z></Dimension>
+        <FunctionalGroup>Carrier.Deck Segment</FunctionalGroup>
+        <Arrangements>
+          <ArrangementTemplate>
+            <SitesInX>1</SitesInX>
+            <SitesInY>1</SitesInY>
+            <SitesInZ>1</SitesInZ>
+            <SiteSpacingInX>0</SiteSpacingInX>
+            <SiteSpacingInY>0</SiteSpacingInY>
+            <SiteSpacingInZ>0</SiteSpacingInZ>
+            <PositionInParent><X>0</X><Y>0</Y><Z>0</Z></PositionInParent>
+          </ArrangementTemplate>
+        </Arrangements>
+
+      </CarrierOrLabwareTemplate>
+    </PayloadData>
+  </Payload>
+</VxData>

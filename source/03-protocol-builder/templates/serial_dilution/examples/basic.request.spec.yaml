@@ -1,0 +1,34 @@
+schema_version: tecan.request_spec.v1
+request:
+  intent: Build an 8-point 1:10 serial dilution from SourcePlate into DilutionPlate.
+  protocol_name: Serial dilution example
+  status: draft
+template:
+  name: serial_dilution
+  parameters:
+    sample_volume_ul: 10
+    diluent_volume_ul: 90
+    dilution_count: 8
+    mix_cycles: 8
+    liquid_class: Water Free Single
+source:
+  context: null
+  context_kind: null
+  contexts: []
+  project_archives: []
+  collection: null
+  source_scripts: []
+  pattern_refs: []
+generation:
+  simulate: false
+  compile_xscr: false
+  apply_modeling: false
+review:
+  state: needs_review
+  required_before_final_generation: true
+  decisions: []
+  unresolved_questions: []
+acceptance:
+  validation_diff_required: true
+  ready_to_import_bundle_required: true
+  ready_gates: all_configured

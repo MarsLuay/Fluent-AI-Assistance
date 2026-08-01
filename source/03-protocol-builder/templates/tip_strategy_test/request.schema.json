@@ -1,0 +1,68 @@
+{
+  "$id": "https://fluent-ai-assistance.local/templates/tip_strategy_test/request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "request": {
+      "properties": {
+        "intent": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "intent"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "tecan.request_spec.v1"
+    },
+    "template": {
+      "properties": {
+        "name": {
+          "const": "tip_strategy_test"
+        },
+        "parameters": {
+          "properties": {
+            "allow_tip_reuse": {
+              "type": "boolean"
+            },
+            "test_volume_ul": {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            "tip_strategy": {
+              "enum": [
+                "fresh_only",
+                "return_for_reuse",
+                "drop_to_waste"
+              ],
+              "type": "string"
+            },
+            "wash_scheme": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "test_volume_ul",
+            "tip_strategy",
+            "wash_scheme"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "parameters"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "request",
+    "template"
+  ],
+  "title": "Tip Strategy Test Template Request",
+  "type": "object"
+}

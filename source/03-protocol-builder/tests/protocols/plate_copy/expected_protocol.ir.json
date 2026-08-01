@@ -1,0 +1,29 @@
+{
+  "labware": [
+    {
+      "label": "TemplatePlate"
+    },
+    {
+      "label": "CopyPlate"
+    }
+  ],
+  "liquid_classes": [
+    {
+      "name": "Serum Single"
+    }
+  ],
+  "steps": [
+    {
+      "operation": "add_labware"
+    },
+    {
+      "operation": "add_labware"
+    },
+    {
+      "operation": "aspirate"
+    },
+    {
+      "operation": "dispense"
+    }
+  ]
+}

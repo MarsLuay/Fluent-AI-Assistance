@@ -1,0 +1,11 @@
+<Object Type="Tecan.Core.Scripting.AlternateGroup">
+  <AlternateGroup>
+    <Objects>
+{{ElseStatements}}
+    </Objects>
+    <Name>{{AlternateName}}</Name>
+    <IsBreakpoint>{{IsBreakpoint}}</IsBreakpoint>
+    <IsDisabledForExecution>{{IsDisabledForExecution}}</IsDisabledForExecution>
+    <LineNumber>{{LineNumber}}</LineNumber>
+  </AlternateGroup>
+</Object>

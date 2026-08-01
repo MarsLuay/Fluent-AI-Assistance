@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VxData>
+  <Payload>
+    <ObjectName>Unsupported Runtime Step</ObjectName>
+    <Comment />
+    <Reference>
+      <Guid>11111111-1234-aaaa-ffff-000000000222</Guid>
+      <TypeId>WorktableWorkspace</TypeId>
+      <ObjectName>780_Empty</ObjectName>
+    </Reference>
+    <ScriptGroup>
+      <Objects>
+        <Object Type="Tecan.Core.Scripting.Worktable.Data.AddLabwareDataV1">
+          <AddLabwareDataV1>
+            <LabwareType>96 Well Flat</LabwareType>
+            <LabwareLable>Plate1</LabwareLable>
+            <Location>Site</Location>
+            <Position>1</Position>
+          </AddLabwareDataV1>
+        </Object>
+        <Object Type="Tecan.Core.Scripting.WaitStatement">
+          <WaitStatement>
+            <Duration>1</Duration>
+          </WaitStatement>
+        </Object>
+        <Object Type="Tecan.Core.Scripting.ExecuteApplicationStatement">
+          <ExecuteApplicationStatement>
+            <Application>external_tool.exe</Application>
+            <Arguments>--run</Arguments>
+          </ExecuteApplicationStatement>
+        </Object>
+      </Objects>
+      <Name>Steps</Name>
+    </ScriptGroup>
+  </Payload>
+</VxData>

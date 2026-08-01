@@ -1,0 +1,32 @@
+{
+  "commands": [
+    {
+      "device_alias": "MCA384",
+      "id": "Mca384AspirateScriptCommandDataV2",
+      "labware": "TemplatePlate",
+      "liquid_class": "Serum Single",
+      "volume": 5
+    },
+    {
+      "device_alias": "MCA384",
+      "id": "Mca384DispenseScriptCommandDataV2",
+      "labware": "CopyPlate",
+      "liquid_class": "Serum Single",
+      "volume": 5
+    }
+  ],
+  "labware": [
+    {
+      "label": "TemplatePlate",
+      "position": 4,
+      "type": "96 Well Flat"
+    },
+    {
+      "label": "CopyPlate",
+      "position": 5,
+      "type": "96 Well Flat"
+    }
+  ],
+  "script_name": "Plate Copy",
+  "worktable": "Plate Copy Worktable"
+}

@@ -1,0 +1,24 @@
+schema_version: tecan.request_spec.v1
+request:
+  intent: Synthetic stub — tiny prompt-only script for engine unit tests.
+  verbatim_prompt: Create a prompt-only demo script with one acknowledge step.
+  protocol_name: DemoScript_Synthetic
+  status: reviewed
+source:
+  contexts: []
+  source_scripts: []
+generation:
+  prompt_only: true
+review: {}
+acceptance:
+  required_checks:
+    - Operator acknowledges the demo prompt.
+verification_recipe:
+  worktable: WT_Demo
+  labware: []
+  groups:
+    - name: Operator setup
+      description: Synthetic setup group for parser/lint coverage.
+      steps:
+        - prompt: Acknowledge this synthetic demo prompt.
+          plain_prompt: true

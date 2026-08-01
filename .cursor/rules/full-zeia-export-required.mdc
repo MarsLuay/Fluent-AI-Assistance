@@ -1,0 +1,15 @@
+---
+description: Require full FluentControl ZEIA exports for protocol generation
+globs: source/03-protocol-builder/**
+alwaysApply: false
+---
+
+# Full ZEIA Export Required
+
+For protocol-builder new-script generation, require an existing full FluentControl ZEIA export as the base context.
+
+- A full export should include source scripts and referenced worktables, liquid classes, labware/system-specific objects, and other dependencies.
+- If no full export was clearly provided, ask the user for one and wait.
+- If import/generation reports a likely partial/non-full ZEIA, ask for the full export and wait.
+- Continue with a partial/non-full ZEIA only after explicit user approval.
+- Record that exception with `--approve-partial-zeia` or `generation.approve_partial_zeia: true`; never infer approval from silence.

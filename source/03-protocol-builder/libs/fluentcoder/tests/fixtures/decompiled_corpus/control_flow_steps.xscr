@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VxData>
+  <Payload>
+    <ObjectName>Control Flow Steps</ObjectName>
+    <Comment />
+    <ScriptGroup>
+      <Objects>
+        <Object Type="Tecan.Core.Scripting.DelayStatement">
+          <DelayStatement>
+            <Delay>1500</Delay>
+          </DelayStatement>
+        </Object>
+        <Object Type="Tecan.Core.Scripting.LoopGroup">
+          <LoopGroup>
+            <Name>Cycle waits</Name>
+            <NumberOfLoops>2</NumberOfLoops>
+            <Objects>
+              <Object Type="Tecan.Core.Scripting.WaitStatement">
+                <WaitStatement>
+                  <Duration>1</Duration>
+                </WaitStatement>
+              </Object>
+            </Objects>
+          </LoopGroup>
+        </Object>
+      </Objects>
+      <Name>Steps</Name>
+    </ScriptGroup>
+  </Payload>
+</VxData>

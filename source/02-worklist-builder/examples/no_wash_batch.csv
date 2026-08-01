@@ -1,0 +1,9 @@
+source_label,source_type,source_position,dest_label,dest_type,dest_position,volume_ul,liquid_class
+Reservoir,100ml Trough,1,Plate1,96 Well Flat,A1,50,Water Free Single
+Reservoir,100ml Trough,1,Plate1,96 Well Flat,B1,50,Water Free Single
+Reservoir,100ml Trough,1,Plate1,96 Well Flat,C1,50,Water Free Single
+Reservoir,100ml Trough,1,Plate1,96 Well Flat,D1,50,Water Free Single
+Reservoir,100ml Trough,1,Plate1,96 Well Flat,E1,50,Water Free Single
+Reservoir,100ml Trough,1,Plate1,96 Well Flat,F1,50,Water Free Single
+Reservoir,100ml Trough,1,Plate1,96 Well Flat,G1,50,Water Free Single
+Reservoir,100ml Trough,1,Plate1,96 Well Flat,H1,50,Water Free Single

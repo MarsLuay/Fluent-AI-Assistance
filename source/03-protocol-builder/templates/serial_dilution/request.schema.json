@@ -1,0 +1,70 @@
+{
+  "$id": "https://fluent-ai-assistance.local/templates/serial_dilution/request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "request": {
+      "properties": {
+        "intent": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "intent"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "tecan.request_spec.v1"
+    },
+    "template": {
+      "properties": {
+        "name": {
+          "const": "serial_dilution"
+        },
+        "parameters": {
+          "properties": {
+            "diluent_volume_ul": {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            "dilution_count": {
+              "minimum": 2,
+              "type": "integer"
+            },
+            "liquid_class": {
+              "type": "string"
+            },
+            "mix_cycles": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "sample_volume_ul": {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "sample_volume_ul",
+            "diluent_volume_ul",
+            "dilution_count",
+            "liquid_class"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "parameters"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "request",
+    "template"
+  ],
+  "title": "Serial Dilution Template Request",
+  "type": "object"
+}

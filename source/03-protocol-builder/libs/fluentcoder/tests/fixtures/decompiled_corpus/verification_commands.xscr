@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VxData>
+  <Payload>
+    <ObjectName>Verification Commands</ObjectName>
+    <Comment />
+    <ScriptGroup>
+      <Objects>
+        <Object Type="Tecan.Core.Scripting.CommentStatement">
+          <CommentStatement>
+            <Comment>Operator setup</Comment>
+          </CommentStatement>
+        </Object>
+        <Object Type="Tecan.Core.Scripting.SetVariableStatement">
+          <SetVariableStatement><Name>cycles</Name><Value>2</Value></SetVariableStatement>
+        </Object>
+        <Object Type="Tecan.Core.Scripting.DelayStatement">
+          <DelayStatement><Delay>500</Delay></DelayStatement>
+        </Object>
+        <Object Type="Tecan.Core.Scripting.StartTimerStatement">
+          <StartTimerStatement><Timer>1</Timer></StartTimerStatement>
+        </Object>
+        <Object Type="Tecan.Core.Scripting.WaitForTimerStatement">
+          <WaitForTimerStatement><Timer>1</Timer><Duration>30</Duration></WaitForTimerStatement>
+        </Object>
+        <Object Type="Tecan.Core.Scripting.UserPromptStatement">
+          <UserPromptStatement><Prompt>Confirm deck state</Prompt><Timeout>0</Timeout></UserPromptStatement>
+        </Object>
+        <Object Type="Tecan.VisionX.TouchTools.Driver.RUP.RUPStandardStatement">
+          <RUPStandardStatement>
+            <StandardProperties>
+              <StandardStatementDataClass>
+                <SelectedImagePath>media/step_001_image.png</SelectedImagePath>
+                <MessageText>Seat the adapter</MessageText>
+              </StandardStatementDataClass>
+            </StandardProperties>
+            <CheckMessagePrompt>Seat the adapter</CheckMessagePrompt>
+            <RUPScreenTitle>Adapter check</RUPScreenTitle>
+            <RUPTimeOut>15</RUPTimeOut>
+          </RUPStandardStatement>
+        </Object>
+        <Object Type="Tecan.Core.Scripting.SubRoutineStatement">
+          <SubRoutineStatement>
+            <SubRoutine>"TEST\SUB_Minimal_v1"</SubRoutine>
+            <ExecutionMode><ExecutionMode>Synchronous</ExecutionMode></ExecutionMode>
+          </SubRoutineStatement>
+        </Object>
+        <Object Type="Tecan.Core.Scripting.ConditionalGroup">
+          <ConditionalGroup>
+            <Name>If ready</Name>
+            <Condition>ready=1</Condition>
+            <Objects>
+              <Object Type="Tecan.Core.Scripting.UserPromptStatement">
+                <UserPromptStatement><Prompt>Proceed</Prompt><Timeout>5</Timeout></UserPromptStatement>
+              </Object>
+            </Objects>
+          </ConditionalGroup>
+        </Object>
+      </Objects>
+      <Name>Steps</Name>
+    </ScriptGroup>
+  </Payload>
+</VxData>

@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "name": "local-tecan-script-corpus",
+  "updated_at": "2026-07-13",
+  "path_base": "source/03-protocol-builder",
+  "description": "Reviewed local ZEIA, XSCR, and GWL corpus assets used for protocol-builder QA and alias-map expansion.",
+  "sources": [
+    {
+      "id": "worklist-fixtures",
+      "kind": "gwl_fixture_set",
+      "assets": [
+        {
+          "kind": "gwl",
+          "path": "corpus/gwl/simple_transfer.gwl",
+          "role": "worklist_fixture",
+          "description": "Simple 4-well transfer with wash records."
+        },
+        {
+          "kind": "gwl",
+          "path": "corpus/gwl/no_wash_batch.gwl",
+          "role": "worklist_fixture",
+          "description": "Eight transfers from a reservoir without wash records."
+        }
+      ],
+      "record_expectations": {
+        "simple_transfer": {
+          "liquid_handling_steps": 8,
+          "wash_records": 4,
+          "break_records": 1
+        },
+        "no_wash_batch": {
+          "liquid_handling_steps": 16,
+          "wash_records": 0,
+          "break_records": 1
+        }
+      },
+      "labware_names": [
+        "DestPlate",
+        "Plate1",
+        "Reservoir",
+        "SourcePlate"
+      ],
+      "liquid_classes": [
+        "Water Free Single"
+      ],
+      "notes": [
+        "Fixture copies preserve useful GWL coverage after generated build artifacts are untracked."
+      ]
+    }
+  ],
+  "extension_counts": {
+    ".gwl": 2
+  },
+  "alias_map_expectations": [
+    {
+      "kind": "catalog",
+      "alias": "EVA[001]",
+      "canonical": "EVA"
+    },
+    {
+      "kind": "labware",
+      "alias": "EVA[001]",
+      "canonical": "EVA"
+    },
+    {
+      "kind": "device_alias",
+      "alias": "Instrument=1/Device=MCA384:1",
+      "canonical": "MCA384"
+    }
+  ],
+  "next_ingestion_targets": [
+    "Import additional reviewed ZEIA archives into isolated project contexts.",
+    "Add safe XSCR and GWL fixture copies only after manual review.",
+    "Expand alias_map_expectations from manifest alias candidates before adding generation features."
+  ]
+}

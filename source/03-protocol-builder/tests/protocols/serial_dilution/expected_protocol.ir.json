@@ -1,0 +1,32 @@
+{
+  "labware": [
+    {
+      "label": "SourcePlate"
+    },
+    {
+      "label": "DilutionPlate"
+    }
+  ],
+  "liquid_classes": [
+    {
+      "name": "Water Free Single"
+    }
+  ],
+  "steps": [
+    {
+      "operation": "add_labware"
+    },
+    {
+      "operation": "add_labware"
+    },
+    {
+      "operation": "aspirate"
+    },
+    {
+      "operation": "dispense"
+    },
+    {
+      "operation": "mca384_mix"
+    }
+  ]
+}

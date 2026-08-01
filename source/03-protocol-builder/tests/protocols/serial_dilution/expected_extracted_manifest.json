@@ -1,0 +1,12 @@
+{
+  "labware_names": [
+    "DilutionPlate",
+    "SourcePlate"
+  ],
+  "liquid_classes": [
+    "Water Free Single"
+  ],
+  "script_count": 1,
+  "worklist_paths": [],
+  "workspace_count": 1
+}
