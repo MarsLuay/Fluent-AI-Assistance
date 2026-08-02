@@ -1387,6 +1387,8 @@ def _copy_v2_setup_script(destination: Path) -> None:
         "collect_tecan_diagnostic_bundle.ps1",
         "copy_tree_with_progress.ps1",
         "stall_watchdog.ps1",
+        "install_external_files.ps1",
+        "deploy_touchtools_media.ps1",
     )
     for helper_name in helpers:
         helper = template.with_name(helper_name)

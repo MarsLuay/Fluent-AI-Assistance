@@ -45,6 +45,7 @@ class BundleSetupTests(unittest.TestCase):
             "--collect-method-source",
             "--install-instrument",
             "--install-external-files",
+            "--deploy-touchtools",
         ):
             self.assertIn(option, text)
         for removed_option in (
@@ -62,6 +63,7 @@ class BundleSetupTests(unittest.TestCase):
             ":phase_collect_method_source",
             ":phase_install_external",
             ":phase_install_instrument",
+            ":phase_deploy_touchtools",
         ):
             self.assertIn(phase, text)
         for removed_phase in (
@@ -71,21 +73,28 @@ class BundleSetupTests(unittest.TestCase):
         ):
             self.assertNotIn(removed_phase, text)
         self.assertNotIn("deploy_touchtools_images.bat", text)
+        self.assertIn("deploy_touchtools_media.ps1", text)
+        self.assertIn("install_external_files.ps1", text)
         self.assertIn("echo Bundle: %BUNDLE_ARG%", text)
         self.assertNotIn('call :setup_log "Bundle: %BUNDLE_DIR%"', text)
         self.assertIn('-OutputRoot "%TEMP_ARG%" -BundleRoot "%BUNDLE_ARG%"', text)
         self.assertNotIn('-OutputRoot "%BUNDLE_ARG%"', text)
         self.assertNotIn('-OutputRoot "%BUNDLE_DIR%"', text)
-        self.assertIn('if "%RUN_LOGS%%RUN_COLLECT_INSTRUMENT%%RUN_COLLECT_METHOD_SOURCE%%RUN_INSTALL_INSTRUMENT%%RUN_INSTALL_EXTERNAL%"=="00000" goto :menu', text)
-        self.assertIn("external_file_deployments", text)
-        self.assertIn("Get-FileHash", text)
+        self.assertIn(
+            'if "%RUN_LOGS%%RUN_COLLECT_INSTRUMENT%%RUN_COLLECT_METHOD_SOURCE%%RUN_INSTALL_INSTRUMENT%%RUN_INSTALL_EXTERNAL%%RUN_DEPLOY_TOUCHTOOLS%"=="000000" goto :menu',
+            text,
+        )
         self.assertIn("if errorlevel 5 goto :menu", text)
         self.assertIn("call net session", text)
+        self.assertIn("Relaunch this utility as Administrator now?", text)
+        self.assertIn("Open the temp_files results folder now?", text)
+        self.assertIn("Installing with progress bar:", text)
         self.assertIn("Tecan support utility", text)
         self.assertIn("1. Collect Logs", text)
         self.assertIn("2. Collect/Install Drivers and Configs", text)
-        self.assertIn("3. Settings", text)
-        self.assertIn("4. Exit", text)
+        self.assertIn("3. Deploy TouchTools media", text)
+        self.assertIn("4. Settings", text)
+        self.assertIn("5. Exit", text)
         self.assertIn("Choose the error type you want logs for.", text)
         self.assertNotIn("Diagnostic log package", text)
         self.assertIn("1. Everything", text)
@@ -132,6 +141,10 @@ class BundleSetupTests(unittest.TestCase):
         self.assertTrue(progress_helper.is_file())
         stall_helper = path.with_name("stall_watchdog.ps1")
         self.assertTrue(stall_helper.is_file())
+        install_helper = path.with_name("install_external_files.ps1")
+        self.assertTrue(install_helper.is_file())
+        deploy_helper = path.with_name("deploy_touchtools_media.ps1")
+        self.assertTrue(deploy_helper.is_file())
         progress_text = progress_helper.read_text(encoding="utf-8")
         self.assertIn("Write-VisibleProgress", progress_text)
         self.assertIn("Invoke-RemoveTree", progress_text)
@@ -147,6 +160,12 @@ class BundleSetupTests(unittest.TestCase):
         self.assertIn("tecan.import_error_scan.v1", helper_text)
         self.assertIn("datastore_iot_client_logs", helper_text)
         self.assertIn("IoT-Client\\MAP.Services.Logging.Service\\LogFile", helper_text)
+        deploy_text = deploy_helper.read_text(encoding="utf-8")
+        self.assertIn("Write-VisibleProgress", deploy_text)
+        self.assertIn("Get-FileHash", deploy_text)
+        install_text = install_helper.read_text(encoding="utf-8")
+        self.assertIn("external_file_deployments", install_text)
+        self.assertIn("Get-FileHash", install_text)
         for token in (
             "Get-ImportScanFileKind",
             "source_kind",

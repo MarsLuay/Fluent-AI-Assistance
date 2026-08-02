@@ -20,6 +20,7 @@ set "RUN_COLLECT_INSTRUMENT=0"
 set "RUN_COLLECT_METHOD_SOURCE=0"
 set "RUN_INSTALL_INSTRUMENT=0"
 set "RUN_INSTALL_EXTERNAL=0"
+set "RUN_DEPLOY_TOUCHTOOLS=0"
 set "LOG_PROFILE=everything"
 set "LOG_PROFILE_LABEL=Everything"
 set "LOG_LOOKBACK_DAYS=1"
@@ -52,6 +53,7 @@ if /I "%~1"=="--collect-instrument" goto :arg_collect_instrument
 if /I "%~1"=="--collect-method-source" goto :arg_collect_method_source
 if /I "%~1"=="--install-instrument" goto :arg_install_instrument
 if /I "%~1"=="--install-external-files" goto :arg_install_external
+if /I "%~1"=="--deploy-touchtools" goto :arg_deploy_touchtools
 if /I "%~1"=="--no-pause" goto :arg_no_pause
 if /I "%~1"=="--help" goto :usage
 if /I "%~1"=="/?" goto :usage
@@ -125,6 +127,11 @@ set "RUN_INSTALL_EXTERNAL=1"
 shift
 goto :parse_args
 
+:arg_deploy_touchtools
+set "RUN_DEPLOY_TOUCHTOOLS=1"
+shift
+goto :parse_args
+
 :arg_no_pause
 set "NO_PAUSE=1"
 shift
@@ -136,18 +143,24 @@ set "RUN_COLLECT_INSTRUMENT=0"
 set "RUN_COLLECT_METHOD_SOURCE=0"
 set "RUN_INSTALL_INSTRUMENT=0"
 set "RUN_INSTALL_EXTERNAL=0"
+set "RUN_DEPLOY_TOUCHTOOLS=0"
 set "SHOW_LOG_MENU=0"
 echo.
 echo Tecan support utility
 echo =====================
 echo 1. Collect Logs
 echo 2. Collect/Install Drivers and Configs
-echo 3. Settings
-echo 4. Exit
+echo 3. Deploy TouchTools media
+echo 4. Settings
+echo 5. Exit
 echo.
-choice /C 1234 /N /M "Select an option [1-4]: "
-if errorlevel 4 exit /b 0
-if errorlevel 3 goto :settings_menu
+choice /C 12345 /N /M "Select an option [1-5]: "
+if errorlevel 5 exit /b 0
+if errorlevel 4 goto :settings_menu
+if errorlevel 3 (
+    set "RUN_DEPLOY_TOUCHTOOLS=1"
+    goto :run_selected
+)
 if errorlevel 2 goto :driver_config_menu
 goto :log_profile_menu
 
@@ -240,7 +253,7 @@ goto :settings_menu
 
 :run_selected
 if "%SHOW_LOG_MENU%"=="1" goto :log_profile_menu
-if "%RUN_LOGS%%RUN_COLLECT_INSTRUMENT%%RUN_COLLECT_METHOD_SOURCE%%RUN_INSTALL_INSTRUMENT%%RUN_INSTALL_EXTERNAL%"=="00000" goto :menu
+if "%RUN_LOGS%%RUN_COLLECT_INSTRUMENT%%RUN_COLLECT_METHOD_SOURCE%%RUN_INSTALL_INSTRUMENT%%RUN_INSTALL_EXTERNAL%%RUN_DEPLOY_TOUCHTOOLS%"=="000000" goto :menu
 call :setup_log "==================================================="
 call :setup_log "Tecan support utility"
 echo Bundle: %BUNDLE_ARG%
@@ -264,6 +277,10 @@ if "%RUN_INSTALL_EXTERNAL%"=="1" (
 )
 if "%RUN_INSTALL_INSTRUMENT%"=="1" (
     call :phase_install_instrument
+    if errorlevel 1 set "SETUP_ERROR=1"
+)
+if "%RUN_DEPLOY_TOUCHTOOLS%"=="1" (
+    call :phase_deploy_touchtools
     if errorlevel 1 set "SETUP_ERROR=1"
 )
 goto :finish
@@ -338,6 +355,8 @@ exit /b 0
 
 :phase_install_instrument
 call :setup_log "Phase: install instrument driver/config snapshot"
+set "ELEVATE_ARGS=--install-instrument"
+if "%NO_PAUSE%"=="1" set "ELEVATE_ARGS=%ELEVATE_ARGS% --no-pause"
 call :require_admin
 if errorlevel 1 (
     call :setup_log "ERROR Administrator privileges are required for instrument install."
@@ -348,32 +367,62 @@ if not exist "%SNAPSHOT%\" (
     call :setup_log "ERROR instrument_snapshot is missing."
     exit /b 1
 )
-call :mirror_install "%SNAPSHOT%\VisionX_Config" "%ProgramData%\Tecan\VisionX\Config"
+call :mirror_install "%SNAPSHOT%\VisionX_Config" "%ProgramData%\Tecan\VisionX\Config" "1/5 Install VisionX Config"
 if errorlevel 1 exit /b 1
-call :mirror_install "%SNAPSHOT%\VisionX_InstrumentConfigurations" "%ProgramData%\Tecan\VisionX\InstrumentConfigurations"
+call :mirror_install "%SNAPSHOT%\VisionX_InstrumentConfigurations" "%ProgramData%\Tecan\VisionX\InstrumentConfigurations" "2/5 Install InstrumentConfigurations"
 if errorlevel 1 exit /b 1
-call :mirror_install "%SNAPSHOT%\VisionX_InstrumentInformation" "%ProgramData%\Tecan\VisionX\InstrumentInformation"
+call :mirror_install "%SNAPSHOT%\VisionX_InstrumentInformation" "%ProgramData%\Tecan\VisionX\InstrumentInformation" "3/5 Install InstrumentInformation"
 if errorlevel 1 exit /b 1
-call :mirror_install "%SNAPSHOT%\VisionX_MapDataBase" "%ProgramData%\Tecan\VisionX\MapDataBase"
+call :mirror_install "%SNAPSHOT%\VisionX_MapDataBase" "%ProgramData%\Tecan\VisionX\MapDataBase" "4/5 Install MapDataBase"
 if errorlevel 1 exit /b 1
-call :mirror_install "%SNAPSHOT%\FluentControl_Drivers" "%ProgramFiles%\Tecan\FluentControl\Drivers"
+call :mirror_install "%SNAPSHOT%\FluentControl_Drivers" "%ProgramFiles%\Tecan\FluentControl\Drivers" "5/5 Install FluentControl Drivers"
 if errorlevel 1 exit /b 1
 call :setup_log "Instrument driver/config installation complete."
 exit /b 0
 
 :phase_install_external
 call :setup_log "Phase: install staged external files"
+if "%RUN_INSTALL_INSTRUMENT%"=="1" (
+    set "ELEVATE_ARGS=--install-instrument"
+) else (
+    set "ELEVATE_ARGS=--install-external-files"
+)
+if "%NO_PAUSE%"=="1" set "ELEVATE_ARGS=%ELEVATE_ARGS% --no-pause"
 call :require_admin
 if errorlevel 1 (
     call :setup_log "ERROR Administrator privileges are required for external file installation."
     exit /b 1
 )
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $root=$env:BUNDLE_DIR; $manifestPath=Join-Path $root 'support\delivery_manifest.json'; if (!(Test-Path -LiteralPath $manifestPath)) { throw 'support\delivery_manifest.json is missing' }; $manifest=Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json; $deployments=@($manifest.external_file_deployments); if ($deployments.Count -eq 0) { Write-Host 'No staged external files to install.' }; foreach ($item in $deployments) { $relative=[string]$item.bundle_path; $target=[string]$item.target_path; $expected=([string]$item.sha256).ToLowerInvariant(); if ([string]::IsNullOrWhiteSpace($relative) -or [string]::IsNullOrWhiteSpace($target) -or $expected.Length -ne 64) { throw 'Invalid external-file deployment record' }; $source=Join-Path $root ($relative -replace '/', '\'); if (!(Test-Path -LiteralPath $source -PathType Leaf)) { throw ('Missing staged external file: ' + $source) }; $sourceHash=(Get-FileHash -Algorithm SHA256 -LiteralPath $source).Hash.ToLowerInvariant(); if ($sourceHash -ne $expected) { throw ('Staged external file hash mismatch: ' + $source) }; $parent=Split-Path -Parent $target; if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }; Copy-Item -LiteralPath $source -Destination $target -Force; $targetHash=(Get-FileHash -Algorithm SHA256 -LiteralPath $target).Hash.ToLowerInvariant(); if ($targetHash -ne $expected) { throw ('Installed external file hash mismatch: ' + $target) }; Write-Host ('Installed external file: ' + $target) }"
+set "INSTALL_PS=%SUPPORT_DIR%install_external_files.ps1"
+if not exist "%INSTALL_PS%" set "INSTALL_PS=%BUNDLE_DIR%install_external_files.ps1"
+if not exist "%INSTALL_PS%" (
+    call :setup_log "ERROR install_external_files.ps1 is required beside this BAT."
+    exit /b 1
+)
+powershell -NoProfile -ExecutionPolicy Bypass -File "%INSTALL_PS%" -BundleRoot "%BUNDLE_ARG%"
 if errorlevel 1 (
     call :setup_log "ERROR staged external file installation failed."
     exit /b 1
 )
 call :setup_log "Staged external file installation complete."
+exit /b 0
+
+:phase_deploy_touchtools
+call :setup_log "Phase: deploy TouchTools media"
+set "DEPLOY_PS=%SUPPORT_DIR%deploy_touchtools_media.ps1"
+if not exist "%DEPLOY_PS%" set "DEPLOY_PS=%BUNDLE_DIR%deploy_touchtools_media.ps1"
+if not exist "%DEPLOY_PS%" (
+    call :setup_log "ERROR deploy_touchtools_media.ps1 is required beside this BAT."
+    exit /b 1
+)
+set "DEPLOY_EXTRA="
+if "%NO_PAUSE%"=="1" set "DEPLOY_EXTRA=-NoPause"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%DEPLOY_PS%" -BundleRoot "%BUNDLE_ARG%" %DEPLOY_EXTRA%
+if errorlevel 1 (
+    call :setup_log "ERROR TouchTools media deploy failed."
+    exit /b 1
+)
+call :setup_log "TouchTools media deploy complete."
 exit /b 0
 
 :mirror_collect
@@ -446,10 +495,25 @@ if not exist "%~1\" (
     exit /b 0
 )
 if not exist "%~2\" mkdir "%~2" >nul 2>&1
-robocopy "%~1" "%~2" /E /R:2 /W:1 /XJ /NFL /NDL /NJH /NJS >nul
-if errorlevel 8 (
-    call :setup_log "ERROR install copy failed: %~2"
-    exit /b 1
+set "MIRROR_LABEL=%~3"
+if "%MIRROR_LABEL%"=="" set "MIRROR_LABEL=%~2"
+set "PROGRESS_PS=%SUPPORT_DIR%copy_tree_with_progress.ps1"
+if not exist "%PROGRESS_PS%" set "PROGRESS_PS=%BUNDLE_DIR%copy_tree_with_progress.ps1"
+if exist "%PROGRESS_PS%" (
+    call :setup_log "Installing with progress bar: %MIRROR_LABEL%"
+    call :touch_progress_heartbeat "install:%MIRROR_LABEL%"
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%PROGRESS_PS%" -Action Copy -Source "%~1" -Destination "%~2" -Label "%MIRROR_LABEL%"
+    if errorlevel 8 (
+        call :setup_log "ERROR install copy failed: %~2"
+        exit /b 1
+    )
+) else (
+    call :setup_log "Installing with robocopy progress: %MIRROR_LABEL%"
+    robocopy "%~1" "%~2" /E /R:2 /W:1 /XJ /NFL /NDL /ETA
+    if errorlevel 8 (
+        call :setup_log "ERROR install copy failed: %~2"
+        exit /b 1
+    )
 )
 call :setup_log "Installed: %~2"
 exit /b 0
@@ -567,11 +631,23 @@ if exist "%TEMP_DIR%tecan_bundle_setup_STALL.error.txt" (
 )
 if "%SETUP_ERROR%"=="1" (
     call :setup_log "Support utility finished with errors. Review %LOG%."
+    call :offer_open_temp_files
     if not "%NO_PAUSE%"=="1" pause
     exit /b 1
 )
 call :setup_log "Support utility completed successfully."
+call :setup_log "Results folder: %TEMP_DIR%"
+call :offer_open_temp_files
 if not "%NO_PAUSE%"=="1" pause
+exit /b 0
+
+:offer_open_temp_files
+if "%NO_PAUSE%"=="1" exit /b 0
+if not exist "%TEMP_DIR%" exit /b 0
+echo.
+choice /C YN /N /M "Open the temp_files results folder now? [Y/N]: "
+if errorlevel 2 exit /b 0
+explorer "%TEMP_DIR%"
 exit /b 0
 
 :usage
@@ -583,6 +659,7 @@ echo   run_tecan_bundle_setup.bat --collect-instrument [--no-pause]
 echo   run_tecan_bundle_setup.bat --collect-method-source [--no-pause]
 echo   run_tecan_bundle_setup.bat --install-instrument [--no-pause]
 echo   run_tecan_bundle_setup.bat --install-external-files [--no-pause]
+echo   run_tecan_bundle_setup.bat --deploy-touchtools [--no-pause]
 exit /b 0
 
 :usage_error
@@ -655,5 +732,12 @@ exit /b 0
 
 :require_admin
 call net session >nul 2>&1
-if errorlevel 1 exit /b 1
-exit /b 0
+if not errorlevel 1 exit /b 0
+call :setup_log "Administrator privileges are required for this step."
+if "%NO_PAUSE%"=="1" exit /b 1
+echo.
+choice /C YN /N /M "Relaunch this utility as Administrator now? [Y/N]: "
+if errorlevel 2 exit /b 1
+if "%ELEVATE_ARGS%"=="" set "ELEVATE_ARGS=--install-instrument --no-pause"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$args = @('%ELEVATE_ARGS%'.Split(' ', [System.StringSplitOptions]::RemoveEmptyEntries)); Start-Process -FilePath '%~f0' -WorkingDirectory '%BUNDLE_ARG%' -Verb RunAs -ArgumentList $args | Out-Null"
+exit /b 1

@@ -1,6 +1,6 @@
 [project]
 name = "tecan-protocol-builder"
-version = "0.1.1"
+version = "0.1.2"
 description = "Local Codex-friendly FluentControl protocol builder around fluentcoder."
 readme = "README.md"
 license = {text = "PolyForm-Noncommercial-1.0.0"}

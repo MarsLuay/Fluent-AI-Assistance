@@ -133,28 +133,27 @@ python -m fluent_pipeline.cli normalize-worktable-gif media\step_003_video.gif `
 
 **Bundled support BAT:**
 
-Run `run_tecan_bundle_setup.bat` at the bundle root when you need diagnostics
-or an instrument driver/config snapshot. It is the sole published BAT and its
-top-level menu is intentionally small:
+Run `run_tecan_bundle_setup.bat` at the bundle root. It is the sole published BAT
+at the delivery root. Top-level menu:
 
 1. Collect Logs
 2. Collect/Install Drivers and Configs
-3. Exit
+3. Deploy TouchTools media
+4. Settings
+5. Exit
 
-Log collection opens a profile submenu for Everything, In-Script errors, Tecan
-Program Crash, Import errors, and Likely Causes Script. Driver/config opens a
-submenu to collect a snapshot into the bundle or install a snapshot from the
-bundle.
+Log collection opens a profile submenu (Everything, In-Script errors, Tecan
+Program Crash, Import errors). Driver/config opens collect snapshot / install
+snapshot / collect method source. Deploy TouchTools copies `media/processed/`
+into `TouchToolsData\Images\<ScriptName>_media\` with a progress bar and SHA-256
+checks (`--deploy-touchtools` for non-interactive).
 
-The BAT does not perform media or external-file setup. Generated delivery
-bundles already contain the staged artifacts; use manual copy only when a local
-instrument workflow requires TouchTools files to be placed under:
+Install paths show the same ASCII progress bars as collect. If a step needs
+Administrator rights, the BAT can offer to relaunch elevated. When finished it
+can open the `temp_files\` results folder.
 
-```text
-C:\ProgramData\Tecan\VisionX\TouchToolsData\Images
-```
-
-Check `tecan_bundle_setup.log` at the bundle root.
+Check `tecan_bundle_setup.log` and `deploy_touchtools_images.log` under the
+bundle root / temp_files as applicable.
 
 **Option A — manual copy:**
 

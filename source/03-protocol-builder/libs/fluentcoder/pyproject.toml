@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fluentcoder"
-version = "0.1.1"
+version = "0.1.2"
 description = "fluentcoder authoring/simulation/compiler for the Fluent AI-Assistance fluent-pipeline"
 readme = "README.md"
 license = {text = "PolyForm-Noncommercial-1.0.0"}

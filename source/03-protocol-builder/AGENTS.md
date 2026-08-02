@@ -885,9 +885,10 @@ after generation.
   Each external payload record must contain its exact `bundle_path`, absolute
   `target_path`, and lowercase SHA-256. Never resolve deployment sources by
   recursive basename search. The setup BAT verifies source and installed hashes.
-- `run_tecan_bundle_setup.bat --all` must run strict V2 bundle verification
-  before any installation, deployment, or log-collection phase and stop on
-  verification failure.
+- Ready bundle publication validates V2 layout and delivery_manifest hashes.
+  Use `run_tecan_bundle_setup.bat` on the instrument PC for log collection,
+  driver/config snapshot install, and TouchTools media deploy (menu or
+  `--deploy-touchtools`). There is no `--all` flag; pick the task you need.
 - Ready bundle publication is atomic replacement of
   `ready-to-import/<protocol>/`. Stage and validate the replacement folder
   first; failed or `validated_not_ready` runs must not create or replace the
@@ -940,7 +941,8 @@ after generation.
    Worktable steps carry `CustomDetailImageFilePath` when using legacy mode).
 2. Copy deploy-ready files from `media/processed/` to
    `TouchToolsData\Images\<ScriptName>_media\` (run
-   `run_tecan_bundle_setup.bat`; basenames must match the script paths).
+   `run_tecan_bundle_setup.bat` and choose **Deploy TouchTools media**, or
+   `--deploy-touchtools`; basenames must match the script paths).
    Standard prompts are GIF-first; Worktable deck-presence prompts use the GIF
    slot for `CustomDetailImageFilePath` (normalized during generation when needed).
 3. Run initialization worktable, then preview RUP Standard steps in Script Editor.
