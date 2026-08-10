@@ -157,8 +157,35 @@ def _global_catalog_db_path() -> Path:
     return fluentcoder_root() / "fluentcoder" / "catalog" / "install_index.db"
 
 
+def _catalog_info_check() -> dict[str, Any]:
+    """Inspect the catalog in-process so MCP stdio never nests a Python probe."""
+    try:
+        from fluentcoder.catalog.catalog import category_counts, index_exists, install_info
+
+        if not index_exists():
+            return {
+                "name": "catalog info",
+                "ok": False,
+                "detail": "Catalog index is empty. Run `fluentcoder catalog refresh`.",
+            }
+        info = install_info() or {}
+        counts = category_counts()
+    except Exception as exc:  # noqa: BLE001 - doctor reports failures instead of aborting
+        return {
+            "name": "catalog info",
+            "ok": False,
+            "detail": f"catalog query failed: {exc}",
+        }
+    component_count = sum(int(value) for value in counts.values())
+    return {
+        "name": "catalog info",
+        "ok": True,
+        "detail": f"{component_count} components from `{info.get('install_path') or 'unknown install'}`",
+    }
+
+
 def _catalog_info_ok() -> bool:
-    return bool(run_fluentcoder(["catalog", "info"]).ok)
+    return bool(_catalog_info_check()["ok"])
 
 
 def _fc_install_with_components() -> Path | None:
@@ -341,7 +368,7 @@ def collect_doctor_checks(*, install_missing: bool = False) -> list[dict[str, An
                 "result": lxml,
             }
         )
-        catalog_check = _result_check("catalog info", run_fluentcoder(["catalog", "info"]))
+        catalog_check = _catalog_info_check()
         if catalog_heal.get("action") not in {None, "already_populated"}:
             heal_detail = str(catalog_heal.get("detail") or "").strip()
             if heal_detail:

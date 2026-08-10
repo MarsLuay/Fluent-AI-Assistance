@@ -12,6 +12,25 @@ from fluent_pipeline.cli.commands import doctor as doctor_cmd
 
 
 class EnsureGlobalCatalogTests(unittest.TestCase):
+    def test_catalog_info_check_uses_in_process_catalog_api(self) -> None:
+        with (
+            mock.patch("fluentcoder.catalog.catalog.index_exists", return_value=True),
+            mock.patch(
+                "fluentcoder.catalog.catalog.install_info",
+                return_value={"install_path": "C:/Tecan"},
+            ),
+            mock.patch(
+                "fluentcoder.catalog.catalog.category_counts",
+                return_value={"plate": 2, "carrier": 3},
+            ),
+            mock.patch.object(doctor_cmd, "run_fluentcoder") as run_fc,
+        ):
+            result = doctor_cmd._catalog_info_check()
+
+        self.assertTrue(result["ok"])
+        self.assertIn("5 components", result["detail"])
+        run_fc.assert_not_called()
+
     def test_skips_when_catalog_already_ok(self) -> None:
         with mock.patch.object(doctor_cmd, "_catalog_info_ok", return_value=True):
             result = doctor_cmd.ensure_global_catalog_index()
