@@ -54,6 +54,14 @@ def _ok_finalization_report() -> FinalizationReport:
     )
 
 
+def _assert_rendered_path(test_case: unittest.TestCase, rendered: str, label: str, expected: Path) -> None:
+    prefix = f"{label}: "
+    matching_lines = [line for line in rendered.splitlines() if line.startswith(prefix)]
+    test_case.assertEqual(len(matching_lines), 1)
+    actual = Path(matching_lines[0][len(prefix) :])
+    test_case.assertTrue(actual.samefile(expected), f"{actual} does not identify {expected}")
+
+
 class CliPathResolutionTests(unittest.TestCase):
     def test_resolve_spec_command_is_registered_for_regeneration_preflight(self):
         args = _build_parser().parse_args(
@@ -844,8 +852,8 @@ class CliPathResolutionTests(unittest.TestCase):
             self.assertIsNone(final_args[3])
             self.assertEqual(final_args[4], {"source_ir_origin": "compile_input"})
             normalized_stdout = stdout.getvalue().replace("/private/var/", "/var/")
-            self.assertIn(f"Compiled XSCR: {output}", normalized_stdout)
-            self.assertIn(f"Compile report: {output.with_suffix('.compile.md')}", normalized_stdout)
+            _assert_rendered_path(self, normalized_stdout, "Compiled XSCR", output)
+            _assert_rendered_path(self, normalized_stdout, "Compile report", output.with_suffix(".compile.md"))
             self.assertNotIn("Ready to import", normalized_stdout)
             self.assertIn("Compiled XSCR Finalization", output.with_suffix(".compile.md").read_text(encoding="utf-8"))
 
@@ -894,8 +902,8 @@ class CliPathResolutionTests(unittest.TestCase):
             self.assertIsNone(final_args[3])
             self.assertEqual(final_args[4], {"source_ir_origin": "ir_build"})
             normalized_stdout = stdout.getvalue().replace("/private/var/", "/var/")
-            self.assertIn(f"Compiled XSCR: {xscr_path}", normalized_stdout)
-            self.assertIn(f"Compile report: {xscr_path.with_suffix('.compile.md')}", normalized_stdout)
+            _assert_rendered_path(self, normalized_stdout, "Compiled XSCR", xscr_path)
+            _assert_rendered_path(self, normalized_stdout, "Compile report", xscr_path.with_suffix(".compile.md"))
             self.assertNotIn("Ready to import", normalized_stdout)
             self.assertIn("Compiled XSCR Finalization", xscr_path.with_suffix(".compile.md").read_text(encoding="utf-8"))
 
@@ -968,8 +976,8 @@ class CliPathResolutionTests(unittest.TestCase):
             self.assertEqual([Path(item).resolve() for item in final_args[3]], [source.resolve()])
             self.assertEqual(final_args[4], {"source_ir_origin": "roundtrip_source_xscr"})
             normalized_stdout = stdout.getvalue().replace("/private/var/", "/var/")
-            self.assertIn(f"Compiled XSCR: {compiled}", normalized_stdout)
-            self.assertIn(f"Compile report: {out_dir / f'{source.stem}_compile.md'}", normalized_stdout)
+            _assert_rendered_path(self, normalized_stdout, "Compiled XSCR", compiled)
+            _assert_rendered_path(self, normalized_stdout, "Compile report", out_dir / f"{source.stem}_compile.md")
             self.assertNotIn("Ready to import", normalized_stdout)
             self.assertIn("Compiled XSCR Finalization", (out_dir / f"{source.stem}_compile.md").read_text(encoding="utf-8"))
 
