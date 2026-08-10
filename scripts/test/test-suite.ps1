@@ -60,7 +60,7 @@ function Ensure-PythonEnvironment {
     if (-not $venvPython) {
         Write-Host ""
         Write-Host "==> bootstrap"
-        & $InstallScript -SkipSmokeTest
+        & $InstallScript -SkipSmokeTest | Out-Host
         if ($LASTEXITCODE -ne 0) {
             throw "Environment bootstrap failed with exit code $LASTEXITCODE."
         }
@@ -70,7 +70,7 @@ function Ensure-PythonEnvironment {
     if (-not (Test-PytestAvailable -Executable $python)) {
         Write-Host ""
         Write-Host "==> bootstrap"
-        & $InstallScript -SkipSmokeTest
+        & $InstallScript -SkipSmokeTest | Out-Host
         if ($LASTEXITCODE -ne 0) {
             throw "Environment bootstrap failed with exit code $LASTEXITCODE."
         }
