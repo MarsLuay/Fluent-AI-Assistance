@@ -6,10 +6,10 @@
 | CLI `__main__` | `fluent_pipeline/cli/__main__.py` | `python -m fluent_pipeline.cli` |
 | MCP server | `fluent_pipeline/mcp_server.py` | stdio tools (`fluent_*`); console script `tecan-ai-mcp` |
 | MCP gateway | `fluent_pipeline/mcp_gateway.py` | safety + service calls |
-| Application services | `fluent_pipeline/application_services.py` | Facade DTOs for generate/import/inspect/repair |
-| Generation workflow | `fluent_pipeline/generation_workflow.py` + `workflows/generation/` | orchestration (stages partially extracted) |
+| Application services | `fluent_pipeline/application_services.py` + `authoring_status.py` | Facade DTOs plus the canonical Python/CLI/MCP authoring and recovery status |
+| Generation workflow | `fluent_pipeline/workflows/generation/workflow.py` | Canonical orchestration; `generation_workflow.py` remains a compatibility facade |
 | Export / package | `fluent_pipeline/exports.py` | ready-to-import publish |
-| Bootstrap | `fluent_pipeline/bootstrap.py` | editable workspace install |
+| Bootstrap | `fluent_pipeline/bootstrap.py` + `bootstrap_status.py` | canonical install graph plus fail-closed next-step status |
 | FluentCoder render | `libs/fluentcoder/.../compiler/renderer.py` | `.xscr` emit |
 | Catalog indexer | `libs/fluentcoder/.../catalog/indexer.py` | SQL index from install/ZEIA |
 | Project reader CLI | `source/01-project-reader/tecan_reader/cli.py` | `project-reader` / `tecan-reader` |

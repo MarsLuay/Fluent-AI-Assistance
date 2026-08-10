@@ -45,6 +45,7 @@ class ProgressStage:
 
 GENERATION_PROGRESS_STAGES: tuple[ProgressStage, ...] = (
     ProgressStage("load_context", "Loading project context"),
+    ProgressStage("infer_missing_details", "Inferring missing details"),
     ProgressStage("validate_request", "Validating request"),
     ProgressStage("build_protocol_ir", "Building protocol IR"),
     ProgressStage("render_script", "Rendering script"),

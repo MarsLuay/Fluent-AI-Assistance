@@ -9,7 +9,8 @@ if "%BUNDLE_ARG:~-1%"=="\" set "BUNDLE_ARG=%BUNDLE_ARG:~0,-1%"
 set "TEMP_DIR=%BUNDLE_DIR%temp_files\"
 set "TEMP_ARG=%TEMP_DIR%"
 if "%TEMP_ARG:~-1%"=="\" set "TEMP_ARG=%TEMP_ARG:~0,-1%"
-set "SUPPORT_DIR=%BUNDLE_DIR%support\"
+set "SUPPORT_DIR=%BUNDLE_DIR%source\"
+if not exist "%SUPPORT_DIR%collect_tecan_diagnostic_bundle.ps1" set "SUPPORT_DIR=%BUNDLE_DIR%support\"
 if not exist "%SUPPORT_DIR%collect_tecan_diagnostic_bundle.ps1" set "SUPPORT_DIR=%BUNDLE_DIR%"
 if not exist "%TEMP_DIR%" mkdir "%TEMP_DIR%" >nul 2>&1
 set "LOG=%TEMP_DIR%tecan_bundle_setup.log"
@@ -300,7 +301,7 @@ set "FLUENTCONTROL_INFOPAD_ARG="
 if /I "%LOG_PROFILE%"=="script-errors" set "FLUENTCONTROL_INFOPAD_ARG=-CaptureFluentControlInfopad"
 if /I "%LOG_PROFILE%"=="everything" set "FLUENTCONTROL_INFOPAD_ARG=-CaptureFluentControlInfopad"
 if not exist "%SETUP_LOG_SCRIPT%" (
-    call :setup_log "ERROR collect_tecan_diagnostic_bundle.ps1 is required beside this BAT."
+    call :setup_log "ERROR source\collect_tecan_diagnostic_bundle.ps1 is required."
     exit /b 1
 )
 powershell -NoProfile -ExecutionPolicy Bypass -File "%SETUP_LOG_SCRIPT%" -Profile "%LOG_PROFILE%" -OutputRoot "%TEMP_ARG%" -BundleRoot "%BUNDLE_ARG%" -SinceDays %LOG_LOOKBACK_DAYS% -LikelyCauseMaxRecords %LIKELY_CAUSE_MAX_RECORDS% -EventLogMaxEvents %WINDOWS_EVENT_MAX_EVENTS% %FLUENTCONTROL_INFOPAD_ARG%
@@ -396,7 +397,7 @@ if errorlevel 1 (
 set "INSTALL_PS=%SUPPORT_DIR%install_external_files.ps1"
 if not exist "%INSTALL_PS%" set "INSTALL_PS=%BUNDLE_DIR%install_external_files.ps1"
 if not exist "%INSTALL_PS%" (
-    call :setup_log "ERROR install_external_files.ps1 is required beside this BAT."
+    call :setup_log "ERROR source\install_external_files.ps1 is required."
     exit /b 1
 )
 powershell -NoProfile -ExecutionPolicy Bypass -File "%INSTALL_PS%" -BundleRoot "%BUNDLE_ARG%"
@@ -412,7 +413,7 @@ call :setup_log "Phase: deploy TouchTools media"
 set "DEPLOY_PS=%SUPPORT_DIR%deploy_touchtools_media.ps1"
 if not exist "%DEPLOY_PS%" set "DEPLOY_PS=%BUNDLE_DIR%deploy_touchtools_media.ps1"
 if not exist "%DEPLOY_PS%" (
-    call :setup_log "ERROR deploy_touchtools_media.ps1 is required beside this BAT."
+    call :setup_log "ERROR source\deploy_touchtools_media.ps1 is required."
     exit /b 1
 )
 set "DEPLOY_EXTRA="

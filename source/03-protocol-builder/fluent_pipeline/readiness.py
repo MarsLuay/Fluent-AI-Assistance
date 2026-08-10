@@ -18,8 +18,18 @@ class ReadinessGateStatus(StrEnum):
     NOT_RUN = "not_run"
 
 
+class LiveHandoffStatus(StrEnum):
+    """Terminal statuses for checks that require a target-system handoff."""
+
+    PASSED = "passed"
+    FAILED = "failed"
+    NEEDS_REVIEW = "needs_review"
+    NOT_RUN = "not_run"
+
+
 STRICT_READY = frozenset({ReadinessGateStatus.PASSED})
 REVIEWABLE_READY = frozenset({ReadinessGateStatus.PASSED, ReadinessGateStatus.NEEDS_REVIEW})
+LIVE_HANDOFF_STATUSES = frozenset(LiveHandoffStatus)
 
 
 CANONICAL_READINESS_KEYS = (
@@ -100,6 +110,105 @@ def gate_status_in_policy(value: Any, policy: Iterable[Any] | None) -> bool:
     return normalized in normalize_readiness_gate_policy(policy)
 
 
+_LIVE_HANDOFF_STATUS_ALIASES = {
+    "load_clean": LiveHandoffStatus.PASSED,
+    "load_failed": LiveHandoffStatus.FAILED,
+    "error": LiveHandoffStatus.FAILED,
+    "unavailable": LiveHandoffStatus.NOT_RUN,
+    "hardware_review_required": LiveHandoffStatus.NEEDS_REVIEW,
+    "validated_not_ready": LiveHandoffStatus.NEEDS_REVIEW,
+    "import_ready_needs_review": LiveHandoffStatus.NEEDS_REVIEW,
+    "not_validated": LiveHandoffStatus.NOT_RUN,
+    "not_configured": LiveHandoffStatus.NOT_RUN,
+    "skipped": LiveHandoffStatus.NOT_RUN,
+}
+
+
+def normalize_live_handoff_status(value: Any) -> LiveHandoffStatus | None:
+    """Normalize legacy live-handoff values into the four terminal statuses."""
+    if isinstance(value, LiveHandoffStatus):
+        return value
+    text = str(value or "").strip().casefold()
+    if not text:
+        return None
+    try:
+        return LiveHandoffStatus(text)
+    except ValueError:
+        return _LIVE_HANDOFF_STATUS_ALIASES.get(text)
+
+
+def coerce_live_handoff_status(value: Any) -> LiveHandoffStatus:
+    """Return a deterministic live-handoff status, failing closed to review."""
+    normalized = normalize_live_handoff_status(value)
+    if normalized is not None:
+        return normalized
+    if value is None or not str(value).strip():
+        return LiveHandoffStatus.NOT_RUN
+    return LiveHandoffStatus.NEEDS_REVIEW
+
+
+def live_handoff_next_action(kind: str, status: Any) -> str:
+    """Return one plain-language next action for a live-handoff state."""
+    normalized = coerce_live_handoff_status(status)
+    actions = {
+        "fluentcontrol_load_diagnostic": {
+            LiveHandoffStatus.PASSED: "No action: Gate 27 passed; continue with the separate hardware review.",
+            LiveHandoffStatus.FAILED: "Resolve the Gate 27 FluentControl load errors, then rerun Gate 27 or manually reopen the generated script in Script Editor.",
+            LiveHandoffStatus.NEEDS_REVIEW: "Review the Gate 27 diagnostic details, then rerun the check or manually open the generated script in Script Editor.",
+            LiveHandoffStatus.NOT_RUN: "Run optional Gate 27 on the target FluentControl system, or manually open the generated script in Script Editor.",
+        },
+        "script_editor_load": {
+            LiveHandoffStatus.PASSED: "No action: Script Editor load is confirmed; complete hardware review before running.",
+            LiveHandoffStatus.FAILED: "Resolve the Script Editor load error, then reopen the generated script and record a clean load.",
+            LiveHandoffStatus.NEEDS_REVIEW: "Review the Script Editor handoff details, then reopen the generated script and record the result.",
+            LiveHandoffStatus.NOT_RUN: "Open the generated script in FluentControl Script Editor and record whether it loads cleanly.",
+        },
+        "hardware_run": {
+            LiveHandoffStatus.PASSED: "Proceed only under the approved target-system run procedure.",
+            LiveHandoffStatus.FAILED: "Resolve the target-system run failure before retrying; do not execute the method until it is reviewed.",
+            LiveHandoffStatus.NEEDS_REVIEW: "Review target dependencies, deck state, labware, liquids, adapters, fingers, prompts, and instrument setup before running.",
+            LiveHandoffStatus.NOT_RUN: "Resolve offline blockers first, then complete target-system review before any hardware run.",
+        },
+    }
+    return actions.get(kind, {}).get(
+        normalized,
+        "Review the handoff details and record a definitive result before continuing.",
+    )
+
+
+_NON_EXECUTION_STATUSES = frozenset({"unavailable", "skipped", "not_configured"})
+_LIVE_EVIDENCE_KEYS = (
+    "errors",
+    "runtime_errors",
+    "diagnostics",
+    "messages",
+    "last_error",
+    "returncode",
+    "stdout_sample",
+    "stderr_sample",
+)
+
+
+def _mapping_has_live_evidence(value: Mapping[str, Any]) -> bool:
+    return any(value.get(key) not in (None, "", [], {}) for key in _LIVE_EVIDENCE_KEYS)
+
+
+def _canonical_load_status(
+    load_diag: Mapping[str, Any],
+    gates: Mapping[str, Mapping[str, Any]],
+) -> tuple[LiveHandoffStatus, str]:
+    """Normalize Gate 27, accounting for compatibility-shim non-execution details."""
+    detail = gates.get("fluent_context_check") or {}
+    details = detail.get("details") if isinstance(detail.get("details"), Mapping) else {}
+    detail_status = str(details.get("status") or "").strip().casefold()
+    if detail_status in _NON_EXECUTION_STATUSES:
+        return (
+            LiveHandoffStatus.NEEDS_REVIEW if _mapping_has_live_evidence(details) else LiveHandoffStatus.NOT_RUN,
+            "gate_details",
+        )
+    return coerce_live_handoff_status(load_diag.get("status")), "report"
+
+
 def build_canonical_readiness(
     *,
     validation_report: Mapping[str, Any] | None,
@@ -127,7 +236,7 @@ def build_canonical_readiness(
 
     offline_status = str(offline.get("status") or "not_validated")
     review_status = str(review.get("status") or "not_validated")
-    load_status = str(load_diag.get("status") or "not_run")
+    load_status, load_evidence = _canonical_load_status(load_diag, gates)
     simulation_gate_status = gate_status("simulation_passes")
     fluent_context_gate_status = gate_status("fluent_context_check")
 
@@ -149,12 +258,45 @@ def build_canonical_readiness(
     else:
         simulation_status = "not_verified"
 
-    if offline_status == "ready_to_import":
-        hardware_status = "hardware_review_required"
-    elif offline_status == "not_validated":
-        hardware_status = "not_validated"
+    script_editor_input = report.get("script_editor_load")
+    if isinstance(script_editor_input, Mapping) and "status" in script_editor_input:
+        script_editor_status = coerce_live_handoff_status(script_editor_input.get("status"))
+        script_editor_summary = str(
+            script_editor_input.get("summary")
+            or "Script Editor load handoff status was supplied by the live result."
+        )
+        script_editor_evidence = "reported"
+    elif load_status in {LiveHandoffStatus.PASSED, LiveHandoffStatus.FAILED, LiveHandoffStatus.NEEDS_REVIEW}:
+        script_editor_status = load_status
+        script_editor_evidence = "gate_27" if load_evidence == "report" else "gate_27:gate_details"
+        script_editor_summary = {
+            LiveHandoffStatus.PASSED: "Script Editor load was confirmed by the Gate 27 FluentControl diagnostic.",
+            LiveHandoffStatus.FAILED: "The Gate 27 FluentControl diagnostic reported a Script Editor load failure.",
+            LiveHandoffStatus.NEEDS_REVIEW: "Gate 27 produced a result that requires Script Editor handoff review.",
+        }[load_status]
     else:
-        hardware_status = "validated_not_ready"
+        script_editor_status = LiveHandoffStatus.NOT_RUN
+        script_editor_evidence = "manual_handoff_required"
+        script_editor_summary = "Script Editor load was not checked by Gate 27 or a manual handoff."
+
+    hardware_input = report.get("hardware_run")
+    if isinstance(hardware_input, Mapping) and "status" in hardware_input:
+        hardware_status = coerce_live_handoff_status(hardware_input.get("status"))
+        hardware_summary = str(
+            hardware_input.get("summary")
+            or "Hardware-run handoff status was supplied by the live result."
+        )
+    elif offline_status == "ready_to_import":
+        hardware_status = LiveHandoffStatus.NEEDS_REVIEW
+        hardware_summary = (
+            "Offline validation passed, but the bundle does not certify hardware-run readiness; "
+            "target-system review is required."
+        )
+    else:
+        hardware_status = LiveHandoffStatus.NOT_RUN
+        hardware_summary = (
+            "No hardware run was performed. Resolve offline validation blockers before target-system review."
+        )
 
     return {
         "offline_validation": {
@@ -179,7 +321,7 @@ def build_canonical_readiness(
             "gates": list(review.get("gates") or []),
         },
         "fluentcontrol_load_diagnostic": {
-            "status": load_status,
+            "status": load_status.value,
             "summary": str(
                 load_diag.get("summary")
                 or "Optional FluentControl import/load diagnostic did not run."
@@ -187,6 +329,7 @@ def build_canonical_readiness(
             "requested": bool(load_diag.get("requested")),
             "gate": str(load_diag.get("gate") or "Gate 27"),
             "gate_present": bool(load_diag.get("gate_present")),
+            "next_action": live_handoff_next_action("fluentcontrol_load_diagnostic", load_status),
         },
         "generated_zeia_import": {
             "status": generated_zeia_status,
@@ -198,12 +341,11 @@ def build_canonical_readiness(
             ),
         },
         "script_editor_load": {
-            "status": load_status,
+            "status": script_editor_status.value,
             "gate_27_fluent_context": fluent_context_gate_status,
-            "summary": str(
-                load_diag.get("summary")
-                or "Optional FluentControl import/load diagnostic did not run."
-            ),
+            "summary": script_editor_summary,
+            "evidence": script_editor_evidence,
+            "next_action": live_handoff_next_action("script_editor_load", script_editor_status),
         },
         "simulation": {
             "status": simulation_status,
@@ -217,14 +359,9 @@ def build_canonical_readiness(
             ),
         },
         "hardware_run": {
-            "status": hardware_status,
-            "summary": (
-                "Requires operator review, target-system dependencies, and real FluentControl validation before instrument use."
-                if hardware_status == "hardware_review_required"
-                else "Hardware readiness is blocked until offline validation passes."
-                if hardware_status == "validated_not_ready"
-                else "Hardware readiness is unavailable because validation did not run."
-            ),
+            "status": hardware_status.value,
+            "summary": hardware_summary,
+            "next_action": live_handoff_next_action("hardware_run", hardware_status),
         },
     }
 
@@ -237,16 +374,10 @@ def readiness_status_from_readiness(
     profile = readiness if isinstance(readiness, Mapping) else {}
     offline_status = str(((profile.get("offline_validation") or {}).get("status")) or "not_validated")
     review_status = str(((profile.get("review_state") or {}).get("status")) or "not_validated")
-    load_status = str(((profile.get("script_editor_load") or {}).get("status")) or "not_run")
-
     if workflow_status == "scaffold_not_validated" or offline_status == "not_validated":
         return "scaffold_not_validated"
     if offline_status != "ready_to_import":
         return "validated_not_ready"
-    if load_status == "load_clean":
-        return "load_clean"
-    if load_status == "load_failed":
-        return "load_failed"
     if review_status == "import_ready_needs_review":
         return "import_ready_needs_review"
     return "ready_to_import"

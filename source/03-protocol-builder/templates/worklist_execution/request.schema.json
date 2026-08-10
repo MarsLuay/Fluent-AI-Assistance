@@ -24,6 +24,8 @@
         },
         "parameters": {
           "properties": {
+            "tip_box": {"type": "string"},
+            "worktable": {"type": "string"},
             "destination_plate": {
               "type": "string"
             },
@@ -47,7 +49,8 @@
             "worklist_path",
             "worklist_format",
             "source_plate",
-            "destination_plate"
+            "destination_plate",
+            "tip_box"
           ],
           "type": "object"
         }

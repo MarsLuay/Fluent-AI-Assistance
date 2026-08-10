@@ -6,10 +6,12 @@ import pytest
 
 from fluent_pipeline.progress import GENERATION_PROGRESS_STAGES, ProgressEmitter
 from fluent_pipeline.runner import PipelineError
+import fluent_pipeline.generation_workflow as generation_facade
 from fluent_pipeline.workflows.generation import (
     GenerationStageRunner,
     GenerationState,
     LoadContextStage,
+    run_generation_workflow as canonical_run_generation_workflow,
 )
 
 
@@ -44,6 +46,15 @@ def test_stage_runner_is_sequential_and_preserves_one_shared_state() -> None:
 
     assert result is state
     assert state.context == "ab"
+
+
+def test_generation_workflow_implementation_is_owned_by_generation_package() -> None:
+    assert canonical_run_generation_workflow.__module__ == (
+        "fluent_pipeline.workflows.generation.workflow"
+    )
+    assert generation_facade.GenerationRequest.__module__ == (
+        "fluent_pipeline.workflows.generation.workflow"
+    )
 
 
 def test_load_context_stage_preserves_legacy_progress_contract() -> None:

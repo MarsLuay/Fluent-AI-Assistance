@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ...generation_options import GenerationOptions
-    from ...generation_workflow import GenerationRequest
     from ...progress import ProgressEmitter
     from ...project_context import ProjectLike
+    from .workflow import GenerationRequest
 
 
 @dataclass

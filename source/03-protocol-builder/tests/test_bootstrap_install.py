@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 from fluent_pipeline import bootstrap
@@ -27,6 +28,16 @@ def _create_venv(venv_root: Path) -> Path:
         text=True,
     )
     return _venv_python(venv_root)
+
+
+def _wheel_metadata(wheelhouse: Path, distribution: str) -> str:
+    wheel_name = distribution.replace("-", "_")
+    wheel = next(wheelhouse.glob(f"{wheel_name}-*.whl"))
+    with zipfile.ZipFile(wheel) as archive:
+        metadata_path = next(
+            name for name in archive.namelist() if name.endswith(".dist-info/METADATA")
+        )
+        return archive.read(metadata_path).decode("utf-8")
 
 
 def test_clean_environment_bootstrap_smoke(tmp_path: Path, capfd) -> None:
@@ -57,8 +68,18 @@ def test_wheel_build_and_non_editable_install_smoke(tmp_path: Path, capfd) -> No
         bootstrap.build_workspace_wheelhouse(build_python, wheelhouse)
 
         install_python = _create_venv(tmp_path / "wheel-install")
-        bootstrap.install_workspace_from_wheelhouse(install_python, wheelhouse)
-        bootstrap.run_pip_check(install_python)
+        offline_cwd = tmp_path / "offline-cwd"
+        offline_cwd.mkdir()
+        bootstrap.install_workspace_from_wheelhouse(install_python, wheelhouse, cwd=offline_cwd)
+        bootstrap.run_pip_check(install_python, cwd=offline_cwd)
+
+    for package in bootstrap.workspace_packages():
+        requires_dist = (
+            line
+            for line in _wheel_metadata(wheelhouse, package.distribution).splitlines()
+            if line.startswith("Requires-Dist:")
+        )
+        assert all("file:" not in requirement for requirement in requires_dist)
 
     env = dict(os.environ)
     env["FLUENTCODER_PYTHON"] = str(install_python)

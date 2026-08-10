@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tecan-worklist-builder"
-version = "0.1.2"
+version = "0.1.3"
 description = "Local, dependency-free Tecan Gemini/Fluent .gwl worklist builder"
 readme = "README.md"
 license = {text = "PolyForm-Noncommercial-1.0.0"}
 requires-python = ">=3.11"
 dependencies = [
-  "tecan-common @ file:../00-shared",
+  "tecan-common==0.1.3",
 ]
 
 [project.scripts]

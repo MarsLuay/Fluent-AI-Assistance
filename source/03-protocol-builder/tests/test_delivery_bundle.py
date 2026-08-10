@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,20 +15,29 @@ from fluent_pipeline.delivery_bundle import (
 
 def _write_valid_bundle(root: Path, protocol_name: str = "demo") -> Path:
     bundle = root / protocol_name
-    (bundle / "source").mkdir(parents=True)
+    source = bundle / "source"
+    source.mkdir(parents=True)
     (bundle / "media").mkdir()
-    (bundle / "reports").mkdir()
-    (bundle / "generated").mkdir()
-    (bundle / "support").mkdir()
+    (source / "reports").mkdir()
+    (source / "generated").mkdir()
     (bundle / f"{protocol_name}.zeia").write_bytes(b"zeia")
     (bundle / "run_tecan_bundle_setup.bat").write_text("@echo off\n", encoding="utf-8")
     (bundle / "RECREATE_SCRIPT.md").write_text("# Recreate\n", encoding="utf-8")
-    (bundle / "support" / "request.spec.yaml").write_text("request: {}\n", encoding="utf-8")
-    (bundle / "support" / "protocol.ir.json").write_text("{}\n", encoding="utf-8")
-    (bundle / "generated" / "protocol.py").write_text("def build_worktable():\n    pass\n", encoding="utf-8")
-    (bundle / "support" / "generation_manifest.json").write_text("{}\n", encoding="utf-8")
-    (bundle / "support" / "GENERATION_WORKFLOW.md").write_text("# Workflow\n", encoding="utf-8")
-    (bundle / "support" / "delivery_manifest.json").write_text(
+    (source / "request.spec.yaml").write_text("request: {}\n", encoding="utf-8")
+    (source / "protocol.ir.json").write_text("{}\n", encoding="utf-8")
+    (source / "metadata.json").write_text("{}\n", encoding="utf-8")
+    (source / "generated" / "protocol.py").write_text("def build_worktable():\n    pass\n", encoding="utf-8")
+    (source / "generation_manifest.json").write_text("{}\n", encoding="utf-8")
+    (source / "GENERATION_WORKFLOW.md").write_text("# Workflow\n", encoding="utf-8")
+    for helper in (
+        "collect_tecan_diagnostic_bundle.ps1",
+        "copy_tree_with_progress.ps1",
+        "deploy_touchtools_media.ps1",
+        "install_external_files.ps1",
+        "stall_watchdog.ps1",
+    ):
+        (source / helper).write_text("# helper\n", encoding="utf-8")
+    (source / "delivery_manifest.json").write_text(
         json.dumps(
             {
                 "schema_version": DELIVERY_MANIFEST_SCHEMA_VERSION,
@@ -58,7 +68,7 @@ class DeliveryBundleValidationTests(unittest.TestCase):
 
         self.assertTrue(result.ok, result.to_dict())
 
-    def test_root_rejects_support_artifacts(self) -> None:
+    def test_root_rejects_source_artifact_aliases(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             bundle = _write_valid_bundle(Path(tmp))
             (bundle / "delivery_manifest.json").write_text("{}\n", encoding="utf-8")
@@ -68,10 +78,25 @@ class DeliveryBundleValidationTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertIn("unexpected_root_file", {issue.code for issue in result.issues})
 
+    def test_root_rejects_source_artifact_alias_directories(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = _write_valid_bundle(Path(tmp))
+            (bundle / "reports").mkdir()
+            (bundle / "generated").mkdir()
+            (bundle / "support").mkdir()
+
+            result = validate_v2_delivery_bundle(bundle)
+
+        self.assertFalse(result.ok)
+        self.assertEqual(
+            sum(issue.code == "unexpected_root_directory" for issue in result.issues),
+            3,
+        )
+
     def test_missing_required_v2_members_fail(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             bundle = _write_valid_bundle(Path(tmp))
-            (bundle / "source").rmdir()
+            shutil.rmtree(bundle / "source")
 
             result = validate_v2_delivery_bundle(bundle)
 
@@ -81,9 +106,9 @@ class DeliveryBundleValidationTests(unittest.TestCase):
     def test_delivery_manifest_must_be_v2_schema(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             bundle = _write_valid_bundle(Path(tmp))
-            manifest = json.loads((bundle / "support" / "delivery_manifest.json").read_text(encoding="utf-8"))
+            manifest = json.loads((bundle / "source" / "delivery_manifest.json").read_text(encoding="utf-8"))
             manifest["schema_version"] = "tecan.protocol_delivery.v1"
-            (bundle / "support" / "delivery_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            (bundle / "source" / "delivery_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 
             result = validate_v2_delivery_bundle(bundle)
 
@@ -109,7 +134,7 @@ class DeliveryBundleValidationTests(unittest.TestCase):
             payload = bundle / "source" / "external-files" / "16" / "asset.dat"
             payload.parent.mkdir(parents=True)
             payload.write_bytes(b"exact payload")
-            manifest_path = bundle / "support" / "delivery_manifest.json"
+            manifest_path = bundle / "source" / "delivery_manifest.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             manifest["external_file_deployments"] = [
                 {
@@ -130,7 +155,7 @@ class DeliveryBundleValidationTests(unittest.TestCase):
             payload = bundle / "source" / "external-files" / "1" / "duplicate.dat"
             payload.parent.mkdir(parents=True)
             payload.write_bytes(b"tampered")
-            manifest_path = bundle / "support" / "delivery_manifest.json"
+            manifest_path = bundle / "source" / "delivery_manifest.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             manifest["external_file_deployments"] = [
                 {
@@ -149,7 +174,7 @@ class DeliveryBundleValidationTests(unittest.TestCase):
     def test_external_deployment_rejects_bundle_path_escape(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             bundle = _write_valid_bundle(Path(tmp))
-            manifest_path = bundle / "support" / "delivery_manifest.json"
+            manifest_path = bundle / "source" / "delivery_manifest.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             manifest["external_file_deployments"] = [
                 {

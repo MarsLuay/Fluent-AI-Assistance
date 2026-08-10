@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fluentcoder"
-version = "0.1.2"
+version = "0.1.3"
 description = "fluentcoder authoring/simulation/compiler for the Fluent AI-Assistance fluent-pipeline"
 readme = "README.md"
 license = {text = "PolyForm-Noncommercial-1.0.0"}
@@ -12,7 +12,7 @@ requires-python = ">=3.11"
 dependencies = [
   "pydantic>=2,<3",
   "PyYAML>=6,<7",
-  "tecan-common @ file:../../../00-shared",
+  "tecan-common==0.1.3",
 ]
 
 [project.optional-dependencies]

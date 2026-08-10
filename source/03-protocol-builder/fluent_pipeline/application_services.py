@@ -6,6 +6,15 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
+from .authoring_status import (
+    AuthoringStatus,
+    generation_status,
+    repair_apply_status,
+    repair_plan_status,
+    request_spec_created_status,
+    request_spec_validation_status,
+    verification_status,
+)
 from .fluent_log_parser import (
     build_fluent_log_report,
     build_latest_fluent_log_report,
@@ -34,6 +43,10 @@ class GenerationResult:
     request: GenerationRequest
     manifest: dict[str, Any]
 
+    @property
+    def authoring_status(self) -> AuthoringStatus:
+        return generation_status(self.manifest)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "workflow_status": self.manifest.get("workflow_status"),
@@ -45,6 +58,7 @@ class GenerationResult:
             "published_artifacts": self.manifest.get("published_artifacts") or [],
             "internal_artifacts": self.manifest.get("internal_artifacts") or [],
             "deliverable": self.manifest.get("deliverable"),
+            "authoring_status": self.authoring_status.to_dict(),
             "manifest": self.manifest,
         }
 
@@ -112,11 +126,16 @@ class RequestSpecCreateResult:
     spec: dict[str, Any]
     output_path: Path
 
+    @property
+    def authoring_status(self) -> AuthoringStatus:
+        return request_spec_created_status(self.output_path)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "ok": True,
             "spec": self.spec,
             "artifacts": [str(self.output_path)],
+            "authoring_status": self.authoring_status.to_dict(),
         }
 
 
@@ -130,11 +149,20 @@ class RequestSpecValidationResult:
     request: RequestSpecValidationRequest
     result: LintResult
 
+    @property
+    def authoring_status(self) -> AuthoringStatus:
+        return request_spec_validation_status(
+            ok=self.result.ok,
+            findings=(asdict(item) for item in self.result.findings),
+            spec_path=self.request.spec_path,
+        )
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "ok": self.result.ok,
             "estimated_ir_body_steps": self.result.estimated_ir_body_steps,
             "findings": [asdict(item) for item in self.result.findings],
+            "authoring_status": self.authoring_status.to_dict(),
         }
 
 
@@ -152,10 +180,18 @@ class RepairPlanResult:
     plan: RepairPlan
     report_path: Path | None = None
 
+    @property
+    def authoring_status(self) -> AuthoringStatus:
+        return repair_plan_status(
+            self.plan.to_dict(),
+            artifacts=(self.report_path,) if self.report_path else (),
+        )
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "plan": self.plan.to_dict(),
             "report_path": str(self.report_path) if self.report_path else None,
+            "authoring_status": self.authoring_status.to_dict(),
         }
 
 
@@ -176,12 +212,24 @@ class RepairApplyResult:
     applied_actions: tuple[RepairAction, ...]
     report_path: Path | None = None
 
+    @property
+    def authoring_status(self) -> AuthoringStatus:
+        artifacts = [self.request.output_path]
+        if self.report_path:
+            artifacts.append(self.report_path)
+        return repair_apply_status(
+            plan=self.plan.to_dict(),
+            applied_actions=(action.to_dict() for action in self.applied_actions),
+            artifacts=artifacts,
+        )
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "output_path": str(self.request.output_path),
             "plan": self.plan.to_dict(),
             "applied_actions": [action.to_dict() for action in self.applied_actions],
             "report_path": str(self.report_path) if self.report_path else None,
+            "authoring_status": self.authoring_status.to_dict(),
         }
 
 
@@ -208,6 +256,11 @@ class BundleVerificationResult:
     report_path: Path | None = None
     json_path: Path | None = None
 
+    @property
+    def authoring_status(self) -> AuthoringStatus:
+        artifacts = [path for path in (self.report_path, self.json_path) if path is not None]
+        return verification_status(self.report, artifacts=artifacts)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "ok": bool(self.report.get("ready")),
@@ -216,6 +269,7 @@ class BundleVerificationResult:
             "report": self.report,
             "report_path": str(self.report_path) if self.report_path else None,
             "json_path": str(self.json_path) if self.json_path else None,
+            "authoring_status": self.authoring_status.to_dict(),
         }
 
 

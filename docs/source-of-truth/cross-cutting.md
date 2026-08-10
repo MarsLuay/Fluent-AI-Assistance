@@ -16,6 +16,7 @@
 
 ## Error model
 
+- Python application services own `authoring_status` (`status`, findings, artifacts, allowed action, next action, live handoff actions); CLI and MCP do not derive competing states.
 - `RenderError` on missing DeviceAlias/AvailableID or alias→AvailableID cross-fill (`Instrument=` in AvailableID).
 - xlqc parse: `ValueError` when XML exceeds `max_xml_bytes`.
 - Catalog miss → empty GUID string (no invent); generation.yaml guid only if site-configured.

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VxData>
+  <Payload>
+    <ObjectName>DemoScript</ObjectName>
+    <Comment>Synthetic public acceptance fixture.</Comment>
+    <Reference>
+      <Guid>aaaaaaaa-bbbb-4ccc-8ddd-111111111111</Guid>
+      <TypeId>WorktableWorkspace</TypeId>
+      <ObjectName>WT_Demo</ObjectName>
+    </Reference>
+    <PayloadData>
+      <Script>
+        <Commands>
+          <ScriptGroup>
+            <Objects>
+              <Object Type="Tecan.Core.Scripting.ScriptGroupDataV1">
+                <ScriptGroupDataV1>
+                  <Name>Synthetic transfer</Name>
+                  <Data>
+                    <Statements>
+                      <Object Type="Tecan.Core.Scripting.Worktable.Data.AddLabwareDataV1">
+                        <AddLabwareDataV1>
+                          <LabwareType>Synthetic_Plate_Type</LabwareType>
+                          <LabwareLable>Demo_Source</LabwareLable>
+                          <Location>Demo_Nest_Pos</Location>
+                          <Position>1</Position>
+                          <Rotation>0</Rotation>
+                          <HasLid>False</HasLid>
+                          <Data><LineNumber>1</LineNumber></Data>
+                        </AddLabwareDataV1>
+                      </Object>
+                      <Object Type="Tecan.Core.Scripting.Worktable.Data.AddLabwareDataV1">
+                        <AddLabwareDataV1>
+                          <LabwareType>Synthetic_Plate_Type</LabwareType>
+                          <LabwareLable>Demo_Destination</LabwareLable>
+                          <Location>Demo_Nest_Pos</Location>
+                          <Position>2</Position>
+                          <Rotation>0</Rotation>
+                          <HasLid>False</HasLid>
+                          <Data><LineNumber>2</LineNumber></Data>
+                        </AddLabwareDataV1>
+                      </Object>
+                      <Object Type="Tecan.Core.Scripting.Commands.Mca384AspirateScriptCommandDataV2">
+                        <Mca384AspirateScriptCommandDataV2>
+                          <LiquidClassName>Synthetic_Water_LC</LiquidClassName>
+                          <Volume>20</Volume>
+                          <ScriptCommandCommonDataV2>
+                            <LabwareName>Demo_Source</LabwareName>
+                            <DeviceAlias>Synthetic_Device_1</DeviceAlias>
+                            <LineNumber>3</LineNumber>
+                          </ScriptCommandCommonDataV2>
+                        </Mca384AspirateScriptCommandDataV2>
+                      </Object>
+                      <Object Type="Tecan.Core.Scripting.Commands.Mca384DispenseScriptCommandDataV2">
+                        <Mca384DispenseScriptCommandDataV2>
+                          <LiquidClassName>Synthetic_Water_LC</LiquidClassName>
+                          <Volume>20</Volume>
+                          <ScriptCommandCommonDataV2>
+                            <LabwareName>Demo_Destination</LabwareName>
+                            <DeviceAlias>Synthetic_Device_1</DeviceAlias>
+                            <LineNumber>4</LineNumber>
+                          </ScriptCommandCommonDataV2>
+                        </Mca384DispenseScriptCommandDataV2>
+                      </Object>
+                    </Statements>
+                  </Data>
+                </ScriptGroupDataV1>
+              </Object>
+            </Objects>
+          </ScriptGroup>
+        </Commands>
+      </Script>
+    </PayloadData>
+  </Payload>
+</VxData>

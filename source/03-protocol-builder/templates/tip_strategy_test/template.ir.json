@@ -10,54 +10,49 @@
   "ir_version": "tecan.protocol_ir.v2",
   "labware": [
     {
-      "catalog": "Reagent Reservoir",
+      "catalog": "",
       "id": "water_reservoir",
-      "label": "WaterReservoir",
-      "location": "Site",
-      "position": 1,
-      "python_class": "Plate96",
+      "label": "water_reservoir",
+      "location": "",
+      "position": null,
       "role": "source"
     },
     {
-      "catalog": "96 Well Flat",
+      "catalog": "",
       "id": "test_plate",
-      "label": "TestPlate",
-      "location": "Site",
-      "position": 2,
-      "python_class": "Plate96",
+      "label": "test_plate",
+      "location": "",
+      "position": null,
       "role": "destination"
     },
     {
-      "catalog": "MCA96, 100ul, Box",
+      "catalog": "",
       "id": "tip_box",
-      "label": "TipBox",
-      "location": "Site",
-      "position": 3,
-      "python_class": "MCA100Box",
+      "label": "tip_box",
+      "location": "",
+      "position": null,
       "role": "tips"
     },
     {
-      "catalog": "MCA96, 100ul, Box",
+      "catalog": "",
       "id": "return_tip_box",
-      "label": "ReturnTipBox",
-      "location": "Site",
-      "position": 4,
-      "python_class": "MCA100Box",
+      "label": "return_tip_box",
+      "location": "",
+      "position": null,
       "role": "tips"
     },
     {
-      "catalog": "Waste",
+      "catalog": "",
       "id": "waste",
-      "label": "Waste",
-      "location": "Site",
-      "position": 5,
-      "python_class": "Plate96",
+      "label": "waste",
+      "location": "",
+      "position": null,
       "role": "waste"
     }
   ],
   "liquid_classes": [
     {
-      "name": "Water Free Single",
+      "name": "__GROUND_FROM_CONTEXT__",
       "role": "pipetting"
     }
   ],
@@ -96,12 +91,12 @@
       "name": "Add Water Reservoir",
       "operation": "add_labware",
       "parameters": {
-        "label": "WaterReservoir",
-        "labware_type": "Reagent Reservoir",
-        "location": "Site",
-        "position": 1
+        "label": "water_reservoir",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "WaterReservoir"
+      "target_labware": "water_reservoir"
     },
     {
       "group": "Setup",
@@ -110,12 +105,12 @@
       "name": "Add Test Plate",
       "operation": "add_labware",
       "parameters": {
-        "label": "TestPlate",
-        "labware_type": "96 Well Flat",
-        "location": "Site",
-        "position": 2
+        "label": "test_plate",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "TestPlate"
+      "target_labware": "test_plate"
     },
     {
       "group": "Setup",
@@ -124,12 +119,12 @@
       "name": "Add Tip Box",
       "operation": "add_labware",
       "parameters": {
-        "label": "TipBox",
-        "labware_type": "MCA96, 100ul, Box",
-        "location": "Site",
-        "position": 3
+        "label": "tip_box",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "TipBox"
+      "target_labware": "tip_box"
     },
     {
       "group": "Setup",
@@ -138,26 +133,26 @@
       "name": "Add Return Tip Box",
       "operation": "add_labware",
       "parameters": {
-        "label": "ReturnTipBox",
-        "labware_type": "MCA96, 100ul, Box",
-        "location": "Site",
-        "position": 4
+        "label": "return_tip_box",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "ReturnTipBox"
+      "target_labware": "return_tip_box"
     },
     {
       "group": "Setup",
       "id": "step_005",
       "index": 5,
-      "name": "Add Waste",
+      "name": "Add waste",
       "operation": "add_labware",
       "parameters": {
-        "label": "Waste",
-        "labware_type": "Waste",
-        "location": "Site",
-        "position": 5
+        "label": "waste",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "Waste"
+      "target_labware": "waste"
     },
     {
       "group": "Tip Strategy",
@@ -168,34 +163,34 @@
       "parameters": {
         "tip_strategy": "fresh"
       },
-      "target_labware": "TipBox"
+      "target_labware": "tip_box"
     },
     {
       "group": "Tip Strategy",
       "id": "step_007",
       "index": 7,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Aspirate Test Liquid",
       "operation": "aspirate",
       "parameters": {
         "source_well": "A1"
       },
-      "source_labware": "WaterReservoir",
-      "target_labware": "WaterReservoir",
+      "source_labware": "water_reservoir",
+      "target_labware": "water_reservoir",
       "volume_ul": 10
     },
     {
-      "destination_labware": "TestPlate",
+      "destination_labware": "test_plate",
       "group": "Tip Strategy",
       "id": "step_008",
       "index": 8,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Dispense Test Liquid",
       "operation": "dispense",
       "parameters": {
         "destination_well": "A1"
       },
-      "target_labware": "TestPlate",
+      "target_labware": "test_plate",
       "volume_ul": 10
     },
     {
@@ -207,7 +202,7 @@
       "parameters": {
         "tip_strategy": "return_for_reuse"
       },
-      "target_labware": "ReturnTipBox"
+      "target_labware": "return_tip_box"
     },
     {
       "group": "Tip Strategy",
@@ -218,46 +213,46 @@
       "parameters": {
         "tip_strategy": "reuse_returned"
       },
-      "target_labware": "ReturnTipBox"
+      "target_labware": "return_tip_box"
     },
     {
       "group": "Tip Strategy",
       "id": "step_011",
       "index": 11,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Aspirate Reuse Test Liquid",
       "operation": "aspirate",
       "parameters": {
         "source_well": "A1"
       },
-      "source_labware": "WaterReservoir",
-      "target_labware": "WaterReservoir",
+      "source_labware": "water_reservoir",
+      "target_labware": "water_reservoir",
       "volume_ul": 10
     },
     {
-      "destination_labware": "TestPlate",
+      "destination_labware": "test_plate",
       "group": "Tip Strategy",
       "id": "step_012",
       "index": 12,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Dispense Reuse Test Liquid",
       "operation": "dispense",
       "parameters": {
         "destination_well": "B1"
       },
-      "target_labware": "TestPlate",
+      "target_labware": "test_plate",
       "volume_ul": 10
     },
     {
       "group": "Cleanup",
       "id": "step_013",
       "index": 13,
-      "name": "Drop Tips To Waste",
+      "name": "Drop Tips To waste",
       "operation": "mca384_drop_tips",
       "parameters": {
         "tip_strategy": "drop_to_waste"
       },
-      "target_labware": "Waste"
+      "target_labware": "waste"
     },
     {
       "group": "Cleanup",
@@ -292,6 +287,6 @@
   "worktable": {
     "auto_place": false,
     "guid": "",
-    "name": "Template Worktable"
+    "name": ""
   }
 }

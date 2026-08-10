@@ -24,6 +24,11 @@
         },
         "parameters": {
           "properties": {
+            "input_plate": {"type": "string"},
+            "normalized_plate": {"type": "string"},
+            "diluent_reservoir": {"type": "string"},
+            "tip_box": {"type": "string"},
+            "worktable": {"type": "string"},
             "concentration_map": {
               "type": "string"
             },
@@ -44,6 +49,10 @@
             }
           },
           "required": [
+            "input_plate",
+            "normalized_plate",
+            "diluent_reservoir",
+            "tip_box",
             "target_concentration",
             "final_volume_ul",
             "concentration_map",

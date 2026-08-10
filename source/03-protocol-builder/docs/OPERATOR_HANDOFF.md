@@ -3,7 +3,7 @@
 Use this page when a protocol-builder run finishes and publishes a protocol
 folder under `ready-to-import/`. It ties together FluentControl import and what
 "ready" actually means. Per-run details live in the protocol folder's
-`GENERATION_WORKFLOW.md` and `generation_manifest.json`.
+`source/GENERATION_WORKFLOW.md` and `source/generation_manifest.json`.
 
 For Codex-assisted generation steps, see [CODEX_WORKFLOW.md](CODEX_WORKFLOW.md).
 For gates, IR flow, and `map-media` details, see
@@ -16,10 +16,17 @@ ready-to-import/
   <protocol>/
     <protocol>.zeia
     run_tecan_bundle_setup.bat
-    delivery_manifest.json
-    source/
+    RECREATE_SCRIPT.md
     media/
-    reports/
+    source/
+      delivery_manifest.json
+      generation_manifest.json
+      GENERATION_WORKFLOW.md
+      request.spec.yaml
+      protocol.ir.json
+      metadata.json
+      generated/protocol.py
+      reports/
 ```
 
 A successful generation atomically replaces the whole
@@ -42,10 +49,10 @@ dependencies).
 2. Open FluentControl.
 3. Import `<protocol>/<protocol>.zeia`.
 4. Open the generated script in Script Editor.
-5. Read the protocol folder reports for checksum status, missing model
+5. Read `source/reports/` for checksum status, missing model
    dependencies, media payloads, and archive health before calling the import
    clean.
-6. Apply manual deck/labware/liquid setup from `reports/worktable_changes.md`
+6. Apply manual deck/labware/liquid setup from `source/worktable_changes.md`
    and `RECREATE_SCRIPT.md` as needed.
 7. If the protocol-builder CLI is available, optionally re-check the V2
    delivery structure from the builder tree with
@@ -179,10 +186,10 @@ A passing offline ZEIA archive is **not** the same as safe to run on hardware.
 
 | Term | Meaning | Where to check |
 | --- | --- | --- |
-| `offline_validation.status: ready_to_import` | Required offline gates passed; generated ZEIA checksums and archive structure are acceptable for FluentControl import | Run output reports and `generation_manifest.json` |
-| `review_state.status: import_ready_needs_review` | Offline validation passed, but at least one required gate still has a non-blocking review item | Run output reports and `generation_manifest.json` |
+| `offline_validation.status: ready_to_import` | Required offline gates passed; generated ZEIA checksums and archive structure are acceptable for FluentControl import | Run output reports and `source/generation_manifest.json` |
+| `review_state.status: import_ready_needs_review` | Offline validation passed, but at least one required gate still has a non-blocking review item | Run output reports and `source/generation_manifest.json` |
 | `fluentcontrol_load_diagnostic.status: load_clean` | Script Editor opens the generated artifact without load errors | Optional Gate 27 output or manual Script Editor open on the instrument PC |
-| `fluentcontrol_load_diagnostic.status: load_failed` | Optional Gate 27 found a Script Editor load problem; offline structure is still valid, but load-clean is false | Run output reports and `generation_manifest.json` |
+| `fluentcontrol_load_diagnostic.status: load_failed` | Optional Gate 27 found a Script Editor load problem; offline structure is still valid, but load-clean is false | Run output reports and `source/generation_manifest.json` |
 | **simulation-clean** | Offline simulation passed (Gate 7) | Run output simulation report |
 | `review_state.status: hardware_review_required` | Default post-validation handoff state. The archive is not a hardware-run certificate. | Operator confirms deck, labware, liquids, adapters/fingers, prompts, and instrument state on the target system |
 

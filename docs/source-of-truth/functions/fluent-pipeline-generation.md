@@ -1,10 +1,11 @@
 # Functions: fluent-pipeline-generation
 
-Source roots: `fluent_pipeline/` (14 files)
+Source roots: `fluent_pipeline/` (16 files)
 
 | Symbol | File | Signature | Purpose | Side effects / errors |
 | --- | --- | --- | --- | --- |
 | `GenerationResult` | `application_services.py` | class | class | , |
+| `GenerationResult.authoring_status` | `application_services.py` | property | Derive the canonical generation/handoff state from the manifest. | No adapter-local state. |
 | `GenerationResult.to_dict` | `application_services.py` | `()` | see source | see source |
 | `ProjectImportRequest` | `application_services.py` | class | class | , |
 | `ProjectImportResult` | `application_services.py` | class | class | , |
@@ -14,18 +15,23 @@ Source roots: `fluent_pipeline/` (14 files)
 | `ProjectInspectionResult.to_dict` | `application_services.py` | `()` | see source | see source |
 | `RequestSpecCreateRequest` | `application_services.py` | class | class | , |
 | `RequestSpecCreateResult` | `application_services.py` | class | class | , |
+| `RequestSpecCreateResult.authoring_status` | `application_services.py` | property | Return the canonical next step after spec creation. | No adapter-local state. |
 | `RequestSpecCreateResult.to_dict` | `application_services.py` | `()` | see source | see source |
 | `RequestSpecValidationRequest` | `application_services.py` | class | class | , |
 | `RequestSpecValidationResult` | `application_services.py` | class | class | , |
+| `RequestSpecValidationResult.authoring_status` | `application_services.py` | property | Convert lint findings into the shared valid/invalid contract. | Preserves finding paths and messages. |
 | `RequestSpecValidationResult.to_dict` | `application_services.py` | `()` | see source | see source |
 | `RepairPlanRequest` | `application_services.py` | class | class | , |
 | `RepairPlanResult` | `application_services.py` | class | class | , |
+| `RepairPlanResult.authoring_status` | `application_services.py` | property | Classify ready, review, or no-op repair plans. | No repair is applied. |
 | `RepairPlanResult.to_dict` | `application_services.py` | `()` | see source | see source |
 | `RepairApplyRequest` | `application_services.py` | class | class | , |
 | `RepairApplyResult` | `application_services.py` | class | class | , |
+| `RepairApplyResult.authoring_status` | `application_services.py` | property | Classify applied or no-op repair output for verification. | No adapter-local derivation. |
 | `RepairApplyResult.to_dict` | `application_services.py` | `()` | see source | see source |
 | `BundleVerificationRequest` | `application_services.py` | class | class | , |
 | `BundleVerificationResult` | `application_services.py` | class | class | , |
+| `BundleVerificationResult.authoring_status` | `application_services.py` | property | Convert readiness output into the canonical verification state. | Fail closed when `ready` is false. |
 | `BundleVerificationResult.to_dict` | `application_services.py` | `()` | see source | see source |
 | `LogAnalysisRequest` | `application_services.py` | class | class | , |
 | `LogAnalysisResult` | `application_services.py` | class | class | , |
@@ -40,6 +46,15 @@ Source roots: `fluent_pipeline/` (14 files)
 | `verify_bundle` | `application_services.py` | `(request)` | Validate a ready-to-import bundle through the shared application layer. | see source |
 | `analyze_logs` | `application_services.py` | `(request)` | Parse one FluentControl log or scan the latest recent logs. | see source |
 | `_load_project_context (priv)` | `application_services.py` | `(context_name)` | see source | see source |
+| `AuthoringFinding.to_dict` | `authoring_status.py` | `()` | Serialize one adapter-neutral finding. | Pure. |
+| `HandoffAction.to_dict` | `authoring_status.py` | `()` | Serialize one live-system handoff action. | Pure. |
+| `AuthoringStatus.to_dict` | `authoring_status.py` | `()` | Serialize the shared status contract for Python, CLI, and MCP. | Pure. |
+| `request_spec_created_status` | `authoring_status.py` | `(output_path)` | Produce the review/validation next step after request-spec creation. | Pure. |
+| `request_spec_validation_status` | `authoring_status.py` | `(*, ok, findings, spec_path)` | Normalize request-spec findings and select valid or invalid state. | Pure; consumes the findings iterable. |
+| `generation_status` | `authoring_status.py` | `(manifest)` | Derive scaffold, blocked-final, or final-ready handoff from one manifest. | Normalizes legacy `load_clean`; never certifies unrecorded live checks. |
+| `repair_plan_status` | `authoring_status.py` | `(plan, *, artifacts=())` | Derive ready, review, or no-op repair state. | Pure. |
+| `repair_apply_status` | `authoring_status.py` | `(*, plan, applied_actions, artifacts=())` | Derive applied or no-op repair state. | Pure; consumes applied actions. |
+| `verification_status` | `authoring_status.py` | `(report, *, artifacts=())` | Derive ready or blocked verification state and normalized findings. | Fails closed when the report is not ready. |
 | `GenerationOptions` | `generation_options.py` | class | class | , |
 | `GenerationOptions.as_dict` | `generation_options.py` | `()` | Return durable request-spec generation options as a mapping. | see source |
 | `GenerationOptions.runtime_dict` | `generation_options.py` | `()` | Return adapter-only runtime options excluded from request specs. | see source |
@@ -48,46 +63,48 @@ Source roots: `fluent_pipeline/` (14 files)
 | `generation_options_from_cli_args` | `generation_options.py` | `(args)` | see source | see source |
 | `_normalize_verification_prompt_rup (priv)` | `generation_options.py` | `(value)` | see source | see source |
 | `fluent_version_requires_worktable_images` | `generation_options.py` | `(value)` | see source | see source |
-| `ApprovalSet` | `generation_workflow.py` | class | class | , |
-| `GenerationRequest` | `generation_workflow.py` | class | class | , |
-| `_load_generation_context (priv)` | `generation_workflow.py` | `(context_name)` | see source | see source |
-| `run_generation_workflow` | `generation_workflow.py` | `(request)` | Run or scaffold the official generation workflow. | see source |
-| `inspect_generation_context` | `generation_workflow.py` | `(context, selected_scripts)` | see source | see source |
-| `build_seed_protocol_ir` | `generation_workflow.py` | `()` | see source | see source |
-| `render_generation_plan` | `generation_workflow.py` | `(intent, context, selection, stages)` | see source | see source |
-| `render_rga_move_policy_markdown` | `generation_workflow.py` | `(policy)` | see source | see source |
-| `render_context_inspection_markdown` | `generation_workflow.py` | `(inspection)` | see source | see source |
-| `_build_readiness_profile (priv)` | `generation_workflow.py` | `()` | see source | see source |
-| `render_generation_summary` | `generation_workflow.py` | `(manifest)` | see source | see source |
-| `_normalized_artifact_hash (priv)` | `generation_workflow.py` | `(path, roots)` | see source | see source |
-| `_load_manifest_dict (priv)` | `generation_workflow.py` | `(raw_path)` | see source | see source |
-| `_context_with_request_sources (priv)` | `generation_workflow.py` | `(context, spec)` | Use every request-declared project as one generation context.  Request specs often use a small edite | see source |
-| `_refresh_request_spec_full_zeia_export (priv)` | `generation_workflow.py` | `(spec, assessment)` | see source | see source |
-| `_verify_full_zeia_export (priv)` | `generation_workflow.py` | `(context)` | see source | see source |
-| `_write_blocked_full_zeia_manifest (priv)` | `generation_workflow.py` | `()` | see source | see source |
-| `_render_full_zeia_export_markdown (priv)` | `generation_workflow.py` | `(assessment)` | see source | see source |
-| `_normalize_compiled_variable_declaration_namespaces (priv)` | `generation_workflow.py` | `(xscr_path)` | Keep DataContract ``xsi:type`` prefixes in scope after XML reserialization.  ElementTree preserves n | see source |
-| `_copy_source_workspace_data (priv)` | `generation_workflow.py` | `(xscr_path, source_scripts)` | Preserve native workspace-delta metadata for RUP Worktable prompts. | see source |
-| `_required_subroutine_references (priv)` | `generation_workflow.py` | `(ir)` | see source | see source |
-| `_first_payload_data_index (priv)` | `generation_workflow.py` | `(payload)` | see source | see source |
-| `_stamp_approved_automated_verification_moves (priv)` | `generation_workflow.py` | `(ir, request_spec_doc)` | Keep baseline/preserved move_plate steps automated when the spec approves it. | see source |
-| `_clear_verification_script_protocol_comment (priv)` | `generation_workflow.py` | `(ir)` | Do not publish the generation prompt as the FluentControl script comment. | see source |
-| `_primary_context_source_projects (priv)` | `generation_workflow.py` | `(context)` | Return the ZEIA archive(s) that should be used as generated-output bases.  A project collection can  | see source |
-| `_generation_ir_source_mode (priv)` | `generation_workflow.py` | `()` | Select the sole step source using the documented strict precedence. | see source |
-| `_annotate_explicit_recipe_prompt_media (priv)` | `generation_workflow.py` | `(ir)` | Attach recipe prompt media slots before IR export, draft render, and compile. | see source |
-| `_attach_regeneration_baseline_context (priv)` | `generation_workflow.py` | `(ir)` | Retain baseline provenance without implicitly replacing requested steps. | see source |
-| `_matching_regeneration_baseline_script (priv)` | `generation_workflow.py` | `(context, protocol_name)` | Return the primary-project script matching the requested protocol identity. | see source |
-| `_default_worktable (priv)` | `generation_workflow.py` | `(context, selected_scripts)` | Resolve the protocol worktable from script refs / recipe, not archive order.  Preference order: 1. R | see source |
-| `finalize_media_slot_files` | `generation_workflow.py` | `(ir, media_dir)` | Convert dropped videos and normalize Worktable GIF slots in-place. | see source |
-| `build_ir_from_recipe` | `generation_workflow.py` | `(recipe)` | Synthesize a verification-recipe protocol IR. | see source |
-| `_normalize_ir_labware_labels_against_manifest (priv)` | `generation_workflow.py` | `(ir, manifest)` | Align synthesized dynamic labware labels with labels proven by context.  Some source scripts use var | see source |
-| `_rewrite_ir_labware_labels (priv)` | `generation_workflow.py` | `(value, rewrites, parent_key)` | see source | see source |
-| `_attach_source_move_patterns (priv)` | `generation_workflow.py` | `(ir, selected_source_records)` | Back verification moves with matching commands from ungenerated XSCRs. | see source |
-| `_recipe_set_variable_payload (priv)` | `generation_workflow.py` | `(data)` | see source | see source |
-| `_normalize_toggle_simulation_values (priv)` | `generation_workflow.py` | `(values, category_conditions)` | see source | see source |
-| `_normalize_fluent_condition_expression (priv)` | `generation_workflow.py` | `(condition)` | see source | see source |
-| `_add_labware_location_requires_raw_xml (priv)` | `generation_workflow.py` | `(location)` | see source | see source |
-| `_render_add_labware_raw_xml (priv)` | `generation_workflow.py` | `(params)` | see source | see source |
+| `ApprovalSet` | `workflows/generation/workflow.py` | class | class | , |
+| `GenerationRequest` | `workflows/generation/workflow.py` | class | class | , |
+| `_load_generation_context (priv)` | `workflows/generation/workflow.py` | `(context_name)` | see source | see source |
+| `run_generation_workflow` | `workflows/generation/workflow.py` | `(request)` | Run or scaffold the official generation workflow. | see source |
+| `inspect_generation_context` | `workflows/generation/workflow.py` | `(context, selected_scripts)` | see source | see source |
+| `build_seed_protocol_ir` | `workflows/generation/workflow.py` | `()` | see source | see source |
+| `render_generation_plan` | `workflows/generation/workflow.py` | `(intent, context, selection, stages)` | see source | see source |
+| `render_rga_move_policy_markdown` | `workflows/generation/workflow.py` | `(policy)` | see source | see source |
+| `render_context_inspection_markdown` | `workflows/generation/workflow.py` | `(inspection)` | see source | see source |
+| `_build_readiness_profile (priv)` | `workflows/generation/workflow.py` | `()` | see source | see source |
+| `render_generation_summary` | `workflows/generation/workflow.py` | `(manifest)` | see source | see source |
+| `_protocol_delivery_folder_complete (priv)` | `workflows/generation/workflow.py` | `(protocol_folder, *, protocol_name, require_final_reports=True)` | Check the final ZEIA/root guide plus nested `source/` spec, IR, generated Python, reports, and final manifests. | Reads filesystem state. |
+| `_companion_artifact_records (priv)` | `workflows/generation/workflow.py` | `(artifact_paths)` | Describe root recreation instructions and all other final companions under `source/`. | Returns manifest records; no writes. |
+| `_normalized_artifact_hash (priv)` | `workflows/generation/workflow.py` | `(path, roots)` | see source | see source |
+| `_load_manifest_dict (priv)` | `workflows/generation/workflow.py` | `(raw_path)` | see source | see source |
+| `_context_with_request_sources (priv)` | `workflows/generation/workflow.py` | `(context, spec)` | Use every request-declared project as one generation context.  Request specs often use a small edite | see source |
+| `_refresh_request_spec_full_zeia_export (priv)` | `workflows/generation/workflow.py` | `(spec, assessment)` | see source | see source |
+| `_verify_full_zeia_export (priv)` | `workflows/generation/workflow.py` | `(context)` | see source | see source |
+| `_write_blocked_full_zeia_manifest (priv)` | `workflows/generation/workflow.py` | `()` | see source | see source |
+| `_render_full_zeia_export_markdown (priv)` | `workflows/generation/workflow.py` | `(assessment)` | see source | see source |
+| `_normalize_compiled_variable_declaration_namespaces (priv)` | `workflows/generation/workflow.py` | `(xscr_path)` | Keep DataContract ``xsi:type`` prefixes in scope after XML reserialization.  ElementTree preserves n | see source |
+| `_copy_source_workspace_data (priv)` | `workflows/generation/workflow.py` | `(xscr_path, source_scripts)` | Preserve native workspace-delta metadata for RUP Worktable prompts. | see source |
+| `_required_subroutine_references (priv)` | `workflows/generation/workflow.py` | `(ir)` | see source | see source |
+| `_first_payload_data_index (priv)` | `workflows/generation/workflow.py` | `(payload)` | see source | see source |
+| `_stamp_approved_automated_verification_moves (priv)` | `workflows/generation/workflow.py` | `(ir, request_spec_doc)` | Keep baseline/preserved move_plate steps automated when the spec approves it. | see source |
+| `_clear_verification_script_protocol_comment (priv)` | `workflows/generation/workflow.py` | `(ir)` | Do not publish the generation prompt as the FluentControl script comment. | see source |
+| `_primary_context_source_projects (priv)` | `workflows/generation/workflow.py` | `(context)` | Return the ZEIA archive(s) that should be used as generated-output bases.  A project collection can  | see source |
+| `_generation_ir_source_mode (priv)` | `workflows/generation/workflow.py` | `()` | Select the sole step source using the documented strict precedence. | see source |
+| `_annotate_explicit_recipe_prompt_media (priv)` | `workflows/generation/workflow.py` | `(ir)` | Attach recipe prompt media slots before IR export, draft render, and compile. | see source |
+| `_attach_regeneration_baseline_context (priv)` | `workflows/generation/workflow.py` | `(ir)` | Retain baseline provenance without implicitly replacing requested steps. | see source |
+| `_matching_regeneration_baseline_script (priv)` | `workflows/generation/workflow.py` | `(context, protocol_name)` | Return the primary-project script matching the requested protocol identity. | see source |
+| `_default_worktable (priv)` | `workflows/generation/workflow.py` | `(context, selected_scripts)` | Resolve the protocol worktable from script refs / recipe, not archive order.  Preference order: 1. R | see source |
+| `finalize_media_slot_files` | `workflows/generation/workflow.py` | `(ir, media_dir)` | Convert dropped videos and normalize Worktable GIF slots in-place. | see source |
+| `build_ir_from_recipe` | `workflows/generation/workflow.py` | `(recipe)` | Synthesize a verification-recipe protocol IR. | see source |
+| `_normalize_ir_labware_labels_against_manifest (priv)` | `workflows/generation/workflow.py` | `(ir, manifest)` | Align synthesized dynamic labware labels with labels proven by context.  Some source scripts use var | see source |
+| `_rewrite_ir_labware_labels (priv)` | `workflows/generation/workflow.py` | `(value, rewrites, parent_key)` | see source | see source |
+| `_attach_source_move_patterns (priv)` | `workflows/generation/workflow.py` | `(ir, selected_source_records)` | Back verification moves with matching commands from ungenerated XSCRs. | see source |
+| `_recipe_set_variable_payload (priv)` | `workflows/generation/workflow.py` | `(data)` | see source | see source |
+| `_normalize_toggle_simulation_values (priv)` | `workflows/generation/workflow.py` | `(values, category_conditions)` | see source | see source |
+| `_normalize_fluent_condition_expression (priv)` | `workflows/generation/workflow.py` | `(condition)` | see source | see source |
+| `_add_labware_location_requires_raw_xml (priv)` | `workflows/generation/workflow.py` | `(location)` | see source | see source |
+| `_render_add_labware_raw_xml (priv)` | `workflows/generation/workflow.py` | `(params)` | see source | see source |
 | `synthesize_seed_ir` | `ir_planner.py` | `(ir)` | Populate a seed IR with ordered steps and inventory where possible.  The supplied ``ir`` is mutated  | see source |
 | `_mark_synthesis_review_required (priv)` | `ir_planner.py` | `(ir)` | see source | see source |
 | `_load_selected_source_ir (priv)` | `ir_planner.py` | `(script, warnings)` | see source | see source |

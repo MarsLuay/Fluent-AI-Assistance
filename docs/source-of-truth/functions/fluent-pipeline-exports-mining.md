@@ -48,12 +48,12 @@ Source roots: `fluent_pipeline/` (12 files)
 | `DeliveryBundleValidationResult` | `delivery_bundle.py` | class | class | , |
 | `DeliveryBundleValidationResult.errors` | `delivery_bundle.py` | `()` | see source | see source |
 | `DeliveryBundleValidationResult.to_dict` | `delivery_bundle.py` | `()` | see source | see source |
-| `validate_v2_delivery_bundle` | `delivery_bundle.py` | `(bundle_dir)` | Validate the complete V2 delivery-folder contract.  This checks the final human/AI delivery bundle,  | see source |
+| `validate_v2_delivery_bundle` | `delivery_bundle.py` | `(bundle_dir, *, protocol_name=None, require_final_reports=True)` | Validate strict new `source/` bundles while retaining read compatibility for legacy root/`support/` bundles. | Rejects loose XSCR and unexpected root artifacts; verifies manifests, helper files, deployment hashes, and final reports. |
 | `render_delivery_bundle_validation` | `delivery_bundle.py` | `(result)` | see source | see source |
 | `delivery_bundle_failure_message` | `delivery_bundle.py` | `(result)` | see source | see source |
-| `_validate_manifest_artifacts (priv)` | `delivery_bundle.py` | `(manifest)` | see source | see source |
-| `_validate_external_file_deployments (priv)` | `delivery_bundle.py` | `(manifest)` | see source | see source |
-| `_validate_no_unpublished_artifacts (priv)` | `delivery_bundle.py` | `(bundle_dir, protocol_name, add_issue)` | see source | see source |
+| `_validate_manifest_artifacts (priv)` | `delivery_bundle.py` | `(manifest, *, bundle_dir, protocol_name, manifest_path, add_issue)` | Validate manifest deliverables against the selected source/legacy manifest path. | Adds validation issues. |
+| `_validate_external_file_deployments (priv)` | `delivery_bundle.py` | `(manifest, *, bundle_dir, manifest_path, add_issue)` | Validate exact deployment paths and hashes using the selected manifest. | Reads payload files; adds validation issues. |
+| `_validate_no_unpublished_artifacts (priv)` | `delivery_bundle.py` | `(bundle_dir, protocol_name, add_issue, *, source_layout)` | Enforce the minimal root for new `source/` bundles and compatible legacy rules. | Adds validation issues for unexpected root files/directories, loose XSCR, extra ZEIA, and extra BAT files. |
 | `build_driver_macros_catalog` | `driver_macros_export.py` | `()` | Mine macro_name / module_name pairs from scripts and optional DataStore objects. | see source |
 | `write_driver_macros_catalog` | `driver_macros_export.py` | `(destination)` | Write ``driver_macros.json``. Empty catalog still writes (soft inventory). | see source |
 | `write_driver_macros_for_context` | `driver_macros_export.py` | `(context_root, manifest)` | see source | see source |
@@ -69,12 +69,15 @@ Source roots: `fluent_pipeline/` (12 files)
 | `_replace_path_with_retry (priv)` | `exports.py` | `(source, destination)` | Atomically replace a path, tolerating transient Windows file locks. | see source |
 | `publish_ready_to_import_bundle` | `exports.py` | `(stage)` | Deprecated staging-folder publish.  Do not use for handoff. Delivery bundles must go through ``publi | see source |
 | `publish_ready_to_import_zeia` | `exports.py` | `(stage)` | Publish validated generated ZEIA archives as complete protocol delivery folders. | see source |
+| `_assemble_protocol_delivery_folder (priv)` | `exports.py` | `(stage, *, zeia_artifact, staged_dir, protocol_folder)` | Assemble the minimal root and nested `source/` artifact tree before atomic publication. | Copies artifacts, stages media/external files, writes manifest, and validates the staged folder. |
 | `_copy_v2_source_tree (priv)` | `exports.py` | `(source_dir, destination_dir)` | Copy the accepted V2 companion tree without importable/intermediate artifacts. | see source |
+| `_copy_v2_setup_script (priv)` | `exports.py` | `(destination)` | Copy the root setup BAT and place all five PowerShell helpers under sibling `source/`. | Raises `PipelineError` when a template/helper is missing. |
 | `_write_touchtools_deploy_config (priv)` | `exports.py` | `(source_dir, protocol_folder)` | see source | see source |
 | `_stage_external_file_deployments (priv)` | `exports.py` | `(archive_path)` | Stage non-TouchTools ZEIA filesystem payloads with exact deployment metadata. | see source |
-| `_write_delivery_manifest (priv)` | `exports.py` | `(stage)` | see source | see source |
+| `_write_delivery_manifest (priv)` | `exports.py` | `(stage, *, staged_dir, protocol_folder, external_file_deployments)` | Write `source/delivery_manifest.json` with source-relative companion paths. | Writes JSON. |
 | `attach_generation_reports_to_protocol_folders` | `exports.py` | `(artifact_paths)` | Atomically attach final generation reports to published protocol folders. | see source |
-| `attach_generation_reports_to_protocol_folder` | `exports.py` | `(protocol_dir)` | Attach final generation reports to one protocol delivery folder via atomic replacement. | see source |
+| `attach_generation_reports_to_protocol_folder` | `exports.py` | `(protocol_dir, *, generation_manifest, workflow_report, companion_files=None)` | Attach final generation reports under `source/` via atomic replacement. | Copies non-XSCR companions, refreshes the delivery manifest, validates, and swaps the folder. |
+| `_refresh_delivery_manifest (priv)` | `exports.py` | `(staged_dir)` | Refresh final report entries in `source/delivery_manifest.json`. | Reads/writes JSON; ignores absent or malformed manifests. |
 | `_validate_published_protocol_folder (priv)` | `exports.py` | `(protocol_dir, protocol_folder)` | see source | see source |
 | `cleanup_ready_to_import_stage` | `exports.py` | `(stage)` | Discard a staged bundle that was not published. | see source |
 | `attach_generation_reports_to_ready_bundles` | `exports.py` | `(artifact_paths)` | Attach finalized workflow reports to ready bundles created by this run. | see source |

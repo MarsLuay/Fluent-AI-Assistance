@@ -5,9 +5,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = [System.IO.Path]::GetFullPath($BundleRoot)
-$manifestPath = Join-Path $root "support\delivery_manifest.json"
+$manifestPath = Join-Path $root "source\delivery_manifest.json"
 if (-not (Test-Path -LiteralPath $manifestPath)) {
-    throw "support\delivery_manifest.json is missing"
+    $manifestPath = Join-Path $root "support\delivery_manifest.json"
+}
+if (-not (Test-Path -LiteralPath $manifestPath)) {
+    $manifestPath = Join-Path $root "delivery_manifest.json"
+}
+if (-not (Test-Path -LiteralPath $manifestPath)) {
+    throw "source\delivery_manifest.json is missing"
 }
 
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json

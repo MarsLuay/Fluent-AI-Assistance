@@ -1216,9 +1216,21 @@ def _assemble_protocol_delivery_folder(
 
     required_files = [
         (stage.script_dir / "RECREATE_SCRIPT.md", staged_dir / "RECREATE_SCRIPT.md", "recreate instructions"),
-        (stage.script_dir / "source" / "request.spec.yaml", staged_dir / "request.spec.yaml", "request specification"),
-        (stage.script_dir / "source" / "protocol.ir.json", staged_dir / "protocol.ir.json", "protocol IR"),
-        (stage.script_dir / "source" / "protocol_draft.py", staged_dir / "generated" / "protocol.py", "generated Python"),
+        (
+            stage.script_dir / "source" / "request.spec.yaml",
+            staged_dir / "source" / "request.spec.yaml",
+            "request specification",
+        ),
+        (
+            stage.script_dir / "source" / "protocol.ir.json",
+            staged_dir / "source" / "protocol.ir.json",
+            "protocol IR",
+        ),
+        (
+            stage.script_dir / "source" / "protocol_draft.py",
+            staged_dir / "source" / "generated" / "protocol.py",
+            "generated Python",
+        ),
     ]
     missing = [label for source, _destination, label in required_files if not source.exists()]
     reports_source = stage.script_dir / "source" / "reports"
@@ -1234,14 +1246,8 @@ def _assemble_protocol_delivery_folder(
     for source, destination, _label in required_files:
         _copy(source, destination)
 
-    reports_dir = staged_dir / "reports"
-    _copy_directory_contents(reports_source, reports_dir)
-    _copy_delivery_optional(stage.script_dir / "source" / "worktable_changes.md", reports_dir / "worktable_changes.md")
-    _copy_delivery_optional(stage.script_dir / "source" / "worktable.patch.json", reports_dir / "worktable.patch.json")
-    _copy_delivery_optional(stage.script_dir / "source" / "validation_diff.md", reports_dir / "validation_diff.md")
-    _copy_delivery_optional(stage.script_dir / "source" / "validation_diff.json", reports_dir / "validation_diff.json")
-    _copy_delivery_optional(stage.metadata_path, staged_dir / "metadata.json")
     _copy_v2_source_tree(stage.script_dir / "source", staged_dir / "source")
+    _copy_delivery_optional(stage.metadata_path, staged_dir / "source" / "metadata.json")
     _copy_delivery_optional(stage.script_dir / "RECREATE_SCRIPT.md", staged_dir / "source" / "RECREATE_SCRIPT.md")
     _copy_delivery_optional(stage.script_dir / "RECIPE_GROUP_NOTES.md", staged_dir / "RECIPE_GROUP_NOTES.md")
     _copy_delivery_optional(stage.script_dir / "RECIPE_GROUP_NOTES.md", staged_dir / "source" / "RECIPE_GROUP_NOTES.md")
@@ -1390,11 +1396,13 @@ def _copy_v2_setup_script(destination: Path) -> None:
         "install_external_files.ps1",
         "deploy_touchtools_media.ps1",
     )
+    helper_dir = destination.parent / "source"
+    helper_dir.mkdir(parents=True, exist_ok=True)
     for helper_name in helpers:
         helper = template.with_name(helper_name)
         if not helper.is_file():
             raise PipelineError(f"Tecan bundle setup helper is missing: {helper}")
-        _copy(helper, destination.with_name(helper.name))
+        _copy(helper, helper_dir / helper.name)
 
 
 def _copy_directory_contents(source_dir: Path, destination_dir: Path) -> None:
@@ -1435,14 +1443,15 @@ def _write_delivery_manifest(
         ],
         "companion_artifacts": [
             {"kind": "recreation_instructions", "path": "RECREATE_SCRIPT.md"},
-            {"kind": "request_specification", "path": "request.spec.yaml"},
-            {"kind": "protocol_ir", "path": "protocol.ir.json"},
-            {"kind": "generated_python", "path": "generated/protocol.py"},
-            {"kind": "reports", "path": "reports/"},
-            {"kind": "bundle_metadata", "path": "metadata.json"},
+            {"kind": "request_specification", "path": "source/request.spec.yaml"},
+            {"kind": "protocol_ir", "path": "source/protocol.ir.json"},
+            {"kind": "generated_python", "path": "source/generated/protocol.py"},
+            {"kind": "reports", "path": "source/reports/"},
+            {"kind": "bundle_metadata", "path": "source/metadata.json"},
             {"kind": "v2_source_tree", "path": "source/"},
             {"kind": "touchtools_media", "path": "media/"},
             {"kind": "bundle_setup", "path": "run_tecan_bundle_setup.bat"},
+            {"kind": "bundle_setup_helpers", "path": "source/"},
         ],
         "internal_artifacts": [
             {
@@ -1453,7 +1462,7 @@ def _write_delivery_manifest(
         ],
         "source_staging_bundle": str(stage.script_dir),
     }
-    write_json(staged_dir / "delivery_manifest.json", delivery_manifest)
+    write_json(staged_dir / "source" / "delivery_manifest.json", delivery_manifest)
 
 
 def attach_generation_reports_to_protocol_folders(
@@ -1500,8 +1509,6 @@ def attach_generation_reports_to_protocol_folder(
         shutil.rmtree(staged_dir)
     shutil.copytree(protocol_dir, staged_dir)
     artifacts = [
-        ExportedArtifact(generation_manifest, staged_dir / "generation_manifest.json", "generation-manifest"),
-        ExportedArtifact(workflow_report, staged_dir / "GENERATION_WORKFLOW.md", "workflow-report"),
         ExportedArtifact(
             generation_manifest,
             staged_dir / "source" / "generation_manifest.json",
@@ -1514,14 +1521,17 @@ def attach_generation_reports_to_protocol_folder(
         ),
     ]
     try:
-        _copy(generation_manifest, staged_dir / "generation_manifest.json")
-        _copy(workflow_report, staged_dir / "GENERATION_WORKFLOW.md")
         _copy(generation_manifest, staged_dir / "source" / "generation_manifest.json")
         _copy(workflow_report, staged_dir / "source" / "GENERATION_WORKFLOW.md")
         for relative, source in (companion_files or {}).items():
             if not source.exists() or source.suffix.lower() == ".xscr":
                 continue
-            destination = staged_dir / Path(relative)
+            relative_path = Path(relative)
+            destination = (
+                staged_dir / relative_path
+                if relative_path.as_posix() in {"RECREATE_SCRIPT.md", "RECIPE_GROUP_NOTES.md"}
+                else staged_dir / "source" / relative_path
+            )
             _copy(source, destination)
             artifacts.append(ExportedArtifact(source, destination, _delivery_artifact_kind(relative)))
         _refresh_delivery_manifest(staged_dir)
@@ -1548,7 +1558,7 @@ def _delivery_artifact_kind(relative: str) -> str:
 
 
 def _refresh_delivery_manifest(staged_dir: Path) -> None:
-    manifest_path = staged_dir / "delivery_manifest.json"
+    manifest_path = staged_dir / "source" / "delivery_manifest.json"
     if not manifest_path.exists():
         return
     try:
@@ -1572,8 +1582,6 @@ def _refresh_delivery_manifest(staged_dir: Path) -> None:
     companions = manifest.setdefault("companion_artifacts", [])
     existing = {item.get("path") for item in companions if isinstance(item, dict)}
     for kind, relative in (
-        ("generation_manifest", "generation_manifest.json"),
-        ("workflow_report", "GENERATION_WORKFLOW.md"),
         ("generation_manifest", "source/generation_manifest.json"),
         ("workflow_report", "source/GENERATION_WORKFLOW.md"),
     ):

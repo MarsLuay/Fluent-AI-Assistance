@@ -1,0 +1,1133 @@
+{
+  "schema_version": 1,
+  "docs_root": "source-of-truth",
+  "pages": [
+    {
+      "path": "README.md",
+      "title": "Source of truth (derived)",
+      "kind": "root",
+      "links": [
+        "architecture.md",
+        "conflicts.md",
+        "cross-cutting.md",
+        "entrypoints.md",
+        "functions/fluent-pipeline-api-v2.md",
+        "functions/fluent-pipeline-cli.md",
+        "functions/fluent-pipeline-exports-mining.md",
+        "functions/fluent-pipeline-gates-validation.md",
+        "functions/fluent-pipeline-generation.md",
+        "functions/fluent-pipeline-liquid-classes.md",
+        "functions/fluent-pipeline-mcp.md",
+        "functions/fluent-pipeline-misc.md",
+        "functions/fluent-pipeline-ops-media.md",
+        "functions/fluent-pipeline-project.md",
+        "functions/fluent-pipeline-protocol-ir.md",
+        "functions/fluent-pipeline-support.md",
+        "functions/fluentcoder-catalog-xlqc.md",
+        "functions/fluentcoder-renderer-device-lc.md",
+        "functions/simulator-labware-catalog.md",
+        "modules/fluent-pipeline-api-v2.md",
+        "modules/fluent-pipeline-cli.md",
+        "modules/fluent-pipeline-exports-mining.md",
+        "modules/fluent-pipeline-gates-validation.md",
+        "modules/fluent-pipeline-generation.md",
+        "modules/fluent-pipeline-liquid-classes.md",
+        "modules/fluent-pipeline-mcp.md",
+        "modules/fluent-pipeline-misc.md",
+        "modules/fluent-pipeline-ops-media.md",
+        "modules/fluent-pipeline-overview.md",
+        "modules/fluent-pipeline-project.md",
+        "modules/fluent-pipeline-protocol-ir.md",
+        "modules/fluent-pipeline-support.md",
+        "modules/fluentcoder-catalog-xlqc.md",
+        "modules/fluentcoder-renderer-device-lc.md",
+        "modules/simulator-labware-catalog.md",
+        "types/fluent-pipeline-api-v2.md",
+        "types/fluent-pipeline-exports-mining.md",
+        "types/fluent-pipeline-gates-validation.md",
+        "types/fluent-pipeline-generation.md",
+        "types/fluent-pipeline-liquid-classes.md",
+        "types/fluent-pipeline-mcp.md",
+        "types/fluent-pipeline-misc.md",
+        "types/fluent-pipeline-ops-media.md",
+        "types/fluent-pipeline-project.md",
+        "types/fluent-pipeline-protocol-ir.md",
+        "types/fluent-pipeline-support.md",
+        "types/fluentcoder-catalog-xlqc.md",
+        "types/simulator-labware-catalog.md"
+      ],
+      "source_references": [
+        "source/*/AGENTS.md",
+        "scripts/docs_nav.py"
+      ],
+      "backlinks": [],
+      "related": [
+        "architecture.md",
+        "conflicts.md",
+        "cross-cutting.md",
+        "entrypoints.md",
+        "functions/fluent-pipeline-api-v2.md",
+        "functions/fluent-pipeline-cli.md",
+        "functions/fluent-pipeline-exports-mining.md",
+        "functions/fluent-pipeline-gates-validation.md",
+        "functions/fluent-pipeline-generation.md",
+        "functions/fluent-pipeline-liquid-classes.md",
+        "functions/fluent-pipeline-mcp.md",
+        "functions/fluent-pipeline-misc.md",
+        "functions/fluent-pipeline-ops-media.md",
+        "functions/fluent-pipeline-project.md",
+        "functions/fluent-pipeline-protocol-ir.md",
+        "functions/fluent-pipeline-support.md",
+        "functions/fluentcoder-catalog-xlqc.md",
+        "functions/fluentcoder-renderer-device-lc.md",
+        "functions/simulator-labware-catalog.md",
+        "modules/fluent-pipeline-api-v2.md",
+        "modules/fluent-pipeline-cli.md",
+        "modules/fluent-pipeline-exports-mining.md",
+        "modules/fluent-pipeline-gates-validation.md",
+        "modules/fluent-pipeline-generation.md",
+        "modules/fluent-pipeline-liquid-classes.md",
+        "modules/fluent-pipeline-mcp.md",
+        "modules/fluent-pipeline-misc.md",
+        "modules/fluent-pipeline-ops-media.md",
+        "modules/fluent-pipeline-overview.md",
+        "modules/fluent-pipeline-project.md",
+        "modules/fluent-pipeline-protocol-ir.md",
+        "modules/fluent-pipeline-support.md",
+        "modules/fluentcoder-catalog-xlqc.md",
+        "modules/fluentcoder-renderer-device-lc.md",
+        "modules/simulator-labware-catalog.md",
+        "types/fluent-pipeline-api-v2.md",
+        "types/fluent-pipeline-exports-mining.md",
+        "types/fluent-pipeline-gates-validation.md",
+        "types/fluent-pipeline-generation.md",
+        "types/fluent-pipeline-liquid-classes.md",
+        "types/fluent-pipeline-mcp.md",
+        "types/fluent-pipeline-misc.md",
+        "types/fluent-pipeline-ops-media.md",
+        "types/fluent-pipeline-project.md",
+        "types/fluent-pipeline-protocol-ir.md",
+        "types/fluent-pipeline-support.md",
+        "types/fluentcoder-catalog-xlqc.md",
+        "types/simulator-labware-catalog.md"
+      ]
+    },
+    {
+      "path": "architecture.md",
+      "title": "Architecture",
+      "kind": "root",
+      "links": [],
+      "source_references": [],
+      "backlinks": [
+        "README.md"
+      ],
+      "related": [
+        "README.md"
+      ]
+    },
+    {
+      "path": "conflicts.md",
+      "title": "Open conflicts and duplicates",
+      "kind": "root",
+      "links": [],
+      "source_references": [
+        "fluent_pipeline/fluent_naming.py",
+        "fluent_pipeline/worktable_datastore.py",
+        "policies/prompt_text.py",
+        "api_v2/validate_runtime.runtime_error_for_validate_failure(..., kind=…)",
+        "api_v2/validate_runtime.py",
+        "workflows/generation/workflow.py",
+        "source/tools/*.py"
+      ],
+      "backlinks": [
+        "README.md"
+      ],
+      "related": [
+        "README.md"
+      ]
+    },
+    {
+      "path": "cross-cutting.md",
+      "title": "Cross-cutting",
+      "kind": "root",
+      "links": [],
+      "source_references": [
+        "libs/fluentcoder/fluentcoder/_assets/config/generation.yaml",
+        "fluent_pipeline/config.py",
+        "ready-to-import/_shared/temp_files/build/tecan_project_index.sqlite",
+        "cli/runtime.py"
+      ],
+      "backlinks": [
+        "README.md"
+      ],
+      "related": [
+        "README.md"
+      ]
+    },
+    {
+      "path": "entrypoints.md",
+      "title": "Entrypoints",
+      "kind": "root",
+      "links": [
+        "modules/fluent-pipeline-overview.md"
+      ],
+      "source_references": [
+        "fluent_pipeline/cli/__main__.py",
+        "fluent_pipeline/mcp_server.py",
+        "fluent_pipeline/mcp_gateway.py",
+        "fluent_pipeline/application_services.py",
+        "fluent_pipeline/workflows/generation/workflow.py",
+        "fluent_pipeline/exports.py",
+        "fluent_pipeline/bootstrap.py",
+        "libs/fluentcoder/.../compiler/renderer.py",
+        "libs/fluentcoder/.../catalog/indexer.py",
+        "source/01-project-reader/tecan_reader/cli.py",
+        "source/02-worklist-builder/tecan_worklist/cli.py",
+        "tools/simulator/launch_simulator.py",
+        "scripts/install/install.ps1",
+        ".mcp/server-config.json",
+        "scripts/agent/agent-brief.py",
+        "scripts/test/test-suite.ps1",
+        "fluent_pipeline/cli/parser.py"
+      ],
+      "backlinks": [
+        "README.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluent-pipeline-overview.md"
+      ]
+    },
+    {
+      "path": "functions/fluent-pipeline-api-v2.md",
+      "title": "Functions: fluent-pipeline-api-v2",
+      "kind": "functions",
+      "links": [],
+      "source_references": [
+        "api_v2/add_labware_golden.py",
+        "api_v2/ced.py",
+        "api_v2/command_summary.py",
+        "api_v2/command_tracing.py",
+        "api_v2/command_validate.py",
+        "api_v2/commands.py",
+        "api_v2/context_enrichment.py",
+        "api_v2/events.py",
+        "api_v2/expressions.py",
+        "api_v2/generic_command_validate.py",
+        "api_v2/generic_passthrough.py",
+        "api_v2/golden_compare.py",
+        "api_v2/legacy_sila.py",
+        "api_v2/native_provider.py",
+        "api_v2/progress_policy.py",
+        "api_v2/run_control.py",
+        "api_v2/runtime.py",
+        "api_v2/runtime_events.py",
+        "api_v2/runtime_session.py",
+        "api_v2/state.py",
+        "api_v2/subroutine_identity.py",
+        "api_v2/types.py",
+        "api_v2/verification_helpers.py",
+        "api_v2/xml_compare.py",
+        "api_v2/validate_runtime.py"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-api-v2.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluent-pipeline-api-v2.md"
+      ]
+    },
+    {
+      "path": "functions/fluent-pipeline-cli.md",
+      "title": "Functions: fluent-pipeline-cli",
+      "kind": "functions",
+      "links": [],
+      "source_references": [
+        "cli/commands/diagnostics.py",
+        "cli/commands/generation.py",
+        "cli/commands/projects.py",
+        "cli/commands/validation.py",
+        "cli/parser.py",
+        "cli/rendering.py",
+        "cli/requests.py",
+        "cli/runtime.py"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-cli.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluent-pipeline-cli.md"
+      ]
+    },
+    {
+      "path": "functions/fluent-pipeline-exports-mining.md",
+      "title": "Functions: fluent-pipeline-exports-mining",
+      "kind": "functions",
+      "links": [],
+      "source_references": [
+        "source/delivery_manifest.json",
+        "| Persist ZEIA-derived connector coverage (name profiles → resolved GUIDs/counts). | see source |\n|",
+        "Connectors/*.x | see source |\n|",
+        "| Persist ZEIA-mined Legacy/Application driver macro inventory (soft-empty OK). | see source |\n|",
+        "| Unique local GUID for name+folder, or None if missing/ambiguous. | see source |\n|",
+        "| Report referenced workspaces/LCs/components missing from SystemSpecific + base. | see source |\n|",
+        "Components/*.xcmp",
+        "| Derive labware/catalog alias maps from a ZEIA-built catalog (instance → type). | see source |\n|",
+        "| Emit guid/name refs without inventing guid↔name pairings. | see source |\n|",
+        "| Backward-compatible alias , now includes nest/cap TypeName families. | see source |\n|",
+        "fs/mapping.xml",
+        "meta/content.xml",
+        "| Drop TouchTools media FileReferences not used by prompt image/sound fields.  Regeneration that repla | see source |\n|"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-exports-mining.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluent-pipeline-exports-mining.md"
+      ]
+    },
+    {
+      "path": "functions/fluent-pipeline-gates-validation.md",
+      "title": "Functions: fluent-pipeline-gates-validation",
+      "kind": "functions",
+      "links": [],
+      "source_references": [
+        "gates/archive.py",
+        "gates/ir.py",
+        "gates/evaluators.py",
+        "gates/models.py",
+        "gates/registry.py",
+        "gates/worktable.py"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-gates-validation.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluent-pipeline-gates-validation.md"
+      ]
+    },
+    {
+      "path": "functions/fluent-pipeline-generation.md",
+      "title": "Functions: fluent-pipeline-generation",
+      "kind": "functions",
+      "links": [],
+      "source_references": [
+        "workflows/generation/workflow.py",
+        "workflows/generation/runner.py",
+        "workflows/generation/stages.py",
+        "workflows/generation/state.py"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-generation.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluent-pipeline-generation.md"
+      ]
+    },
+    {
+      "path": "functions/fluent-pipeline-liquid-classes.md",
+      "title": "Functions: fluent-pipeline-liquid-classes",
+      "kind": "functions",
+      "links": [],
+      "source_references": [
+        "fluent_pipeline/liquid_classes_export.py"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-liquid-classes.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluent-pipeline-liquid-classes.md"
+      ]
+    },
+    {
+      "path": "functions/fluent-pipeline-mcp.md",
+      "title": "Functions: fluent-pipeline-mcp",
+      "kind": "functions",
+      "links": [],
+      "source_references": [],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-mcp.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluent-pipeline-mcp.md"
+      ]
+    },
+    {
+      "path": "functions/fluent-pipeline-misc.md",
+      "title": "Functions: fluent-pipeline-misc",
+      "kind": "functions",
+      "links": [],
+      "source_references": [],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-misc.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluent-pipeline-misc.md"
+      ]
+    },
+    {
+      "path": "functions/fluent-pipeline-ops-media.md",
+      "title": "Functions: fluent-pipeline-ops-media",
+      "kind": "functions",
+      "links": [],
+      "source_references": [],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-ops-media.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluent-pipeline-ops-media.md"
+      ]
+    },
+    {
+      "path": "functions/fluent-pipeline-project.md",
+      "title": "Functions: fluent-pipeline-project",
+      "kind": "functions",
+      "links": [],
+      "source_references": [],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-project.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluent-pipeline-project.md"
+      ]
+    },
+    {
+      "path": "functions/fluent-pipeline-protocol-ir.md",
+      "title": "Functions: fluent-pipeline-protocol-ir",
+      "kind": "functions",
+      "links": [],
+      "source_references": [
+        "ir/rga_move_policy.py"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-protocol-ir.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluent-pipeline-protocol-ir.md"
+      ]
+    },
+    {
+      "path": "functions/fluent-pipeline-support.md",
+      "title": "Functions: fluent-pipeline-support",
+      "kind": "functions",
+      "links": [],
+      "source_references": [
+        "policies/prompt_text.py"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-support.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluent-pipeline-support.md"
+      ]
+    },
+    {
+      "path": "functions/fluentcoder-catalog-xlqc.md",
+      "title": "Functions: fluentcoder-catalog-xlqc",
+      "kind": "functions",
+      "links": [],
+      "source_references": [],
+      "backlinks": [
+        "README.md",
+        "modules/fluentcoder-catalog-xlqc.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluentcoder-catalog-xlqc.md"
+      ]
+    },
+    {
+      "path": "functions/fluentcoder-renderer-device-lc.md",
+      "title": "Functions: fluentcoder-renderer-device-lc",
+      "kind": "functions",
+      "links": [],
+      "source_references": [
+        "libs/fluentcoder/fluentcoder/compiler/renderer.py"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluentcoder-renderer-device-lc.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluentcoder-renderer-device-lc.md"
+      ]
+    },
+    {
+      "path": "functions/simulator-labware-catalog.md",
+      "title": "Functions: simulator-labware-catalog",
+      "kind": "functions",
+      "links": [],
+      "source_references": [
+        "source/04-protocol-simulator/src/data/labwareCatalog.ts"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/simulator-labware-catalog.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/simulator-labware-catalog.md"
+      ]
+    },
+    {
+      "path": "modules/fluent-pipeline-api-v2.md",
+      "title": "Module: fluent-pipeline-api-v2",
+      "kind": "modules",
+      "links": [
+        "functions/fluent-pipeline-api-v2.md",
+        "types/fluent-pipeline-api-v2.md"
+      ],
+      "source_references": [
+        "api_v2/__init__.py",
+        "api_v2/add_labware_golden.py",
+        "api_v2/ced.py",
+        "api_v2/command_summary.py",
+        "api_v2/command_tracing.py",
+        "api_v2/command_validate.py",
+        "api_v2/commands.py",
+        "api_v2/context_enrichment.py",
+        "api_v2/events.py",
+        "api_v2/expressions.py",
+        "api_v2/generic_command_validate.py",
+        "api_v2/generic_passthrough.py",
+        "api_v2/golden_compare.py",
+        "api_v2/legacy_sila.py",
+        "api_v2/native_provider.py",
+        "api_v2/progress_policy.py",
+        "api_v2/run_control.py",
+        "api_v2/runtime.py",
+        "api_v2/runtime_events.py",
+        "api_v2/runtime_session.py",
+        "api_v2/state.py",
+        "api_v2/subroutine_identity.py",
+        "api_v2/types.py",
+        "api_v2/validate_runtime.py",
+        "api_v2/verification_helpers.py",
+        "api_v2/xml_compare.py"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-overview.md"
+      ],
+      "related": [
+        "README.md",
+        "functions/fluent-pipeline-api-v2.md",
+        "modules/fluent-pipeline-overview.md",
+        "types/fluent-pipeline-api-v2.md"
+      ]
+    },
+    {
+      "path": "modules/fluent-pipeline-cli.md",
+      "title": "Module: fluent-pipeline-cli",
+      "kind": "modules",
+      "links": [
+        "functions/fluent-pipeline-cli.md"
+      ],
+      "source_references": [
+        "cli/__init__.py",
+        "cli/__main__.py",
+        "cli/commands/__init__.py",
+        "cli/commands/diagnostics.py",
+        "cli/commands/doctor.py",
+        "cli/commands/generation.py",
+        "cli/commands/projects.py",
+        "cli/commands/simulator.py",
+        "cli/commands/validation.py",
+        "cli/parser.py",
+        "cli/rendering.py",
+        "cli/requests.py",
+        "cli/runtime.py"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-overview.md"
+      ],
+      "related": [
+        "README.md",
+        "functions/fluent-pipeline-cli.md",
+        "modules/fluent-pipeline-overview.md"
+      ]
+    },
+    {
+      "path": "modules/fluent-pipeline-exports-mining.md",
+      "title": "Module: fluent-pipeline-exports-mining",
+      "kind": "modules",
+      "links": [
+        "functions/fluent-pipeline-exports-mining.md",
+        "types/fluent-pipeline-exports-mining.md"
+      ],
+      "source_references": [],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-overview.md"
+      ],
+      "related": [
+        "README.md",
+        "functions/fluent-pipeline-exports-mining.md",
+        "modules/fluent-pipeline-overview.md",
+        "types/fluent-pipeline-exports-mining.md"
+      ]
+    },
+    {
+      "path": "modules/fluent-pipeline-gates-validation.md",
+      "title": "Module: fluent-pipeline-gates-validation",
+      "kind": "modules",
+      "links": [
+        "functions/fluent-pipeline-gates-validation.md"
+      ],
+      "source_references": [
+        "gates/__init__.py",
+        "gates/archive.py",
+        "gates/evaluators.py",
+        "gates/ir.py",
+        "gates/models.py",
+        "gates/registry.py",
+        "gates/worktable.py"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-overview.md"
+      ],
+      "related": [
+        "README.md",
+        "functions/fluent-pipeline-gates-validation.md",
+        "modules/fluent-pipeline-overview.md"
+      ]
+    },
+    {
+      "path": "modules/fluent-pipeline-generation.md",
+      "title": "Module: fluent-pipeline-generation",
+      "kind": "modules",
+      "links": [
+        "functions/fluent-pipeline-generation.md",
+        "types/fluent-pipeline-generation.md"
+      ],
+      "source_references": [
+        "workflows/__init__.py",
+        "workflows/generation/__init__.py",
+        "workflows/generation/runner.py",
+        "workflows/generation/stages.py",
+        "workflows/generation/state.py",
+        "workflows/generation/workflow.py"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-overview.md"
+      ],
+      "related": [
+        "README.md",
+        "functions/fluent-pipeline-generation.md",
+        "modules/fluent-pipeline-overview.md",
+        "types/fluent-pipeline-generation.md"
+      ]
+    },
+    {
+      "path": "modules/fluent-pipeline-liquid-classes.md",
+      "title": "Module: fluent-pipeline-liquid-classes",
+      "kind": "modules",
+      "links": [
+        "functions/fluent-pipeline-liquid-classes.md",
+        "types/fluent-pipeline-liquid-classes.md"
+      ],
+      "source_references": [
+        "source/03-protocol-builder/fluent_pipeline/liquid_classes_export.py"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-overview.md"
+      ],
+      "related": [
+        "README.md",
+        "functions/fluent-pipeline-liquid-classes.md",
+        "modules/fluent-pipeline-overview.md",
+        "types/fluent-pipeline-liquid-classes.md"
+      ]
+    },
+    {
+      "path": "modules/fluent-pipeline-mcp.md",
+      "title": "Module: fluent-pipeline-mcp",
+      "kind": "modules",
+      "links": [
+        "functions/fluent-pipeline-mcp.md"
+      ],
+      "source_references": [],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-overview.md"
+      ],
+      "related": [
+        "README.md",
+        "functions/fluent-pipeline-mcp.md",
+        "modules/fluent-pipeline-overview.md"
+      ]
+    },
+    {
+      "path": "modules/fluent-pipeline-misc.md",
+      "title": "Module: fluent-pipeline-misc",
+      "kind": "modules",
+      "links": [
+        "functions/fluent-pipeline-misc.md"
+      ],
+      "source_references": [],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-overview.md"
+      ],
+      "related": [
+        "README.md",
+        "functions/fluent-pipeline-misc.md",
+        "modules/fluent-pipeline-overview.md"
+      ]
+    },
+    {
+      "path": "modules/fluent-pipeline-ops-media.md",
+      "title": "Module: fluent-pipeline-ops-media",
+      "kind": "modules",
+      "links": [
+        "functions/fluent-pipeline-ops-media.md"
+      ],
+      "source_references": [],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-overview.md"
+      ],
+      "related": [
+        "README.md",
+        "functions/fluent-pipeline-ops-media.md",
+        "modules/fluent-pipeline-overview.md"
+      ]
+    },
+    {
+      "path": "modules/fluent-pipeline-overview.md",
+      "title": "Module: fluent-pipeline-overview",
+      "kind": "modules",
+      "links": [
+        "modules/fluent-pipeline-api-v2.md",
+        "modules/fluent-pipeline-cli.md",
+        "modules/fluent-pipeline-exports-mining.md",
+        "modules/fluent-pipeline-gates-validation.md",
+        "modules/fluent-pipeline-generation.md",
+        "modules/fluent-pipeline-liquid-classes.md",
+        "modules/fluent-pipeline-mcp.md",
+        "modules/fluent-pipeline-misc.md",
+        "modules/fluent-pipeline-ops-media.md",
+        "modules/fluent-pipeline-project.md",
+        "modules/fluent-pipeline-protocol-ir.md",
+        "modules/fluent-pipeline-support.md"
+      ],
+      "source_references": [],
+      "backlinks": [
+        "README.md",
+        "entrypoints.md"
+      ],
+      "related": [
+        "README.md",
+        "entrypoints.md",
+        "modules/fluent-pipeline-api-v2.md",
+        "modules/fluent-pipeline-cli.md",
+        "modules/fluent-pipeline-exports-mining.md",
+        "modules/fluent-pipeline-gates-validation.md",
+        "modules/fluent-pipeline-generation.md",
+        "modules/fluent-pipeline-liquid-classes.md",
+        "modules/fluent-pipeline-mcp.md",
+        "modules/fluent-pipeline-misc.md",
+        "modules/fluent-pipeline-ops-media.md",
+        "modules/fluent-pipeline-project.md",
+        "modules/fluent-pipeline-protocol-ir.md",
+        "modules/fluent-pipeline-support.md"
+      ]
+    },
+    {
+      "path": "modules/fluent-pipeline-project.md",
+      "title": "Module: fluent-pipeline-project",
+      "kind": "modules",
+      "links": [
+        "functions/fluent-pipeline-project.md"
+      ],
+      "source_references": [],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-overview.md"
+      ],
+      "related": [
+        "README.md",
+        "functions/fluent-pipeline-project.md",
+        "modules/fluent-pipeline-overview.md"
+      ]
+    },
+    {
+      "path": "modules/fluent-pipeline-protocol-ir.md",
+      "title": "Module: fluent-pipeline-protocol-ir",
+      "kind": "modules",
+      "links": [
+        "functions/fluent-pipeline-protocol-ir.md",
+        "types/fluent-pipeline-protocol-ir.md"
+      ],
+      "source_references": [
+        "ir/__init__.py",
+        "ir/rga_move_policy.py"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-overview.md"
+      ],
+      "related": [
+        "README.md",
+        "functions/fluent-pipeline-protocol-ir.md",
+        "modules/fluent-pipeline-overview.md",
+        "types/fluent-pipeline-protocol-ir.md"
+      ]
+    },
+    {
+      "path": "modules/fluent-pipeline-support.md",
+      "title": "Module: fluent-pipeline-support",
+      "kind": "modules",
+      "links": [
+        "functions/fluent-pipeline-support.md"
+      ],
+      "source_references": [
+        "policies/__init__.py",
+        "policies/prompt_text.py"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-overview.md"
+      ],
+      "related": [
+        "README.md",
+        "functions/fluent-pipeline-support.md",
+        "modules/fluent-pipeline-overview.md"
+      ]
+    },
+    {
+      "path": "modules/fluentcoder-catalog-xlqc.md",
+      "title": "Module: fluentcoder-catalog-xlqc",
+      "kind": "modules",
+      "links": [
+        "functions/fluentcoder-catalog-xlqc.md",
+        "types/fluentcoder-catalog-xlqc.md"
+      ],
+      "source_references": [
+        "source/03-protocol-builder/libs/fluentcoder/fluentcoder/catalog/xlqc.py",
+        "catalog/catalog.py",
+        "catalog/indexer.py"
+      ],
+      "backlinks": [
+        "README.md"
+      ],
+      "related": [
+        "README.md",
+        "functions/fluentcoder-catalog-xlqc.md",
+        "types/fluentcoder-catalog-xlqc.md"
+      ]
+    },
+    {
+      "path": "modules/fluentcoder-renderer-device-lc.md",
+      "title": "Module: fluentcoder-renderer-device-lc",
+      "kind": "modules",
+      "links": [
+        "functions/fluentcoder-renderer-device-lc.md"
+      ],
+      "source_references": [
+        "source/03-protocol-builder/libs/fluentcoder/fluentcoder/compiler/renderer.py"
+      ],
+      "backlinks": [
+        "README.md"
+      ],
+      "related": [
+        "README.md",
+        "functions/fluentcoder-renderer-device-lc.md"
+      ]
+    },
+    {
+      "path": "modules/simulator-labware-catalog.md",
+      "title": "Module: simulator-labware-catalog",
+      "kind": "modules",
+      "links": [
+        "functions/simulator-labware-catalog.md",
+        "types/simulator-labware-catalog.md"
+      ],
+      "source_references": [
+        "source/04-protocol-simulator/src/data/labwareCatalog.ts"
+      ],
+      "backlinks": [
+        "README.md"
+      ],
+      "related": [
+        "README.md",
+        "functions/simulator-labware-catalog.md",
+        "types/simulator-labware-catalog.md"
+      ]
+    },
+    {
+      "path": "types/fluent-pipeline-api-v2.md",
+      "title": "Types: fluent-pipeline-api-v2",
+      "kind": "types",
+      "links": [],
+      "source_references": [
+        "api_v2/command_tracing.py",
+        "api_v2/commands.py",
+        "api_v2/types.py",
+        "api_v2/run_control.py",
+        "api_v2/ced.py",
+        "api_v2/command_validate.py",
+        "api_v2/xml_compare.py",
+        "api_v2/events.py",
+        "api_v2/expressions.py",
+        "api_v2/generic_command_validate.py",
+        "api_v2/verification_helpers.py",
+        "api_v2/runtime.py",
+        "api_v2/native_provider.py",
+        "api_v2/progress_policy.py",
+        "api_v2/runtime_events.py"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-api-v2.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluent-pipeline-api-v2.md"
+      ]
+    },
+    {
+      "path": "types/fluent-pipeline-exports-mining.md",
+      "title": "Types: fluent-pipeline-exports-mining",
+      "kind": "types",
+      "links": [],
+      "source_references": [],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-exports-mining.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluent-pipeline-exports-mining.md"
+      ]
+    },
+    {
+      "path": "types/fluent-pipeline-gates-validation.md",
+      "title": "Types: fluent-pipeline-gates-validation",
+      "kind": "types",
+      "links": [],
+      "source_references": [
+        "gates/registry.py",
+        "gates/models.py"
+      ],
+      "backlinks": [
+        "README.md"
+      ],
+      "related": [
+        "README.md"
+      ]
+    },
+    {
+      "path": "types/fluent-pipeline-generation.md",
+      "title": "Types: fluent-pipeline-generation",
+      "kind": "types",
+      "links": [],
+      "source_references": [
+        "workflows/generation/workflow.py",
+        "workflows/generation/runner.py",
+        "workflows/generation/state.py",
+        "workflows/generation/stages.py"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-generation.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluent-pipeline-generation.md"
+      ]
+    },
+    {
+      "path": "types/fluent-pipeline-liquid-classes.md",
+      "title": "Types: fluent-pipeline-liquid-classes",
+      "kind": "types",
+      "links": [],
+      "source_references": [],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-liquid-classes.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluent-pipeline-liquid-classes.md"
+      ]
+    },
+    {
+      "path": "types/fluent-pipeline-mcp.md",
+      "title": "Types: fluent-pipeline-mcp",
+      "kind": "types",
+      "links": [],
+      "source_references": [],
+      "backlinks": [
+        "README.md"
+      ],
+      "related": [
+        "README.md"
+      ]
+    },
+    {
+      "path": "types/fluent-pipeline-misc.md",
+      "title": "Types: fluent-pipeline-misc",
+      "kind": "types",
+      "links": [],
+      "source_references": [],
+      "backlinks": [
+        "README.md"
+      ],
+      "related": [
+        "README.md"
+      ]
+    },
+    {
+      "path": "types/fluent-pipeline-ops-media.md",
+      "title": "Types: fluent-pipeline-ops-media",
+      "kind": "types",
+      "links": [],
+      "source_references": [],
+      "backlinks": [
+        "README.md"
+      ],
+      "related": [
+        "README.md"
+      ]
+    },
+    {
+      "path": "types/fluent-pipeline-project.md",
+      "title": "Types: fluent-pipeline-project",
+      "kind": "types",
+      "links": [],
+      "source_references": [],
+      "backlinks": [
+        "README.md"
+      ],
+      "related": [
+        "README.md"
+      ]
+    },
+    {
+      "path": "types/fluent-pipeline-protocol-ir.md",
+      "title": "Types: fluent-pipeline-protocol-ir",
+      "kind": "types",
+      "links": [],
+      "source_references": [],
+      "backlinks": [
+        "README.md",
+        "modules/fluent-pipeline-protocol-ir.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluent-pipeline-protocol-ir.md"
+      ]
+    },
+    {
+      "path": "types/fluent-pipeline-support.md",
+      "title": "Types: fluent-pipeline-support",
+      "kind": "types",
+      "links": [],
+      "source_references": [],
+      "backlinks": [
+        "README.md"
+      ],
+      "related": [
+        "README.md"
+      ]
+    },
+    {
+      "path": "types/fluentcoder-catalog-xlqc.md",
+      "title": "Types: fluentcoder-catalog-xlqc",
+      "kind": "types",
+      "links": [],
+      "source_references": [
+        "catalog/xlqc.py",
+        "catalog/catalog.py"
+      ],
+      "backlinks": [
+        "README.md",
+        "modules/fluentcoder-catalog-xlqc.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/fluentcoder-catalog-xlqc.md"
+      ]
+    },
+    {
+      "path": "types/simulator-labware-catalog.md",
+      "title": "Types: simulator-labware-catalog",
+      "kind": "types",
+      "links": [],
+      "source_references": [],
+      "backlinks": [
+        "README.md",
+        "modules/simulator-labware-catalog.md"
+      ],
+      "related": [
+        "README.md",
+        "modules/simulator-labware-catalog.md"
+      ]
+    }
+  ],
+  "external_links": [
+    {
+      "page": "README.md",
+      "target": "../../CONTRIBUTING.md"
+    },
+    {
+      "page": "README.md",
+      "target": "../AGENT_BRIEF.md"
+    },
+    {
+      "page": "README.md",
+      "target": "../AI_INSTALL_PROMPT.md"
+    },
+    {
+      "page": "README.md",
+      "target": "../ARCHITECTURE.md"
+    },
+    {
+      "page": "README.md",
+      "target": "../CAPABILITIES.md"
+    },
+    {
+      "page": "README.md",
+      "target": "../INSTALLATION.md"
+    },
+    {
+      "page": "README.md",
+      "target": "../MCP_TOOLS.md"
+    },
+    {
+      "page": "README.md",
+      "target": "../SAFETY.md"
+    }
+  ],
+  "unresolved_links": []
+}

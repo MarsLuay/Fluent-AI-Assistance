@@ -160,18 +160,27 @@ class CliPathResolutionTests(unittest.TestCase):
             published_zeia = protocol_folder / "demo.zeia"
             published_zeia.write_bytes(b"zeia")
             (protocol_folder / "RECREATE_SCRIPT.md").write_text("# Recreate\n", encoding="utf-8")
-            (protocol_folder / "generation_manifest.json").write_text("{}", encoding="utf-8")
-            (protocol_folder / "GENERATION_WORKFLOW.md").write_text("# Workflow\n", encoding="utf-8")
-            (protocol_folder / "request.spec.yaml").write_text("request: {}\n", encoding="utf-8")
-            (protocol_folder / "protocol.ir.json").write_text("{}", encoding="utf-8")
             (protocol_folder / "run_tecan_bundle_setup.bat").write_text("@echo off\n", encoding="utf-8")
-            generated_dir = protocol_folder / "generated"
-            generated_dir.mkdir()
+            source_dir = protocol_folder / "source"
+            generated_dir = source_dir / "generated"
+            generated_dir.mkdir(parents=True)
+            (source_dir / "generation_manifest.json").write_text("{}", encoding="utf-8")
+            (source_dir / "GENERATION_WORKFLOW.md").write_text("# Workflow\n", encoding="utf-8")
+            (source_dir / "request.spec.yaml").write_text("request: {}\n", encoding="utf-8")
+            (source_dir / "protocol.ir.json").write_text("{}", encoding="utf-8")
+            (source_dir / "metadata.json").write_text("{}", encoding="utf-8")
             (generated_dir / "protocol.py").write_text("def build_worktable():\n    pass\n", encoding="utf-8")
-            (protocol_folder / "reports").mkdir()
-            (protocol_folder / "source").mkdir()
+            (source_dir / "reports").mkdir()
             (protocol_folder / "media").mkdir()
-            (protocol_folder / "delivery_manifest.json").write_text(
+            for helper in (
+                "collect_tecan_diagnostic_bundle.ps1",
+                "copy_tree_with_progress.ps1",
+                "deploy_touchtools_media.ps1",
+                "install_external_files.ps1",
+                "stall_watchdog.ps1",
+            ):
+                (source_dir / helper).write_text("# helper\n", encoding="utf-8")
+            (source_dir / "delivery_manifest.json").write_text(
                 json.dumps(
                     {
                         "schema_version": "tecan.protocol_delivery.v2",
@@ -208,6 +217,44 @@ class CliPathResolutionTests(unittest.TestCase):
             self.assertIn(f"Ready-to-import ZEIA: {published_zeia}", rendered)
             self.assertNotIn("Compiled XSCR:", rendered)
             self.assertEqual(generation_exit_code(result), 0)
+
+    def test_generate_summary_uses_canonical_handoff_status_and_actions(self):
+        result = GenerationResult(
+            request=SimpleNamespace(),
+            manifest={
+                "workflow_status": "ready_to_import",
+                "readiness_status": "ready_to_import",
+                "ready_to_import": True,
+                "workflow_report": "workflow.md",
+                "generation_manifest": "generation_manifest.json",
+                "request_spec": "request.spec.yaml",
+                "readiness": {
+                    "fluentcontrol_load_diagnostic": {
+                        "status": "failed",
+                        "next_action": "Resolve the Gate 27 diagnostic result.",
+                    },
+                    "script_editor_load": {
+                        "status": "passed",
+                        "next_action": "No action: Script Editor load is confirmed.",
+                    },
+                    "hardware_run": {
+                        "status": "needs_review",
+                        "next_action": "Review the target system before running.",
+                    },
+                },
+            },
+        )
+        output = io.StringIO()
+
+        print_generation_result(result, stream=output)
+
+        rendered = output.getvalue()
+        self.assertIn("Status: ready_to_import (READY TO IMPORT)", rendered)
+        self.assertNotIn("LOAD NOT VERIFIED", rendered)
+        self.assertNotIn("LOAD FAILED", rendered)
+        self.assertIn("Next (FluentControl load diagnostic): Resolve the Gate 27 diagnostic result.", rendered)
+        self.assertIn("Next (Script Editor load): No action: Script Editor load is confirmed.", rendered)
+        self.assertIn("Next (Hardware run): Review the target system before running.", rendered)
 
     def test_explicit_collection_overrides_spec_source_context_defaults(self):
         args = SimpleNamespace(

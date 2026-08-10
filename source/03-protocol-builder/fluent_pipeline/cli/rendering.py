@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 from typing import Any, TextIO
 
+from ..authoring_status import AuthoringState, AuthoringStatus
 from ..application_services import (
     BundleVerificationResult,
     GenerationResult,
@@ -54,9 +55,25 @@ def progress_callback_from_mode(mode: Any) -> ProgressCallback | None:
     return callback
 
 
+def print_authoring_status(status: AuthoringStatus, *, stream: TextIO = sys.stdout) -> None:
+    """Render the shared application status without deriving adapter-local state."""
+    print(f"Authoring status: {status.status.value}", file=stream)
+    for finding in status.findings:
+        location = f" at {finding.location}" if finding.location else ""
+        print(
+            f"Authoring finding [{finding.severity}] {finding.code}{location}: {finding.message}",
+            file=stream,
+        )
+    print(f"Authoring artifacts: {json.dumps(list(status.artifacts))}", file=stream)
+    print(f"Allowed action: {status.allowed_action}", file=stream)
+    print(f"Next: {status.next_action}", file=stream)
+    for action in status.handoff_actions:
+        print(f"Next ({action.label}): {action.next_action}", file=stream)
+
+
 def generation_exit_code(result: GenerationResult) -> int:
     manifest = result.manifest
-    if not manifest.get("ready_to_import"):
+    if result.authoring_status.status != AuthoringState.FINAL_READY_HANDOFF:
         return 1
     bundle_dir = _generation_protocol_folder(manifest)
     if bundle_dir is None:
@@ -97,36 +114,36 @@ def _generation_protocol_folder(manifest: dict[str, Any]) -> Path | None:
 
 def print_generation_result(result: GenerationResult, *, stream: TextIO = sys.stdout) -> None:
     manifest = result.manifest
+    authoring_status = result.authoring_status
     status = str(manifest.get("workflow_status") or "scaffold_not_validated")
     readiness_status = str(manifest.get("readiness_status") or status)
-    if manifest.get("ready_to_import"):
-        if readiness_status == "load_failed":
-            print(f"Status: {status} (READY TO IMPORT; LOAD FAILED)", file=stream)
-        elif readiness_status in {"ready_to_import", "import_ready_needs_review"}:
-            suffix = "; NEEDS REVIEW" if readiness_status == "import_ready_needs_review" else ""
-            print(f"Status: {status} (READY TO IMPORT{suffix})", file=stream)
-        elif readiness_status != "load_clean":
-            print(f"Status: {status} (READY TO IMPORT; LOAD NOT VERIFIED)", file=stream)
+    if authoring_status.status == AuthoringState.FINAL_READY_HANDOFF:
+        if readiness_status == "import_ready_needs_review":
+            print(f"Status: {status} (READY TO IMPORT; NEEDS REVIEW)", file=stream)
         else:
             print(f"Status: {status} (READY TO IMPORT)", file=stream)
-    elif status == "needs_full_zeia_export":
+    elif authoring_status.allowed_action == "provide_full_zeia_export":
         print(f"Status: {status} (FULL ZEIA EXPORT REQUIRED - ask user before continuing)", file=stream)
-    elif status == "scaffold_not_validated":
+    elif authoring_status.status == AuthoringState.SCAFFOLD_NEEDS_REVIEW:
         print(f"Status: {status} (SCAFFOLD ONLY - NOT validated, NOT ready to import)", file=stream)
     else:
         print(f"Status: {status} (NOT ready to import - see ready_validation.md)", file=stream)
     print(f"Readiness status: {readiness_status}", file=stream)
-    readiness = manifest.get("readiness") or {}
-    load_status = (readiness.get("script_editor_load") or {}).get("status")
-    if manifest.get("ready_to_import") and load_status != "load_clean":
-        print(
-            "Next: run the optional --fluent-context-check diagnostic or manually open the "
-            "generated artifact in FluentControl Script Editor before claiming load-clean.",
-            file=stream,
-        )
+    print_authoring_status(authoring_status, stream=stream)
     print(f"Generation workflow: {manifest['workflow_report']}", file=stream)
     print(f"Generation manifest: {manifest['generation_manifest']}", file=stream)
     print(f"Request spec: {manifest['request_spec']}", file=stream)
+    inference = manifest.get("inference") or {}
+    if manifest.get("inference_report"):
+        print(f"Inference review: {manifest['inference_report']}", file=stream)
+        print(
+            "Inferred details: "
+            f"{int(inference.get('inferred_count') or 0)} "
+            f"(unresolved: {int(inference.get('unresolved_count') or 0)})",
+            file=stream,
+        )
+    if manifest.get("inference_json"):
+        print(f"Inference JSON: {manifest['inference_json']}", file=stream)
     if manifest.get("full_zeia_export_report"):
         print(f"Full ZEIA export check: {manifest['full_zeia_export_report']}", file=stream)
     if manifest.get("protocol_ir"):
@@ -189,10 +206,11 @@ def print_project_inspection_result(
 def print_request_spec_result(result: RequestSpecCreateResult, *, stream: TextIO = sys.stdout) -> None:
     print(f"Request spec: {result.output_path}", file=stream)
     print("Next: review request.spec.yaml, then run generate --spec request.spec.yaml", file=stream)
+    print_authoring_status(result.authoring_status, stream=stream)
 
 
 def request_spec_validation_exit_code(result: RequestSpecValidationResult) -> int:
-    return 1 if result.result.errors else 0
+    return 1 if result.authoring_status.status == AuthoringState.REQUEST_SPEC_INVALID else 0
 
 
 def print_request_spec_validation_result(
@@ -201,6 +219,7 @@ def print_request_spec_validation_result(
     stream: TextIO = sys.stdout,
 ) -> None:
     print(render_lint_report(result.result, source=str(result.request.spec_path)), file=stream)
+    print_authoring_status(result.authoring_status, stream=stream)
 
 
 def print_repair_plan_result(
@@ -212,9 +231,12 @@ def print_repair_plan_result(
     if result.report_path is not None:
         print(f"Repair report: {result.report_path}", file=stream)
     if as_json:
-        print(json.dumps(result.plan.to_dict(), indent=2, sort_keys=True), file=stream)
+        payload = result.plan.to_dict()
+        payload["authoring_status"] = result.authoring_status.to_dict()
+        print(json.dumps(payload, indent=2, sort_keys=True), file=stream)
         return
     _print_repair_plan(result.plan, stream=stream)
+    print_authoring_status(result.authoring_status, stream=stream)
 
 
 def print_repair_apply_result(result: RepairApplyResult, *, stream: TextIO = sys.stdout) -> None:
@@ -228,6 +250,7 @@ def print_repair_apply_result(result: RepairApplyResult, *, stream: TextIO = sys
         print(f"Applied {action.kind}{suffix}: {action.summary}", file=stream)
     if result.request.context_name:
         print(f"Project context: {result.request.context_name}", file=stream)
+    print_authoring_status(result.authoring_status, stream=stream)
 
 
 def log_analysis_exit_code(result: LogAnalysisResult) -> int:
@@ -262,7 +285,7 @@ def print_log_analysis_result(
 
 
 def bundle_verification_exit_code(result: BundleVerificationResult) -> int:
-    return 0 if result.report.get("ready") else 1
+    return 0 if result.authoring_status.status == AuthoringState.VERIFICATION_READY else 1
 
 
 def print_bundle_verification_result(
@@ -276,7 +299,9 @@ def print_bundle_verification_result(
     if result.report_path is not None:
         print(f"Ready-validation report: {result.report_path}", file=stream)
     if as_json:
-        print(json.dumps(result.report, indent=2, sort_keys=True), file=stream)
+        payload = dict(result.report)
+        payload["authoring_status"] = result.authoring_status.to_dict()
+        print(json.dumps(payload, indent=2, sort_keys=True), file=stream)
         return
     print(
         "Ready validation: "
@@ -288,6 +313,7 @@ def print_bundle_verification_result(
         if gate.get("status") not in {"failed", "needs_review"}:
             continue
         print(f"  [{gate.get('status')}] {gate.get('id')}: {gate.get('summary')}", file=stream)
+    print_authoring_status(result.authoring_status, stream=stream)
 
 
 def _print_repair_plan(plan: Any, *, stream: TextIO = sys.stdout) -> None:

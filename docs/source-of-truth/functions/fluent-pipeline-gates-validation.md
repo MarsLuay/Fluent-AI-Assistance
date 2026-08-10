@@ -1,12 +1,34 @@
 # Functions: fluent-pipeline-gates-validation
 
-Source roots: `fluent_pipeline/` (10 files)
+Source roots: `fluent_pipeline/` (11 files)
 
 | Symbol | File | Signature | Purpose | Side effects / errors |
 | --- | --- | --- | --- | --- |
 | `evaluate_zeia_parsed` | `gates/archive.py` | `(context)` | Check the imported source manifest or supplied source ZEIA archives. | see source |
 | `evaluate_protocol_ir_schema` | `gates/ir.py` | `(context)` | Validate canonical IR and ZEIA-derived labware label/catalog contracts. | see source |
 | `a200_adapter_catalog_issues` | `gates/ir.py` | `(ir, preferred_label_catalogs)` | Compatibility wrapper around ZEIA preferred label/catalog checks. | see source |
+| `evaluate_labware` | `gates/evaluators.py` | `(context)` | Require every requested labware identity to resolve in imported evidence. | Returns a fail-closed gate record. |
+| `evaluate_liquid_classes` | `gates/evaluators.py` | `(context)` | Require every liquid class to resolve in imported evidence. | Returns a fail-closed gate record. |
+| `evaluate_worklists` | `gates/evaluators.py` | `(context)` | Validate referenced worklist paths or an explicitly supplied worklist. | Reads path existence. |
+| `evaluate_python_draft` | `gates/evaluators.py` | `(context)` | Confirm the generated Python draft exists and exposes the expected builder. | Reads the draft. |
+| `evaluate_simulation` | `gates/evaluators.py` | `(context)` | Convert the recorded simulator result into the canonical gate. | Fails when simulation did not pass. |
+| `evaluate_repair_plan` | `gates/evaluators.py` | `(context)` | Block unresolved critical repair findings. | Reads the repair-plan payload. |
+| `evaluate_xscr` | `gates/evaluators.py` | `(context)` | Confirm XSCR compilation produced the expected artifact without failure. | Reads compile artifacts. |
+| `evaluate_recreate` | `gates/evaluators.py` | `(context)` | Compare `RECREATE_SCRIPT.md` with canonical IR rendering. | Reads both artifacts. |
+| `evaluate_liquid_state` | `gates/evaluators.py` | `(context)` | Validate liquid-state behavior or classify a justified trivial pass. | Runs liquid-state validation. |
+| `evaluate_fluent_context_check` | `gates/evaluators.py` | `(context)` | Normalize the optional live FluentControl diagnostic. | Returns `None` when not requested. |
+| `evaluate_post_compile_xscr` | `gates/evaluators.py` | `(context)` | Reinspect compiled XSCR inventory and parsing errors. | Reads compiled XSCR evidence. |
+| `evaluate_xscr_ir_roundtrip` | `gates/evaluators.py` | `(context)` | Compare decompiled XSCR behavior with canonical IR. | Fails on behavioral drift. |
+| `evaluate_volume_bounds` | `gates/evaluators.py` | `(context)` | Enforce reviewed volume bounds over modeled liquid-handling steps. | Fails closed on invalid expressions or values. |
+| `evaluate_well_ranges` | `gates/evaluators.py` | `(context)` | Validate well references against modeled labware geometry. | Fails closed on invalid wells. |
+| `evaluate_tip_capacity` | `gates/evaluators.py` | `(context)` | Validate tip demand against imported tip resources. | Fails closed on insufficient capacity. |
+| `evaluate_liquid_class_compatibility` | `gates/evaluators.py` | `(context)` | Check operation/head/tip compatibility against imported liquid-class evidence. | Fails closed on incompatibility. |
+| `evaluate_no_unapproved_raw_xml` | `gates/evaluators.py` | `(context)` | Block raw XML unless the recorded approval contract permits it. | Reads draft, compiled inventory, and options. |
+| `evaluate_checksums` | `gates/evaluators.py` | `(context)` | Verify generated ZEIA entry checksums and waiver state. | Reads archive/checksum evidence. |
+| `evaluate_generated_zeia` | `gates/evaluators.py` | `(context)` | Validate packaged ZEIA integrity, metadata, and references. | Reads the generated archive. |
+| `evaluate_subroutine_additions` | `gates/evaluators.py` | `(context)` | Audit metadata for subroutines newly added to the generated ZEIA. | Used by the dependency gate. |
+| `evaluate_subroutine_dependencies` | `gates/evaluators.py` | `(context)` | Resolve subroutine calls and packaged Script dependencies. | Reads IR, XSCR, manifests, and source archives. |
+| `evaluate_command_inventory` | `gates/evaluators.py` | `(context)` | Resolve literal compiled command names against source inventories and aliases. | Fails closed on unknown names. |
 | `ValidationContext` | `gates/models.py` | class | Artifacts computed once and supplied to registered readiness evaluators.  Keep this context data-onl | , |
 | `RegisteredGateEvaluator` | `gates/registry.py` | class | One statically registered evaluator and its reviewed artifact contract. | , |
 | `readiness_evaluator_registry` | `gates/registry.py` | `()` | see source | see source |

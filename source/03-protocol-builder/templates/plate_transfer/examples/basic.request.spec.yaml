@@ -1,18 +1,19 @@
 schema_version: tecan.request_spec.v1
 request:
-  intent: Transfer 20 uL from SourcePlate A1 to DestinationPlate A1 using Water Free Single.
-  protocol_name: Plate transfer example
+  intent: Ground this plate-transfer shape in exact names and placements from the selected imported context.
+  protocol_name: null
   status: draft
 template:
   name: plate_transfer
   parameters:
-    source_plate: SourcePlate
-    destination_plate: DestinationPlate
-    source_well: A1
-    destination_well: A1
-    transfer_volume_ul: 20
-    liquid_class: Water Free Single
-    tip_box: Tips
+    source_plate: ""
+    destination_plate: ""
+    source_well: ""
+    destination_well: ""
+    transfer_volume_ul: null
+    liquid_class: ""
+    tip_box: ""
+    worktable: ""
 source:
   context: null
   context_kind: null

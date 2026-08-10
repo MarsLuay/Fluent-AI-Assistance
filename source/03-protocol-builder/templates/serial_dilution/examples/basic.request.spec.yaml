@@ -1,16 +1,21 @@
 schema_version: tecan.request_spec.v1
 request:
-  intent: Build an 8-point 1:10 serial dilution from SourcePlate into DilutionPlate.
-  protocol_name: Serial dilution example
+  intent: Ground this serial-dilution shape in reviewed values and exact names from the selected imported context.
+  protocol_name: null
   status: draft
 template:
   name: serial_dilution
   parameters:
-    sample_volume_ul: 10
-    diluent_volume_ul: 90
-    dilution_count: 8
-    mix_cycles: 8
-    liquid_class: Water Free Single
+    source_plate: ""
+    dilution_plate: ""
+    diluent_reservoir: ""
+    tip_box: ""
+    worktable: ""
+    sample_volume_ul: null
+    diluent_volume_ul: null
+    dilution_count: null
+    mix_cycles: null
+    liquid_class: ""
 source:
   context: null
   context_kind: null

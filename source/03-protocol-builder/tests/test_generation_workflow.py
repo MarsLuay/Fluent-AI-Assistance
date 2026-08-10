@@ -25,12 +25,14 @@ from fluent_pipeline.generation_workflow import (
     _matching_regeneration_baseline_script,
     _normalize_ir_labware_labels_against_manifest,
     _refresh_request_spec_context,
+    render_generation_summary,
     run_generation_workflow as _run_generation_workflow,
 )
 from fluent_pipeline.readiness import readiness_status_from_readiness
 from fluent_pipeline.readiness_gates import readiness_gate_approval_context_keys
 from fluent_pipeline.protocol_ir import write_protocol_ir
 from fluent_pipeline.protocol_ir_schema import ProtocolIRValidationError
+from fluent_pipeline.provenance import distribution_version
 from fluent_pipeline.repair import RepairAction, RepairPlan
 from fluent_pipeline.request_spec import normalize_request_spec, write_request_spec
 from fluent_pipeline.runner import CommandResult
@@ -317,7 +319,7 @@ class GenerationWorkflowTests(unittest.TestCase):
                 ("publish_bundle", "skipped"),
             ],
         )
-        self.assertTrue(all(event.total_stages == 10 for event in events))
+        self.assertTrue(all(event.total_stages == 11 for event in events))
 
     def test_progress_callback_emits_failed_event_for_request_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -864,10 +866,16 @@ class GenerationWorkflowTests(unittest.TestCase):
                 self.assertTrue(Path(manifest["workflow_report"]).exists())
                 environment = manifest["environment"]
                 self.assertIn("repository_commit", environment)
-                self.assertEqual(environment["protocol_builder_version"], "0.1.0")
-                self.assertEqual(environment["fluentcoder_version"], "0.1.0")
-                self.assertEqual(environment["tecan_common_version"], "0.1.0")
-                self.assertEqual(environment["reader_version"], "0.1.0")
+                self.assertEqual(
+                    environment["protocol_builder_version"],
+                    distribution_version("tecan-protocol-builder"),
+                )
+                self.assertEqual(environment["fluentcoder_version"], distribution_version("fluentcoder"))
+                self.assertEqual(environment["tecan_common_version"], distribution_version("tecan-common"))
+                self.assertEqual(
+                    environment["reader_version"],
+                    distribution_version("tecan-project-reader"),
+                )
                 self.assertEqual(environment["readiness_registry_version"], "tecan.readiness_gate_registry.v2")
                 self.assertEqual(environment["simulation_backend"], "not_run")
                 self.assertTrue(environment["command_registry_sha256"])
@@ -962,12 +970,39 @@ class GenerationWorkflowTests(unittest.TestCase):
 
         self.assertEqual(
             readiness_status_from_readiness(profile, workflow_status="ready_to_import"),
-            "load_failed",
+            "ready_to_import",
         )
         self.assertEqual(profile["generated_zeia_import"]["status"], "ready_to_import")
-        self.assertEqual(profile["script_editor_load"]["status"], "load_failed")
+        self.assertEqual(profile["script_editor_load"]["status"], "failed")
         self.assertEqual(profile["offline_validation"]["status"], "ready_to_import")
         self.assertEqual(profile["review_state"]["status"], "hardware_review_required")
+
+    def test_generation_summary_prints_live_handoff_next_actions(self):
+        summary = render_generation_summary(
+            {
+                "workflow_status": "ready_to_import",
+                "readiness_status": "ready_to_import",
+                "ready_to_import": True,
+                "readiness": {
+                    "script_editor_load": {
+                        "status": "failed",
+                        "summary": "Gate 27 reported a load failure.",
+                        "next_action": "Resolve the load error and reopen the script.",
+                    },
+                    "hardware_run": {
+                        "status": "needs_review",
+                        "summary": "Target-system review is required.",
+                        "next_action": "Review the target system before running.",
+                    },
+                },
+            }
+        )
+
+        self.assertIn("SCRIPT EDITOR LOAD FAILED", summary)
+        self.assertIn("Script Editor Load: `failed`", summary)
+        self.assertIn("Hardware Run: `needs_review`", summary)
+        self.assertIn("Next action: Resolve the load error and reopen the script.", summary)
+        self.assertIn("Next action: Review the target system before running.", summary)
 
     def test_generation_success_requires_protocol_folder_zeia(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -980,18 +1015,28 @@ class GenerationWorkflowTests(unittest.TestCase):
             loose_zeia.write_bytes(b"loose")
             folder_zeia.write_bytes(b"folder")
             (protocol_folder / "RECREATE_SCRIPT.md").write_text("# Recreate\n", encoding="utf-8")
-            (protocol_folder / "request.spec.yaml").write_text("request: {}\n", encoding="utf-8")
-            (protocol_folder / "protocol.ir.json").write_text("{}", encoding="utf-8")
             (protocol_folder / "run_tecan_bundle_setup.bat").write_text("@echo off\n", encoding="utf-8")
-            (protocol_folder / "generation_manifest.json").write_text("{}", encoding="utf-8")
-            (protocol_folder / "GENERATION_WORKFLOW.md").write_text("# Workflow\n", encoding="utf-8")
-            generated_dir = protocol_folder / "generated"
-            generated_dir.mkdir()
+            source_dir = protocol_folder / "source"
+            generated_dir = source_dir / "generated"
+            reports_dir = source_dir / "reports"
+            generated_dir.mkdir(parents=True)
+            reports_dir.mkdir()
+            (source_dir / "request.spec.yaml").write_text("request: {}\n", encoding="utf-8")
+            (source_dir / "protocol.ir.json").write_text("{}", encoding="utf-8")
+            (source_dir / "metadata.json").write_text("{}", encoding="utf-8")
+            (source_dir / "generation_manifest.json").write_text("{}", encoding="utf-8")
+            (source_dir / "GENERATION_WORKFLOW.md").write_text("# Workflow\n", encoding="utf-8")
             (generated_dir / "protocol.py").write_text("def build_worktable():\n    pass\n", encoding="utf-8")
-            (protocol_folder / "reports").mkdir()
-            (protocol_folder / "source").mkdir()
             (protocol_folder / "media").mkdir()
-            (protocol_folder / "delivery_manifest.json").write_text(
+            for helper in (
+                "collect_tecan_diagnostic_bundle.ps1",
+                "copy_tree_with_progress.ps1",
+                "deploy_touchtools_media.ps1",
+                "install_external_files.ps1",
+                "stall_watchdog.ps1",
+            ):
+                (source_dir / helper).write_text("# helper\n", encoding="utf-8")
+            (source_dir / "delivery_manifest.json").write_text(
                 json.dumps(
                     {
                         "schema_version": "tecan.protocol_delivery.v2",

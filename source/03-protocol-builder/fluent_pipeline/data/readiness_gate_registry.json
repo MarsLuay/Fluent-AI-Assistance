@@ -30,112 +30,191 @@
       "id": "labware_resolves",
       "name": "all labware names resolve",
       "classification": "required_offline_gate",
-      "description": "Requested labware names resolve in the source context or approved aliases."
+      "description": "Requested labware names resolve in the source context or approved aliases.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_labware",
+      "artifact_inputs": [
+        "protocol.ir.json",
+        "source manifest"
+      ]
     },
     {
       "number": 4,
       "id": "liquid_classes_resolve",
       "name": "all liquid classes resolve",
       "classification": "required_offline_gate",
-      "description": "Requested liquid classes resolve in the source context or approved aliases."
+      "description": "Requested liquid classes resolve in the source context or approved aliases.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_liquid_classes",
+      "artifact_inputs": [
+        "protocol.ir.json",
+        "source manifest"
+      ]
     },
     {
       "number": 5,
       "id": "worklist_paths_valid",
       "name": "all worklist paths valid",
       "classification": "required_offline_gate",
-      "description": "Any emitted worklist paths are present and valid for handoff."
+      "description": "Any emitted worklist paths are present and valid for handoff.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_worklists",
+      "artifact_inputs": [
+        "protocol.ir.json",
+        "source manifest",
+        "worklist"
+      ]
     },
     {
       "number": 6,
       "id": "python_draft_generated",
       "name": "Python draft generated",
       "classification": "required_offline_gate",
-      "description": "The generated Python draft exists and defines the expected worktable builder."
+      "description": "The generated Python draft exists and defines the expected worktable builder.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_python_draft",
+      "artifact_inputs": [
+        "Python draft"
+      ]
     },
     {
       "number": 7,
       "id": "simulation_passes",
       "name": "simulation passes",
       "classification": "required_offline_gate",
-      "description": "The offline simulator reports a passing result."
+      "description": "The offline simulator reports a passing result.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_simulation",
+      "artifact_inputs": [
+        "simulation report"
+      ]
     },
     {
       "number": 8,
       "id": "repair_plan_clear",
       "name": "repair-plan has no unresolved critical errors",
       "classification": "required_offline_gate",
-      "description": "The repair plan has no unresolved critical findings."
+      "description": "The repair plan has no unresolved critical findings.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_repair_plan",
+      "artifact_inputs": [
+        "repair plan"
+      ]
     },
     {
       "number": 9,
       "id": "xscr_compiles",
       "name": ".xscr compiles",
       "classification": "required_offline_gate",
-      "description": "The compiled XSCR exists and the compile stage did not fail."
+      "description": "The compiled XSCR exists and the compile stage did not fail.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_xscr",
+      "artifact_inputs": [
+        "compiled XSCR",
+        "compile report"
+      ]
     },
     {
       "number": 10,
       "id": "recreate_matches_ir",
       "name": "RECREATE_SCRIPT.md matches protocol.ir.json",
       "classification": "required_offline_gate",
-      "description": "The recreate guide matches the canonical protocol IR structure."
+      "description": "The recreate guide matches the canonical protocol IR structure.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_recreate",
+      "artifact_inputs": [
+        "protocol.ir.json",
+        "RECREATE_SCRIPT.md"
+      ]
     },
     {
       "number": 11,
       "id": "post_compile_xscr_reinspect",
       "name": "post-compile XSCR re-inspects successfully",
       "classification": "required_offline_gate",
-      "description": "The compiled XSCR parses back into usable canonical data without FluentControl findings."
+      "description": "The compiled XSCR parses back into usable canonical data without FluentControl findings.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_post_compile_xscr",
+      "artifact_inputs": [
+        "compiled XSCR",
+        "protocol.ir.json",
+        "source manifest"
+      ]
     },
     {
       "number": 12,
       "id": "xscr_ir_roundtrip_matches",
       "name": "compiled XSCR roundtrip IR matches protocol.ir.json",
       "classification": "required_offline_gate",
-      "description": "The compiled XSCR preserves the expected IR structure and operation ordering."
+      "description": "The compiled XSCR preserves the expected IR structure and operation ordering.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_xscr_ir_roundtrip",
+      "artifact_inputs": [
+        "protocol.ir.json",
+        "compiled XSCR"
+      ]
     },
     {
       "number": 13,
       "id": "volume_bounds_valid",
       "name": "liquid handling volumes are within configured bounds",
       "classification": "required_offline_gate",
-      "description": "Liquid-handling volumes remain inside the configured instrument limits."
+      "description": "Liquid-handling volumes remain inside the configured instrument limits.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_volume_bounds",
+      "artifact_inputs": [
+        "protocol.ir.json",
+        "validation options"
+      ]
     },
     {
       "number": 14,
       "id": "well_ranges_valid",
       "name": "explicit well references are in range",
       "classification": "required_offline_gate",
-      "description": "Explicit well references stay within the addressed labware geometry."
+      "description": "Explicit well references stay within the addressed labware geometry.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_well_ranges",
+      "artifact_inputs": [
+        "protocol.ir.json"
+      ]
     },
     {
       "number": 15,
       "id": "tip_capacity_valid",
       "name": "tip capacity can support liquid handling volumes",
       "classification": "required_offline_gate",
-      "description": "Selected tips can support the requested aspirate and dispense volumes."
+      "description": "Selected tips can support the requested aspirate and dispense volumes.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_tip_capacity",
+      "artifact_inputs": [
+        "protocol.ir.json",
+        "source manifest"
+      ]
     },
     {
       "number": 16,
       "id": "liquid_class_compatible",
       "name": "liquid classes are compatible with selected operations",
       "classification": "required_offline_gate",
-      "description": "Selected liquid classes are compatible with the operations they are used for."
+      "description": "Selected liquid classes are compatible with the operations they are used for.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_liquid_class_compatibility",
+      "artifact_inputs": [
+        "protocol.ir.json",
+        "source manifest"
+      ]
     },
     {
       "number": 17,
       "id": "no_unapproved_raw_xml",
       "name": "no unsupported raw XML unless approved",
       "classification": "required_offline_gate",
-      "description": "Unsupported raw XML does not ship unless it was explicitly reviewed and approved."
+      "description": "Unsupported raw XML does not ship unless it was explicitly reviewed and approved.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_no_unapproved_raw_xml",
+      "artifact_inputs": [
+        "Python draft",
+        "compiled XSCR",
+        "validation options"
+      ]
     },
     {
       "number": 18,
       "id": "liquid_state_valid",
       "name": "robotools-style liquid state model is valid",
       "classification": "required_offline_gate",
-      "description": "The liquid-state model stays internally consistent for the generated protocol."
+      "description": "The liquid-state model stays internally consistent for the generated protocol.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_liquid_state",
+      "artifact_inputs": [
+        "protocol.ir.json",
+        "liquid-state report"
+      ]
     },
     {
       "number": 19,
@@ -196,35 +275,63 @@
       "id": "checksums_valid",
       "name": "generated ZEIA entries carry valid FluentControl checksums",
       "classification": "required_offline_gate",
-      "description": "Edited ZEIA entries carry checksums FluentControl can accept during import."
+      "description": "Edited ZEIA entries carry checksums FluentControl can accept during import.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_checksums",
+      "artifact_inputs": [
+        "compiled XSCR",
+        "source project archives",
+        "checksum audit"
+      ]
     },
     {
       "number": 24,
       "id": "generated_zeia_valid",
       "name": "packaged generated ZEIA opens, resolves references, and matches its datastore metadata",
       "classification": "required_offline_gate",
-      "description": "The packaged generated ZEIA is readable, consistent, and packaged with the expected datastore metadata."
+      "description": "The packaged generated ZEIA is readable, consistent, and packaged with the expected datastore metadata.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_generated_zeia",
+      "artifact_inputs": [
+        "source project archives",
+        "archive audit"
+      ]
     },
     {
       "number": 25,
       "id": "command_inventory_resolves",
       "name": "compiled command name strings resolve in the source context",
       "classification": "required_offline_gate",
-      "description": "Literal compiled command names resolve in the source context or approved aliases."
+      "description": "Literal compiled command names resolve in the source context or approved aliases.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_command_inventory",
+      "artifact_inputs": [
+        "compiled XSCR",
+        "source manifest",
+        "alias maps"
+      ]
     },
     {
       "number": 26,
       "id": "subroutine_dependencies_valid",
       "name": "subroutine calls resolve to loadable Script dependencies",
       "classification": "required_offline_gate",
-      "description": "Subroutine calls resolve cleanly and package the expected Script dependencies."
+      "description": "Subroutine calls resolve cleanly and package the expected Script dependencies.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_subroutine_dependencies",
+      "artifact_inputs": [
+        "protocol.ir.json",
+        "compiled XSCR",
+        "source manifest",
+        "source project archives"
+      ]
     },
     {
       "number": 27,
       "id": "fluent_context_check",
       "name": "optional FluentControl import/load diagnostic",
       "classification": "optional_diagnostic",
-      "description": "Optional live diagnostic that imports or opens the generated artifact in FluentControl or Script Editor. It is not required for offline ready-to-import status."
+      "description": "Optional live diagnostic that imports or opens the generated artifact in FluentControl or Script Editor. It is not required for offline ready-to-import status.",
+      "implementation": "fluent_pipeline.gates.evaluators:evaluate_fluent_context_check",
+      "artifact_inputs": [
+        "FluentControl diagnostic report"
+      ]
     }
   ]
 }

@@ -53,8 +53,9 @@ arbitrary shell commands.
 - `fluent_pipeline/mcp_server.py`: MCP tools, resources, and reusable prompt.
 - `fluent_pipeline/mcp_gateway.py`: safety checks and calls into the Python API.
 - `fluent_pipeline/cli/`: command-line interface.
-- `fluent_pipeline/generation_workflow.py`: protocol generation orchestration.
-- `fluent_pipeline/validation.py`: ready-to-import validation gates.
+- `fluent_pipeline/application_services.py` + `authoring_status.py`: shared Python/CLI/MCP results and authoring/recovery state.
+- `fluent_pipeline/workflows/generation/`: canonical protocol generation orchestration; `generation_workflow.py` is the compatibility facade.
+- `fluent_pipeline/gates/`: canonical readiness evaluators; `validation.py` orchestrates reports and preserves compatibility wrappers.
 - `fluent_pipeline/exports.py`: ready-to-import publish.
 
 ## Workspace layout
@@ -65,6 +66,12 @@ Generated work lives under `ready-to-import/`:
 - `<protocol>_vN/` , published bundles
 - `_shared/temp_files/build/` , shared indexes, setuptools staging, api_v2 reports
 - `_shared/temp_files/logs/` , event logs
+
+Published bundle roots stay operator-focused: `<protocol>_vN.zeia`,
+`run_tecan_bundle_setup.bat`, `RECREATE_SCRIPT.md`, `media/`, and `source/`
+(plus optional `RECIPE_GROUP_NOTES.md`). PowerShell helpers, manifests,
+`request.spec.yaml`, `protocol.ir.json`, `metadata.json`, generated Python, and
+reports live under `source/`. Runtime diagnostics may create `temp_files/`.
 
 ## Transport
 

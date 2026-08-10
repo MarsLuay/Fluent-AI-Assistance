@@ -71,7 +71,16 @@ def validate_v2_delivery_bundle(
     issues: list[DeliveryBundleIssue] = []
     manifest: dict[str, Any] = {}
     support_dir = bundle_dir / "support"
-    metadata_dir = support_dir if support_dir.is_dir() else bundle_dir
+    source_dir = bundle_dir / "source"
+    if (source_dir / "delivery_manifest.json").is_file():
+        metadata_dir = source_dir
+        source_layout = True
+    elif (support_dir / "delivery_manifest.json").is_file():
+        metadata_dir = support_dir
+        source_layout = False
+    else:
+        metadata_dir = bundle_dir
+        source_layout = False
     manifest_path = metadata_dir / "delivery_manifest.json"
     zeia_path = bundle_dir / f"{expected_name}.zeia"
 
@@ -98,18 +107,44 @@ def validate_v2_delivery_bundle(
             require_final_reports=require_final_reports,
         )
 
+    reports_dir = source_dir / "reports" if source_layout else bundle_dir / "reports"
+    generated_python = (
+        source_dir / "generated" / "protocol.py"
+        if source_layout
+        else bundle_dir / "generated" / "protocol.py"
+    )
     required_paths = [
         (zeia_path, "missing_zeia", "validated FluentControl ZEIA is missing"),
         (manifest_path, "missing_delivery_manifest", f"{manifest_path.relative_to(bundle_dir)} is missing"),
         (bundle_dir / "run_tecan_bundle_setup.bat", "missing_setup_bat", "run_tecan_bundle_setup.bat is missing"),
-        (bundle_dir / "source", "missing_source_dir", "source/ companion tree is missing"),
+        (source_dir, "missing_source_dir", "source/ companion tree is missing"),
         (bundle_dir / "media", "missing_media_dir", "media/ payload tree is missing"),
-        (bundle_dir / "reports", "missing_reports_dir", "reports/ validation tree is missing"),
+        (reports_dir, "missing_reports_dir", f"{reports_dir.relative_to(bundle_dir)} validation tree is missing"),
         (bundle_dir / "RECREATE_SCRIPT.md", "missing_recreate_script", "RECREATE_SCRIPT.md is missing"),
         (metadata_dir / "request.spec.yaml", "missing_request_spec", f"{(metadata_dir / 'request.spec.yaml').relative_to(bundle_dir)} is missing"),
         (metadata_dir / "protocol.ir.json", "missing_protocol_ir", f"{(metadata_dir / 'protocol.ir.json').relative_to(bundle_dir)} is missing"),
-        (bundle_dir / "generated" / "protocol.py", "missing_generated_python", "generated/protocol.py is missing"),
+        (generated_python, "missing_generated_python", f"{generated_python.relative_to(bundle_dir)} is missing"),
     ]
+    if source_layout:
+        required_paths.extend(
+            [
+                (source_dir / "metadata.json", "missing_bundle_metadata", "source/metadata.json is missing"),
+                *(
+                    (
+                        source_dir / helper,
+                        "missing_setup_helper",
+                        f"source/{helper} is missing",
+                    )
+                    for helper in (
+                        "collect_tecan_diagnostic_bundle.ps1",
+                        "copy_tree_with_progress.ps1",
+                        "deploy_touchtools_media.ps1",
+                        "install_external_files.ps1",
+                        "stall_watchdog.ps1",
+                    )
+                ),
+            ]
+        )
     if require_final_reports:
         required_paths.extend(
             [
@@ -153,15 +188,22 @@ def validate_v2_delivery_bundle(
             manifest,
             bundle_dir=bundle_dir,
             protocol_name=expected_name,
+            manifest_path=manifest_path,
             add_issue=add,
         )
         _validate_external_file_deployments(
             manifest,
             bundle_dir=bundle_dir,
+            manifest_path=manifest_path,
             add_issue=add,
         )
 
-    _validate_no_unpublished_artifacts(bundle_dir, expected_name, add)
+    _validate_no_unpublished_artifacts(
+        bundle_dir,
+        expected_name,
+        add,
+        source_layout=source_layout,
+    )
 
     return DeliveryBundleValidationResult(
         bundle_dir=bundle_dir,
@@ -202,11 +244,12 @@ def _validate_manifest_artifacts(
     *,
     bundle_dir: Path,
     protocol_name: str,
+    manifest_path: Path,
     add_issue: Any,
 ) -> None:
     deliverables = manifest.get("deliverables")
     if not isinstance(deliverables, list):
-        add_issue("missing_manifest_deliverables", "delivery manifest must list deliverables", bundle_dir / "support" / "delivery_manifest.json")
+        add_issue("missing_manifest_deliverables", "delivery manifest must list deliverables", manifest_path)
         return
     expected = f"{protocol_name}.zeia"
     zeia_deliverables = [
@@ -217,10 +260,10 @@ def _validate_manifest_artifacts(
         and item.get("path") == expected
     ]
     if len(zeia_deliverables) != 1:
-        add_issue("invalid_manifest_zeia_deliverable", f"delivery manifest must list exactly one ZEIA deliverable at {expected}", bundle_dir / "support" / "delivery_manifest.json")
+        add_issue("invalid_manifest_zeia_deliverable", f"delivery manifest must list exactly one ZEIA deliverable at {expected}", manifest_path)
     for item in deliverables:
         if not isinstance(item, dict):
-            add_issue("invalid_manifest_deliverable", "delivery manifest deliverables must be objects", bundle_dir / "support" / "delivery_manifest.json")
+            add_issue("invalid_manifest_deliverable", "delivery manifest deliverables must be objects", manifest_path)
             continue
         path = str(item.get("path") or "")
         if path.lower().endswith(".xscr"):
@@ -233,10 +276,10 @@ def _validate_external_file_deployments(
     manifest: dict[str, Any],
     *,
     bundle_dir: Path,
+    manifest_path: Path,
     add_issue: Any,
 ) -> None:
     deployments = manifest.get("external_file_deployments")
-    manifest_path = bundle_dir / "support" / "delivery_manifest.json"
     if not isinstance(deployments, list):
         add_issue(
             "missing_external_file_deployments",
@@ -308,19 +351,34 @@ def _validate_external_file_deployments(
             )
 
 
-def _validate_no_unpublished_artifacts(bundle_dir: Path, protocol_name: str, add_issue: Any) -> None:
+def _validate_no_unpublished_artifacts(
+    bundle_dir: Path,
+    protocol_name: str,
+    add_issue: Any,
+    *,
+    source_layout: bool,
+) -> None:
     expected_zeia = bundle_dir / f"{protocol_name}.zeia"
-    if (bundle_dir / "support").is_dir():
+    if source_layout or (bundle_dir / "support").is_dir():
         allowed_root_files = {
             expected_zeia.name,
             "run_tecan_bundle_setup.bat",
             "RECREATE_SCRIPT.md",
+            "RECIPE_GROUP_NOTES.md",
         }
+        allowed_root_directories = {"source", "media", "temp_files"}
         for item in bundle_dir.iterdir():
             if item.is_file() and item.name not in allowed_root_files:
                 add_issue(
                     "unexpected_root_file",
-                    "only the ZEIA, run_tecan_bundle_setup.bat, and RECREATE_SCRIPT.md may be files at the delivery root",
+                    "only the ZEIA, run_tecan_bundle_setup.bat, RECREATE_SCRIPT.md, and optional "
+                    "RECIPE_GROUP_NOTES.md may be files at the delivery root",
+                    item,
+                )
+            elif source_layout and item.is_dir() and item.name not in allowed_root_directories:
+                add_issue(
+                    "unexpected_root_directory",
+                    "new V2 delivery roots may contain only source/, media/, and runtime temp_files/ directories",
                     item,
                 )
     for xscr in bundle_dir.rglob("*.xscr"):

@@ -28,6 +28,14 @@ class BundleLifecycleTests(unittest.TestCase):
         self.assertEqual(
             verification_state_from_readiness(
                 ready_to_import=True,
+                readiness={"script_editor_load": {"status": "passed"}},
+                workflow_status="ready_to_import",
+            ),
+            "load_tested",
+        )
+        self.assertEqual(
+            verification_state_from_readiness(
+                ready_to_import=True,
                 readiness={
                     "offline_validation": {"status": "ready_to_import"},
                     "review_state": {"status": "import_ready_needs_review"},

@@ -1,4 +1,4 @@
-"""Initial generation workflow stages extracted from the legacy facade."""
+"""Canonical generation workflow stage implementations."""
 
 from __future__ import annotations
 

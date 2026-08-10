@@ -10,36 +10,33 @@
   "ir_version": "tecan.protocol_ir.v2",
   "labware": [
     {
-      "catalog": "96 Well Flat",
+      "catalog": "",
       "id": "source_plate",
-      "label": "SourcePlate",
-      "location": "Site",
-      "position": 1,
-      "python_class": "Plate96",
+      "label": "source_plate",
+      "location": "",
+      "position": null,
       "role": "source"
     },
     {
-      "catalog": "96 Well Flat",
+      "catalog": "",
       "id": "destination_plate",
-      "label": "DestinationPlate",
-      "location": "Site",
-      "position": 2,
-      "python_class": "Plate96",
+      "label": "destination_plate",
+      "location": "",
+      "position": null,
       "role": "destination"
     },
     {
-      "catalog": "MCA96, 100ul, Box",
+      "catalog": "",
       "id": "tips",
-      "label": "Tips",
-      "location": "Site",
-      "position": 4,
-      "python_class": "MCA100Box",
+      "label": "tips",
+      "location": "",
+      "position": null,
       "role": "tips"
     }
   ],
   "liquid_classes": [
     {
-      "name": "Water Free Single",
+      "name": "__GROUND_FROM_CONTEXT__",
       "role": "pipetting"
     }
   ],
@@ -72,12 +69,12 @@
       "name": "Add Source Plate",
       "operation": "add_labware",
       "parameters": {
-        "label": "SourcePlate",
-        "labware_type": "96 Well Flat",
-        "location": "Site",
-        "position": 1
+        "label": "source_plate",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "SourcePlate"
+      "target_labware": "source_plate"
     },
     {
       "group": "Setup",
@@ -86,12 +83,12 @@
       "name": "Add Destination Plate",
       "operation": "add_labware",
       "parameters": {
-        "label": "DestinationPlate",
-        "labware_type": "96 Well Flat",
-        "location": "Site",
-        "position": 2
+        "label": "destination_plate",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "DestinationPlate"
+      "target_labware": "destination_plate"
     },
     {
       "group": "Setup",
@@ -100,12 +97,12 @@
       "name": "Add Tip Box",
       "operation": "add_labware",
       "parameters": {
-        "label": "Tips",
-        "labware_type": "MCA96, 100ul, Box",
-        "location": "Site",
-        "position": 4
+        "label": "tips",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "Tips"
+      "target_labware": "tips"
     },
     {
       "group": "Worklist",
@@ -124,10 +121,10 @@
       "name": "Read Worklist",
       "operation": "read_worklist",
       "parameters": {
-        "path": "generated_worklist.gwl",
-        "worklist_name": "GeneratedWorklist"
+        "path": "__GROUND_WORKLIST_FROM_CONTEXT__",
+        "worklist_name": "__GROUND_WORKLIST_FROM_CONTEXT__"
       },
-      "target_labware": "DestinationPlate"
+      "target_labware": "destination_plate"
     },
     {
       "group": "Cleanup",
@@ -148,7 +145,7 @@
   },
   "variables": [
     {
-      "default": "generated_worklist.gwl",
+      "default": "__GROUND_WORKLIST_FROM_CONTEXT__",
       "name": "worklist_path",
       "type": "path"
     }
@@ -156,14 +153,14 @@
   "worklists": [
     {
       "format": "gwl",
-      "name": "GeneratedWorklist",
-      "path": "generated_worklist.gwl",
+      "name": "__GROUND_WORKLIST_FROM_CONTEXT__",
+      "path": "__GROUND_WORKLIST_FROM_CONTEXT__",
       "required": true
     }
   ],
   "worktable": {
     "auto_place": false,
     "guid": "",
-    "name": "Template Worktable"
+    "name": ""
   }
 }

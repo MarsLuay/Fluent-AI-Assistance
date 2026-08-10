@@ -24,6 +24,13 @@
         },
         "parameters": {
           "properties": {
+            "water_reservoir": {"type": "string"},
+            "test_plate": {"type": "string"},
+            "tip_box": {"type": "string"},
+            "return_tip_box": {"type": "string"},
+            "waste": {"type": "string"},
+            "liquid_class": {"type": "string"},
+            "worktable": {"type": "string"},
             "allow_tip_reuse": {
               "type": "boolean"
             },
@@ -44,6 +51,12 @@
             }
           },
           "required": [
+            "water_reservoir",
+            "test_plate",
+            "tip_box",
+            "return_tip_box",
+            "waste",
+            "liquid_class",
             "test_volume_ul",
             "tip_strategy",
             "wash_scheme"

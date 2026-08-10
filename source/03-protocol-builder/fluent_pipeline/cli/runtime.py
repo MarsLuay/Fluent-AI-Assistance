@@ -254,18 +254,19 @@ def _safe_output_label(value: str) -> str:
 
 def _generation_return_code(manifest: dict[str, Any]) -> int:
     published = Path(str(manifest.get("published_zeia_path") or ""))
+    source_dir = published.parent / "source"
     if (
         manifest.get("ready_to_import")
         and published.suffix.lower() == ".zeia"
         and published.parent.name == published.stem
         and published.exists()
         and (published.parent / "RECREATE_SCRIPT.md").exists()
-        and (published.parent / "generation_manifest.json").exists()
-        and (published.parent / "GENERATION_WORKFLOW.md").exists()
-        and (published.parent / "request.spec.yaml").exists()
-        and (published.parent / "protocol.ir.json").exists()
-        and (published.parent / "generated" / "protocol.py").exists()
-        and (published.parent / "reports").exists()
+        and (source_dir / "generation_manifest.json").exists()
+        and (source_dir / "GENERATION_WORKFLOW.md").exists()
+        and (source_dir / "request.spec.yaml").exists()
+        and (source_dir / "protocol.ir.json").exists()
+        and (source_dir / "generated" / "protocol.py").exists()
+        and (source_dir / "reports").exists()
     ):
         return 0
     return 1

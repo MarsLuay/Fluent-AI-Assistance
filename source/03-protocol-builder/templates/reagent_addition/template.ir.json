@@ -10,36 +10,33 @@
   "ir_version": "tecan.protocol_ir.v2",
   "labware": [
     {
-      "catalog": "Reagent Reservoir",
+      "catalog": "",
       "id": "reagent_reservoir",
-      "label": "ReagentReservoir",
-      "location": "Site",
-      "position": 1,
-      "python_class": "Plate96",
+      "label": "reagent_reservoir",
+      "location": "",
+      "position": null,
       "role": "reagent_source"
     },
     {
-      "catalog": "96 Well Flat",
+      "catalog": "",
       "id": "assay_plate",
-      "label": "AssayPlate",
-      "location": "Site",
-      "position": 2,
-      "python_class": "Plate96",
+      "label": "assay_plate",
+      "location": "",
+      "position": null,
       "role": "destination"
     },
     {
-      "catalog": "MCA96, 100ul, Box",
+      "catalog": "",
       "id": "tips",
-      "label": "Tips",
-      "location": "Site",
-      "position": 4,
-      "python_class": "MCA100Box",
+      "label": "tips",
+      "location": "",
+      "position": null,
       "role": "tips"
     }
   ],
   "liquid_classes": [
     {
-      "name": "Water Free Single",
+      "name": "__GROUND_FROM_CONTEXT__",
       "role": "pipetting"
     }
   ],
@@ -78,12 +75,12 @@
       "name": "Add Reagent Reservoir",
       "operation": "add_labware",
       "parameters": {
-        "label": "ReagentReservoir",
-        "labware_type": "Reagent Reservoir",
-        "location": "Site",
-        "position": 1
+        "label": "reagent_reservoir",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "ReagentReservoir"
+      "target_labware": "reagent_reservoir"
     },
     {
       "group": "Setup",
@@ -92,12 +89,12 @@
       "name": "Add Assay Plate",
       "operation": "add_labware",
       "parameters": {
-        "label": "AssayPlate",
-        "labware_type": "96 Well Flat",
-        "location": "Site",
-        "position": 2
+        "label": "assay_plate",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "AssayPlate"
+      "target_labware": "assay_plate"
     },
     {
       "group": "Setup",
@@ -106,76 +103,76 @@
       "name": "Add Tip Box",
       "operation": "add_labware",
       "parameters": {
-        "label": "Tips",
-        "labware_type": "MCA96, 100ul, Box",
-        "location": "Site",
-        "position": 4
+        "label": "tips",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "Tips"
+      "target_labware": "tips"
     },
     {
       "group": "Addition",
       "id": "step_004",
       "index": 4,
-      "name": "Pick Up Tips",
+      "name": "Pick Up tips",
       "operation": "pick_up_tips",
       "parameters": {
         "tip_strategy": "new_tips"
       },
-      "target_labware": "Tips"
+      "target_labware": "tips"
     },
     {
       "group": "Addition",
       "id": "step_005",
       "index": 5,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Aspirate Reagent",
       "operation": "aspirate",
       "parameters": {
         "source_well": "A1"
       },
-      "source_labware": "ReagentReservoir",
-      "target_labware": "ReagentReservoir",
+      "source_labware": "reagent_reservoir",
+      "target_labware": "reagent_reservoir",
       "volume_ul": 25
     },
     {
-      "destination_labware": "AssayPlate",
+      "destination_labware": "assay_plate",
       "group": "Addition",
       "id": "step_006",
       "index": 6,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Dispense Reagent",
       "operation": "dispense",
       "parameters": {
         "destination_well": "A1"
       },
-      "target_labware": "AssayPlate",
+      "target_labware": "assay_plate",
       "volume_ul": 25
     },
     {
       "group": "Addition",
       "id": "step_007",
       "index": 7,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Mix After Addition",
       "operation": "mca384_mix",
       "parameters": {
         "cycles": 5,
         "well": "A1"
       },
-      "target_labware": "AssayPlate",
+      "target_labware": "assay_plate",
       "volume_ul": 20
     },
     {
       "group": "Cleanup",
       "id": "step_008",
       "index": 8,
-      "name": "Return Tips",
+      "name": "Return tips",
       "operation": "set_tips_back",
       "parameters": {
         "tip_strategy": "return_to_source"
       },
-      "target_labware": "Tips"
+      "target_labware": "tips"
     }
   ],
   "template": {
@@ -200,6 +197,6 @@
   "worktable": {
     "auto_place": false,
     "guid": "",
-    "name": "Template Worktable"
+    "name": ""
   }
 }

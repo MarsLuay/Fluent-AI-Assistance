@@ -127,6 +127,107 @@ class ReadinessConsistencyTests(unittest.TestCase):
                 self.assertEqual(payload["readiness_status"], readiness_status)
                 self.assertEqual(payload["readiness"], readiness)
 
+            self.assertEqual(readiness_status, "import_ready_needs_review")
+            self.assertEqual(readiness["fluentcontrol_load_diagnostic"]["status"], "failed")
+            self.assertEqual(readiness["script_editor_load"]["status"], "failed")
+            self.assertEqual(readiness["script_editor_load"]["evidence"], "gate_27")
+            self.assertEqual(readiness["hardware_run"]["status"], "needs_review")
+            for key in ("fluentcontrol_load_diagnostic", "script_editor_load", "hardware_run"):
+                self.assertTrue(readiness[key]["next_action"])
+
+    def test_live_handoff_statuses_close_without_changing_offline_readiness(self):
+        base_report = {
+            "offline_validation": {"status": "ready_to_import"},
+            "review_state": {"status": "hardware_review_required"},
+            "gates": [{"id": "simulation_passes", "status": "passed"}],
+        }
+        for raw_status, expected_status in (
+            (None, "not_run"),
+            ("load_clean", "passed"),
+            ("load_failed", "failed"),
+            ("ambiguous", "needs_review"),
+        ):
+            report = dict(base_report)
+            if raw_status is not None:
+                report["fluentcontrol_load_diagnostic"] = {"status": raw_status}
+            readiness = build_canonical_readiness(
+                validation_report=report,
+                package_outputs=["generated_project.zeia"],
+            )
+
+            with self.subTest(raw_status=raw_status):
+                self.assertEqual(readiness["offline_validation"]["status"], "ready_to_import")
+                self.assertEqual(readiness["generated_zeia_import"]["status"], "ready_to_import")
+                self.assertEqual(readiness["fluentcontrol_load_diagnostic"]["status"], expected_status)
+                self.assertIn(
+                    readiness["script_editor_load"]["status"],
+                    {"passed", "failed", "needs_review", "not_run"},
+                )
+                self.assertIn(
+                    readiness["hardware_run"]["status"],
+                    {"passed", "failed", "needs_review", "not_run"},
+                )
+                self.assertTrue(readiness["fluentcontrol_load_diagnostic"]["next_action"])
+                self.assertTrue(readiness["script_editor_load"]["next_action"])
+                self.assertTrue(readiness["hardware_run"]["next_action"])
+
+    def test_hardware_handoff_stays_unrun_when_offline_validation_is_blocked(self):
+        readiness = build_canonical_readiness(
+            validation_report={
+                "offline_validation": {"status": "validated_not_ready"},
+                "review_state": {"status": "validated_not_ready"},
+                "gates": [],
+            },
+            package_outputs=[],
+        )
+
+        self.assertEqual(readiness["hardware_run"]["status"], "not_run")
+        self.assertIn("offline", readiness["hardware_run"]["next_action"].casefold())
+
+    def test_nonexecuted_gate_details_do_not_fake_a_script_editor_failure(self):
+        for detail_status in ("unavailable", "skipped", "not_configured"):
+            report = {
+                "offline_validation": {"status": "ready_to_import"},
+                "review_state": {"status": "hardware_review_required"},
+                "fluentcontrol_load_diagnostic": {
+                    "status": "load_failed",
+                    "summary": "Compatibility shim did not provide a live result.",
+                    "requested": True,
+                    "gate": "Gate 27",
+                    "gate_present": True,
+                },
+                "gates": [
+                    {
+                        "id": "fluent_context_check",
+                        "status": "failed",
+                        "summary": "Optional diagnostic was unavailable.",
+                        "details": {
+                            "status": detail_status,
+                            "provider": "offline-compatibility-shim",
+                            "method": "protocol",
+                        },
+                    }
+                ],
+            }
+            readiness = build_canonical_readiness(
+                validation_report=report,
+                package_outputs=["generated_project.zeia"],
+            )
+
+            with self.subTest(detail_status=detail_status):
+                self.assertEqual(readiness["fluentcontrol_load_diagnostic"]["status"], "not_run")
+                self.assertEqual(readiness["script_editor_load"]["status"], "not_run")
+                self.assertNotEqual(readiness["script_editor_load"]["status"], "failed")
+                self.assertIn("Open the generated script", readiness["script_editor_load"]["next_action"])
+
+        report["gates"][0]["details"]["diagnostics"] = ["Provider result requires review."]
+        readiness = build_canonical_readiness(
+            validation_report=report,
+            package_outputs=["generated_project.zeia"],
+        )
+        self.assertEqual(readiness["fluentcontrol_load_diagnostic"]["status"], "needs_review")
+        self.assertEqual(readiness["script_editor_load"]["status"], "needs_review")
+
 
 if __name__ == "__main__":
     unittest.main()

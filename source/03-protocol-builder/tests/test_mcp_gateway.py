@@ -200,19 +200,28 @@ class McpGatewayTests(unittest.TestCase):
             output = root / "allowed" / "build"
             gateway.write_roots = [(root / "allowed").resolve()]
             protocol_folder = root / "allowed" / "ready-to-import" / "demo"
-            (protocol_folder / "source").mkdir(parents=True)
+            source_dir = protocol_folder / "source"
+            (source_dir / "reports").mkdir(parents=True)
             (protocol_folder / "media").mkdir()
-            (protocol_folder / "reports").mkdir()
-            (protocol_folder / "generated").mkdir()
+            (source_dir / "generated").mkdir()
             (protocol_folder / "demo.zeia").write_bytes(b"zeia")
             (protocol_folder / "run_tecan_bundle_setup.bat").write_text("@echo off\n", encoding="utf-8")
             (protocol_folder / "RECREATE_SCRIPT.md").write_text("# Recreate\n", encoding="utf-8")
-            (protocol_folder / "request.spec.yaml").write_text("request: {}\n", encoding="utf-8")
-            (protocol_folder / "protocol.ir.json").write_text("{}\n", encoding="utf-8")
-            (protocol_folder / "generated" / "protocol.py").write_text("def build_worktable():\n    pass\n", encoding="utf-8")
-            (protocol_folder / "generation_manifest.json").write_text("{}\n", encoding="utf-8")
-            (protocol_folder / "GENERATION_WORKFLOW.md").write_text("# Workflow\n", encoding="utf-8")
-            (protocol_folder / "delivery_manifest.json").write_text(
+            (source_dir / "request.spec.yaml").write_text("request: {}\n", encoding="utf-8")
+            (source_dir / "protocol.ir.json").write_text("{}\n", encoding="utf-8")
+            (source_dir / "metadata.json").write_text("{}\n", encoding="utf-8")
+            (source_dir / "generated" / "protocol.py").write_text("def build_worktable():\n    pass\n", encoding="utf-8")
+            (source_dir / "generation_manifest.json").write_text("{}\n", encoding="utf-8")
+            (source_dir / "GENERATION_WORKFLOW.md").write_text("# Workflow\n", encoding="utf-8")
+            for helper in (
+                "collect_tecan_diagnostic_bundle.ps1",
+                "copy_tree_with_progress.ps1",
+                "deploy_touchtools_media.ps1",
+                "install_external_files.ps1",
+                "stall_watchdog.ps1",
+            ):
+                (source_dir / helper).write_text("# helper\n", encoding="utf-8")
+            (source_dir / "delivery_manifest.json").write_text(
                 json.dumps(
                     {
                         "schema_version": "tecan.protocol_delivery.v2",

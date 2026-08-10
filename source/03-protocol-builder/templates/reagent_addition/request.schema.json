@@ -24,6 +24,8 @@
         },
         "parameters": {
           "properties": {
+            "tip_box": {"type": "string"},
+            "worktable": {"type": "string"},
             "destination_plate": {
               "type": "string"
             },
@@ -46,9 +48,11 @@
           },
           "required": [
             "reagent_name",
+            "reagent_reservoir",
             "reagent_volume_ul",
             "destination_plate",
-            "liquid_class"
+            "liquid_class",
+            "tip_box"
           ],
           "type": "object"
         }

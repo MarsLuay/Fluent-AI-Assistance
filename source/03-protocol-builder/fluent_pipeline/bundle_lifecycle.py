@@ -96,10 +96,11 @@ def verification_state_from_readiness(
     profile = readiness or {}
     if not profile:
         return "offline_validated"
-    load_state = (profile.get("fluentcontrol_load_diagnostic") or {}).get("status")
-    if not load_state:
-        load_state = (profile.get("script_editor_load") or {}).get("status")
-    if load_state == "load_clean":
+    load_states = [
+        (profile.get("fluentcontrol_load_diagnostic") or {}).get("status"),
+        (profile.get("script_editor_load") or {}).get("status"),
+    ]
+    if any(state in {"passed", "load_clean"} for state in load_states):
         return "load_tested"
     offline_state = (profile.get("offline_validation") or {}).get("status")
     review_state = (profile.get("review_state") or {}).get("status")

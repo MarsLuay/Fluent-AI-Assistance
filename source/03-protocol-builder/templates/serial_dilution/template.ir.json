@@ -10,45 +10,41 @@
   "ir_version": "tecan.protocol_ir.v2",
   "labware": [
     {
-      "catalog": "96 Well Flat",
+      "catalog": "",
       "id": "source_plate",
-      "label": "SourcePlate",
-      "location": "Site",
-      "position": 1,
-      "python_class": "Plate96",
+      "label": "source_plate",
+      "location": "",
+      "position": null,
       "role": "source"
     },
     {
-      "catalog": "96 Well Flat",
+      "catalog": "",
       "id": "dilution_plate",
-      "label": "DilutionPlate",
-      "location": "Site",
-      "position": 2,
-      "python_class": "Plate96",
+      "label": "dilution_plate",
+      "location": "",
+      "position": null,
       "role": "destination"
     },
     {
-      "catalog": "Reagent Reservoir",
+      "catalog": "",
       "id": "diluent_reservoir",
-      "label": "DiluentReservoir",
-      "location": "Site",
-      "position": 3,
-      "python_class": "Plate96",
+      "label": "diluent_reservoir",
+      "location": "",
+      "position": null,
       "role": "reagent_source"
     },
     {
-      "catalog": "MCA96, 100ul, Box",
+      "catalog": "",
       "id": "tips",
-      "label": "Tips",
-      "location": "Site",
-      "position": 4,
-      "python_class": "MCA100Box",
+      "label": "tips",
+      "location": "",
+      "position": null,
       "role": "tips"
     }
   ],
   "liquid_classes": [
     {
-      "name": "Water Free Single",
+      "name": "__GROUND_FROM_CONTEXT__",
       "role": "pipetting"
     }
   ],
@@ -92,12 +88,12 @@
       "name": "Add Source Plate",
       "operation": "add_labware",
       "parameters": {
-        "label": "SourcePlate",
-        "labware_type": "96 Well Flat",
-        "location": "Site",
-        "position": 1
+        "label": "source_plate",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "SourcePlate"
+      "target_labware": "source_plate"
     },
     {
       "group": "Setup",
@@ -106,12 +102,12 @@
       "name": "Add Dilution Plate",
       "operation": "add_labware",
       "parameters": {
-        "label": "DilutionPlate",
-        "labware_type": "96 Well Flat",
-        "location": "Site",
-        "position": 2
+        "label": "dilution_plate",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "DilutionPlate"
+      "target_labware": "dilution_plate"
     },
     {
       "group": "Setup",
@@ -120,12 +116,12 @@
       "name": "Add Diluent Reservoir",
       "operation": "add_labware",
       "parameters": {
-        "label": "DiluentReservoir",
-        "labware_type": "Reagent Reservoir",
-        "location": "Site",
-        "position": 3
+        "label": "diluent_reservoir",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "DiluentReservoir"
+      "target_labware": "diluent_reservoir"
     },
     {
       "group": "Setup",
@@ -134,132 +130,132 @@
       "name": "Add Tip Box",
       "operation": "add_labware",
       "parameters": {
-        "label": "Tips",
-        "labware_type": "MCA96, 100ul, Box",
-        "location": "Site",
-        "position": 4
+        "label": "tips",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "Tips"
+      "target_labware": "tips"
     },
     {
       "group": "Dilution",
       "id": "step_005",
       "index": 5,
-      "name": "Pick Up Tips",
+      "name": "Pick Up tips",
       "operation": "pick_up_tips",
       "parameters": {
         "tip_strategy": "new_tips_per_series"
       },
-      "target_labware": "Tips"
+      "target_labware": "tips"
     },
     {
       "group": "Dilution",
       "id": "step_006",
       "index": 6,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Add Diluent",
       "operation": "aspirate",
       "parameters": {
         "source_well": "A1"
       },
-      "source_labware": "DiluentReservoir",
-      "target_labware": "DiluentReservoir",
+      "source_labware": "diluent_reservoir",
+      "target_labware": "diluent_reservoir",
       "volume_ul": 90
     },
     {
-      "destination_labware": "DilutionPlate",
+      "destination_labware": "dilution_plate",
       "group": "Dilution",
       "id": "step_007",
       "index": 7,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Dispense Diluent Into First Column",
       "operation": "dispense",
       "parameters": {
         "destination_well": "A1"
       },
-      "target_labware": "DilutionPlate",
+      "target_labware": "dilution_plate",
       "volume_ul": 90
     },
     {
       "group": "Dilution",
       "id": "step_008",
       "index": 8,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Aspirate Sample",
       "operation": "aspirate",
       "parameters": {
         "source_well": "A1"
       },
-      "source_labware": "SourcePlate",
-      "target_labware": "SourcePlate",
+      "source_labware": "source_plate",
+      "target_labware": "source_plate",
       "volume_ul": 10
     },
     {
-      "destination_labware": "DilutionPlate",
+      "destination_labware": "dilution_plate",
       "group": "Dilution",
       "id": "step_009",
       "index": 9,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Dispense Sample Into First Column",
       "operation": "dispense",
       "parameters": {
         "destination_well": "A1"
       },
-      "target_labware": "DilutionPlate",
+      "target_labware": "dilution_plate",
       "volume_ul": 10
     },
     {
       "group": "Dilution",
       "id": "step_010",
       "index": 10,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Mix First Dilution",
       "operation": "mca384_mix",
       "parameters": {
         "cycles": 8,
         "well": "A1"
       },
-      "target_labware": "DilutionPlate",
+      "target_labware": "dilution_plate",
       "volume_ul": 50
     },
     {
       "group": "Dilution",
       "id": "step_011",
       "index": 11,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Carry Forward Dilution",
       "operation": "aspirate",
       "parameters": {
         "source_well": "A1"
       },
-      "source_labware": "DilutionPlate",
-      "target_labware": "DilutionPlate",
+      "source_labware": "dilution_plate",
+      "target_labware": "dilution_plate",
       "volume_ul": 10
     },
     {
-      "destination_labware": "DilutionPlate",
+      "destination_labware": "dilution_plate",
       "group": "Dilution",
       "id": "step_012",
       "index": 12,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Dispense Into Next Dilution",
       "operation": "dispense",
       "parameters": {
         "destination_well": "A2"
       },
-      "target_labware": "DilutionPlate",
+      "target_labware": "dilution_plate",
       "volume_ul": 10
     },
     {
       "group": "Cleanup",
       "id": "step_013",
       "index": 13,
-      "name": "Return Tips",
+      "name": "Return tips",
       "operation": "set_tips_back",
       "parameters": {
         "tip_strategy": "return_to_source"
       },
-      "target_labware": "Tips"
+      "target_labware": "tips"
     }
   ],
   "template": {
@@ -289,6 +285,6 @@
   "worktable": {
     "auto_place": false,
     "guid": "",
-    "name": "Template Worktable"
+    "name": ""
   }
 }

@@ -113,6 +113,7 @@ class BundleSetupTests(unittest.TestCase):
         self.assertIn("Current settings for this BAT:", text)
         self.assertIn("Log lookback days: %LOG_LOOKBACK_DAYS%", text)
         self.assertIn('set "TEMP_DIR=%BUNDLE_DIR%temp_files\\"', text)
+        self.assertIn('set "SUPPORT_DIR=%BUNDLE_DIR%source\\"', text)
         self.assertIn('set "SETUP_LOG_OUTPUT=%TEMP_ARG%"', text)
         self.assertIn('-OutputRoot "%TEMP_ARG%"', text)
         self.assertIn('set "LOG_LOOKBACK_DAYS=1"', text)

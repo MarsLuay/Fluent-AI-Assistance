@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import tomllib
 import unittest
 from pathlib import Path
@@ -13,10 +14,10 @@ def _project_dependencies(pyproject_path: Path) -> set[str]:
     names: set[str] = set()
     for item in data.get("project", {}).get("dependencies", []):
         text = str(item).strip()
-        # Accept bare names and PEP 508 direct references (`pkg @ file:…`).
-        name = text.split("@", 1)[0].split(";", 1)[0].strip()
-        if name:
-            names.add(name)
+        # Accept bare names, version constraints, extras, and direct references.
+        match = re.match(r"[A-Za-z0-9][A-Za-z0-9._-]*", text)
+        if match:
+            names.add(match.group(0))
     return names
 
 

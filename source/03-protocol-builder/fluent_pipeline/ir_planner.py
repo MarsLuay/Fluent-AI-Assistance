@@ -13,6 +13,12 @@ from pathlib import Path
 from typing import Any
 
 from .command_registry import registry_command_operation, registry_field_value, registry_requires
+from .inference import (
+    InferenceCandidate,
+    InferenceOrigin,
+    infer_value,
+    records_to_candidates,
+)
 from .protocol_ir_schema import (
     LABWARE_TARGET_OPERATIONS,
     LIQUID_CLASS_OPERATIONS,
@@ -132,6 +138,11 @@ def synthesize_seed_ir(
         "source_script_count": len(selected_scripts),
         "pattern_window_count": len(pattern_windows),
         "warnings": warnings,
+        "inferred_field_count": sum(
+            len(item.get("decisions") or [])
+            for item in warnings
+            if item.get("kind") == "inferred_pattern_step"
+        ),
     }
     ir.setdefault("source", {})["ir_synthesis"] = synthesis
     return synthesis
@@ -314,7 +325,7 @@ def _append_pattern_window_steps(
             )
             continue
 
-        planned = _build_planned_step(operation, window, step, fields, source_path, warnings)
+        planned = _build_planned_step(operation, window, step, fields, source_path, warnings, ir=ir)
         if not planned:
             continue
 
@@ -332,12 +343,95 @@ def _build_planned_step(
     fields: dict[str, Any],
     source_path: str,
     warnings: list[dict[str, Any]],
+    *,
+    ir: dict[str, Any],
 ) -> dict[str, Any] | None:
     command_name = step.get("command_name")
     target_labware = _clean_string(registry_field_value(command_name, "labware", fields)) or _labware_from_fields(fields)
     liquid_class = registry_field_value(command_name, "liquid_class", fields) or _first_field(fields, LIQUID_CLASS_FIELDS)
     volume = _number_value(registry_field_value(command_name, "volume_ul", fields) or _first_field(fields, VOLUME_FIELDS))
     worklist = _clean_string(registry_field_value(command_name, "worklist", fields)) or _first_worklist(fields)
+    inference_decisions = []
+    field_path = f"$.patterns[{window.get('id')}].commands[{step.get('command_index')}]"
+
+    if not target_labware and (operation in LABWARE_TARGET_OPERATIONS or "labware" in set(registry_requires(command_name))):
+        decision = infer_value(
+            f"{field_path}.target_labware",
+            candidates=records_to_candidates(
+                [item for item in ir.get("labware") or [] if isinstance(item, dict)],
+                value_keys=("label", "name", "id"),
+                origin=InferenceOrigin.EXACT_SOURCE,
+                source_prefix="selected_source:labware",
+                reason="Reuse labware inventory mined from the selected source script.",
+                intent=f"{operation} {step.get('summary') or ''}",
+                priority=400,
+            ),
+        )
+        if not decision.unresolved:
+            target_labware = str(decision.value)
+            inference_decisions.append(decision)
+
+    if not liquid_class and (operation in LIQUID_CLASS_OPERATIONS or "liquid_class" in set(registry_requires(command_name))):
+        decision = infer_value(
+            f"{field_path}.liquid_class",
+            candidates=records_to_candidates(
+                [item for item in ir.get("liquid_classes") or [] if isinstance(item, dict)],
+                value_keys=("name", "label", "id"),
+                origin=InferenceOrigin.EXACT_SOURCE,
+                source_prefix="selected_source:liquid_class",
+                reason="Reuse a liquid class mined from the selected source script.",
+                intent=f"{operation} {step.get('summary') or ''}",
+                priority=400,
+            ),
+        )
+        if not decision.unresolved:
+            liquid_class = str(decision.value)
+            inference_decisions.append(decision)
+
+    if volume is None and (operation in VOLUME_OPERATIONS or "volume_ul" in set(registry_requires(command_name))):
+        volume_candidates = [
+            InferenceCandidate(
+                value=item.get("volume_ul"),
+                origin=InferenceOrigin.EXACT_SOURCE,
+                source=str(item.get("source_path") or "selected_source:step"),
+                reason="Reuse a volume from a previously mined source step.",
+                priority=400,
+            )
+            for item in ir.get("steps") or []
+            if isinstance(item, dict)
+            and item.get("operation") == operation
+            and _number_value(item.get("volume_ul")) is not None
+        ]
+        decision = infer_value(
+            f"{field_path}.volume_ul",
+            candidates=volume_candidates,
+            fallback=InferenceCandidate(
+                value=1,
+                origin=InferenceOrigin.TEMPLATE_DEFAULT,
+                source="protocol_ir:site_agnostic_shape",
+                reason="Use the minimum positive site-agnostic draft volume.",
+                priority=50,
+            ),
+        )
+        if not decision.unresolved:
+            volume = _number_value(decision.value)
+            inference_decisions.append(decision)
+
+    if not worklist and "worklist" in set(registry_requires(command_name)):
+        decision = infer_value(
+            f"{field_path}.worklist",
+            candidates=records_to_candidates(
+                [item for item in ir.get("worklists") or [] if isinstance(item, dict)],
+                value_keys=("path", "source", "name", "id"),
+                origin=InferenceOrigin.EXACT_SOURCE,
+                source_prefix="selected_source:worklist",
+                reason="Reuse a worklist mined from the selected source script.",
+                priority=400,
+            ),
+        )
+        if not decision.unresolved:
+            worklist = str(decision.value)
+            inference_decisions.append(decision)
 
     missing: list[str] = []
     required_fields = set(registry_requires(command_name))
@@ -373,9 +467,20 @@ def _build_planned_step(
         "summary": step.get("summary"),
         "line": step.get("line"),
         "fields": fields,
+        "inference": [decision.to_dict() for decision in inference_decisions],
     }
     if worklist:
         parameters["worklist"] = worklist
+    if inference_decisions:
+        warnings.append(
+            {
+                "kind": "inferred_pattern_step",
+                "pattern_id": window.get("id"),
+                "command_index": step.get("command_index"),
+                "operation": operation,
+                "decisions": [decision.to_dict() for decision in inference_decisions],
+            }
+        )
 
     planned: dict[str, Any] = {
         "operation": operation,

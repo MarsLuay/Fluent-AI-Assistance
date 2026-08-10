@@ -1,16 +1,21 @@
 schema_version: tecan.request_spec.v1
 request:
-  intent: Normalize samples to 10 ng/uL in 50 uL final volume using DiluentReservoir.
-  protocol_name: Normalization example
+  intent: Ground this normalization shape in reviewed values and exact names from the selected imported context.
+  protocol_name: null
   status: draft
 template:
   name: normalization
   parameters:
-    target_concentration: 10
-    target_units: ng/uL
-    final_volume_ul: 50
-    concentration_map: concentrations.csv
-    liquid_class: Water Free Single
+    input_plate: ""
+    normalized_plate: ""
+    diluent_reservoir: ""
+    tip_box: ""
+    worktable: ""
+    target_concentration: null
+    target_units: ""
+    final_volume_ul: null
+    concentration_map: ""
+    liquid_class: ""
 source:
   context: null
   context_kind: null

@@ -1,17 +1,26 @@
 schema_version: tecan.request_spec.v1
 request:
-  intent: Perform magnetic bead cleanup with 20 uL beads, two 150 uL washes, and 30 uL elution.
-  protocol_name: Bead cleanup example
+  intent: Ground this bead-cleanup shape in reviewed values and exact names from the selected imported context.
+  protocol_name: null
   status: draft
 template:
   name: bead_cleanup
   parameters:
-    bead_volume_ul: 20
-    wash_volume_ul: 150
-    wash_count: 2
-    elution_volume_ul: 30
-    magnet_settle_time_min: 5
-    dry_time_min: 3
+    sample_plate: ""
+    bead_reservoir: ""
+    wash_reservoir: ""
+    elution_buffer_reservoir: ""
+    elution_plate: ""
+    waste_reservoir: ""
+    tip_box: ""
+    liquid_class: ""
+    worktable: ""
+    bead_volume_ul: null
+    wash_volume_ul: null
+    wash_count: null
+    elution_volume_ul: null
+    magnet_settle_time_min: null
+    dry_time_min: null
 source:
   context: null
   context_kind: null

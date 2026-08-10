@@ -1,25 +1,37 @@
 {
-  "schema_version": 1,
-  "name": "local-tecan-script-corpus",
-  "updated_at": "2026-07-13",
+  "schema_version": 2,
+  "name": "local-tecan-acceptance-corpus",
+  "updated_at": "2026-08-09",
   "path_base": "source/03-protocol-builder",
-  "description": "Reviewed local ZEIA, XSCR, and GWL corpus assets used for protocol-builder QA and alias-map expansion.",
+  "description": "Synthetic, public, lab-agnostic assets for deterministic protocol-builder acceptance checks.",
+  "privacy": {
+    "classification": "synthetic_public",
+    "contains_private_goldens": false,
+    "private_goldens_enabled_by_default": false,
+    "private_golden_environment": [
+      "TECAN_ENABLE_PRIVATE_GOLDENS",
+      "TECAN_GOLDEN_SPEC",
+      "TECAN_GOLDEN_CONTEXT",
+      "TECAN_GOLDEN_CONTEXT_ROOT"
+    ]
+  },
   "sources": [
     {
       "id": "worklist-fixtures",
       "kind": "gwl_fixture_set",
+      "classification": "synthetic_public",
       "assets": [
         {
           "kind": "gwl",
           "path": "corpus/gwl/simple_transfer.gwl",
           "role": "worklist_fixture",
-          "description": "Simple 4-well transfer with wash records."
+          "description": "Simple four-position transfer with wash records."
         },
         {
           "kind": "gwl",
           "path": "corpus/gwl/no_wash_batch.gwl",
           "role": "worklist_fixture",
-          "description": "Eight transfers from a reservoir without wash records."
+          "description": "Eight synthetic transfers without wash records."
         }
       ],
       "record_expectations": {
@@ -46,10 +58,140 @@
       "notes": [
         "Fixture copies preserve useful GWL coverage after generated build artifacts are untracked."
       ]
+    },
+    {
+      "id": "synthetic-script-fixtures",
+      "kind": "synthetic_acceptance_set",
+      "classification": "synthetic_public",
+      "assets": [
+        {
+          "kind": "xscr",
+          "path": "tests/fixtures/acceptance/synthetic_transfer.xscr",
+          "role": "script_fixture",
+          "description": "Small synthetic XSCR with two labware declarations and one transfer."
+        },
+        {
+          "kind": "xwsp",
+          "path": "tests/fixtures/acceptance/synthetic_worktable.xwsp",
+          "role": "zeia_recipe_input",
+          "description": "Minimal synthetic worktable object used only in a temporary ZEIA archive."
+        },
+        {
+          "kind": "zeia_recipe",
+          "path": "tests/fixtures/acceptance/synthetic_partial.zeia.json",
+          "role": "archive_recipe",
+          "description": "Recipe for a deterministic temporary partial ZEIA; the archive itself is never committed."
+        },
+        {
+          "kind": "request_spec",
+          "path": "tests/fixtures/acceptance/request.valid.spec.yaml",
+          "role": "valid_spec_fixture",
+          "description": "Valid synthetic request spec for lint acceptance."
+        },
+        {
+          "kind": "request_spec",
+          "path": "tests/fixtures/acceptance/request.invalid.spec.yaml",
+          "role": "expected_failure_fixture",
+          "description": "Invalid synthetic request spec for expected lint failure coverage."
+        }
+      ]
+    }
+  ],
+  "acceptance_cases": [
+    {
+      "id": "gwl-simple-transfer",
+      "input": {
+        "kind": "gwl",
+        "path": "corpus/gwl/simple_transfer.gwl"
+      },
+      "request_spec": "tests/fixtures/acceptance/request.valid.spec.yaml",
+      "run_ready_validation": false,
+      "expectations": {
+        "import": "pass",
+        "inspect_provenance": "pass",
+        "spec_lint": "pass",
+        "determinism": "pass",
+        "validation": "not_run",
+        "publication": "not_applicable"
+      }
+    },
+    {
+      "id": "xscr-synthetic-transfer",
+      "input": {
+        "kind": "xscr",
+        "path": "tests/fixtures/acceptance/synthetic_transfer.xscr"
+      },
+      "request_spec": "tests/fixtures/acceptance/request.valid.spec.yaml",
+      "run_ready_validation": true,
+      "expectations": {
+        "import": "pass",
+        "inspect_provenance": "pass",
+        "spec_lint": "pass",
+        "determinism": "pass",
+        "validation": "not_ready",
+        "publication": "blocked"
+      },
+      "expected_boundary": "A source XSCR is inspectable but is not a generated, compiled, fully validated ready bundle."
+    },
+    {
+      "id": "zeia-synthetic-partial",
+      "input": {
+        "kind": "zeia_recipe",
+        "path": "tests/fixtures/acceptance/synthetic_partial.zeia.json"
+      },
+      "request_spec": "tests/fixtures/acceptance/request.valid.spec.yaml",
+      "run_ready_validation": true,
+      "expectations": {
+        "import": "pass",
+        "inspect_provenance": "pass",
+        "spec_lint": "pass",
+        "determinism": "pass",
+        "validation": "not_ready",
+        "publication": "blocked"
+      },
+      "expected_boundary": "The synthetic ZEIA is intentionally partial and cannot satisfy full-export, compile, checksum, packaged-project, and publication gates."
+    },
+    {
+      "id": "invalid-spec-rejected",
+      "input": {
+        "kind": "gwl",
+        "path": "corpus/gwl/no_wash_batch.gwl"
+      },
+      "request_spec": "tests/fixtures/acceptance/request.invalid.spec.yaml",
+      "run_ready_validation": false,
+      "expectations": {
+        "import": "pass",
+        "inspect_provenance": "pass",
+        "spec_lint": "fail",
+        "determinism": "pass",
+        "validation": "not_run",
+        "publication": "not_applicable"
+      }
+    },
+    {
+      "id": "malformed-xscr-rejected",
+      "input": {
+        "kind": "xscr",
+        "path": "tests/fixtures/acceptance/malformed_synthetic.xscr"
+      },
+      "request_spec": "tests/fixtures/acceptance/request.valid.spec.yaml",
+      "run_ready_validation": false,
+      "expectations": {
+        "import": "fail",
+        "inspect_provenance": "not_run",
+        "spec_lint": "pass",
+        "determinism": "pass",
+        "validation": "not_run",
+        "publication": "not_applicable"
+      }
     }
   ],
   "extension_counts": {
-    ".gwl": 2
+    ".gwl": 2,
+    ".json": 1,
+    ".xscr": 1,
+    ".xwsp": 1,
+    ".yaml": 2
   },
   "alias_map_expectations": [
     {
@@ -69,8 +211,7 @@
     }
   ],
   "next_ingestion_targets": [
-    "Import additional reviewed ZEIA archives into isolated project contexts.",
-    "Add safe XSCR and GWL fixture copies only after manual review.",
-    "Expand alias_map_expectations from manifest alias candidates before adding generation features."
+    "Keep private ZEIA goldens outside the source-controlled corpus and opt in through the existing environment variables.",
+    "Add only manually reviewed synthetic/public fixtures; never publish generated ready-to-import artifacts from this corpus."
   ]
 }

@@ -474,12 +474,17 @@ class ExportFinalizationTests(unittest.TestCase):
                 published_root = exports.READY_TO_IMPORT_DIR / "demo_v1"
                 self.assertEqual((published_root / "demo_v1.zeia").read_bytes(), b"generated zeia")
                 self.assertTrue((published_root / "RECREATE_SCRIPT.md").exists())
-                self.assertTrue((published_root / "request.spec.yaml").exists())
-                self.assertTrue((published_root / "protocol.ir.json").exists())
-                self.assertTrue((published_root / "generated" / "protocol.py").exists())
-                self.assertTrue((published_root / "reports" / "validation_report.json").exists())
-                self.assertTrue((published_root / "delivery_manifest.json").exists())
+                self.assertFalse((published_root / "request.spec.yaml").exists())
+                self.assertFalse((published_root / "protocol.ir.json").exists())
+                self.assertFalse((published_root / "generated").exists())
+                self.assertFalse((published_root / "reports").exists())
+                self.assertFalse((published_root / "delivery_manifest.json").exists())
+                self.assertTrue((published_root / "source" / "request.spec.yaml").exists())
                 self.assertTrue((published_root / "source" / "protocol.ir.json").exists())
+                self.assertTrue((published_root / "source" / "generated" / "protocol.py").exists())
+                self.assertTrue((published_root / "source" / "reports" / "validation_report.json").exists())
+                self.assertTrue((published_root / "source" / "delivery_manifest.json").exists())
+                self.assertTrue((published_root / "source" / "metadata.json").exists())
                 self.assertTrue((published_root / "media" / "media_manifest.json").exists())
                 setup_bat = published_root / "run_tecan_bundle_setup.bat"
                 self.assertEqual(
@@ -487,15 +492,15 @@ class ExportFinalizationTests(unittest.TestCase):
                     ["run_tecan_bundle_setup.bat"],
                 )
                 setup_text = setup_bat.read_text(encoding="utf-8")
-                helper = published_root / "collect_tecan_diagnostic_bundle.ps1"
+                helper = published_root / "source" / "collect_tecan_diagnostic_bundle.ps1"
                 self.assertTrue(helper.exists())
-                progress_helper = published_root / "copy_tree_with_progress.ps1"
+                progress_helper = published_root / "source" / "copy_tree_with_progress.ps1"
                 self.assertTrue(progress_helper.exists())
-                stall_helper = published_root / "stall_watchdog.ps1"
+                stall_helper = published_root / "source" / "stall_watchdog.ps1"
                 self.assertTrue(stall_helper.exists())
-                install_helper = published_root / "install_external_files.ps1"
+                install_helper = published_root / "source" / "install_external_files.ps1"
                 self.assertTrue(install_helper.exists())
-                deploy_helper = published_root / "deploy_touchtools_media.ps1"
+                deploy_helper = published_root / "source" / "deploy_touchtools_media.ps1"
                 self.assertTrue(deploy_helper.exists())
                 self.assertIn("copy_tree_with_progress.ps1", setup_text)
                 self.assertIn("stall_watchdog.ps1", setup_text)
@@ -599,7 +604,7 @@ class ExportFinalizationTests(unittest.TestCase):
                 self.assertEqual((published_root / "demo_v2.zeia").read_bytes(), b"new zeia")
                 self.assertEqual((exports.READY_TO_IMPORT_DIR / "demo" / "demo.zeia").read_bytes(), b"old zeia")
                 self.assertTrue((published_root / "RECREATE_SCRIPT.md").exists())
-                self.assertTrue((published_root / "generated" / "protocol.py").exists())
+                self.assertTrue((published_root / "source" / "generated" / "protocol.py").exists())
                 self.assertFalse((exports.READY_TO_IMPORT_DIR / "demo.zeia").exists())
                 self.assertFalse(staging_root.exists())
             finally:
@@ -638,22 +643,30 @@ class ExportFinalizationTests(unittest.TestCase):
             tmp_path = Path(tmp)
             ready_root = tmp_path / "ready-to-import"
             protocol_dir = ready_root / "demo"
-            reports_dir = protocol_dir / "reports"
-            generated_dir = protocol_dir / "generated"
             source_dir = protocol_dir / "source"
+            reports_dir = source_dir / "reports"
+            generated_dir = source_dir / "generated"
             media_dir = protocol_dir / "media"
             reports_dir.mkdir(parents=True)
             generated_dir.mkdir()
-            source_dir.mkdir()
             media_dir.mkdir()
             zeia = protocol_dir / "demo.zeia"
             zeia.write_bytes(b"zeia")
             (protocol_dir / "RECREATE_SCRIPT.md").write_text("# Recreate\n", encoding="utf-8")
-            (protocol_dir / "request.spec.yaml").write_text("request: {}\n", encoding="utf-8")
-            (protocol_dir / "protocol.ir.json").write_text("{}", encoding="utf-8")
+            (source_dir / "request.spec.yaml").write_text("request: {}\n", encoding="utf-8")
+            (source_dir / "protocol.ir.json").write_text("{}", encoding="utf-8")
+            (source_dir / "metadata.json").write_text("{}", encoding="utf-8")
             (generated_dir / "protocol.py").write_text("def build_worktable():\n    pass\n", encoding="utf-8")
             (protocol_dir / "run_tecan_bundle_setup.bat").write_text("@echo off\n", encoding="utf-8")
-            (protocol_dir / "delivery_manifest.json").write_text(
+            for helper in (
+                "collect_tecan_diagnostic_bundle.ps1",
+                "copy_tree_with_progress.ps1",
+                "deploy_touchtools_media.ps1",
+                "install_external_files.ps1",
+                "stall_watchdog.ps1",
+            ):
+                (source_dir / helper).write_text("# helper\n", encoding="utf-8")
+            (source_dir / "delivery_manifest.json").write_text(
                 json.dumps(
                     {
                         "schema_version": "tecan.protocol_delivery.v2",
@@ -686,16 +699,16 @@ class ExportFinalizationTests(unittest.TestCase):
                 },
             )
 
-            self.assertTrue((protocol_dir / "generation_manifest.json").exists())
-            self.assertTrue((protocol_dir / "GENERATION_WORKFLOW.md").exists())
+            self.assertFalse((protocol_dir / "generation_manifest.json").exists())
+            self.assertFalse((protocol_dir / "GENERATION_WORKFLOW.md").exists())
             self.assertTrue((protocol_dir / "source" / "generation_manifest.json").exists())
             self.assertTrue((protocol_dir / "source" / "GENERATION_WORKFLOW.md").exists())
-            self.assertTrue((protocol_dir / "reports" / "validation.json").exists())
-            self.assertFalse((protocol_dir / "reports" / "internal.xscr").exists())
+            self.assertTrue((protocol_dir / "source" / "reports" / "validation.json").exists())
+            self.assertFalse((protocol_dir / "source" / "reports" / "internal.xscr").exists())
             self.assertTrue(any(item.kind == "generation-manifest" for item in attached))
-            delivery_manifest = json.loads((protocol_dir / "delivery_manifest.json").read_text(encoding="utf-8"))
+            delivery_manifest = json.loads((protocol_dir / "source" / "delivery_manifest.json").read_text(encoding="utf-8"))
             self.assertIn(
-                {"kind": "generation_manifest", "path": "generation_manifest.json"},
+                {"kind": "generation_manifest", "path": "source/generation_manifest.json"},
                 delivery_manifest["companion_artifacts"],
             )
 
@@ -1734,9 +1747,9 @@ def build_worktable():
                 self.assertTrue((published_root / "source" / "reports" / "validation_report.json").exists())
                 self.assertTrue((published_root / "source" / "worktable_changes.md").exists())
                 self.assertTrue((published_root / "source" / "worktable.patch.json").exists())
-                self.assertTrue((published_root / "source" / "request.spec.yaml").exists() or (published_root / "request.spec.yaml").exists())
-                self.assertTrue((published_root / "source" / "validation_diff.md").exists() or (published_root / "reports" / "validation_diff.md").exists())
-                self.assertTrue((published_root / "source" / "metadata.json").exists() or (published_root / "metadata.json").exists())
+                self.assertTrue((published_root / "source" / "request.spec.yaml").exists())
+                self.assertTrue((published_root / "source" / "validation_diff.md").exists())
+                self.assertTrue((published_root / "source" / "metadata.json").exists())
                 self.assertTrue((published_root / "RECREATE_SCRIPT.md").exists())
                 self.assertTrue((published_root / "source" / "subroutines" / "SUBROUTINES.md").exists())
                 self.assertTrue((published_root / "source" / "HARDWARE_PINS.md").exists())
@@ -3360,4 +3373,3 @@ class ProjectAuditMergeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

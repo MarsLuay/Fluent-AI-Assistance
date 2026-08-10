@@ -42,7 +42,7 @@ jobs:
             source/03-protocol-builder/libs/fluentcoder/pyproject.toml
             source/tools/pyproject.toml
       - name: Run fast suite
-        run: pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-fast.ps1
+        run: pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\test\test-fast.ps1
 
   mcp:
     runs-on: windows-latest
@@ -60,7 +60,34 @@ jobs:
             source/03-protocol-builder/libs/fluentcoder/pyproject.toml
             source/tools/pyproject.toml
       - name: Run MCP suite
-        run: pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-mcp.ps1
+        run: pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\test\test-mcp.ps1
+
+  protocol-builder:
+    name: Protocol builder — wheel, acceptance, full suite
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            source/00-shared/pyproject.toml
+            source/01-project-reader/pyproject.toml
+            source/02-worklist-builder/pyproject.toml
+            source/03-protocol-builder/pyproject.toml
+            source/03-protocol-builder/libs/fluentcoder/pyproject.toml
+            source/tools/pyproject.toml
+      - name: Bootstrap workspace
+        run: pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\install\install.ps1 -SkipSmokeTest
+      - name: Verify wheel installation
+        working-directory: source/03-protocol-builder
+        run: ..\..\.venv\Scripts\python.exe -m pytest tests/test_bootstrap_install.py::test_wheel_build_and_non_editable_install_smoke -q
+      - name: Run synthetic acceptance corpus
+        working-directory: source/03-protocol-builder
+        run: ..\..\.venv\Scripts\python.exe -m pytest tests/acceptance -q
+      - name: Run full builder suite
+        run: pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\test\test-all.ps1
 
   web-simulator:
     name: Web simulator

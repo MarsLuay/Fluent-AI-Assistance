@@ -64,14 +64,17 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "all labware names resolve",
     "classification": "required_offline_gate",
     "description": "Requested labware names resolve in the source context or approved aliases.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_labware",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "protocol.ir.json",
+      "source manifest"
+    ]
   },
   {
     "gateNumber": 4,
@@ -80,14 +83,17 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "all liquid classes resolve",
     "classification": "required_offline_gate",
     "description": "Requested liquid classes resolve in the source context or approved aliases.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_liquid_classes",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "protocol.ir.json",
+      "source manifest"
+    ]
   },
   {
     "gateNumber": 5,
@@ -96,14 +102,18 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "all worklist paths valid",
     "classification": "required_offline_gate",
     "description": "Any emitted worklist paths are present and valid for handoff.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_worklists",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "protocol.ir.json",
+      "source manifest",
+      "worklist"
+    ]
   },
   {
     "gateNumber": 6,
@@ -112,14 +122,16 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "Python draft generated",
     "classification": "required_offline_gate",
     "description": "The generated Python draft exists and defines the expected worktable builder.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_python_draft",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "Python draft"
+    ]
   },
   {
     "gateNumber": 7,
@@ -128,14 +140,16 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "simulation passes",
     "classification": "required_offline_gate",
     "description": "The offline simulator reports a passing result.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_simulation",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "simulation report"
+    ]
   },
   {
     "gateNumber": 8,
@@ -144,14 +158,16 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "repair-plan has no unresolved critical errors",
     "classification": "required_offline_gate",
     "description": "The repair plan has no unresolved critical findings.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_repair_plan",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "repair plan"
+    ]
   },
   {
     "gateNumber": 9,
@@ -160,14 +176,17 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": ".xscr compiles",
     "classification": "required_offline_gate",
     "description": "The compiled XSCR exists and the compile stage did not fail.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_xscr",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "compiled XSCR",
+      "compile report"
+    ]
   },
   {
     "gateNumber": 10,
@@ -176,14 +195,17 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "RECREATE_SCRIPT.md matches protocol.ir.json",
     "classification": "required_offline_gate",
     "description": "The recreate guide matches the canonical protocol IR structure.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_recreate",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "protocol.ir.json",
+      "RECREATE_SCRIPT.md"
+    ]
   },
   {
     "gateNumber": 11,
@@ -192,14 +214,18 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "post-compile XSCR re-inspects successfully",
     "classification": "required_offline_gate",
     "description": "The compiled XSCR parses back into usable canonical data without FluentControl findings.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_post_compile_xscr",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "compiled XSCR",
+      "protocol.ir.json",
+      "source manifest"
+    ]
   },
   {
     "gateNumber": 12,
@@ -208,14 +234,17 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "compiled XSCR roundtrip IR matches protocol.ir.json",
     "classification": "required_offline_gate",
     "description": "The compiled XSCR preserves the expected IR structure and operation ordering.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_xscr_ir_roundtrip",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "protocol.ir.json",
+      "compiled XSCR"
+    ]
   },
   {
     "gateNumber": 13,
@@ -224,14 +253,17 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "liquid handling volumes are within configured bounds",
     "classification": "required_offline_gate",
     "description": "Liquid-handling volumes remain inside the configured instrument limits.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_volume_bounds",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "protocol.ir.json",
+      "validation options"
+    ]
   },
   {
     "gateNumber": 14,
@@ -240,14 +272,16 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "explicit well references are in range",
     "classification": "required_offline_gate",
     "description": "Explicit well references stay within the addressed labware geometry.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_well_ranges",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "protocol.ir.json"
+    ]
   },
   {
     "gateNumber": 15,
@@ -256,14 +290,17 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "tip capacity can support liquid handling volumes",
     "classification": "required_offline_gate",
     "description": "Selected tips can support the requested aspirate and dispense volumes.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_tip_capacity",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "protocol.ir.json",
+      "source manifest"
+    ]
   },
   {
     "gateNumber": 16,
@@ -272,14 +309,17 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "liquid classes are compatible with selected operations",
     "classification": "required_offline_gate",
     "description": "Selected liquid classes are compatible with the operations they are used for.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_liquid_class_compatibility",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "protocol.ir.json",
+      "source manifest"
+    ]
   },
   {
     "gateNumber": 17,
@@ -288,14 +328,18 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "no unsupported raw XML unless approved",
     "classification": "required_offline_gate",
     "description": "Unsupported raw XML does not ship unless it was explicitly reviewed and approved.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_no_unapproved_raw_xml",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "Python draft",
+      "compiled XSCR",
+      "validation options"
+    ]
   },
   {
     "gateNumber": 18,
@@ -304,14 +348,17 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "robotools-style liquid state model is valid",
     "classification": "required_offline_gate",
     "description": "The liquid-state model stays internally consistent for the generated protocol.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_liquid_state",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "protocol.ir.json",
+      "liquid-state report"
+    ]
   },
   {
     "gateNumber": 19,
@@ -396,14 +443,18 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "generated ZEIA entries carry valid FluentControl checksums",
     "classification": "required_offline_gate",
     "description": "Edited ZEIA entries carry checksums FluentControl can accept during import.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_checksums",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "compiled XSCR",
+      "source project archives",
+      "checksum audit"
+    ]
   },
   {
     "gateNumber": 24,
@@ -412,14 +463,17 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "packaged generated ZEIA opens, resolves references, and matches its datastore metadata",
     "classification": "required_offline_gate",
     "description": "The packaged generated ZEIA is readable, consistent, and packaged with the expected datastore metadata.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_generated_zeia",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "source project archives",
+      "archive audit"
+    ]
   },
   {
     "gateNumber": 25,
@@ -428,14 +482,18 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "compiled command name strings resolve in the source context",
     "classification": "required_offline_gate",
     "description": "Literal compiled command names resolve in the source context or approved aliases.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_command_inventory",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "compiled XSCR",
+      "source manifest",
+      "alias maps"
+    ]
   },
   {
     "gateNumber": 26,
@@ -444,14 +502,19 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "subroutine calls resolve to loadable Script dependencies",
     "classification": "required_offline_gate",
     "description": "Subroutine calls resolve cleanly and package the expected Script dependencies.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_subroutine_dependencies",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "protocol.ir.json",
+      "compiled XSCR",
+      "source manifest",
+      "source project archives"
+    ]
   },
   {
     "gateNumber": 27,
@@ -460,13 +523,15 @@ export const READINESS_GATE_DEFINITIONS: ReadinessGateDefinition[] = [
     "name": "optional FluentControl import/load diagnostic",
     "classification": "optional_diagnostic",
     "description": "Optional live diagnostic that imports or opens the generated artifact in FluentControl or Script Editor. It is not required for offline ready-to-import status.",
-    "implementation": null,
+    "implementation": "fluent_pipeline.gates.evaluators:evaluate_fluent_context_check",
     "reviewPolicy": null,
     "approvalKey": null,
     "cliFlag": null,
     "mcpCapability": null,
     "requestSpecPath": null,
     "remediation": null,
-    "artifactInputs": []
+    "artifactInputs": [
+      "FluentControl diagnostic report"
+    ]
   }
 ];

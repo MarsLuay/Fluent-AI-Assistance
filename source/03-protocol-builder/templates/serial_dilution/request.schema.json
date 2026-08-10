@@ -24,6 +24,11 @@
         },
         "parameters": {
           "properties": {
+            "source_plate": {"type": "string"},
+            "dilution_plate": {"type": "string"},
+            "diluent_reservoir": {"type": "string"},
+            "tip_box": {"type": "string"},
+            "worktable": {"type": "string"},
             "diluent_volume_ul": {
               "exclusiveMinimum": 0,
               "type": "number"
@@ -45,6 +50,10 @@
             }
           },
           "required": [
+            "source_plate",
+            "dilution_plate",
+            "diluent_reservoir",
+            "tip_box",
             "sample_volume_ul",
             "diluent_volume_ul",
             "dilution_count",

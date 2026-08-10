@@ -444,16 +444,12 @@ def publish_ready_to_import_bundle(
 
     archive_path = staging_dir / f"{bundle_name}.zeia"
     reports_dir = staging_dir / "source" / "reports"
-    root_reports_dir = staging_dir / "reports"
     source_dir = staging_dir / "source"
-    generated_dir = staging_dir / "generated"
+    generated_dir = source_dir / "generated"
     media_dir = staging_dir / "media"
-    support_dir = staging_dir / "support"
     reports_dir.mkdir(parents=True, exist_ok=True)
-    root_reports_dir.mkdir(parents=True, exist_ok=True)
     generated_dir.mkdir(parents=True, exist_ok=True)
     media_dir.mkdir(parents=True, exist_ok=True)
-    support_dir.mkdir(parents=True, exist_ok=True)
 
     source_zeia = _source_zeia_for_project(Path(str(report.get("project_root") or "")))
     external_file_report: dict[str, Any] = {}
@@ -512,7 +508,7 @@ def publish_ready_to_import_bundle(
         encoding="utf-8",
     )
     (reports_dir / "command_corpus_report.md").write_text(render_markdown(bundle_report), encoding="utf-8")
-    (root_reports_dir / "README.md").write_text(
+    (reports_dir / "README.md").write_text(
         "Command corpus reports live under `source/reports/`. The only import deliverable is the root ZEIA.\n",
         encoding="utf-8",
     )
@@ -521,22 +517,21 @@ def publish_ready_to_import_bundle(
         encoding="utf-8",
     )
     (staging_dir / "RECREATE_SCRIPT.md").write_text(_recreate_script(bundle_report), encoding="utf-8")
-    (support_dir / "request.spec.yaml").write_text(_request_spec(bundle_report), encoding="utf-8")
-    (support_dir / "protocol.ir.json").write_text(
+    (source_dir / "request.spec.yaml").write_text(_request_spec(bundle_report), encoding="utf-8")
+    (source_dir / "protocol.ir.json").write_text(
         json.dumps(_protocol_ir_stub(bundle_report), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    (support_dir / "generation_manifest.json").write_text(
+    (source_dir / "generation_manifest.json").write_text(
         json.dumps(_generation_manifest(bundle_report, bundle_name=bundle_name), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    (support_dir / "GENERATION_WORKFLOW.md").write_text(
+    (source_dir / "GENERATION_WORKFLOW.md").write_text(
         _generation_workflow_markdown(bundle_report, bundle_name=bundle_name),
         encoding="utf-8",
     )
     (generated_dir / "protocol.py").write_text(_generated_protocol_stub(), encoding="utf-8")
-    _copy_v2_setup_script(support_dir / "run_tecan_bundle_setup.bat")
-    shutil.move(str(support_dir / "run_tecan_bundle_setup.bat"), staging_dir / "run_tecan_bundle_setup.bat")
+    _copy_v2_setup_script(staging_dir / "run_tecan_bundle_setup.bat")
     _write_delivery_manifest(
         staging_dir,
         bundle_name,
@@ -602,7 +597,7 @@ def _generation_workflow_markdown(report: dict[str, Any], *, bundle_name: str) -
             f"- Source project: `{report.get('project_root') or ''}`",
             f"- Target script folder: `{report.get('target_script_folder') or DEFAULT_TARGET_SCRIPT_FOLDER}`",
             f"- Sample execution: `{report.get('sample_execution') or DEFAULT_SAMPLE_EXECUTION}`",
-            "- Delivery: root ZEIA only; support artifacts remain under `support/`.",
+            "- Delivery: root ZEIA only; support artifacts remain under `source/`.",
             "",
         ]
     )
@@ -637,8 +632,8 @@ def _write_delivery_manifest(
     *,
     external_file_deployments: list[dict[str, str]],
 ) -> None:
-    support_dir = staging_dir / "support"
-    (support_dir / "delivery_manifest.json").write_text(
+    source_dir = staging_dir / "source"
+    (source_dir / "delivery_manifest.json").write_text(
         json.dumps(
             {
                 "schema_version": DELIVERY_MANIFEST_SCHEMA_VERSION,
@@ -654,11 +649,11 @@ def _write_delivery_manifest(
                 ],
                 "companion_artifacts": [
                     {"kind": "recreation_instructions", "path": "RECREATE_SCRIPT.md"},
-                    {"kind": "request_specification", "path": "support/request.spec.yaml"},
-                    {"kind": "protocol_ir", "path": "support/protocol.ir.json"},
-                    {"kind": "delivery_manifest", "path": "support/delivery_manifest.json"},
-                    {"kind": "generated_python", "path": "generated/protocol.py"},
-                    {"kind": "reports", "path": "reports/"},
+                    {"kind": "request_specification", "path": "source/request.spec.yaml"},
+                    {"kind": "protocol_ir", "path": "source/protocol.ir.json"},
+                    {"kind": "delivery_manifest", "path": "source/delivery_manifest.json"},
+                    {"kind": "generated_python", "path": "source/generated/protocol.py"},
+                    {"kind": "reports", "path": "source/reports/"},
                     {"kind": "source_tree", "path": "source/"},
                     {"kind": "bundle_setup", "path": "run_tecan_bundle_setup.bat"},
                 ],

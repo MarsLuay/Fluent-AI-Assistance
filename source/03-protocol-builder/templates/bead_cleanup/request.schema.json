@@ -24,6 +24,15 @@
         },
         "parameters": {
           "properties": {
+            "sample_plate": {"type": "string"},
+            "bead_reservoir": {"type": "string"},
+            "wash_reservoir": {"type": "string"},
+            "elution_buffer_reservoir": {"type": "string"},
+            "elution_plate": {"type": "string"},
+            "waste_reservoir": {"type": "string"},
+            "tip_box": {"type": "string"},
+            "liquid_class": {"type": "string"},
+            "worktable": {"type": "string"},
             "bead_volume_ul": {
               "exclusiveMinimum": 0,
               "type": "number"
@@ -50,6 +59,14 @@
             }
           },
           "required": [
+            "sample_plate",
+            "bead_reservoir",
+            "wash_reservoir",
+            "elution_buffer_reservoir",
+            "elution_plate",
+            "waste_reservoir",
+            "tip_box",
+            "liquid_class",
             "bead_volume_ul",
             "wash_volume_ul",
             "wash_count",

@@ -587,21 +587,35 @@ ready-to-import/
   my_new_protocol/
     my_new_protocol.zeia
     run_tecan_bundle_setup.bat
-    delivery_manifest.json
-    source/
+    RECREATE_SCRIPT.md
     media/
-    reports/
+    source/
+      collect_tecan_diagnostic_bundle.ps1
+      copy_tree_with_progress.ps1
+      deploy_touchtools_media.ps1
+      install_external_files.ps1
+      stall_watchdog.ps1
+      delivery_manifest.json
+      generation_manifest.json
+      GENERATION_WORKFLOW.md
+      request.spec.yaml
+      protocol.ir.json
+      metadata.json
+      generated/
+        protocol.py
+      reports/
 ```
 
 The `.zeia` is the only FluentControl import deliverable. The surrounding folder
-is the human and future-agent delivery bundle. Use `delivery_manifest.json` and
-`generation_manifest.json` for the artifact inventory. If a worklist or report
-was not produced, record the absence in the manifest or the relevant run report.
-`request.spec.yaml` is the user-review contract. If
+is the human and future-agent delivery bundle. Use
+`source/delivery_manifest.json` and `source/generation_manifest.json` for the
+artifact inventory. `source/request.spec.yaml` is the user-review contract. If a
+worklist or report was not produced, record the absence in the manifest or the
+relevant run report. If
 `ready-to-import/my_new_protocol/` already exists, stage and validate the new
 folder first and atomically replace the old folder only after the V2 validator
 passes.
-`RECREATE_SCRIPT.md` must be generated from `protocol.ir.json`, including the
+`RECREATE_SCRIPT.md` must be generated from `source/protocol.ir.json`, including the
 worktable, chosen labware/liquid classes, and ordered command steps.
 If a readable source `.zeia` is available, build the published archive from that
 source base and document replacement/addition details in the run reports.
@@ -613,9 +627,9 @@ create extra top-level aliases for generated files in `ready-to-import/`.
 `worktable.patch.json` must be generated from the same diff and include
 machine-readable operations with `safe`, `needs_review`, or `blocking`
 severities.
-`validation_diff.md` / `.json` must compare `request.spec.yaml` against the
+`source/validation_diff.md` / `.json` must compare `source/request.spec.yaml` against the
 generated IR, artifact inventory, worktable diff, and ready validation result.
-`generation_manifest.json` also includes `readiness_status` and a `readiness`
+`source/generation_manifest.json` also includes `readiness_status` and a `readiness`
 object. Treat `readiness_status: ready_to_import` with
 `readiness.fluentcontrol_load_diagnostic.status: not_run` as a clear next
 action: run the optional FluentControl import/load diagnostic or manually open

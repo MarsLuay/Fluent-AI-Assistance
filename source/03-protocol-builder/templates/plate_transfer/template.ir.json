@@ -10,42 +10,34 @@
   "ir_version": "tecan.protocol_ir.v2",
   "labware": [
     {
-      "catalog": "96 Well Flat",
+      "catalog": "",
       "id": "source_plate",
-      "label": "SourcePlate",
-      "location": "Site",
-      "position": 1,
-      "python_class": "Plate96",
+      "label": "source_plate",
+      "location": "",
+      "position": null,
       "role": "source"
     },
     {
-      "catalog": "96 Well Flat",
+      "catalog": "",
       "id": "destination_plate",
-      "label": "DestinationPlate",
-      "location": "Site",
-      "position": 2,
-      "python_class": "Plate96",
+      "label": "destination_plate",
+      "location": "",
+      "position": null,
       "role": "destination"
     },
     {
-      "catalog": "MCA96, 100ul, Box",
+      "catalog": "",
       "id": "tips",
-      "label": "Tips",
-      "location": "Site",
-      "position": 4,
-      "python_class": "MCA100Box",
+      "label": "tips",
+      "location": "",
+      "position": null,
       "role": "tips"
     }
   ],
-  "liquid_classes": [
-    {
-      "name": "Water Free Single",
-      "role": "pipetting"
-    }
-  ],
+  "liquid_classes": [],
   "protocol": {
-    "comment": "Template shape for moving a fixed volume from one plate to another.",
-    "name": "Template Plate Transfer",
+    "comment": "Inert plate-transfer shape. Ground every operational value in an imported context before generation.",
+    "name": "Plate transfer template shape",
     "schema_intent": "canonical reusable template shape"
   },
   "reagents": [
@@ -78,12 +70,12 @@
       "name": "Add Source Plate",
       "operation": "add_labware",
       "parameters": {
-        "label": "SourcePlate",
-        "labware_type": "96 Well Flat",
-        "location": "Site",
-        "position": 1
+        "label": "source_plate",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "SourcePlate"
+      "target_labware": "source_plate"
     },
     {
       "group": "Setup",
@@ -92,12 +84,12 @@
       "name": "Add Destination Plate",
       "operation": "add_labware",
       "parameters": {
-        "label": "DestinationPlate",
-        "labware_type": "96 Well Flat",
-        "location": "Site",
-        "position": 2
+        "label": "destination_plate",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "DestinationPlate"
+      "target_labware": "destination_plate"
     },
     {
       "group": "Setup",
@@ -106,12 +98,12 @@
       "name": "Add Tip Box",
       "operation": "add_labware",
       "parameters": {
-        "label": "Tips",
-        "labware_type": "MCA96, 100ul, Box",
-        "location": "Site",
-        "position": 4
+        "label": "tips",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "Tips"
+      "target_labware": "tips"
     },
     {
       "group": "Transfer",
@@ -122,35 +114,41 @@
       "parameters": {
         "tip_strategy": "new_tips"
       },
-      "target_labware": "Tips"
+      "target_labware": "tips"
     },
     {
       "group": "Transfer",
       "id": "step_005",
       "index": 5,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Aspirate From Source",
       "operation": "aspirate",
       "parameters": {
-        "source_well": "A1"
+        "source_well": ""
       },
-      "source_labware": "SourcePlate",
-      "target_labware": "SourcePlate",
-      "volume_ul": 20
+      "source_labware": "source_plate",
+      "target_labware": "source_plate",
+      "volume_ul_expression": {
+        "kind": "variable_reference",
+        "name": "transfer_volume_ul"
+      }
     },
     {
-      "destination_labware": "DestinationPlate",
+      "destination_labware": "destination_plate",
       "group": "Transfer",
       "id": "step_006",
       "index": 6,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Dispense Into Destination",
       "operation": "dispense",
       "parameters": {
-        "destination_well": "A1"
+        "destination_well": ""
       },
-      "target_labware": "DestinationPlate",
-      "volume_ul": 20
+      "target_labware": "destination_plate",
+      "volume_ul_expression": {
+        "kind": "variable_reference",
+        "name": "transfer_volume_ul"
+      }
     },
     {
       "group": "Cleanup",
@@ -161,7 +159,7 @@
       "parameters": {
         "tip_strategy": "return_to_source"
       },
-      "target_labware": "Tips"
+      "target_labware": "tips"
     }
   ],
   "template": {
@@ -172,17 +170,17 @@
   },
   "variables": [
     {
-      "default": 20,
+      "default_value": null,
       "name": "transfer_volume_ul",
       "type": "number"
     },
     {
-      "default": "A1",
+      "default_value": null,
       "name": "source_well",
       "type": "well"
     },
     {
-      "default": "A1",
+      "default_value": null,
       "name": "destination_well",
       "type": "well"
     }
@@ -191,6 +189,6 @@
   "worktable": {
     "auto_place": false,
     "guid": "",
-    "name": "Template Worktable"
+    "name": ""
   }
 }

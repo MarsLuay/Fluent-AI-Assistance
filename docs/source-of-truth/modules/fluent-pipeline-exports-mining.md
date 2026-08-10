@@ -1,10 +1,10 @@
 # Module: fluent-pipeline-exports-mining
 
-**Paths:** `source/03-protocol-builder/fluent_pipeline/` → 12 files
+**Paths:** `source/03-protocol-builder/fluent_pipeline/` → 14 files
 **Purpose:** ZEIA/import mining and packaging: catalogs, liquid classes, connectors, drivers, bindings, ready-to-import exports.
 **Public surface:** see [functions/fluent-pipeline-exports-mining.md](../functions/fluent-pipeline-exports-mining.md)
 **Depends on:** fluentcoder / shared tecan libs (varies by file)
-**Invariants:** ZEIA-mined evidence over baked product law; fail closed when bindings missing (see cross-cutting).
+**Invariants:** ZEIA-mined evidence over baked product law; fail closed when bindings missing (see cross-cutting). New V2 bundles keep only the ZEIA, setup BAT, recreation guide, `media/`, and `source/` at the root; helpers, manifests, spec, IR, metadata, generated Python, and reports live under `source/`. The validator still recognizes legacy root/`support/` bundles.
 **Related functions:** [functions/fluent-pipeline-exports-mining.md](../functions/fluent-pipeline-exports-mining.md)
 **Related types:** [types/fluent-pipeline-exports-mining.md](../types/fluent-pipeline-exports-mining.md)
 

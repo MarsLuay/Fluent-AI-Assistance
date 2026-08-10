@@ -1,16 +1,18 @@
 schema_version: tecan.request_spec.v1
 request:
-  intent: Execute generated_worklist.gwl using SourcePlate and DestinationPlate context.
-  protocol_name: Worklist execution example
+  intent: Ground this worklist-execution shape in one exact worklist and exact labware from the selected imported context.
+  protocol_name: null
   status: draft
 template:
   name: worklist_execution
   parameters:
-    worklist_path: generated_worklist.gwl
+    worklist_path: ""
     worklist_format: gwl
-    source_plate: SourcePlate
-    destination_plate: DestinationPlate
-    liquid_class: Water Free Single
+    source_plate: ""
+    destination_plate: ""
+    tip_box: ""
+    worktable: ""
+    liquid_class: ""
 source:
   context: null
   context_kind: null

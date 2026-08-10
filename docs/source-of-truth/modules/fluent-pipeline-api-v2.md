@@ -1,6 +1,6 @@
 # Module: fluent-pipeline-api-v2
 
-**Paths:** `source/03-protocol-builder/fluent_pipeline/` → 35 files
+**Paths:** `source/03-protocol-builder/fluent_pipeline/` → 36 files
 **Purpose:** FluentControl API v2 command models, runtime controllers, stepped execution, and command validators.
 **Public surface:** see [functions/fluent-pipeline-api-v2.md](../functions/fluent-pipeline-api-v2.md)
 **Depends on:** fluentcoder / shared tecan libs (varies by file)
@@ -33,6 +33,7 @@
 - `api_v2/state.py`
 - `api_v2/subroutine_identity.py`
 - `api_v2/types.py`
+- `api_v2/validate_runtime.py`
 - `api_v2/verification_helpers.py`
 - `api_v2/xml_compare.py`
 - `api_v2_add_labware_validate.py`

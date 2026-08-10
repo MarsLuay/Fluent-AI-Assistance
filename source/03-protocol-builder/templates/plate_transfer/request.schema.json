@@ -48,16 +48,26 @@
             "tip_box": {
               "type": "string"
             },
+            "worktable": {
+              "description": "Required when the imported context contains more than one worktable.",
+              "type": "string"
+            },
             "transfer_volume_ul": {
               "exclusiveMinimum": 0,
-              "type": "number"
+              "type": [
+                "number",
+                "null"
+              ]
             }
           },
           "required": [
             "source_plate",
             "destination_plate",
+            "source_well",
+            "destination_well",
             "transfer_volume_ul",
-            "liquid_class"
+            "liquid_class",
+            "tip_box"
           ],
           "type": "object"
         }

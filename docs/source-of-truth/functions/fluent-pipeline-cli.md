@@ -57,3 +57,4 @@ Source roots: `fluent_pipeline/` (13 files)
 | `_resolve_artifact_output_path (priv)` | `cli/runtime.py` | `(value)` | Resolve a user-selected intermediate output inside a project temp_files folder. | see source |
 | `_render_log_watch_markdown (priv)` | `cli/runtime.py` | `(protocol, watch)` | see source | see source |
 | `_write_roundtrip_report (priv)` | `cli/runtime.py` | `(path, source, stages)` | see source | see source |
+| `_generation_return_code (priv)` | `cli/runtime.py` | `(manifest)` | Return success only when the published ZEIA/root guide and nested `source/` final artifacts exist. | Reads filesystem state; returns `0` or `1`. |

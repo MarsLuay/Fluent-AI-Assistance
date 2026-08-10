@@ -1,12 +1,15 @@
 # Functions: fluent-pipeline-project
 
-Source roots: `fluent_pipeline/` (10 files)
+Source roots: `fluent_pipeline/` (12 files)
 
 | Symbol | File | Signature | Purpose | Side effects / errors |
 | --- | --- | --- | --- | --- |
 | `archive_reference_fingerprint` | `archive_cache.py` | `(source_project)` | Return a stable ``(size + content)`` fingerprint for a source ZEIA.  Returns ``None`` if the file ca | see source |
 | `load_records` | `archive_cache.py` | `(fingerprint, kind)` | Return cached records of ``kind`` for ``fingerprint``, or ``None``. | see source |
 | `store_records` | `archive_cache.py` | `(fingerprint, kind, records)` | Persist records of ``kind`` for ``fingerprint``. Best effort; never raises. | see source |
+| `normalize_agent_brief_mode` | `agent_brief.py` | `(mode)` | Normalize one requested brief mode to the supported mode vocabulary. | Pure. |
+| `resolve_agent_brief_mode` | `agent_brief.py` | `(intent, *, default="status")` | Select an agent-brief mode from plain-language intent. | Pure; returns confidence and rationale. |
+| `render_agent_brief` | `agent_brief.py` | `(mode)` | Render the compact checklist for one normalized workflow mode. | Raises on unsupported modes. |
 | `AuditImportEvent` | `audit_import_context.py` | class | class | , |
 | `read_audit_import_events` | `audit_import_context.py` | `(paths)` | Return imports with one unambiguous likely main-script name per event. | see source |
 | `import_for_error` | `audit_import_context.py` | `(timestamp, events)` | Return the most recent audit import preceding an error within the causal window. | see source |
@@ -24,6 +27,8 @@ Source roots: `fluent_pipeline/` (10 files)
 | `run_pip_check` | `bootstrap.py` | `(python)` | see source | see source |
 | `ensure_desktop_automation_manifests` | `bootstrap.py` | `()` | see source | see source |
 | `main` | `bootstrap.py` | `(argv)` | see source | see source |
+| `next_bootstrap_step` | `bootstrap_status.py` | `(*, doctor_ok, projects, inspected=False)` | Compute the fail-closed next bootstrap action and tool allow/block lists. | Pure. |
+| `build_bootstrap_status` | `bootstrap_status.py` | `(*, install_missing=False, confirm_install=False, write_report=True, inspected=False)` | Build the stable bootstrap status payload shared by CLI and MCP. | Runs doctor/project inventory and may write the bootstrap report. |
 | `_requirements_text (priv)` | `bootstrap.py` | `()` | see source | see source |
 | `_validate_workspace_package_order (priv)` | `bootstrap.py` | `(packages)` | see source | see source |
 | `_write_text_if_changed (priv)` | `bootstrap.py` | `(path, text)` | see source | see source |

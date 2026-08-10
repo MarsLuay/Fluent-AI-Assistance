@@ -1,0 +1,20 @@
+schema_version: tecan.request_spec.v1
+request:
+  intent: Inspect a synthetic transfer fixture without generating a ready bundle.
+  verbatim_prompt: Inspect a synthetic transfer fixture without generating a ready bundle.
+  protocol_name: DemoScript_Acceptance
+  status: reviewed
+source:
+  contexts:
+    - name: synthetic-context
+  source_scripts:
+    - synthetic-context:DemoScript
+generation:
+  simulate: false
+  compile_xscr: false
+  approve_partial_zeia: false
+review: {}
+acceptance:
+  required_checks:
+    - Preserve synthetic source provenance.
+    - Do not publish a ready-to-import bundle.

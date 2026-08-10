@@ -13,6 +13,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
+from .authoring_status import AuthoringState
 from .application_services import (
     BundleVerificationRequest,
     RepairApplyRequest,
@@ -590,7 +591,10 @@ class ProtocolBuilderGateway:
         if mode == "final":
             delivery_validation = _delivery_bundle_validation_from_manifest(result.manifest)
             payload["delivery_bundle_validation"] = delivery_validation
-            payload["ok"] = bool(result.manifest.get("ready_to_import")) and bool(delivery_validation.get("ok"))
+            payload["ok"] = (
+                result.authoring_status.status == AuthoringState.FINAL_READY_HANDOFF
+                and bool(delivery_validation.get("ok"))
+            )
         else:
             payload["ok"] = True
         payload["mode"] = mode

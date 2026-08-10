@@ -636,11 +636,11 @@ generation.
 - For code changes, run:
 
   ```powershell
-  ..\..\scripts\test-fast.ps1
+  ..\..\scripts\test\test-fast.ps1
   ```
 
-  Use `..\..\scripts\test-mcp.ps1` for MCP changes, `..\..\scripts\test-simulator.ps1`
-  for simulator-gated changes, and `..\..\scripts\test-all.ps1` when you want
+  Use `..\..\scripts\test\test-mcp.ps1` for MCP changes, `..\..\scripts\test\test-simulator.ps1`
+  for simulator-gated changes, and `..\..\scripts\test\test-all.ps1` when you want
   the full sweep.
 
 - For generation work, inspect these artifacts before claiming readiness:
@@ -877,11 +877,11 @@ after generation.
 **Bundle / IR (always):**
 
 - Ready bundles use schema **`tecan.ready_to_import.bundle.v2`**. Bundle root
-  carries `<protocol>.zeia`, `delivery_manifest.json`,
-  `RECREATE_SCRIPT.md`, one `run_tecan_bundle_setup.bat`, root `media/`
-  (`processed/` deploy copies, `unprocessed/` raw backups), root `reports/`,
-  and a `source/` tree for IR, reports, and slot files.
-- `delivery_manifest.json` is the only external-file deployment authority.
+  carries `<protocol>.zeia`, `RECREATE_SCRIPT.md`, one
+  `run_tecan_bundle_setup.bat`, root `media/` (`processed/` deploy copies,
+  `unprocessed/` raw backups), and `source/`. Helpers, manifests, the reviewed
+  spec, IR, metadata, generated Python, and reports all live under `source/`.
+- `source/delivery_manifest.json` is the only external-file deployment authority.
   Each external payload record must contain its exact `bundle_path`, absolute
   `target_path`, and lowercase SHA-256. Never resolve deployment sources by
   recursive basename search. The setup BAT verifies source and installed hashes.

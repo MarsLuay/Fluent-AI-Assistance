@@ -1,0 +1,5 @@
+schema_version: tecan.request_spec.invalid
+request:
+  intent: ""
+generation:
+  preserve_regeneration_baseline: "yes"

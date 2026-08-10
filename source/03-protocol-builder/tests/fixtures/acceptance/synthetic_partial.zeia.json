@@ -1,0 +1,15 @@
+{
+  "schema_version": "tecan.synthetic_zeia_recipe.v1",
+  "archive_name": "synthetic_partial.zeia",
+  "classification": "synthetic_public",
+  "entries": [
+    {
+      "archive_path": "Scripts/DemoScript.xscr",
+      "source": "tests/fixtures/acceptance/synthetic_transfer.xscr"
+    },
+    {
+      "archive_path": "Worktables/WT_Demo.xwsp",
+      "source": "tests/fixtures/acceptance/synthetic_worktable.xwsp"
+    }
+  ]
+}

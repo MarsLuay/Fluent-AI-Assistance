@@ -10,6 +10,8 @@
   <string>launch-tecan-simulator</string>
   <key>CFBundleIdentifier</key>
   <string>local.tecan.protocol-simulator.launcher</string>
+  <key>CFBundleIconFile</key>
+  <string>SimulatorIcon</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>

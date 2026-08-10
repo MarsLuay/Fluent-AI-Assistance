@@ -10,45 +10,41 @@
   "ir_version": "tecan.protocol_ir.v2",
   "labware": [
     {
-      "catalog": "96 Well Flat",
+      "catalog": "",
       "id": "input_plate",
-      "label": "InputPlate",
-      "location": "Site",
-      "position": 1,
-      "python_class": "Plate96",
+      "label": "input_plate",
+      "location": "",
+      "position": null,
       "role": "source"
     },
     {
-      "catalog": "96 Well Flat",
+      "catalog": "",
       "id": "normalized_plate",
-      "label": "NormalizedPlate",
-      "location": "Site",
-      "position": 2,
-      "python_class": "Plate96",
+      "label": "normalized_plate",
+      "location": "",
+      "position": null,
       "role": "destination"
     },
     {
-      "catalog": "Reagent Reservoir",
+      "catalog": "",
       "id": "diluent_reservoir",
-      "label": "DiluentReservoir",
-      "location": "Site",
-      "position": 3,
-      "python_class": "Plate96",
+      "label": "diluent_reservoir",
+      "location": "",
+      "position": null,
       "role": "diluent"
     },
     {
-      "catalog": "MCA96, 100ul, Box",
+      "catalog": "",
       "id": "tips",
-      "label": "Tips",
-      "location": "Site",
-      "position": 4,
-      "python_class": "MCA100Box",
+      "label": "tips",
+      "location": "",
+      "position": null,
       "role": "tips"
     }
   ],
   "liquid_classes": [
     {
-      "name": "Water Free Single",
+      "name": "__GROUND_FROM_CONTEXT__",
       "role": "pipetting"
     }
   ],
@@ -92,12 +88,12 @@
       "name": "Add Input Plate",
       "operation": "add_labware",
       "parameters": {
-        "label": "InputPlate",
-        "labware_type": "96 Well Flat",
-        "location": "Site",
-        "position": 1
+        "label": "input_plate",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "InputPlate"
+      "target_labware": "input_plate"
     },
     {
       "group": "Setup",
@@ -106,12 +102,12 @@
       "name": "Add Normalized Plate",
       "operation": "add_labware",
       "parameters": {
-        "label": "NormalizedPlate",
-        "labware_type": "96 Well Flat",
-        "location": "Site",
-        "position": 2
+        "label": "normalized_plate",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "NormalizedPlate"
+      "target_labware": "normalized_plate"
     },
     {
       "group": "Setup",
@@ -120,12 +116,12 @@
       "name": "Add Diluent Reservoir",
       "operation": "add_labware",
       "parameters": {
-        "label": "DiluentReservoir",
-        "labware_type": "Reagent Reservoir",
-        "location": "Site",
-        "position": 3
+        "label": "diluent_reservoir",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "DiluentReservoir"
+      "target_labware": "diluent_reservoir"
     },
     {
       "group": "Setup",
@@ -134,104 +130,104 @@
       "name": "Add Tip Box",
       "operation": "add_labware",
       "parameters": {
-        "label": "Tips",
-        "labware_type": "MCA96, 100ul, Box",
-        "location": "Site",
-        "position": 4
+        "label": "tips",
+        "labware_type": "",
+        "location": "",
+        "position": null
       },
-      "target_labware": "Tips"
+      "target_labware": "tips"
     },
     {
       "group": "Normalize",
       "id": "step_005",
       "index": 5,
-      "name": "Pick Up Tips",
+      "name": "Pick Up tips",
       "operation": "pick_up_tips",
       "parameters": {
         "tip_strategy": "new_tips"
       },
-      "target_labware": "Tips"
+      "target_labware": "tips"
     },
     {
       "group": "Normalize",
       "id": "step_006",
       "index": 6,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Aspirate Sample Volume",
       "operation": "aspirate",
       "parameters": {
         "source_well": "A1"
       },
-      "source_labware": "InputPlate",
-      "target_labware": "InputPlate",
+      "source_labware": "input_plate",
+      "target_labware": "input_plate",
       "volume_ul": 5
     },
     {
-      "destination_labware": "NormalizedPlate",
+      "destination_labware": "normalized_plate",
       "group": "Normalize",
       "id": "step_007",
       "index": 7,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Dispense Sample",
       "operation": "dispense",
       "parameters": {
         "destination_well": "A1"
       },
-      "target_labware": "NormalizedPlate",
+      "target_labware": "normalized_plate",
       "volume_ul": 5
     },
     {
       "group": "Normalize",
       "id": "step_008",
       "index": 8,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Aspirate Diluent",
       "operation": "aspirate",
       "parameters": {
         "source_well": "A1"
       },
-      "source_labware": "DiluentReservoir",
-      "target_labware": "DiluentReservoir",
+      "source_labware": "diluent_reservoir",
+      "target_labware": "diluent_reservoir",
       "volume_ul": 45
     },
     {
-      "destination_labware": "NormalizedPlate",
+      "destination_labware": "normalized_plate",
       "group": "Normalize",
       "id": "step_009",
       "index": 9,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Dispense Diluent",
       "operation": "dispense",
       "parameters": {
         "destination_well": "A1"
       },
-      "target_labware": "NormalizedPlate",
+      "target_labware": "normalized_plate",
       "volume_ul": 45
     },
     {
       "group": "Normalize",
       "id": "step_010",
       "index": 10,
-      "liquid_class": "Water Free Single",
+      "liquid_class": "__GROUND_FROM_CONTEXT__",
       "name": "Mix Normalized Sample",
       "operation": "mca384_mix",
       "parameters": {
         "cycles": 8,
         "well": "A1"
       },
-      "target_labware": "NormalizedPlate",
+      "target_labware": "normalized_plate",
       "volume_ul": 35
     },
     {
       "group": "Cleanup",
       "id": "step_011",
       "index": 11,
-      "name": "Return Tips",
+      "name": "Return tips",
       "operation": "set_tips_back",
       "parameters": {
         "tip_strategy": "return_to_source"
       },
-      "target_labware": "Tips"
+      "target_labware": "tips"
     }
   ],
   "template": {
@@ -266,6 +262,6 @@
   "worktable": {
     "auto_place": false,
     "guid": "",
-    "name": "Template Worktable"
+    "name": ""
   }
 }

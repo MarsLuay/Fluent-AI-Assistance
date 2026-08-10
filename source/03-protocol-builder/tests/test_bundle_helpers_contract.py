@@ -18,9 +18,9 @@ def _sha256(path: Path) -> str:
 
 def _install_external_files(bundle_root: Path) -> list[str]:
     """Python mirror of install_external_files.ps1 for offline CI."""
-    manifest_path = bundle_root / "support" / "delivery_manifest.json"
+    manifest_path = bundle_root / "source" / "delivery_manifest.json"
     if not manifest_path.is_file():
-        raise FileNotFoundError("support/delivery_manifest.json is missing")
+        raise FileNotFoundError("source/delivery_manifest.json is missing")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     deployments = list(manifest.get("external_file_deployments") or [])
     installed: list[str] = []
@@ -106,7 +106,7 @@ class InstallExternalFilesTests(unittest.TestCase):
     def test_python_mirror_installs_and_rejects_bad_hash(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "bundle"
-            staged = root / "support" / "payload.bin"
+            staged = root / "source" / "payload.bin"
             staged.parent.mkdir(parents=True)
             staged.write_bytes(b"hello-external")
             digest = _sha256(staged)
@@ -114,13 +114,13 @@ class InstallExternalFilesTests(unittest.TestCase):
             manifest = {
                 "external_file_deployments": [
                     {
-                        "bundle_path": "support/payload.bin",
+                        "bundle_path": "source/payload.bin",
                         "target_path": str(target),
                         "sha256": digest,
                     }
                 ]
             }
-            (root / "support" / "delivery_manifest.json").write_text(
+            (root / "source" / "delivery_manifest.json").write_text(
                 json.dumps(manifest), encoding="utf-8"
             )
             installed = _install_external_files(root)
@@ -129,7 +129,7 @@ class InstallExternalFilesTests(unittest.TestCase):
 
             bad = dict(manifest)
             bad["external_file_deployments"][0]["sha256"] = "0" * 64
-            (root / "support" / "delivery_manifest.json").write_text(
+            (root / "source" / "delivery_manifest.json").write_text(
                 json.dumps(bad), encoding="utf-8"
             )
             with self.assertRaises(ValueError):
