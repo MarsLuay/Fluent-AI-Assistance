@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import importlib.util
 import json
 import os
 import shutil
@@ -340,22 +341,34 @@ def collect_doctor_checks(*, install_missing: bool = False) -> list[dict[str, An
     )
 
     if root.exists() and python.exists():
-        checks.append(_result_check("Python version", run_python(["--version"])))
         checks.append(
-            _result_check(
-                "fluentcoder import",
-                run_python(["-c", "import fluentcoder; print('fluentcoder import ok')"]),
+            {
+                "name": "Python version",
+                "ok": True,
+                "detail": f"Python {sys.version.split()[0]}",
+            }
+        )
+        try:
+            import fluentcoder  # noqa: F401
+        except Exception as exc:  # noqa: BLE001 - doctor reports failures instead of aborting
+            checks.append(
+                {
+                    "name": "fluentcoder import",
+                    "ok": False,
+                    "detail": f"fluentcoder import failed: {exc}",
+                }
             )
-        )
-        lxml = run_python(
-            [
-                "-c",
-                "import importlib.util; "
-                "print('present' if importlib.util.find_spec('lxml') else 'missing')",
-            ]
-        )
-        lxml_detail = (lxml.stdout or lxml.stderr).strip()
-        if lxml_detail == "missing":
+        else:
+            checks.append(
+                {
+                    "name": "fluentcoder import",
+                    "ok": True,
+                    "detail": "fluentcoder import ok",
+                }
+            )
+        lxml_present = importlib.util.find_spec("lxml") is not None
+        lxml_detail = "present"
+        if not lxml_present:
             lxml_detail = (
                 "missing; acceptable for this wrapper's tested decompile/simulate/compile "
                 "path on Python 3.14"
@@ -365,7 +378,6 @@ def collect_doctor_checks(*, install_missing: bool = False) -> list[dict[str, An
                 "name": "lxml availability",
                 "ok": True,
                 "detail": lxml_detail,
-                "result": lxml,
             }
         )
         catalog_check = _catalog_info_check()

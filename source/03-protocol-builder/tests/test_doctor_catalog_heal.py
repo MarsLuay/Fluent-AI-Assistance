@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,6 +13,34 @@ from fluent_pipeline.cli.commands import doctor as doctor_cmd
 
 
 class EnsureGlobalCatalogTests(unittest.TestCase):
+    def test_collect_checks_does_not_spawn_read_only_python_probes(self) -> None:
+        with (
+            mock.patch.object(
+                doctor_cmd,
+                "ensure_global_catalog_index",
+                return_value={"ok": False, "action": "unavailable", "detail": "no catalog"},
+            ),
+            mock.patch.object(doctor_cmd, "fluentcoder_root", return_value=Path(__file__).resolve().parents[1]),
+            mock.patch.object(doctor_cmd, "fluentcoder_python", return_value=Path(sys.executable)),
+            mock.patch.object(
+                doctor_cmd,
+                "_catalog_info_check",
+                return_value={"name": "catalog info", "ok": False, "detail": "empty"},
+            ),
+            mock.patch.object(
+                doctor_cmd,
+                "_catalog_workspace_files_check",
+                return_value={"name": "catalog workspace files", "ok": False, "detail": "empty"},
+            ),
+            mock.patch.object(doctor_cmd, "run_python") as run_python,
+            mock.patch.object(doctor_cmd, "run_fluentcoder") as run_fc,
+        ):
+            checks = doctor_cmd.collect_doctor_checks()
+
+        self.assertTrue(any(check["name"] == "Python version" for check in checks))
+        run_python.assert_not_called()
+        run_fc.assert_not_called()
+
     def test_catalog_info_check_uses_in_process_catalog_api(self) -> None:
         with (
             mock.patch("fluentcoder.catalog.catalog.index_exists", return_value=True),
