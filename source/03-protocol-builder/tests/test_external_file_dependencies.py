@@ -129,9 +129,15 @@ class ExternalFileDependencyTests(unittest.TestCase):
             self.assertIn(r"C:\TubeEye\bin\GetLastBarcode.vb", text)
 
     def test_default_search_roots_include_documents(self):
-        with patch.dict("os.environ", {}, clear=False):
-            roots = default_external_file_search_roots()
-        self.assertTrue(any(path.name == "Documents" for path in roots))
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_home = Path(tmp)
+            docs = tmp_home / "Documents"
+            docs.mkdir()
+
+            with patch("pathlib.Path.home", return_value=tmp_home):
+                roots = default_external_file_search_roots()
+
+            self.assertTrue(any(path.name == "Documents" for path in roots))
 
 
 if __name__ == "__main__":

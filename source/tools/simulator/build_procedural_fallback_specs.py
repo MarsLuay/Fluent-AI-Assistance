@@ -14,15 +14,20 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
 from tecan_common import xml_compat as ET
 
 SCRIPT_PATH = Path(__file__).resolve()
 PROJECT_ROOT = SCRIPT_PATH.parents[3]
 DEFAULT_INSTALL = Path(r"C:\ProgramData\Tecan\VisionX\Database")
-DEFAULT_FLUENT_MODELS = PROJECT_ROOT / "source/04-protocol-simulator/public/models/fluent"
+DEFAULT_FLUENT_MODELS = (
+    PROJECT_ROOT / "source/04-protocol-simulator/public/models/fluent"
+)
 DEFAULT_LOCAL_MODELS = DEFAULT_FLUENT_MODELS / "local"
 DEFAULT_REGISTRY = DEFAULT_LOCAL_MODELS / "registry.json"
-DEFAULT_ALIASES = PROJECT_ROOT / "source/03-protocol-builder/config/aliases/labware_aliases.yaml"
+DEFAULT_ALIASES = (
+    PROJECT_ROOT / "source/03-protocol-builder/config/aliases/labware_aliases.yaml"
+)
 DEFAULT_OUTPUT = DEFAULT_LOCAL_MODELS / "procedural-specs.json"
 
 from fluentcoder.catalog.xcmp import load_xcmp, load_xsit
@@ -37,14 +42,16 @@ SPEC_KIND = "fluent-procedural-geometry-specs"
 
 GUID_RE = re.compile(
     r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-    re.I,
+    re.IGNORECASE,
 )
 
 
 def main() -> int:
     args = parse_args()
     output_path = Path(args.out)
-    refuse_tracked_models_root_output(output_path, force=bool(args.force_tracked_overwrite))
+    refuse_tracked_models_root_output(
+        output_path, force=bool(args.force_tracked_overwrite)
+    )
     payload = build_procedural_specs(
         install_path=Path(args.install),
         registry_path=Path(args.registry) if args.registry else None,
@@ -63,7 +70,9 @@ def main() -> int:
     return 0
 
 
-def refuse_tracked_models_root_output(output_path: Path, *, force: bool = False) -> None:
+def refuse_tracked_models_root_output(
+    output_path: Path, *, force: bool = False
+) -> None:
     """Refuse writing host-derived specs beside tracked meshes."""
     if force:
         return
@@ -78,10 +87,22 @@ def refuse_tracked_models_root_output(output_path: Path, *, force: bool = False)
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--install", default=str(DEFAULT_INSTALL), help="Host DB or extracted DataStore root.")
-    parser.add_argument("--registry", default=str(DEFAULT_REGISTRY), help="registry.json for component-only filter.")
-    parser.add_argument("--aliases", default=str(DEFAULT_ALIASES), help="Labware alias YAML.")
-    parser.add_argument("--out", default=str(DEFAULT_OUTPUT), help="Output procedural-specs.json path.")
+    parser.add_argument(
+        "--install",
+        default=str(DEFAULT_INSTALL),
+        help="Host DB or extracted DataStore root.",
+    )
+    parser.add_argument(
+        "--registry",
+        default=str(DEFAULT_REGISTRY),
+        help="registry.json for component-only filter.",
+    )
+    parser.add_argument(
+        "--aliases", default=str(DEFAULT_ALIASES), help="Labware alias YAML."
+    )
+    parser.add_argument(
+        "--out", default=str(DEFAULT_OUTPUT), help="Output procedural-specs.json path."
+    )
     parser.add_argument(
         "--priority-only",
         action="store_true",
@@ -120,9 +141,71 @@ def build_procedural_specs(
 
     specs: list[dict[str, Any]] = []
     seen_component_guids: set[str] = set()
+
+    _process_registry_targets(
+        component_targets=component_targets,
+        components_dir=components_dir,
+        sites_dir=sites_dir,
+        source_type=source_type,
+        alias_map=alias_map,
+        only_priority=only_priority,
+        seen_component_guids=seen_component_guids,
+        specs=specs,
+    )
+
+    if not only_priority:
+        _process_remaining_components(
+            components_dir=components_dir,
+            sites_dir=sites_dir,
+            source_type=source_type,
+            alias_map=alias_map,
+            seen_component_guids=seen_component_guids,
+            specs=specs,
+        )
+
+    specs.sort(
+        key=lambda row: (row.get("componentName") or "", row.get("componentGuid") or "")
+    )
+    with_arrangement = sum(
+        1 for row in specs if (row.get("sites") or {}).get("x", 0) > 0
+    )
+    with_pipettable = sum(1 for row in specs if row.get("pipettable"))
+    return {
+        "schemaVersion": SPEC_SCHEMA_VERSION,
+        "kind": SPEC_KIND,
+        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "sources": {
+            "installPath": str(datastore_root),
+            "installSourceType": source_type,
+            "registryPath": str(registry_path) if registry_path else None,
+            "aliasesPath": str(aliases_path) if aliases_path else None,
+        },
+        "summary": {
+            "specCount": len(specs),
+            "withArrangement": with_arrangement,
+            "withPipettable": with_pipettable,
+            "priorityCount": sum(1 for row in specs if row.get("priority")),
+        },
+        "specs": specs,
+    }
+
+
+def _process_registry_targets(
+    *,
+    component_targets: list[dict[str, Any]],
+    components_dir: Path,
+    sites_dir: Path,
+    source_type: str,
+    alias_map: dict[str, list[str]],
+    only_priority: bool,
+    seen_component_guids: set[str],
+    specs: list[dict[str, Any]],
+) -> None:
     for target in component_targets:
         component_guid = normalize_guid(target.get("componentGuid"))
-        component_name = str(target.get("componentName") or target.get("objectName") or "").strip()
+        component_name = str(
+            target.get("componentName") or target.get("objectName") or ""
+        ).strip()
         if not component_guid:
             continue
         seen_component_guids.add(component_guid)
@@ -156,51 +239,38 @@ def build_procedural_specs(
         )
         specs.append(spec)
 
-    if not only_priority:
-        for xcmp_path in sorted(components_dir.glob("*.xcmp")):
-            component_guid = normalize_guid(xcmp_path.stem)
-            if not component_guid or component_guid in seen_component_guids:
-                continue
-            try:
-                component = load_xcmp(xcmp_path)
-            except Exception:
-                continue
-            specs.append(
-                component_to_spec(
-                    component,
-                    alias_map=alias_map,
-                    sites_dir=sites_dir,
-                    source_type=source_type,
-                    registry_row={
-                        "componentGuid": component_guid,
-                        "componentName": component.name,
-                        "dimensions": None,
-                    },
-                )
-            )
-            seen_component_guids.add(component_guid)
 
-    specs.sort(key=lambda row: (row.get("componentName") or "", row.get("componentGuid") or ""))
-    with_arrangement = sum(1 for row in specs if (row.get("sites") or {}).get("x", 0) > 0)
-    with_pipettable = sum(1 for row in specs if row.get("pipettable"))
-    return {
-        "schemaVersion": SPEC_SCHEMA_VERSION,
-        "kind": SPEC_KIND,
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
-        "sources": {
-            "installPath": str(datastore_root),
-            "installSourceType": source_type,
-            "registryPath": str(registry_path) if registry_path else None,
-            "aliasesPath": str(aliases_path) if aliases_path else None,
-        },
-        "summary": {
-            "specCount": len(specs),
-            "withArrangement": with_arrangement,
-            "withPipettable": with_pipettable,
-            "priorityCount": sum(1 for row in specs if row.get("priority")),
-        },
-        "specs": specs,
-    }
+def _process_remaining_components(
+    *,
+    components_dir: Path,
+    sites_dir: Path,
+    source_type: str,
+    alias_map: dict[str, list[str]],
+    seen_component_guids: set[str],
+    specs: list[dict[str, Any]],
+) -> None:
+    for xcmp_path in sorted(components_dir.glob("*.xcmp")):
+        component_guid = normalize_guid(xcmp_path.stem)
+        if not component_guid or component_guid in seen_component_guids:
+            continue
+        try:
+            component = load_xcmp(xcmp_path)
+        except Exception:  # noqa: BLE001, S112
+            continue
+        specs.append(
+            component_to_spec(
+                component,
+                alias_map=alias_map,
+                sites_dir=sites_dir,
+                source_type=source_type,
+                registry_row={
+                    "componentGuid": component_guid,
+                    "componentName": component.name,
+                    "dimensions": None,
+                },
+            )
+        )
+        seen_component_guids.add(component_guid)
 
 
 def load_component_only_targets(registry_path: Path | None) -> list[dict[str, Any]]:
@@ -209,7 +279,9 @@ def load_component_only_targets(registry_path: Path | None) -> list[dict[str, An
         rows = [
             row
             for row in payload.get("entries", [])
-            if row.get("componentGuid") and not row.get("meshGuid") and row.get("sourceType") != "procedural"
+            if row.get("componentGuid")
+            and not row.get("meshGuid")
+            and row.get("sourceType") != "procedural"
         ]
         if rows:
             return rows
@@ -227,7 +299,11 @@ def component_to_spec(
     component_guid = normalize_guid(component.guid)
     component_name = component.name
     kind, role = infer_kind_role(component_name, component.functional_group)
-    dim = component.dim_mm or dimensions_tuple(registry_row.get("dimensions")) or (0.0, 0.0, 0.0)
+    dim = (
+        component.dim_mm
+        or dimensions_tuple(registry_row.get("dimensions"))
+        or (0.0, 0.0, 0.0)
+    )
     arrangement = component.arrangement
     sites = {"x": 0, "y": 0, "z": 0}
     site_spacing_mm = None
@@ -261,7 +337,9 @@ def component_to_spec(
             if template_guid in seen_templates:
                 continue
             seen_templates.add(template_guid)
-            site_templates.append({"index": index, "siteTemplateGuid": template_guid, **template_row})
+            site_templates.append(
+                {"index": index, "siteTemplateGuid": template_guid, **template_row}
+            )
 
     pipettable_spec = pipettable_to_spec(component.pipettable)
     aliases = sorted(set(alias_map.get(component_name, [])))
@@ -281,7 +359,13 @@ def component_to_spec(
         "aliases": aliases,
         "sourcePath": component.file_path.name,
         "sourceType": source_type,
-        "siteIds": sorted(set(normalize_guid(guid) for guid in component.site_guids if normalize_guid(guid))),
+        "siteIds": sorted(
+            {
+                normalize_guid(guid)
+                for guid in component.site_guids
+                if normalize_guid(guid)
+            }
+        ),
     }
     if site_spacing_mm is not None:
         spec["siteSpacingMm"] = site_spacing_mm
@@ -357,8 +441,12 @@ def load_site_template_summary(sites_dir: Path, template_guid: str) -> dict[str,
             "dimensionsMm": dimensions,
             "connectorGuids": list(site.connector_guids),
         }
-    except Exception:
-        return {"locationGroupName": None, "typeName": None, "dimensionsMm": parse_xsit_dimensions(path)}
+    except Exception:  # noqa: BLE001
+        return {
+            "locationGroupName": None,
+            "typeName": None,
+            "dimensionsMm": parse_xsit_dimensions(path),
+        }
 
 
 def parse_xsit_dimensions(path: Path) -> list[float] | None:
@@ -374,8 +462,12 @@ def parse_xsit_dimensions(path: Path) -> list[float] | None:
                 if name in {"X", "Y", "Z"} and child.text:
                     coords[name] = float(child.text)
             if {"X", "Y", "Z"}.issubset(coords):
-                return [round(coords["X"], 3), round(coords["Y"], 3), round(coords["Z"], 3)]
-    except Exception:
+                return [
+                    round(coords["X"], 3),
+                    round(coords["Y"], 3),
+                    round(coords["Z"], 3),
+                ]
+    except Exception:  # noqa: BLE001
         return None
     return None
 
@@ -444,7 +536,9 @@ def dimensions_array(dimensions: dict[str, Any] | None) -> list[float]:
     ]
 
 
-def dimensions_tuple(dimensions: dict[str, Any] | None) -> tuple[float, float, float] | None:
+def dimensions_tuple(
+    dimensions: dict[str, Any] | None,
+) -> tuple[float, float, float] | None:
     if not dimensions:
         return None
     return (

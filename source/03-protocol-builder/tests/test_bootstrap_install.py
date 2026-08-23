@@ -92,13 +92,7 @@ def test_wheel_build_and_non_editable_install_smoke(tmp_path: Path, capfd) -> No
             env=env,
         )
         subprocess.run(
-            [str(_venv_script(install_python, "tecan-prompt-builder")), "--help"],
-            check=True,
-            cwd=PROJECT_DIR,
-            env=env,
-        )
-        subprocess.run(
-            [str(install_python), "-m", "fluent_pipeline.cli", "--help"],
+            [str(_venv_script(install_python, "tecan-ai-mcp")), "--help"],
             check=True,
             cwd=PROJECT_DIR,
             env=env,
