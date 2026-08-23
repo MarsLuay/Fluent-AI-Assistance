@@ -13,7 +13,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from xml.etree import ElementTree as ET
 
 SCRIPT_PATH = Path(__file__).resolve()
 PROJECT_ROOT = SCRIPT_PATH.parents[3]
@@ -23,7 +22,9 @@ from tecan_tools import extract_fluent_meshes as mesh_extractor
 from tecan_tools import merge_fluent_mesh_libraries as mesh_merge
 
 DEFAULT_HOST_INSTALL = Path(r"C:\ProgramData\Tecan\VisionX\Database")
-DEFAULT_FLUENT_MODELS = PROJECT_ROOT / "source/04-protocol-simulator/public/models/fluent"
+DEFAULT_FLUENT_MODELS = (
+    PROJECT_ROOT / "source/04-protocol-simulator/public/models/fluent"
+)
 DEFAULT_SIM_DIR = DEFAULT_FLUENT_MODELS / "local"
 DEFAULT_ZEIA_MANIFEST = DEFAULT_SIM_DIR / "manifest.sim.bak.json"
 DEFAULT_REGISTRY = DEFAULT_SIM_DIR / "registry.json"
@@ -31,7 +32,6 @@ DEFAULT_MANIFEST = DEFAULT_SIM_DIR / "manifest.json"
 DEFAULT_HARDWARE_MANIFEST = None
 DEFAULT_ZEIA_ARCHIVE = None
 FLUENT_MESH_ASSET_PREFIX = "/models/fluent/local"
-
 
 
 def discover_ready_zeia(repo_root: Path) -> Path | None:
@@ -48,7 +48,11 @@ def discover_ready_zeia(repo_root: Path) -> Path | None:
     for bundle in sorted(ready_root.iterdir()):
         if not bundle.is_dir() or bundle.name.startswith("."):
             continue
-        for rel in (("source", "original-sources"), ("original_sources",), ("source", "original_sources")):
+        for rel in (
+            ("source", "original-sources"),
+            ("original_sources",),
+            ("source", "original_sources"),
+        ):
             folder = bundle.joinpath(*rel)
             if folder.is_dir():
                 found.extend(sorted(folder.glob("*.zeia")))
@@ -84,6 +88,20 @@ class ComponentRecord:
     renderer: str | None = None
 
 
+@dataclass
+class DiagnosticContext:
+    host_meshes: dict[str, MeshRecord]
+    zeia_meshes: dict[str, MeshRecord]
+    glb_guids: set[str]
+    manifest_models: dict[str, dict[str, Any]]
+    registry_entries: list[dict[str, Any]]
+    host_components: dict[str, ComponentRecord]
+    zeia_components: dict[str, ComponentRecord]
+    decoded_textures: dict[str, str]
+    sim_dir: Path
+    manifest_path: Path | None
+
+
 def main() -> int:
     args = parse_args()
     report = build_coverage_report(
@@ -93,7 +111,9 @@ def main() -> int:
         zeia_archive_path=Path(args.zeia_archive) if args.zeia_archive else None,
         registry_path=Path(args.registry) if args.registry else None,
         manifest_path=Path(args.manifest) if args.manifest else None,
-        hardware_manifest_path=Path(args.hardware_manifest) if args.hardware_manifest else None,
+        hardware_manifest_path=(
+            Path(args.hardware_manifest) if args.hardware_manifest else None
+        ),
         hardware_asset_dirs=[Path(value) for value in args.hardware_asset_dir],
     )
 
@@ -101,7 +121,9 @@ def main() -> int:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
-    markdown_path = Path(args.markdown_out) if args.markdown_out else output_path.with_suffix(".md")
+    markdown_path = (
+        Path(args.markdown_out) if args.markdown_out else output_path.with_suffix(".md")
+    )
     markdown_path.write_text(render_markdown_report(report), encoding="utf-8")
 
     summary = report["summary"]
@@ -167,17 +189,32 @@ def build_coverage_report(
     registry_entries = load_registry_entries(registry_path)
     host_components = load_components(host_install, "host-db")
     zeia_components = load_zeia_components(zeia_manifest_path, zeia_archive_path)
-    decoded_textures = load_decoded_texture_index(hardware_manifest_path, hardware_asset_dirs, sim_dir)
+    decoded_textures = load_decoded_texture_index(
+        hardware_manifest_path, hardware_asset_dirs, sim_dir
+    )
+
+    ctx = DiagnosticContext(
+        host_meshes=host_meshes,
+        zeia_meshes=zeia_meshes,
+        glb_guids=glb_guids,
+        manifest_models=manifest_models,
+        registry_entries=registry_entries,
+        host_components=host_components,
+        zeia_components=zeia_components,
+        decoded_textures=decoded_textures,
+        sim_dir=sim_dir,
+        manifest_path=manifest_path,
+    )
 
     host_only = sorted(host_meshes.keys() - zeia_meshes.keys())
     zeia_only = sorted(zeia_meshes.keys() - host_meshes.keys())
 
-    missing_glbs = build_missing_glbs(host_meshes, zeia_meshes, manifest_models, registry_entries, glb_guids, sim_dir)
-    duplicate_names = build_duplicate_names(host_meshes, zeia_meshes, manifest_models, registry_entries)
-    guid_conflicts = build_guid_conflicts(host_meshes, zeia_meshes, manifest_models)
-    components_without_mesh = build_components_without_mesh(host_components, zeia_components)
-    textures_not_decoded = build_textures_not_decoded(host_components, zeia_components, registry_entries, decoded_textures)
-    failed_conversions = build_failed_conversions(manifest_models, manifest_path)
+    missing_glbs = build_missing_glbs(ctx)
+    duplicate_names = build_duplicate_names(ctx)
+    guid_conflicts = build_guid_conflicts(ctx)
+    components_without_mesh = build_components_without_mesh(ctx)
+    textures_not_decoded = build_textures_not_decoded(ctx)
+    failed_conversions = build_failed_conversions(ctx)
 
     return {
         "schemaVersion": DIAGNOSTIC_SCHEMA_VERSION,
@@ -186,12 +223,30 @@ def build_coverage_report(
         "sources": {
             "hostInstall": str(host_install),
             "simDir": str(sim_dir),
-            "zeiaManifestPath": str(zeia_manifest_path) if zeia_manifest_path and zeia_manifest_path.exists() else None,
-            "zeiaArchivePath": str(zeia_archive_path) if zeia_archive_path and zeia_archive_path.exists() else None,
-            "registryPath": str(registry_path) if registry_path and registry_path.exists() else None,
-            "manifestPath": str(manifest_path) if manifest_path and manifest_path.exists() else None,
-            "hardwareManifestPath": str(hardware_manifest_path) if hardware_manifest_path and hardware_manifest_path.exists() else None,
-            "hardwareAssetDirs": [str(path) for path in hardware_asset_dirs if path.exists()],
+            "zeiaManifestPath": (
+                str(zeia_manifest_path)
+                if zeia_manifest_path and zeia_manifest_path.exists()
+                else None
+            ),
+            "zeiaArchivePath": (
+                str(zeia_archive_path)
+                if zeia_archive_path and zeia_archive_path.exists()
+                else None
+            ),
+            "registryPath": (
+                str(registry_path) if registry_path and registry_path.exists() else None
+            ),
+            "manifestPath": (
+                str(manifest_path) if manifest_path and manifest_path.exists() else None
+            ),
+            "hardwareManifestPath": (
+                str(hardware_manifest_path)
+                if hardware_manifest_path and hardware_manifest_path.exists()
+                else None
+            ),
+            "hardwareAssetDirs": [
+                str(path) for path in hardware_asset_dirs if path.exists()
+            ],
         },
         "summary": {
             "hostMeshCount": len(host_meshes),
@@ -199,7 +254,9 @@ def build_coverage_report(
             "glbCount": len(glb_guids),
             "manifestModelCount": len(manifest_models),
             "registryEntryCount": len(registry_entries),
-            "registryMeshCount": sum(1 for entry in registry_entries if entry.get("meshGuid")),
+            "registryMeshCount": sum(
+                1 for entry in registry_entries if entry.get("meshGuid")
+            ),
             "hostOnlyCount": len(host_only),
             "zeiaOnlyCount": len(zeia_only),
             "missingGlbCount": len(missing_glbs),
@@ -240,7 +297,9 @@ def load_host_meshes(host_install: Path) -> dict[str, MeshRecord]:
     return records
 
 
-def load_zeia_meshes(zeia_manifest_path: Path | None, zeia_archive_path: Path | None) -> dict[str, MeshRecord]:
+def load_zeia_meshes(
+    zeia_manifest_path: Path | None, zeia_archive_path: Path | None
+) -> dict[str, MeshRecord]:
     records: dict[str, MeshRecord] = {}
     if zeia_manifest_path and zeia_manifest_path.exists():
         payload = json.loads(zeia_manifest_path.read_text(encoding="utf-8"))
@@ -283,13 +342,17 @@ def load_zeia_meshes(zeia_manifest_path: Path | None, zeia_archive_path: Path | 
     if meshes_dir.exists():
         for path in sorted(meshes_dir.glob("*.xmsh")):
             text = path.read_text(encoding="utf-8-sig")
-            record = mesh_record_from_xmsh_text(str(path.relative_to(archive)), text, "zeia-extract")
+            record = mesh_record_from_xmsh_text(
+                str(path.relative_to(archive)), text, "zeia-extract"
+            )
             if record:
                 records[record.guid] = record
     return records
 
 
-def mesh_record_from_xmsh_text(source_path: str, text: str, source: str) -> MeshRecord | None:
+def mesh_record_from_xmsh_text(
+    source_path: str, text: str, source: str
+) -> MeshRecord | None:
     item = mesh_extractor.SourceMesh(path=source_path, text=text)
     try:
         metadata = mesh_extractor.parse_xmsh(item)
@@ -308,7 +371,9 @@ def mesh_record_from_xmsh_text(source_path: str, text: str, source: str) -> Mesh
     )
 
 
-def resolve_zeia_archive(zeia_archive_path: Path | None, zeia_manifest_path: Path | None) -> Path | None:
+def resolve_zeia_archive(
+    zeia_archive_path: Path | None, zeia_manifest_path: Path | None
+) -> Path | None:
     if zeia_archive_path and zeia_archive_path.exists():
         return zeia_archive_path
     if zeia_manifest_path and zeia_manifest_path.exists():
@@ -325,7 +390,11 @@ def resolve_zeia_archive(zeia_archive_path: Path | None, zeia_manifest_path: Pat
 
 
 def load_glb_guids(sim_dir: Path) -> set[str]:
-    return {normalize_guid(path.stem) for path in sim_dir.glob("*.glb") if normalize_guid(path.stem)}
+    return {
+        normalize_guid(path.stem)
+        for path in sim_dir.glob("*.glb")
+        if normalize_guid(path.stem)
+    }
 
 
 def load_manifest_models(manifest_path: Path | None) -> dict[str, dict[str, Any]]:
@@ -350,7 +419,9 @@ def load_registry_entries(registry_path: Path | None) -> list[dict[str, Any]]:
 def load_components(root: Path, source: str) -> dict[str, ComponentRecord]:
     components_dir = root / "SystemSpecific" / "Worktable" / "Components"
     if not components_dir.exists():
-        components_dir = root / "DataStore" / "SystemSpecific" / "Worktable" / "Components"
+        components_dir = (
+            root / "DataStore" / "SystemSpecific" / "Worktable" / "Components"
+        )
     if not components_dir.exists():
         return {}
     records: dict[str, ComponentRecord] = {}
@@ -369,7 +440,9 @@ def load_components(root: Path, source: str) -> dict[str, ComponentRecord]:
     return records
 
 
-def load_zeia_components(zeia_manifest_path: Path | None, zeia_archive_path: Path | None) -> dict[str, ComponentRecord]:
+def load_zeia_components(
+    zeia_manifest_path: Path | None, zeia_archive_path: Path | None
+) -> dict[str, ComponentRecord]:
     archive = resolve_zeia_archive(zeia_archive_path, zeia_manifest_path)
     if archive is None:
         return {}
@@ -395,7 +468,9 @@ def load_components_from_zip(archive_path: Path) -> dict[str, ComponentRecord]:
 def parse_xcmp_text(source_path: str, text: str, source: str) -> ComponentRecord:
     import tempfile
 
-    with tempfile.NamedTemporaryFile("w", suffix=".xcmp", delete=False, encoding="utf-8") as handle:
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".xcmp", delete=False, encoding="utf-8"
+    ) as handle:
         handle.write(text)
         temp_path = Path(handle.name)
     try:
@@ -463,17 +538,12 @@ def load_decoded_texture_index(
     return decoded
 
 
-def build_missing_glbs(
-    host_meshes: dict[str, MeshRecord],
-    zeia_meshes: dict[str, MeshRecord],
-    manifest_models: dict[str, dict[str, Any]],
-    registry_entries: list[dict[str, Any]],
-    glb_guids: set[str],
-    sim_dir: Path,
-) -> list[dict[str, Any]]:
+def build_missing_glbs(ctx: DiagnosticContext) -> list[dict[str, Any]]:
     expected: dict[str, dict[str, Any]] = {}
 
-    def expect(guid: str, name: str, source: str, asset_path: str | None = None) -> None:
+    def expect(
+        guid: str, name: str, source: str, asset_path: str | None = None
+    ) -> None:
         if not guid:
             return
         expected.setdefault(
@@ -488,23 +558,28 @@ def build_missing_glbs(
         if source not in expected[guid]["sources"]:
             expected[guid]["sources"].append(source)
 
-    for guid, record in host_meshes.items():
+    for guid, record in ctx.host_meshes.items():
         expect(guid, record.name, "host-db", record.asset_path)
-    for guid, record in zeia_meshes.items():
+    for guid, record in ctx.zeia_meshes.items():
         expect(guid, record.name, "zeia", record.asset_path)
-    for guid, model in manifest_models.items():
+    for guid, model in ctx.manifest_models.items():
         expect(guid, str(model.get("name") or guid), "manifest", model.get("assetPath"))
-    for entry in registry_entries:
+    for entry in ctx.registry_entries:
         guid = normalize_guid(entry.get("meshGuid"))
         if not guid or entry.get("sourceType") == "procedural":
             continue
-        expect(guid, str(entry.get("objectName") or entry.get("componentName") or guid), "registry", entry.get("assetPath"))
+        expect(
+            guid,
+            str(entry.get("objectName") or entry.get("componentName") or guid),
+            "registry",
+            entry.get("assetPath"),
+        )
 
     missing: list[dict[str, Any]] = []
     for guid, payload in sorted(expected.items()):
-        if guid in glb_guids:
+        if guid in ctx.glb_guids:
             continue
-        glb_path = sim_dir / f"{guid}.glb"
+        glb_path = ctx.sim_dir / f"{guid}.glb"
         missing.append(
             {
                 **payload,
@@ -515,13 +590,10 @@ def build_missing_glbs(
     return missing
 
 
-def build_duplicate_names(
-    host_meshes: dict[str, MeshRecord],
-    zeia_meshes: dict[str, MeshRecord],
-    manifest_models: dict[str, dict[str, Any]],
-    registry_entries: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    by_name: dict[str, dict[str, set[str]]] = defaultdict(lambda: {"host": set(), "zeia": set(), "manifest": set(), "registry": set()})
+def build_duplicate_names(ctx: DiagnosticContext) -> list[dict[str, Any]]:
+    by_name: dict[str, dict[str, set[str]]] = defaultdict(
+        lambda: {"host": set(), "zeia": set(), "manifest": set(), "registry": set()}
+    )
 
     def add(name: str, source: str, guid: str) -> None:
         key = canonical_name(name)
@@ -529,17 +601,21 @@ def build_duplicate_names(
             return
         by_name[key][source].add(guid)
 
-    for guid, record in host_meshes.items():
+    for guid, record in ctx.host_meshes.items():
         add(record.name, "host", guid)
-    for guid, record in zeia_meshes.items():
+    for guid, record in ctx.zeia_meshes.items():
         add(record.name, "zeia", guid)
-    for guid, model in manifest_models.items():
+    for guid, model in ctx.manifest_models.items():
         add(str(model.get("name") or guid), "manifest", guid)
-    for entry in registry_entries:
+    for entry in ctx.registry_entries:
         guid = normalize_guid(entry.get("meshGuid"))
         if not guid:
             continue
-        add(str(entry.get("objectName") or entry.get("componentName") or guid), "registry", guid)
+        add(
+            str(entry.get("objectName") or entry.get("componentName") or guid),
+            "registry",
+            guid,
+        )
 
     duplicates: list[dict[str, Any]] = []
     for name, buckets in sorted(by_name.items()):
@@ -559,17 +635,15 @@ def build_duplicate_names(
     return duplicates
 
 
-def build_guid_conflicts(
-    host_meshes: dict[str, MeshRecord],
-    zeia_meshes: dict[str, MeshRecord],
-    manifest_models: dict[str, dict[str, Any]],
-) -> list[dict[str, Any]]:
+def build_guid_conflicts(ctx: DiagnosticContext) -> list[dict[str, Any]]:
     conflicts: list[dict[str, Any]] = []
-    all_guids = sorted(set(host_meshes) | set(zeia_meshes) | set(manifest_models))
+    all_guids = sorted(
+        set(ctx.host_meshes) | set(ctx.zeia_meshes) | set(ctx.manifest_models)
+    )
     for guid in all_guids:
-        host = host_meshes.get(guid)
-        zeia = zeia_meshes.get(guid)
-        manifest = manifest_models.get(guid)
+        host = ctx.host_meshes.get(guid)
+        zeia = ctx.zeia_meshes.get(guid)
+        manifest = ctx.manifest_models.get(guid)
         names = unique_strings(
             [
                 host.name if host else None,
@@ -602,14 +676,16 @@ def build_guid_conflicts(
     return conflicts
 
 
-def build_components_without_mesh(
-    host_components: dict[str, ComponentRecord],
-    zeia_components: dict[str, ComponentRecord],
-) -> list[dict[str, Any]]:
+def build_components_without_mesh(ctx: DiagnosticContext) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for source_name, components in (("host-db", host_components), ("zeia", zeia_components)):
-        for guid, component in sorted(components.items(), key=lambda item: item[1].name.lower()):
+    for source_name, components in (
+        ("host-db", ctx.host_components),
+        ("zeia", ctx.zeia_components),
+    ):
+        for guid, component in sorted(
+            components.items(), key=lambda item: item[1].name.lower()
+        ):
             if component.mesh_guids:
                 continue
             key = f"{source_name}:{guid}"
@@ -629,15 +705,15 @@ def build_components_without_mesh(
     return rows
 
 
-def build_textures_not_decoded(
-    host_components: dict[str, ComponentRecord],
-    zeia_components: dict[str, ComponentRecord],
-    registry_entries: list[dict[str, Any]],
-    decoded_textures: dict[str, str],
-) -> list[dict[str, Any]]:
+def build_textures_not_decoded(ctx: DiagnosticContext) -> list[dict[str, Any]]:
     referenced: dict[str, dict[str, Any]] = {}
 
-    def add_texture(texture_id: str, source: str, component_guid: str | None, component_name: str | None) -> None:
+    def add_texture(
+        texture_id: str,
+        source: str,
+        component_guid: str | None,
+        component_name: str | None,
+    ) -> None:
         key = canonical_texture_key(texture_id)
         if not key or looks_like_guid(key):
             return
@@ -657,12 +733,15 @@ def build_textures_not_decoded(
         if component_name and component_name not in row["componentNames"]:
             row["componentNames"].append(component_name)
 
-    for components, source in ((host_components, "host-db"), (zeia_components, "zeia")):
+    for components, source in (
+        (ctx.host_components, "host-db"),
+        (ctx.zeia_components, "zeia"),
+    ):
         for component in components.values():
             for texture_id in component.texture_ids:
                 add_texture(texture_id, source, component.guid, component.name)
 
-    for entry in registry_entries:
+    for entry in ctx.registry_entries:
         component_guid = normalize_guid(entry.get("componentGuid"))
         component_name = entry.get("componentName")
         for texture_id in entry.get("textureIds") or []:
@@ -670,19 +749,16 @@ def build_textures_not_decoded(
 
     missing: list[dict[str, Any]] = []
     for key, row in sorted(referenced.items()):
-        if key in decoded_textures:
+        if key in ctx.decoded_textures:
             continue
         missing.append({**row, "decodedPath": None})
     return missing
 
 
-def build_failed_conversions(
-    manifest_models: dict[str, dict[str, Any]],
-    manifest_path: Path | None,
-) -> list[dict[str, Any]]:
+def build_failed_conversions(ctx: DiagnosticContext) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    if manifest_path and manifest_path.exists():
-        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if ctx.manifest_path and ctx.manifest_path.exists():
+        payload = json.loads(ctx.manifest_path.read_text(encoding="utf-8"))
         for model in payload.get("models", []):
             status = str(model.get("conversionStatus") or "").lower()
             if status in {"failed", "placeholder"} or model.get("error"):
@@ -697,9 +773,11 @@ def build_failed_conversions(
                         "assetPath": model.get("assetPath"),
                     }
                 )
-    for guid, model in manifest_models.items():
+    for guid, model in ctx.manifest_models.items():
         status = str(model.get("conversionStatus") or "").lower()
-        if status not in {"converted", "copied-glb"} and not any(row.get("guid") == guid for row in rows):
+        if status not in {"converted", "copied-glb"} and not any(
+            row.get("guid") == guid for row in rows
+        ):
             rows.append(
                 {
                     "guid": guid,
@@ -752,7 +830,12 @@ def render_markdown_report(report: dict[str, Any]) -> str:
     lines.extend(["", "## ZEIA-Only Models", ""])
     lines.extend(format_mesh_list(report["zeiaOnly"]))
     lines.extend(["", "## Missing GLBs", ""])
-    lines.extend(format_generic_list(report["missingGlbs"], lambda item: f"- `{item['guid']}` {item['name']} ({', '.join(item['sources'])})"))
+    lines.extend(
+        format_generic_list(
+            report["missingGlbs"],
+            lambda item: f"- `{item['guid']}` {item['name']} ({', '.join(item['sources'])})",
+        )
+    )
     lines.extend(["", "## Duplicate Object Names", ""])
     lines.extend(
         format_generic_list(
@@ -775,7 +858,9 @@ def render_markdown_report(report: dict[str, Any]) -> str:
         )
     )
     if len(report["componentsWithoutMesh"]) > 40:
-        lines.append(f"- `{len(report['componentsWithoutMesh']) - 40}` additional entries in JSON report.")
+        lines.append(
+            f"- `{len(report['componentsWithoutMesh']) - 40}` additional entries in JSON report."
+        )
     lines.extend(["", "## Textures Not Decoded", ""])
     lines.extend(
         format_generic_list(
@@ -784,7 +869,9 @@ def render_markdown_report(report: dict[str, Any]) -> str:
         )
     )
     if len(report["texturesNotDecoded"]) > 40:
-        lines.append(f"- `{len(report['texturesNotDecoded']) - 40}` additional entries in JSON report.")
+        lines.append(
+            f"- `{len(report['texturesNotDecoded']) - 40}` additional entries in JSON report."
+        )
     lines.extend(["", "## Failed Conversions", ""])
     lines.extend(
         format_generic_list(
@@ -800,7 +887,9 @@ def format_mesh_list(items: list[dict[str, Any]]) -> list[str]:
     if not items:
         return ["- None"]
     return [f"- `{item['guid']}` — {item['name']}" for item in items[:40]] + (
-        [f"- `{len(items) - 40}` additional entries in JSON report."] if len(items) > 40 else []
+        [f"- `{len(items) - 40}` additional entries in JSON report."]
+        if len(items) > 40
+        else []
     )
 
 

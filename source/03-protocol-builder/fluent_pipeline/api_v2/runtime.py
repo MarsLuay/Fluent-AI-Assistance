@@ -69,7 +69,7 @@ class MockRuntimeController:
         expected = self.resolved_expressions.get(f"user:{user}")
         if expected is not None:
             return str(password or "") == expected
-        return True
+        return False
 
     def ValidateUser(self, username: str, password: str) -> bool:
         return self.validate_user(username, password)
