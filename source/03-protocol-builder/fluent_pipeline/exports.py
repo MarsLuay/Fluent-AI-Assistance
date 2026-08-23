@@ -4807,49 +4807,50 @@ def _restore_windows_datastore_zip_names(archive_path: Path) -> None:
         data = bytearray(archive_path.read_bytes())
     except OSError:
         return
+
     changed = False
-    changed |= _rewrite_zip_filename_records(
-        data,
-        signature=b"PK\x03\x04",
-        name_len_offset=26,
-        extra_len_offset=28,
-        name_offset=30,
-    )
-    changed |= _rewrite_zip_filename_records(
-        data,
-        signature=b"PK\x01\x02",
-        name_len_offset=28,
-        extra_len_offset=30,
-        name_offset=46,
-    )
+
+    try:
+        with zipfile.ZipFile(archive_path, "r") as zf:
+            for info in zf.infolist():
+                local_header_offset = info.header_offset
+                if data[local_header_offset : local_header_offset + 4] == b"PK\x03\x04":
+                    name_len = int.from_bytes(
+                        data[local_header_offset + 26 : local_header_offset + 28], "little"
+                    )
+                    filename = bytes(data[local_header_offset + 30 : local_header_offset + 30 + name_len])
+                    rewritten = _windows_datastore_zip_filename(filename)
+
+                    if rewritten is not None and rewritten != filename and len(rewritten) == len(filename):
+                        data[local_header_offset + 30 : local_header_offset + 30 + name_len] = rewritten
+                        changed = True
+
+            cd_offset = zf.start_dir
+            for _ in zf.infolist():
+                if cd_offset >= len(data):
+                    break
+
+                if data[cd_offset : cd_offset + 4] != b"PK\x01\x02":
+                    break
+
+                filename_len = int.from_bytes(data[cd_offset + 28 : cd_offset + 30], "little")
+                extra_len = int.from_bytes(data[cd_offset + 30 : cd_offset + 32], "little")
+                comment_len = int.from_bytes(data[cd_offset + 32 : cd_offset + 34], "little")
+
+                filename = bytes(data[cd_offset + 46 : cd_offset + 46 + filename_len])
+                rewritten = _windows_datastore_zip_filename(filename)
+
+                if rewritten is not None and rewritten != filename and len(rewritten) == len(filename):
+                    data[cd_offset + 46 : cd_offset + 46 + filename_len] = rewritten
+                    changed = True
+
+                cd_offset += 46 + filename_len + extra_len + comment_len
+
+    except zipfile.BadZipFile:
+        pass
+
     if changed:
         archive_path.write_bytes(data)
-
-
-def _rewrite_zip_filename_records(
-    data: bytearray,
-    *,
-    signature: bytes,
-    name_len_offset: int,
-    extra_len_offset: int,
-    name_offset: int,
-) -> bool:
-    changed = False
-    index = 0
-    while True:
-        start = data.find(signature, index)
-        if start == -1:
-            return changed
-        filename_length = int.from_bytes(data[start + name_len_offset : start + name_len_offset + 2], "little")
-        extra_length = int.from_bytes(data[start + extra_len_offset : start + extra_len_offset + 2], "little")
-        filename_start = start + name_offset
-        filename_end = filename_start + filename_length
-        filename = bytes(data[filename_start:filename_end])
-        rewritten = _windows_datastore_zip_filename(filename)
-        if rewritten is not None and rewritten != filename and len(rewritten) == filename_length:
-            data[filename_start:filename_end] = rewritten
-            changed = True
-        index = filename_end + extra_length
 
 
 def _windows_datastore_zip_filename(filename: bytes) -> bytes | None:
