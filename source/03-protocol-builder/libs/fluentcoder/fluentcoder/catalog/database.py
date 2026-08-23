@@ -1278,17 +1278,13 @@ class TecanDatabase:
             if protocol_type:
                 where.append("(protocol_type IS NULL OR protocol_type = ?)")
                 params.append(protocol_type)
-            where_sql = f" WHERE {' AND '.join(where)}" if where else ""
-            if active_only:
-                rows = conn.execute(
-                    f"SELECT * FROM rules{where_sql} ORDER BY rule_type, category, name",
-                    params
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    f"SELECT * FROM rules{where_sql} ORDER BY rule_type, category, name",
-                    params
-                ).fetchall()
+
+            sql = "SELECT * FROM rules"
+            if where:
+                sql += " WHERE " + " AND ".join(where)
+            sql += " ORDER BY rule_type, category, name"
+
+            rows = conn.execute(sql, params).fetchall()
 
             results = []
             for row in rows:
