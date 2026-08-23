@@ -2887,9 +2887,41 @@ def _value_label(node: ast.AST, reagent_by_var: dict[str, str], labware_by_var: 
 
 
 def _literal_text(node: ast.AST) -> Any:
+    # A safe subset of literal_eval that prevents DoS from deeply nested structures
+    def _eval(node: ast.AST, depth: int) -> Any:
+        if depth > 100:
+            raise ValueError("AST node too deep")
+        if isinstance(node, ast.Constant):
+            return node.value
+        elif isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+            elements = [_eval(e, depth + 1) for e in node.elts]
+            if isinstance(node, ast.Tuple):
+                return tuple(elements)
+            if isinstance(node, ast.Set):
+                return set(elements)
+            return elements
+        elif isinstance(node, ast.Dict):
+            return {_eval(k, depth + 1): _eval(v, depth + 1) for k, v in zip(node.keys, node.values)}
+        elif isinstance(node, ast.UnaryOp):
+            operand = _eval(node.operand, depth + 1)
+            if isinstance(node.op, ast.UAdd) and isinstance(operand, (int, float, complex)):
+                return +operand
+            elif isinstance(node.op, ast.USub) and isinstance(operand, (int, float, complex)):
+                return -operand
+        elif isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Sub)):
+            left = _eval(node.left, depth + 1)
+            right = _eval(node.right, depth + 1)
+            if isinstance(node.op, ast.Add) and isinstance(left, (int, float, complex)) and isinstance(right, (int, float, complex)):
+                return left + right
+            elif isinstance(node.op, ast.Sub) and isinstance(left, (int, float, complex)) and isinstance(right, (int, float, complex)):
+                return left - right
+            elif isinstance(node.op, ast.Add) and isinstance(left, str) and isinstance(right, str):
+                return left + right
+        raise ValueError(f"malformed node or string: {node}")
+
     try:
-        return ast.literal_eval(node)
-    except (TypeError, ValueError, SyntaxError):
+        return _eval(node, 0)
+    except (TypeError, ValueError, SyntaxError, AttributeError):
         return None
 
 

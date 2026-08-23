@@ -7829,11 +7829,9 @@ def _value_label(
 
 
 def _literal_text(node: ast.AST) -> object:
-    try:
-        value = ast.literal_eval(node)
-    except (TypeError, ValueError, SyntaxError):
-        return None
-    return value
+    if isinstance(node, ast.Constant):
+        return node.value
+    return None
 
 
 def _source_path(draft_name: str, current_group: str, source: str, node: ast.AST) -> str:

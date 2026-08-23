@@ -2096,9 +2096,10 @@ def _raw_xml_calls(draft_path: Path | None) -> list[dict[str, Any]]:
 def _raw_xml_call_command_id(node: ast.Call) -> str | None:
     if not node.args:
         return None
-    try:
-        value = ast.literal_eval(node.args[0])
-    except (ValueError, SyntaxError):
+    arg = node.args[0]
+    if isinstance(arg, ast.Constant):
+        value = arg.value
+    else:
         return None
     text = str(value or "").strip()
     return text or None
