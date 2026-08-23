@@ -13,7 +13,6 @@ import sqlite3
 from .archive import inspect_archive
 from .common import to_jsonable
 
-
 SCHEMA_VERSION = "1"
 SCHEMA_SQL = """
         CREATE TABLE IF NOT EXISTS metadata (
@@ -224,29 +223,19 @@ def summarize_project_index(
                 "SELECT kind, COUNT(*) AS count FROM entities GROUP BY kind ORDER BY kind"
             )
         }
-        command_family_counts = {
-            row["family"]: row["count"]
-            for row in conn.execute(
-                """
+        command_family_counts = {row["family"]: row["count"] for row in conn.execute("""
                 SELECT family, COUNT(*) AS count
                 FROM commands
                 GROUP BY family
                 ORDER BY count DESC, family
-                """
-            )
-        }
-        files = [
-            dict(row)
-            for row in conn.execute(
-                """
+                """)}
+        files = [dict(row) for row in conn.execute("""
                 SELECT path, file_name, sha256, indexed_at, entry_count,
                        script_count_total, script_count_summarized,
                        object_count_summarized, gwl_count_summarized
                 FROM zeia_files
                 ORDER BY file_name, path
-                """
-            )
-        ]
+                """)]
         return {
             "kind": "project_index_summary",
             "database": database,
@@ -641,6 +630,8 @@ def _index_command_sequences(
 ) -> None:
     commands = script.get("commands", [])
     source_path = script.get("source") or ""
+
+    rows = []
     for window_size in (2, 3, 4, 5):
         if len(commands) < window_size:
             continue
@@ -650,14 +641,7 @@ def _index_command_sequences(
             command_families = " > ".join(
                 command.get("family") or "" for command in window
             )
-            conn.execute(
-                """
-                INSERT INTO command_sequences(
-                    zeia_file_id, script_id, start_index, length,
-                    command_names, command_families, source_path, metadata_json
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
+            rows.append(
                 (
                     zeia_id,
                     script_id,
@@ -674,8 +658,20 @@ def _index_command_sequences(
                             ],
                         }
                     ),
-                ),
+                )
             )
+
+    if rows:
+        conn.executemany(
+            """
+            INSERT INTO command_sequences(
+                zeia_file_id, script_id, start_index, length,
+                command_names, command_families, source_path, metadata_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            rows,
+        )
 
 
 def _index_object(conn: sqlite3.Connection, zeia_id: int, obj: dict[str, Any]) -> None:
@@ -1099,7 +1095,8 @@ def _metadata_value(conn: sqlite3.Connection, key: str) -> str:
 def _count(conn: sqlite3.Connection, table: str) -> int:
     if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", table):
         raise ValueError(f"Invalid table name: {table}")
-    row = conn.execute(f"SELECT COUNT(*) AS count FROM {table}").fetchone()
+    escaped_table = '"' + table.replace('"', '""') + '"'
+    row = conn.execute(f"SELECT COUNT(*) AS count FROM {escaped_table}").fetchone()
     return int(row["count"] or 0)
 
 
