@@ -23,6 +23,11 @@ from contextlib import contextmanager
 DEFAULT_DB_PATH = Path(__file__).resolve().parent / "tecan.db"
 
 
+def escape_identifier(name: str) -> str:
+    """Escape an SQLite identifier to prevent SQL injection."""
+    return '"' + name.replace('"', '""') + '"'
+
+
 class TecanDatabase:
     """
     SQLite-based knowledge base for Tecan commands and patterns.
@@ -694,31 +699,31 @@ class TecanDatabase:
                 set_clauses = []
                 params = []
                 if "category" in columns:
-                    set_clauses.append("category = COALESCE(?, category)")
+                    set_clauses.append(f"{escape_identifier('category')} = COALESCE(?, {escape_identifier('category')})")
                     params.append(labware.get("category"))
                 if "functional_group" in columns:
-                    set_clauses.append("functional_group = COALESCE(?, functional_group)")
+                    set_clauses.append(f"{escape_identifier('functional_group')} = COALESCE(?, {escape_identifier('functional_group')})")
                     params.append(labware.get("functional_group"))
                 if "wells" in columns:
-                    set_clauses.append("wells = COALESCE(?, wells)")
+                    set_clauses.append(f"{escape_identifier('wells')} = COALESCE(?, {escape_identifier('wells')})")
                     params.append(props.get("wells"))
                 if "rows" in columns:
-                    set_clauses.append("rows = COALESCE(?, rows)")
+                    set_clauses.append(f"{escape_identifier('rows')} = COALESCE(?, {escape_identifier('rows')})")
                     params.append(props.get("rows"))
                 if "columns" in columns:
-                    set_clauses.append("columns = COALESCE(?, columns)")
+                    set_clauses.append(f"{escape_identifier('columns')} = COALESCE(?, {escape_identifier('columns')})")
                     params.append(props.get("columns"))
                 if "x_spacing" in columns:
-                    set_clauses.append("x_spacing = COALESCE(?, x_spacing)")
+                    set_clauses.append(f"{escape_identifier('x_spacing')} = COALESCE(?, {escape_identifier('x_spacing')})")
                     params.append(props.get("x_spacing"))
                 if "y_spacing" in columns:
-                    set_clauses.append("y_spacing = COALESCE(?, y_spacing)")
+                    set_clauses.append(f"{escape_identifier('y_spacing')} = COALESCE(?, {escape_identifier('y_spacing')})")
                     params.append(props.get("y_spacing"))
                 if "properties" in columns:
-                    set_clauses.append("properties = COALESCE(?, properties)")
+                    set_clauses.append(f"{escape_identifier('properties')} = COALESCE(?, {escape_identifier('properties')})")
                     params.append(json.dumps(props) if props else None)
                 if "updated_at" in columns:
-                    set_clauses.append("updated_at = ?")
+                    set_clauses.append(f"{escape_identifier('updated_at')} = ?")
                     params.append(now)
 
                 if set_clauses:
@@ -766,8 +771,9 @@ class TecanDatabase:
                     insert_vals.append(now)
 
                 placeholders = ", ".join(["?"] * len(insert_cols))
+                escaped_cols = [escape_identifier(col) for col in insert_cols]
                 conn.execute(
-                    f"INSERT INTO labware ({', '.join(insert_cols)}) VALUES ({placeholders})",
+                    f"INSERT INTO labware ({', '.join(escaped_cols)}) VALUES ({placeholders})",
                     insert_vals
                 )
                 return True
@@ -845,7 +851,8 @@ class TecanDatabase:
                 indexes = conn.execute("PRAGMA index_list(liquid_classes)").fetchall()
                 for idx in indexes:
                     if idx["unique"]:
-                        idx_cols = [row["name"] for row in conn.execute(f"PRAGMA index_info({idx['name']})").fetchall()]
+                        idx_name_esc = escape_identifier(idx["name"])
+                        idx_cols = [row["name"] for row in conn.execute(f"PRAGMA index_info({idx_name_esc})").fetchall()]
                         if "name" in idx_cols:
                             key_cols = [c for c in idx_cols if c in columns]
                             break
@@ -865,7 +872,7 @@ class TecanDatabase:
                 elif col == "device_type":
                     key_values.append(lc.get("device_type", "unknown"))
 
-            where_clause = " AND ".join([f"{col} = ?" for col in key_cols])
+            where_clause = " AND ".join([f"{escape_identifier(col)} = ?" for col in key_cols])
             existing = conn.execute(
                 f"SELECT id FROM liquid_classes WHERE {where_clause}",
                 key_values
@@ -875,25 +882,25 @@ class TecanDatabase:
                 set_clauses = []
                 params = []
                 if "description" in columns:
-                    set_clauses.append("description = COALESCE(?, description)")
+                    set_clauses.append(f"{escape_identifier('description')} = COALESCE(?, {escape_identifier('description')})")
                     params.append(lc.get("description"))
                 if "aspiration_speed" in columns:
-                    set_clauses.append("aspiration_speed = COALESCE(?, aspiration_speed)")
+                    set_clauses.append(f"{escape_identifier('aspiration_speed')} = COALESCE(?, {escape_identifier('aspiration_speed')})")
                     params.append(key_params.get("aspirationSpeed"))
                 if "dispense_speed" in columns:
-                    set_clauses.append("dispense_speed = COALESCE(?, dispense_speed)")
+                    set_clauses.append(f"{escape_identifier('dispense_speed')} = COALESCE(?, {escape_identifier('dispense_speed')})")
                     params.append(key_params.get("dispenseSpeed"))
                 if "key_parameters" in columns:
-                    set_clauses.append("key_parameters = COALESCE(?, key_parameters)")
+                    set_clauses.append(f"{escape_identifier('key_parameters')} = COALESCE(?, {escape_identifier('key_parameters')})")
                     params.append(json.dumps(key_params) if key_params else None)
                 if "all_parameters" in columns:
-                    set_clauses.append("all_parameters = COALESCE(?, all_parameters)")
+                    set_clauses.append(f"{escape_identifier('all_parameters')} = COALESCE(?, {escape_identifier('all_parameters')})")
                     params.append(json.dumps(all_params) if all_params else None)
                 if "conditions" in columns:
-                    set_clauses.append("conditions = COALESCE(?, conditions)")
+                    set_clauses.append(f"{escape_identifier('conditions')} = COALESCE(?, {escape_identifier('conditions')})")
                     params.append(json.dumps(conditions) if conditions else None)
                 if "updated_at" in columns:
-                    set_clauses.append("updated_at = ?")
+                    set_clauses.append(f"{escape_identifier('updated_at')} = ?")
                     params.append(now)
 
                 if set_clauses:
@@ -936,8 +943,9 @@ class TecanDatabase:
                     insert_vals.append(now)
 
                 placeholders = ", ".join(["?"] * len(insert_cols))
+                escaped_cols = [escape_identifier(col) for col in insert_cols]
                 conn.execute(
-                    f"INSERT INTO liquid_classes ({', '.join(insert_cols)}) VALUES ({placeholders})",
+                    f"INSERT INTO liquid_classes ({', '.join(escaped_cols)}) VALUES ({placeholders})",
                     insert_vals
                 )
                 return True
