@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
+import dataclasses
 import hashlib
 import json
 import re
@@ -145,6 +146,16 @@ ENTITY_KINDS = {
     "reference",
     "catalog_object",
 }
+
+
+@dataclasses.dataclass
+class IndexContext:
+    """Context for indexing operations."""
+
+    conn: sqlite3.Connection
+    zeia_id: int
+    script_id: int
+    source_path: str
 
 
 def discover_zeia_paths(paths: Iterable[str | Path]) -> list[Path]:
@@ -528,6 +539,7 @@ def _index_commands(
 ) -> None:
     source_path = script.get("source") or ""
     commands = script.get("commands", [])
+    ctx = IndexContext(conn, zeia_id, script_id, source_path)
 
     conn.executemany(
         """
@@ -557,10 +569,7 @@ def _index_commands(
         command_index = int(command.get("index") or 0)
         fields = command.get("fields", {})
         _index_command_field_entities(
-            conn,
-            zeia_id,
-            script_id,
-            source_path,
+            ctx,
             command_index,
             fields,
             command.get("family") or "",
@@ -568,10 +577,7 @@ def _index_commands(
 
 
 def _index_command_field_entities(
-    conn: sqlite3.Connection,
-    zeia_id: int,
-    script_id: int,
-    source_path: str,
+    ctx: IndexContext,
     command_index: int,
     fields: dict[str, Any],
     family: str,
@@ -590,13 +596,13 @@ def _index_command_field_entities(
         if not value:
             continue
         _insert_entity(
-            conn,
-            zeia_id,
-            script_id,
+            ctx.conn,
+            ctx.zeia_id,
+            ctx.script_id,
             kind,
             value,
             field_name,
-            source_path,
+            ctx.source_path,
             {"field": field_name, "family": family},
             command_index=command_index,
         )
@@ -610,13 +616,13 @@ def _index_command_field_entities(
             else "dependency"
         )
         _insert_entity(
-            conn,
-            zeia_id,
-            script_id,
+            ctx.conn,
+            ctx.zeia_id,
+            ctx.script_id,
             kind,
             value,
             field_name,
-            source_path,
+            ctx.source_path,
             {"field": field_name, "family": family},
             command_index=command_index,
         )
