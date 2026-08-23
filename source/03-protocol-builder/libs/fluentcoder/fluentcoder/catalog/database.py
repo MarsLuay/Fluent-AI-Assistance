@@ -519,18 +519,20 @@ class TecanDatabase:
                 "tip_type": "MCA384",
             },
         ]
-        for adapter in adapters:
-            conn.execute("""
-                INSERT OR IGNORE INTO adapters
-                (name, display_name, labware_pattern, x_count, y_count, x_spacing, y_spacing,
-                 tool_id, can_mount_tecan_ditis, tip_type, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
+        conn.executemany("""
+            INSERT OR IGNORE INTO adapters
+            (name, display_name, labware_pattern, x_count, y_count, x_spacing, y_spacing,
+             tool_id, can_mount_tecan_ditis, tip_type, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, [
+            (
                 adapter["name"], adapter["display_name"], adapter["labware_pattern"],
                 adapter["x_count"], adapter["y_count"], adapter["x_spacing"], adapter["y_spacing"],
                 adapter["tool_id"], adapter["can_mount_tecan_ditis"], adapter["tip_type"],
                 now, now
-            ))
+            )
+            for adapter in adapters
+        ])
 
     # =========================================================================
     # COMMAND OPERATIONS
