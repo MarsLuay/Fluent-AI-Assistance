@@ -3371,5 +3371,58 @@ class ProjectAuditMergeTests(unittest.TestCase):
         self.assertEqual(dependencies[0]["object_name"], "SUB_Get_Fingers_v1.0")
 
 
+class ArchiveWindowsNameRestorationTests(unittest.TestCase):
+    def test_rewrite_zip_filename_records_false_signature_payload(self):
+        """
+        Verify that `_restore_windows_datastore_zip_names` does not corrupt the ZIP
+        file if a file payload happens to contain a fake `PK\\x01\\x02` or `PK\\x03\\x04`
+        signature followed by deceptive bytes that look like lengths but are actually
+        large values.
+        """
+        from fluent_pipeline.exports import _restore_windows_datastore_zip_names
+
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "test.zip"
+            with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_STORED) as zf:
+                # We craft a payload containing a fake central directory signature
+                payload = bytearray(b"hello PK\x01\x02")
+
+                # The signature starts at offset 6.
+                # name_len_offset is 28, so we need to pad 28 - 4 = 24 bytes (since PK\x01\x02 is 4 bytes).
+                payload.extend(b"\x00" * 24)
+                payload.extend((25).to_bytes(2, "little")) # fake name_len = 25
+                payload.extend((1000).to_bytes(2, "little")) # fake extra_len = 1000
+
+                # extra_len ends at offset 32 relative to the signature.
+                # name_offset is 46, so we need 46 - 32 = 14 bytes padding.
+                payload.extend(b"\x00" * 14)
+
+                # We put a string that triggers `_windows_datastore_zip_filename`
+                payload.extend(b"DataStore/false_file1.txt")
+
+                # Add enough padding so `filename_end` doesn't fall outside the file.
+                payload.extend(b"\x00" * 1200)
+
+                # Write multiple files so the central directory comes after
+                zf.writestr("DataStore/file1.txt", payload)
+                zf.writestr("meta/file2.txt", b"world")
+                zf.writestr("other/file3.txt", b"test")
+
+            # Check that testzip is ok before processing
+            with zipfile.ZipFile(p, "r") as zf:
+                self.assertIsNone(zf.testzip())
+
+            _restore_windows_datastore_zip_names(p)
+
+            # If the patch failed (i.e. skipped past the actual header or corrupted
+            # the payload inside file1.txt), testzip will return the corrupted file name.
+            with zipfile.ZipFile(p, "r") as zf:
+                ret = zf.testzip()
+                self.assertIsNone(ret)
+                names = zf.namelist()
+                # Verify that it correctly processed `meta/file2.txt` to `meta\\file2.txt`.
+                self.assertIn("meta\\file2.txt", names)
+
+
 if __name__ == "__main__":
     unittest.main()
