@@ -13,6 +13,7 @@ Can migrate to PostgreSQL for multi-user scenarios.
 
 import sqlite3
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -40,6 +41,12 @@ class TecanDatabase:
         self._init_schema()
         self._migrate_schema()
         self.seed_dsl_recipes()
+
+    def _validate_identifier(self, name: str) -> str:
+        """Validate SQL identifier to prevent SQL injection."""
+        if not re.match(r'^[a-zA-Z0-9_]+$', name):
+            raise ValueError(f"Invalid SQL identifier: {name}")
+        return name
 
     @contextmanager
     def _connection(self):
@@ -684,62 +691,70 @@ class TecanDatabase:
         props = labware.get("properties", {})
 
         with self._connection() as conn:
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(labware)").fetchall()}
             existing = conn.execute(
                 "SELECT id FROM labware WHERE name = ?",
                 (labware["name"],)
             ).fetchone()
 
             if existing:
-                conn.execute(
-                    """
-                    UPDATE labware SET
-                        category = COALESCE(?, category),
-                        functional_group = COALESCE(?, functional_group),
-                        wells = COALESCE(?, wells),
-                        rows = COALESCE(?, rows),
-                        columns = COALESCE(?, columns),
-                        x_spacing = COALESCE(?, x_spacing),
-                        y_spacing = COALESCE(?, y_spacing),
-                        properties = COALESCE(?, properties),
-                        updated_at = ?
-                    WHERE name = ?
-                    """,
-                    (
-                        labware.get("category"),
-                        labware.get("functional_group"),
-                        props.get("wells"),
-                        props.get("rows"),
-                        props.get("columns"),
-                        props.get("x_spacing"),
-                        props.get("y_spacing"),
-                        json.dumps(props) if props else None,
-                        now,
-                        labware["name"]
+                set_clauses = []
+                params = []
+
+                def add_coalesce_clause(col: str, value: Any):
+                    if col in columns:
+                        safe_col = self._validate_identifier(col)
+                        set_clauses.append(f"{safe_col} = COALESCE(?, {safe_col})")
+                        params.append(value)
+
+                def add_set_clause(col: str, value: Any):
+                    if col in columns:
+                        safe_col = self._validate_identifier(col)
+                        set_clauses.append(f"{safe_col} = ?")
+                        params.append(value)
+
+                add_coalesce_clause("category", labware.get("category"))
+                add_coalesce_clause("functional_group", labware.get("functional_group"))
+                add_coalesce_clause("wells", props.get("wells"))
+                add_coalesce_clause("rows", props.get("rows"))
+                add_coalesce_clause("columns", props.get("columns"))
+                add_coalesce_clause("x_spacing", props.get("x_spacing"))
+                add_coalesce_clause("y_spacing", props.get("y_spacing"))
+                add_coalesce_clause("properties", json.dumps(props) if props else None)
+                add_set_clause("updated_at", now)
+
+                if set_clauses:
+                    params.append(labware["name"])
+                    conn.execute(
+                        f"UPDATE labware SET {', '.join(set_clauses)} WHERE name = ?",
+                        params
                     )
-                )
                 return False
             else:
+                insert_cols = [self._validate_identifier("name")]
+                insert_vals = [labware["name"]]
+
+                def add_insert(col: str, value: Any):
+                    if col in columns:
+                        insert_cols.append(self._validate_identifier(col))
+                        insert_vals.append(value)
+
+                add_insert("category", labware.get("category", "unknown"))
+                add_insert("functional_group", labware.get("functional_group"))
+                add_insert("wells", props.get("wells"))
+                add_insert("rows", props.get("rows"))
+                add_insert("columns", props.get("columns"))
+                add_insert("x_spacing", props.get("x_spacing"))
+                add_insert("y_spacing", props.get("y_spacing"))
+                add_insert("properties", json.dumps(props) if props else None)
+                add_insert("source_file", labware.get("source_file"))
+                add_insert("created_at", now)
+                add_insert("updated_at", now)
+
+                placeholders = ", ".join(["?"] * len(insert_cols))
                 conn.execute(
-                    """
-                    INSERT INTO labware (
-                        name, category, functional_group, wells, rows, columns,
-                        x_spacing, y_spacing, properties, source_file, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        labware["name"],
-                        labware.get("category", "unknown"),
-                        labware.get("functional_group"),
-                        props.get("wells"),
-                        props.get("rows"),
-                        props.get("columns"),
-                        props.get("x_spacing"),
-                        props.get("y_spacing"),
-                        json.dumps(props) if props else None,
-                        labware.get("source_file"),
-                        now,
-                        now
-                    )
+                    f"INSERT INTO labware ({', '.join(insert_cols)}) VALUES ({placeholders})",
+                    insert_vals
                 )
                 return True
 
@@ -810,58 +825,93 @@ class TecanDatabase:
         conditions = lc.get("conditions", [])
 
         with self._connection() as conn:
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(liquid_classes)").fetchall()}
+            key_cols = None
+            try:
+                indexes = conn.execute("PRAGMA index_list(liquid_classes)").fetchall()
+                for idx in indexes:
+                    if idx["unique"]:
+                        idx_cols = [row["name"] for row in conn.execute(f"PRAGMA index_info({idx['name']})").fetchall()]
+                        if "name" in idx_cols:
+                            key_cols = [c for c in idx_cols if c in columns]
+                            break
+            except Exception:
+                key_cols = None
+
+            if not key_cols:
+                key_cols = ["name", "device_type"] if "device_type" in columns else ["name"]
+            key_cols = [c for c in key_cols if c in columns]
+            if not key_cols:
+                key_cols = ["name"]
+
+            key_values = []
+            safe_key_cols = [self._validate_identifier(c) for c in key_cols]
+            for col in safe_key_cols:
+                if col == "name":
+                    key_values.append(lc["name"])
+                elif col == "device_type":
+                    key_values.append(lc.get("device_type", "unknown"))
+
+            where_clause = " AND ".join([f"{col} = ?" for col in safe_key_cols])
             existing = conn.execute(
-                "SELECT id FROM liquid_classes WHERE name = ? AND device_type = ?",
-                (lc["name"], lc.get("device_type", "unknown"))
+                f"SELECT id FROM liquid_classes WHERE {where_clause}",
+                key_values
             ).fetchone()
 
             if existing:
-                conn.execute(
-                    """
-                    UPDATE liquid_classes SET
-                        description = COALESCE(?, description),
-                        aspiration_speed = COALESCE(?, aspiration_speed),
-                        dispense_speed = COALESCE(?, dispense_speed),
-                        key_parameters = COALESCE(?, key_parameters),
-                        all_parameters = COALESCE(?, all_parameters),
-                        conditions = COALESCE(?, conditions),
-                        updated_at = ?
-                    WHERE name = ? AND device_type = ?
-                    """,
-                    (
-                        lc.get("description"),
-                        key_params.get("aspirationSpeed"),
-                        key_params.get("dispenseSpeed"),
-                        json.dumps(key_params) if key_params else None,
-                        json.dumps(all_params) if all_params else None,
-                        json.dumps(conditions) if conditions else None,
-                        now,
-                        lc["name"],
-                        lc.get("device_type", "unknown")
+                set_clauses = []
+                params = []
+
+                def add_coalesce_clause(col: str, value: Any):
+                    if col in columns:
+                        safe_col = self._validate_identifier(col)
+                        set_clauses.append(f"{safe_col} = COALESCE(?, {safe_col})")
+                        params.append(value)
+
+                def add_set_clause(col: str, value: Any):
+                    if col in columns:
+                        safe_col = self._validate_identifier(col)
+                        set_clauses.append(f"{safe_col} = ?")
+                        params.append(value)
+
+                add_coalesce_clause("description", lc.get("description"))
+                add_coalesce_clause("aspiration_speed", key_params.get("aspirationSpeed"))
+                add_coalesce_clause("dispense_speed", key_params.get("dispenseSpeed"))
+                add_coalesce_clause("key_parameters", json.dumps(key_params) if key_params else None)
+                add_coalesce_clause("all_parameters", json.dumps(all_params) if all_params else None)
+                add_coalesce_clause("conditions", json.dumps(conditions) if conditions else None)
+                add_set_clause("updated_at", now)
+
+                if set_clauses:
+                    params.extend(key_values)
+                    conn.execute(
+                        f"UPDATE liquid_classes SET {', '.join(set_clauses)} WHERE {where_clause}",
+                        params
                     )
-                )
                 return False
             else:
+                insert_cols = [self._validate_identifier("name"), self._validate_identifier("device_type")]
+                insert_vals = [lc["name"], lc.get("device_type", "unknown")]
+
+                def add_insert(col: str, value: Any):
+                    if col in columns:
+                        insert_cols.append(self._validate_identifier(col))
+                        insert_vals.append(value)
+
+                add_insert("description", lc.get("description"))
+                add_insert("aspiration_speed", key_params.get("aspirationSpeed"))
+                add_insert("dispense_speed", key_params.get("dispenseSpeed"))
+                add_insert("key_parameters", json.dumps(key_params) if key_params else None)
+                add_insert("all_parameters", json.dumps(all_params) if all_params else None)
+                add_insert("conditions", json.dumps(conditions) if conditions else None)
+                add_insert("source_file", lc.get("source_file"))
+                add_insert("created_at", now)
+                add_insert("updated_at", now)
+
+                placeholders = ", ".join(["?"] * len(insert_cols))
                 conn.execute(
-                    """
-                    INSERT INTO liquid_classes (
-                        name, device_type, description, aspiration_speed, dispense_speed,
-                        key_parameters, all_parameters, conditions, source_file, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        lc["name"],
-                        lc.get("device_type", "unknown"),
-                        lc.get("description"),
-                        key_params.get("aspirationSpeed"),
-                        key_params.get("dispenseSpeed"),
-                        json.dumps(key_params) if key_params else None,
-                        json.dumps(all_params) if all_params else None,
-                        json.dumps(conditions) if conditions else None,
-                        lc.get("source_file"),
-                        now,
-                        now
-                    )
+                    f"INSERT INTO liquid_classes ({', '.join(insert_cols)}) VALUES ({placeholders})",
+                    insert_vals
                 )
                 return True
 
@@ -1228,17 +1278,13 @@ class TecanDatabase:
             if protocol_type:
                 where.append("(protocol_type IS NULL OR protocol_type = ?)")
                 params.append(protocol_type)
-            where_sql = f" WHERE {' AND '.join(where)}" if where else ""
-            if active_only:
-                rows = conn.execute(
-                    f"SELECT * FROM rules{where_sql} ORDER BY rule_type, category, name",
-                    params
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    f"SELECT * FROM rules{where_sql} ORDER BY rule_type, category, name",
-                    params
-                ).fetchall()
+
+            sql = "SELECT * FROM rules"
+            if where:
+                sql += " WHERE " + " AND ".join(where)
+            sql += " ORDER BY rule_type, category, name"
+
+            rows = conn.execute(sql, params).fetchall()
 
             results = []
             for row in rows:
