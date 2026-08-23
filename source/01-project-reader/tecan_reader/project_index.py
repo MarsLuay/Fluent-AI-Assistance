@@ -630,38 +630,33 @@ def _index_command_sequences(
 ) -> None:
     commands = script.get("commands", [])
     source_path = script.get("source") or ""
+    sequence_data = []
 
-    rows = []
     for window_size in (2, 3, 4, 5):
         if len(commands) < window_size:
             continue
         for start in range(0, len(commands) - window_size + 1):
             window = commands[start : start + window_size]
             command_names = " > ".join(command.get("type") or "" for command in window)
-            command_families = " > ".join(
-                command.get("family") or "" for command in window
-            )
-            rows.append(
-                (
-                    zeia_id,
-                    script_id,
-                    int(window[0].get("index") or start + 1),
-                    window_size,
-                    command_names,
-                    command_families,
-                    source_path,
-                    _dump(
-                        {
-                            "lines": [command.get("line") or "" for command in window],
-                            "raw_types": [
-                                command.get("raw_type") or "" for command in window
-                            ],
-                        }
-                    ),
-                )
-            )
+            command_families = " > ".join(command.get("family") or "" for command in window)
 
-    if rows:
+            sequence_data.append((
+                zeia_id,
+                script_id,
+                int(window[0].get("index") or start + 1),
+                window_size,
+                command_names,
+                command_families,
+                source_path,
+                _dump(
+                    {
+                        "lines": [command.get("line") or "" for command in window],
+                        "raw_types": [command.get("raw_type") or "" for command in window],
+                    }
+                ),
+            ))
+
+    if sequence_data:
         conn.executemany(
             """
             INSERT INTO command_sequences(
@@ -670,7 +665,7 @@ def _index_command_sequences(
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            rows,
+            sequence_data
         )
 
 
