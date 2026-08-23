@@ -50,7 +50,9 @@ def discover_zeia_paths(paths: Iterable[str | Path]) -> list[Path]:
     for raw_path in paths:
         path = Path(raw_path).expanduser()
         if path.is_dir():
-            discovered.extend(sorted(item for item in path.rglob("*.zeia") if item.is_file()))
+            discovered.extend(
+                sorted(item for item in path.rglob("*.zeia") if item.is_file())
+            )
             continue
         if path.is_file() and path.suffix.lower() == ".zeia":
             discovered.append(path)
@@ -106,7 +108,9 @@ def build_project_index(
     }
 
 
-def summarize_project_index(db_path_or_conn: str | Path | sqlite3.Connection) -> dict[str, Any]:
+def summarize_project_index(
+    db_path_or_conn: str | Path | sqlite3.Connection,
+) -> dict[str, Any]:
     """Return project-level counts and file summaries from an index."""
     conn, should_close, database = _connection_arg(db_path_or_conn)
     try:
@@ -169,7 +173,9 @@ def search_project_index(
     database = Path(db_path)
     conn = _connect(database)
     try:
-        normalized_kind = kind.strip().lower().replace("-", "_").replace(" ", "_") if kind else None
+        normalized_kind = (
+            kind.strip().lower().replace("-", "_").replace(" ", "_") if kind else None
+        )
         rows = _search_rows(conn, query=query, kind=normalized_kind, limit=limit)
         return {
             "kind": "project_index_search",
@@ -190,7 +196,9 @@ def _connect(path: str | Path) -> sqlite3.Connection:
     return conn
 
 
-def _connection_arg(value: str | Path | sqlite3.Connection) -> tuple[sqlite3.Connection, bool, str]:
+def _connection_arg(
+    value: str | Path | sqlite3.Connection,
+) -> tuple[sqlite3.Connection, bool, str]:
     if isinstance(value, sqlite3.Connection):
         value.row_factory = sqlite3.Row
         return value, False, ""
@@ -310,9 +318,13 @@ def _initialize_database(conn: sqlite3.Connection) -> None:
     )
 
 
-def _index_archive(conn: sqlite3.Connection, zeia_path: Path, report: dict[str, Any]) -> None:
+def _index_archive(
+    conn: sqlite3.Connection, zeia_path: Path, report: dict[str, Any]
+) -> None:
     archive_path = str(zeia_path.resolve())
-    existing = conn.execute("SELECT id FROM zeia_files WHERE path = ?", (archive_path,)).fetchone()
+    existing = conn.execute(
+        "SELECT id FROM zeia_files WHERE path = ?", (archive_path,)
+    ).fetchone()
     if existing:
         conn.execute("DELETE FROM zeia_files WHERE id = ?", (existing["id"],))
 
@@ -349,7 +361,9 @@ def _index_archive(conn: sqlite3.Connection, zeia_path: Path, report: dict[str, 
         _index_worklist(conn, zeia_id, gwl)
 
 
-def _index_script(conn: sqlite3.Connection, zeia_id: int, script: dict[str, Any]) -> None:
+def _index_script(
+    conn: sqlite3.Connection, zeia_id: int, script: dict[str, Any]
+) -> None:
     source_path = script.get("source") or ""
     cursor = conn.execute(
         """
@@ -404,9 +418,20 @@ def _index_references(
         object_name = ref.get("object_name") or ref.get("guid") or ""
         metadata = {"type_id": type_id, "guid": ref.get("guid") or ""}
         kind = "worktable" if "worktable" in type_id.lower() else "reference"
-        _insert_entity(conn, zeia_id, script_id, kind, object_name, type_id, source_path, metadata)
+        _insert_entity(
+            conn, zeia_id, script_id, kind, object_name, type_id, source_path, metadata
+        )
         if kind != "reference":
-            _insert_entity(conn, zeia_id, script_id, "reference", object_name, type_id, source_path, metadata)
+            _insert_entity(
+                conn,
+                zeia_id,
+                script_id,
+                "reference",
+                object_name,
+                type_id,
+                source_path,
+                metadata,
+            )
 
 
 def _index_variables(
@@ -513,29 +538,35 @@ def _index_commands(
     script: dict[str, Any],
 ) -> None:
     source_path = script.get("source") or ""
-    for command in script.get("commands", []):
-        command_index = int(command.get("index") or 0)
-        fields = command.get("fields", {})
-        conn.execute(
-            """
-            INSERT INTO commands(
-                zeia_file_id, script_id, command_index, command_type, raw_type,
-                family, line, name, fields_json
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
+    commands = script.get("commands", [])
+
+    conn.executemany(
+        """
+        INSERT INTO commands(
+            zeia_file_id, script_id, command_index, command_type, raw_type,
+            family, line, name, fields_json
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
             (
                 zeia_id,
                 script_id,
-                command_index,
+                int(command.get("index") or 0),
                 command.get("type") or "",
                 command.get("raw_type") or "",
                 command.get("family") or "",
                 command.get("line") or "",
                 command.get("name") or "",
-                _dump(fields),
-            ),
-        )
+                _dump(command.get("fields", {})),
+            )
+            for command in commands
+        ),
+    )
+
+    for command in commands:
+        command_index = int(command.get("index") or 0)
+        fields = command.get("fields", {})
         _index_command_field_entities(
             conn,
             zeia_id,
@@ -584,7 +615,11 @@ def _index_command_field_entities(
         value = str(fields.get(field_name) or "").strip()
         if not value:
             continue
-        kind = "worklist" if family == "Worklist" or value.lower().endswith(".gwl") else "dependency"
+        kind = (
+            "worklist"
+            if family == "Worklist" or value.lower().endswith(".gwl")
+            else "dependency"
+        )
         _insert_entity(
             conn,
             zeia_id,
@@ -610,9 +645,11 @@ def _index_command_sequences(
         if len(commands) < window_size:
             continue
         for start in range(0, len(commands) - window_size + 1):
-            window = commands[start:start + window_size]
+            window = commands[start : start + window_size]
             command_names = " > ".join(command.get("type") or "" for command in window)
-            command_families = " > ".join(command.get("family") or "" for command in window)
+            command_families = " > ".join(
+                command.get("family") or "" for command in window
+            )
             conn.execute(
                 """
                 INSERT INTO command_sequences(
@@ -632,7 +669,9 @@ def _index_command_sequences(
                     _dump(
                         {
                             "lines": [command.get("line") or "" for command in window],
-                            "raw_types": [command.get("raw_type") or "" for command in window],
+                            "raw_types": [
+                                command.get("raw_type") or "" for command in window
+                            ],
                         }
                     ),
                 ),
@@ -672,14 +711,36 @@ def _index_object(conn: sqlite3.Connection, zeia_id: int, obj: dict[str, Any]) -
         "renderer": obj.get("renderer") or "",
         "guids": obj.get("guids", []),
     }
-    _insert_entity(conn, zeia_id, None, object_kind, object_name, obj.get("kind") or "", source_path, metadata)
+    _insert_entity(
+        conn,
+        zeia_id,
+        None,
+        object_kind,
+        object_name,
+        obj.get("kind") or "",
+        source_path,
+        metadata,
+    )
     if object_kind != "catalog_object":
-        _insert_entity(conn, zeia_id, None, "catalog_object", object_name, obj.get("kind") or "", source_path, metadata)
+        _insert_entity(
+            conn,
+            zeia_id,
+            None,
+            "catalog_object",
+            object_name,
+            obj.get("kind") or "",
+            source_path,
+            metadata,
+        )
     for name in obj.get("names", []):
-        _insert_entity(conn, zeia_id, None, object_kind, name, "object_name", source_path, metadata)
+        _insert_entity(
+            conn, zeia_id, None, object_kind, name, "object_name", source_path, metadata
+        )
 
 
-def _index_worklist(conn: sqlite3.Connection, zeia_id: int, gwl: dict[str, Any]) -> None:
+def _index_worklist(
+    conn: sqlite3.Connection, zeia_id: int, gwl: dict[str, Any]
+) -> None:
     source_path = gwl.get("source") or ""
     conn.execute(
         """
@@ -722,7 +783,10 @@ def _index_worklist(conn: sqlite3.Connection, zeia_id: int, gwl: dict[str, Any])
                 example["rack_label"],
                 "gwl_rack_label",
                 source_path,
-                {"line": example.get("line") or "", "operation": example.get("operation") or ""},
+                {
+                    "line": example.get("line") or "",
+                    "operation": example.get("operation") or "",
+                },
             )
         if example.get("rack_type"):
             _insert_entity(
@@ -733,7 +797,10 @@ def _index_worklist(conn: sqlite3.Connection, zeia_id: int, gwl: dict[str, Any])
                 example["rack_type"],
                 "gwl_rack_type",
                 source_path,
-                {"line": example.get("line") or "", "operation": example.get("operation") or ""},
+                {
+                    "line": example.get("line") or "",
+                    "operation": example.get("operation") or "",
+                },
             )
         if example.get("liquid_class"):
             _insert_entity(
@@ -744,7 +811,10 @@ def _index_worklist(conn: sqlite3.Connection, zeia_id: int, gwl: dict[str, Any])
                 example["liquid_class"],
                 "gwl_liquid_class",
                 source_path,
-                {"line": example.get("line") or "", "operation": example.get("operation") or ""},
+                {
+                    "line": example.get("line") or "",
+                    "operation": example.get("operation") or "",
+                },
             )
 
 
@@ -772,7 +842,16 @@ def _insert_entity(
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (zeia_id, script_id, kind, name, value, source_path, command_index, _dump(metadata)),
+        (
+            zeia_id,
+            script_id,
+            kind,
+            name,
+            value,
+            source_path,
+            command_index,
+            _dump(metadata),
+        ),
     )
 
 
@@ -874,7 +953,9 @@ def _search_entities(
     ]
 
 
-def _search_scripts(conn: sqlite3.Connection, pattern: str, *, limit: int) -> list[dict[str, Any]]:
+def _search_scripts(
+    conn: sqlite3.Connection, pattern: str, *, limit: int
+) -> list[dict[str, Any]]:
     rows = conn.execute(
         """
         SELECT s.object_name, s.entry_path, s.script_version, s.checksum,
@@ -913,7 +994,9 @@ def _search_scripts(conn: sqlite3.Connection, pattern: str, *, limit: int) -> li
     ]
 
 
-def _search_commands(conn: sqlite3.Connection, pattern: str, *, limit: int) -> list[dict[str, Any]]:
+def _search_commands(
+    conn: sqlite3.Connection, pattern: str, *, limit: int
+) -> list[dict[str, Any]]:
     rows = conn.execute(
         """
         SELECT c.command_index, c.command_type, c.raw_type, c.family, c.line,
@@ -955,7 +1038,9 @@ def _search_commands(conn: sqlite3.Connection, pattern: str, *, limit: int) -> l
     ]
 
 
-def _search_sequences(conn: sqlite3.Connection, pattern: str, *, limit: int) -> list[dict[str, Any]]:
+def _search_sequences(
+    conn: sqlite3.Connection, pattern: str, *, limit: int
+) -> list[dict[str, Any]]:
     rows = conn.execute(
         """
         SELECT q.start_index, q.length, q.command_names, q.command_families,
