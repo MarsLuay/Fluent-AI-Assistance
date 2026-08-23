@@ -130,7 +130,7 @@ class ExternalFileDependencyTests(unittest.TestCase):
 
     def test_default_search_roots_include_documents(self):
         with patch("pathlib.Path.home", return_value=Path("/mocked/home")):
-            with patch("pathlib.Path.is_dir", side_effect=lambda: True):
+            with patch("pathlib.Path.is_dir", return_value=True):
                 with patch.dict("os.environ", {}, clear=False):
                     roots = default_external_file_search_roots()
         self.assertTrue(any(path.name == "Documents" for path in roots))
