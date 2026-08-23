@@ -729,7 +729,7 @@ class TecanDatabase:
 
                 if set_clauses:
                     params.append(labware["name"])
-                    update_query = f"UPDATE labware SET {', '.join(set_clauses)} WHERE name = ?"  # nosec B608
+                    update_query = f"UPDATE labware SET {', '.join(set_clauses)} WHERE name = ?"
                     conn.execute(
                         update_query,
                         params
@@ -774,9 +774,8 @@ class TecanDatabase:
 
                 placeholders = ", ".join(["?"] * len(insert_cols))
                 quoted_insert_cols = [_quote_ident(c) for c in insert_cols]
-                insert_query = f"INSERT INTO labware ({', '.join(quoted_insert_cols)}) VALUES ({placeholders})"  # nosec B608
                 conn.execute(
-                    insert_query,
+                    f"INSERT INTO labware ({', '.join(quoted_insert_cols)}) VALUES ({placeholders})",
                     insert_vals
                 )
                 return True
@@ -875,9 +874,8 @@ class TecanDatabase:
                     key_values.append(lc.get("device_type", "unknown"))
 
             where_clause = " AND ".join([f"{_quote_ident(col)} = ?" for col in key_cols])
-            select_query = f"SELECT id FROM liquid_classes WHERE {where_clause}"  # nosec B608
             existing = conn.execute(
-                select_query,
+                f"SELECT id FROM liquid_classes WHERE {where_clause}",
                 key_values
             ).fetchone()
 
@@ -908,7 +906,7 @@ class TecanDatabase:
 
                 if set_clauses:
                     params.extend(key_values)
-                    update_query = f"UPDATE liquid_classes SET {', '.join(set_clauses)} WHERE {where_clause}"  # nosec B608
+                    update_query = f"UPDATE liquid_classes SET {', '.join(set_clauses)} WHERE {where_clause}"
                     conn.execute(
                         update_query,
                         params
@@ -948,9 +946,8 @@ class TecanDatabase:
 
                 placeholders = ", ".join(["?"] * len(insert_cols))
                 quoted_insert_cols = [_quote_ident(c) for c in insert_cols]
-                insert_query = f"INSERT INTO liquid_classes ({', '.join(quoted_insert_cols)}) VALUES ({placeholders})"  # nosec B608
                 conn.execute(
-                    insert_query,
+                    f"INSERT INTO liquid_classes ({', '.join(quoted_insert_cols)}) VALUES ({placeholders})",
                     insert_vals
                 )
                 return True
@@ -1319,7 +1316,7 @@ class TecanDatabase:
                 where.append("(protocol_type IS NULL OR protocol_type = ?)")
                 params.append(protocol_type)
             where_sql = f" WHERE {' AND '.join(where)}" if where else ""
-            select_query = f"SELECT * FROM rules{where_sql} ORDER BY rule_type, category, name"  # nosec B608
+            select_query = f"SELECT * FROM rules{where_sql} ORDER BY rule_type, category, name"
             if active_only:
                 rows = conn.execute(
                     select_query,

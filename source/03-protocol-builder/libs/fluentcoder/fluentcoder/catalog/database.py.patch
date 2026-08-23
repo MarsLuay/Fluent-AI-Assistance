@@ -1,0 +1,56 @@
+--- source/03-protocol-builder/libs/fluentcoder/fluentcoder/catalog/database.py
++++ source/03-protocol-builder/libs/fluentcoder/fluentcoder/catalog/database.py
+@@ -729,7 +729,7 @@
+
+                 if set_clauses:
+                     params.append(labware["name"])
+-                    update_query = f"UPDATE labware SET {', '.join(set_clauses)} WHERE name = ?"
++                    update_query = f"UPDATE labware SET {', '.join(set_clauses)} WHERE name = ?"  # nosec B608
+                     conn.execute(
+                         update_query,
+                         params
+@@ -774,7 +774,7 @@
+
+                 placeholders = ", ".join(["?"] * len(insert_cols))
+                 quoted_insert_cols = [_quote_ident(c) for c in insert_cols]
+-                insert_query = f"INSERT INTO labware ({', '.join(quoted_insert_cols)}) VALUES ({placeholders})"
++                insert_query = f"INSERT INTO labware ({', '.join(quoted_insert_cols)}) VALUES ({placeholders})"  # nosec B608
+                 conn.execute(
+                     insert_query,
+                     insert_vals
+@@ -875,7 +875,7 @@
+                     key_values.append(lc.get("device_type", "unknown"))
+
+             where_clause = " AND ".join([f"{_quote_ident(col)} = ?" for col in key_cols])
+-            select_query = f"SELECT id FROM liquid_classes WHERE {where_clause}"
++            select_query = f"SELECT id FROM liquid_classes WHERE {where_clause}"  # nosec B608
+             existing = conn.execute(
+                 select_query,
+                 key_values
+@@ -908,7 +908,7 @@
+
+                 if set_clauses:
+                     params.extend(key_values)
+-                    update_query = f"UPDATE liquid_classes SET {', '.join(set_clauses)} WHERE {where_clause}"
++                    update_query = f"UPDATE liquid_classes SET {', '.join(set_clauses)} WHERE {where_clause}"  # nosec B608
+                     conn.execute(
+                         update_query,
+                         params
+@@ -948,7 +948,7 @@
+
+                 placeholders = ", ".join(["?"] * len(insert_cols))
+                 quoted_insert_cols = [_quote_ident(c) for c in insert_cols]
+-                insert_query = f"INSERT INTO liquid_classes ({', '.join(quoted_insert_cols)}) VALUES ({placeholders})"
++                insert_query = f"INSERT INTO liquid_classes ({', '.join(quoted_insert_cols)}) VALUES ({placeholders})"  # nosec B608
+                 conn.execute(
+                     insert_query,
+                     insert_vals
+@@ -1319,7 +1319,7 @@
+                 where.append("(protocol_type IS NULL OR protocol_type = ?)")
+                 params.append(protocol_type)
+             where_sql = f" WHERE {' AND '.join(where)}" if where else ""
+-            select_query = f"SELECT * FROM rules{where_sql} ORDER BY rule_type, category, name"
++            select_query = f"SELECT * FROM rules{where_sql} ORDER BY rule_type, category, name"  # nosec B608
+             if active_only:
+                 rows = conn.execute(
+                     select_query,
