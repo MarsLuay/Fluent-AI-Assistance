@@ -229,6 +229,28 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(report["pipette_examples"][0]["rack_label"], "Source")
         self.assertEqual(report["line_count"], 3)
 
+
+    def test_inspect_archive_collects_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = Path(tmp) / "errors.zeia"
+            with zipfile.ZipFile(archive, "w") as zf:
+                # Malformed XML to cause inspect_xscr_text to fail
+                zf.writestr("DataStore/UserSpecific/bad.xscr", "<malformed")
+                # Invalid UTF-8 to cause .decode("utf-8-sig") to fail
+                zf.writestr("Worklists/bad.gwl", b"\xff\xfe")
+
+            report = inspect_archive(archive)
+
+        self.assertEqual(len(report["errors"]), 2)
+
+        errors = {e["entry"]: e["error"] for e in report["errors"]}
+
+        self.assertIn("DataStore/UserSpecific/bad.xscr", errors)
+        self.assertIn("Worklists/bad.gwl", errors)
+
+        self.assertTrue("ParseError" in errors["DataStore/UserSpecific/bad.xscr"] or "unclosed token" in errors["DataStore/UserSpecific/bad.xscr"])
+        self.assertTrue("codec can't decode" in errors["Worklists/bad.gwl"])
+
     def test_inspect_archive_rejects_entry_count_over_limit(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             archive = Path(tmp) / "too_many_entries.zeia"
