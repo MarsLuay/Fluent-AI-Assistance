@@ -404,12 +404,20 @@ class ReaderTests(unittest.TestCase):
                 build_project_index([zeia_path], db_path, force=True)
 
             # The dummy data should have been overwritten by a new sqlite database
-            conn = sqlite3.connect(db_path)
-            try:
+            with sqlite3.connect(db_path) as conn:
                 res = conn.execute("SELECT count(*) FROM sqlite_master").fetchone()
                 self.assertIsNotNone(res)
-            finally:
+
+            # Windows CI issue with file locks: connection context manager closes it,
+            # but sometimes it takes a bit. Let's explicitly close any dangling refs just in case
+            # and unlink it so TemporaryDirectory cleanup does not fail with PermissionError.
+            try:
                 conn.close()
+                import time
+                time.sleep(0.1)
+                db_path.unlink()
+            except OSError:
+                pass
 
     def test_build_project_index_closes_connection_on_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
