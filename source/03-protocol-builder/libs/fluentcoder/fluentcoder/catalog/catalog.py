@@ -579,14 +579,14 @@ def _migrate_install_key_schema(conn: sqlite3.Connection) -> None:
         old_cols = {
             row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
         }
-        select_cols = [col for col in old_cols if col != "install_key"]
+        select_cols = [f'"{col}"' for col in old_cols if col != "install_key"]
         conn.execute(
-            f"INSERT INTO {table}_new (install_key, {', '.join(select_cols)}) "
-            f"SELECT ?, {', '.join(select_cols)} FROM {table}",
+            f'INSERT INTO "{table}_new" ("install_key", {", ".join(select_cols)}) '
+            f'SELECT ?, {", ".join(select_cols)} FROM "{table}"',
             (legacy_key,),
         )
-        conn.execute(f"DROP TABLE {table}")
-        conn.execute(f"ALTER TABLE {table}_new RENAME TO {table}")
+        conn.execute(f'DROP TABLE "{table}"')
+        conn.execute(f'ALTER TABLE "{table}_new" RENAME TO "{table}"')
 
     indexed_columns = {
         row["name"] for row in conn.execute("PRAGMA table_info(indexed_sources)").fetchall()
