@@ -21,7 +21,7 @@ import sqlite3
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 SCRIPT_PATH = Path(__file__).resolve()
 PROJECT_ROOT = SCRIPT_PATH.parents[3]
@@ -615,6 +615,75 @@ def build_compatibility_checks(
     return []
 
 
+def _collect_connector_examples(
+    connector_rows: list[dict[str, Any]],
+    component_names: dict[str, str],
+    site_owner: dict[str, str],
+    child_matches: Callable[[str | None], bool],
+    parent_matches: Callable[[str | None, str], bool],
+) -> list[dict[str, Any]]:
+    examples: list[dict[str, Any]] = []
+    for row in connector_rows:
+        child = normalize_guid(row.get("childComponentGuid"))
+        site_guid = normalize_guid(row.get("siteGuid"))
+        parent = site_owner.get(site_guid)
+        if not child_matches(child):
+            continue
+        if not parent_matches(parent, site_guid):
+            continue
+        examples.append(
+            {
+                "connectorGuid": row.get("guid"),
+                "childComponentGuid": child,
+                "childComponentName": component_names.get(child),
+                "parentComponentGuid": parent,
+                "parentComponentName": component_names.get(parent or ""),
+                "siteGuid": site_guid,
+                "positionMm": row.get("positionMm"),
+            }
+        )
+    return examples
+
+
+def _collect_snap_anchor_examples(
+    snap_anchors_by_component: dict[str, list[dict[str, Any]]],
+    parent_guid_set: set[str],
+    component_names: dict[str, str],
+    child_matches: Callable[[str | None], bool],
+) -> list[dict[str, Any]]:
+    examples: list[dict[str, Any]] = []
+    for parent in sorted(parent_guid_set):
+        for anchor in snap_anchors_by_component.get(parent, []):
+            for child in anchor.get("compatibleChildGuids") or []:
+                if not child_matches(child):
+                    continue
+                examples.append(
+                    {
+                        "connectorGuid": anchor.get("snapPoint", {}).get("connectorGuid"),
+                        "childComponentGuid": child,
+                        "childComponentName": component_names.get(child),
+                        "parentComponentGuid": parent,
+                        "parentComponentName": component_names.get(parent),
+                        "siteGuid": anchor.get("siteGuid"),
+                        "positionMm": anchor.get("snapPoint", {}).get("positionMm"),
+                        "source": "snap-anchor",
+                    }
+                )
+    return examples
+
+
+def _deduplicate_examples(examples: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped: list[dict[str, Any]] = []
+    seen: set[tuple[str | None, str | None, str | None]] = set()
+    for example in examples:
+        key = (example.get("connectorGuid"), example.get("childComponentGuid"), example.get("siteGuid"))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(example)
+    return deduped
+
+
 def build_pair_check(
     *,
     id: str,
@@ -683,59 +752,27 @@ def build_pair_check(
             return any(pattern in child_name for pattern in child_pattern)
         return bool(child_guid) and child == child_guid
 
-    for row in connector_rows:
-        child = normalize_guid(row.get("childComponentGuid"))
-        site_guid = normalize_guid(row.get("siteGuid"))
-        parent = site_owner.get(site_guid)
-        if not child_matches(child):
-            continue
-        if not parent_matches(parent, site_guid):
-            continue
-        examples.append(
-            {
-                "connectorGuid": row.get("guid"),
-                "childComponentGuid": child,
-                "childComponentName": component_names.get(child),
-                "parentComponentGuid": parent,
-                "parentComponentName": component_names.get(parent or ""),
-                "siteGuid": site_guid,
-                "positionMm": row.get("positionMm"),
-            }
+    examples.extend(
+        _collect_connector_examples(
+            connector_rows,
+            component_names,
+            site_owner,
+            child_matches,
+            parent_matches,
         )
+    )
 
     if snap_anchors_by_component and parent_guid_set:
-        for parent in sorted(parent_guid_set):
-            for anchor in snap_anchors_by_component.get(parent, []):
-                for child in anchor.get("compatibleChildGuids") or []:
-                    if not child_matches(child):
-                        continue
-                    examples.append(
-                        {
-                            "connectorGuid": anchor.get("snapPoint", {}).get(
-                                "connectorGuid"
-                            ),
-                            "childComponentGuid": child,
-                            "childComponentName": component_names.get(child),
-                            "parentComponentGuid": parent,
-                            "parentComponentName": component_names.get(parent),
-                            "siteGuid": anchor.get("siteGuid"),
-                            "positionMm": anchor.get("snapPoint", {}).get("positionMm"),
-                            "source": "snap-anchor",
-                        }
-                    )
-
-    deduped: list[dict[str, Any]] = []
-    seen: set[tuple[str | None, str | None, str | None]] = set()
-    for example in examples:
-        key = (
-            example.get("connectorGuid"),
-            example.get("childComponentGuid"),
-            example.get("siteGuid"),
+        examples.extend(
+            _collect_snap_anchor_examples(
+                snap_anchors_by_component,
+                parent_guid_set,
+                component_names,
+                child_matches,
+            )
         )
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(example)
+
+    deduped = _deduplicate_examples(examples)
 
     return {
         "id": id,
