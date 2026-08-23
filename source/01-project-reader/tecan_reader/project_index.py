@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -156,6 +158,18 @@ class IndexContext:
     zeia_id: int
     script_id: int
     source_path: str
+
+
+@dataclass
+class EntityRecord:
+    zeia_id: int
+    script_id: int | None
+    kind: str
+    name: str
+    value: str
+    source_path: str
+    metadata: dict[str, Any]
+    command_index: int | None = None
 
 
 def discover_zeia_paths(paths: Iterable[str | Path]) -> list[Path]:
@@ -391,13 +405,15 @@ def _index_script(
     script_name = script.get("object_name") or source_path
     _insert_entity(
         conn,
-        zeia_id,
-        script_id,
-        "script",
-        script_name,
-        script.get("script_version") or "",
-        source_path,
-        {"checksum": script.get("checksum") or ""},
+        EntityRecord(
+            zeia_id,
+            script_id,
+            "script",
+            script_name,
+            script.get("script_version") or "",
+            source_path,
+            {"checksum": script.get("checksum") or ""},
+        ),
     )
     _index_references(conn, zeia_id, script_id, script)
     _index_variables(conn, zeia_id, script_id, script)
@@ -419,18 +435,21 @@ def _index_references(
         metadata = {"type_id": type_id, "guid": ref.get("guid") or ""}
         kind = "worktable" if "worktable" in type_id.lower() else "reference"
         _insert_entity(
-            conn, zeia_id, script_id, kind, object_name, type_id, source_path, metadata
+            conn,
+            EntityRecord(zeia_id, script_id, kind, object_name, type_id, source_path, metadata),
         )
         if kind != "reference":
             _insert_entity(
                 conn,
-                zeia_id,
-                script_id,
-                "reference",
-                object_name,
-                type_id,
-                source_path,
-                metadata,
+                EntityRecord(
+                    zeia_id,
+                    script_id,
+                    "reference",
+                    object_name,
+                    type_id,
+                    source_path,
+                    metadata,
+                ),
             )
 
 
@@ -444,44 +463,50 @@ def _index_variables(
     for variable in script.get("variables", []):
         _insert_entity(
             conn,
-            zeia_id,
-            script_id,
-            "variable",
-            variable.get("name") or "",
-            variable.get("type") or "",
-            source_path,
-            {
-                "scope": variable.get("scope") or "",
-                "query_on_startup": variable.get("query_on_startup") or "",
-                "read_only": variable.get("read_only") or "",
-            },
+            EntityRecord(
+                zeia_id,
+                script_id,
+                "variable",
+                variable.get("name") or "",
+                variable.get("type") or "",
+                source_path,
+                {
+                    "scope": variable.get("scope") or "",
+                    "query_on_startup": variable.get("query_on_startup") or "",
+                    "read_only": variable.get("read_only") or "",
+                },
+            ),
         )
     for prompt in script.get("query_prompts", []):
         _insert_entity(
             conn,
-            zeia_id,
-            script_id,
-            "variable",
-            prompt.get("name") or "",
-            prompt.get("prompt") or "",
-            source_path,
-            {
-                "role": "query_prompt",
-                "minimum": prompt.get("minimum") or "",
-                "maximum": prompt.get("maximum") or "",
-                "line": prompt.get("line") or "",
-            },
+            EntityRecord(
+                zeia_id,
+                script_id,
+                "variable",
+                prompt.get("name") or "",
+                prompt.get("prompt") or "",
+                source_path,
+                {
+                    "role": "query_prompt",
+                    "minimum": prompt.get("minimum") or "",
+                    "maximum": prompt.get("maximum") or "",
+                    "line": prompt.get("line") or "",
+                },
+            ),
         )
     for set_variable in script.get("set_variables", []):
         _insert_entity(
             conn,
-            zeia_id,
-            script_id,
-            "variable",
-            set_variable.get("name") or "",
-            set_variable.get("value") or "",
-            source_path,
-            {"role": "set_variable", "line": set_variable.get("line") or ""},
+            EntityRecord(
+                zeia_id,
+                script_id,
+                "variable",
+                set_variable.get("name") or "",
+                set_variable.get("value") or "",
+                source_path,
+                {"role": "set_variable", "line": set_variable.get("line") or ""},
+            ),
         )
 
 
@@ -511,23 +536,27 @@ def _index_dependencies(
         for value in values:
             _insert_entity(
                 conn,
-                zeia_id,
-                script_id,
-                dependency_kind_map.get(dep_key, "dependency"),
-                value,
-                dep_key,
-                source_path,
-                {"dependency_key": dep_key},
+                EntityRecord(
+                    zeia_id,
+                    script_id,
+                    dependency_kind_map.get(dep_key, "dependency"),
+                    value,
+                    dep_key,
+                    source_path,
+                    {"dependency_key": dep_key},
+                ),
             )
             _insert_entity(
                 conn,
-                zeia_id,
-                script_id,
-                "dependency",
-                value,
-                dep_key,
-                source_path,
-                {"dependency_key": dep_key},
+                EntityRecord(
+                    zeia_id,
+                    script_id,
+                    "dependency",
+                    value,
+                    dep_key,
+                    source_path,
+                    {"dependency_key": dep_key},
+                ),
             )
 
 
@@ -597,14 +626,16 @@ def _index_command_field_entities(
             continue
         _insert_entity(
             ctx.conn,
-            ctx.zeia_id,
-            ctx.script_id,
-            kind,
-            value,
-            field_name,
-            ctx.source_path,
-            {"field": field_name, "family": family},
-            command_index=command_index,
+            EntityRecord(
+                ctx.zeia_id,
+                ctx.script_id,
+                kind,
+                value,
+                field_name,
+                ctx.source_path,
+                {"field": field_name, "family": family},
+                command_index,
+            ),
         )
     for field_name in ("FileName", "Path"):
         value = str(fields.get(field_name) or "").strip()
@@ -617,14 +648,16 @@ def _index_command_field_entities(
         )
         _insert_entity(
             ctx.conn,
-            ctx.zeia_id,
-            ctx.script_id,
-            kind,
-            value,
-            field_name,
-            ctx.source_path,
-            {"field": field_name, "family": family},
-            command_index=command_index,
+            EntityRecord(
+                ctx.zeia_id,
+                ctx.script_id,
+                kind,
+                value,
+                field_name,
+                ctx.source_path,
+                {"field": field_name, "family": family},
+                command_index,
+            ),
         )
 
 
@@ -710,28 +743,33 @@ def _index_object(conn: sqlite3.Connection, zeia_id: int, obj: dict[str, Any]) -
     }
     _insert_entity(
         conn,
-        zeia_id,
-        None,
-        object_kind,
-        object_name,
-        obj.get("kind") or "",
-        source_path,
-        metadata,
-    )
-    if object_kind != "catalog_object":
-        _insert_entity(
-            conn,
+        EntityRecord(
             zeia_id,
             None,
-            "catalog_object",
+            object_kind,
             object_name,
             obj.get("kind") or "",
             source_path,
             metadata,
+        ),
+    )
+    if object_kind != "catalog_object":
+        _insert_entity(
+            conn,
+            EntityRecord(
+                zeia_id,
+                None,
+                "catalog_object",
+                object_name,
+                obj.get("kind") or "",
+                source_path,
+                metadata,
+            ),
         )
     for name in obj.get("names", []):
         _insert_entity(
-            conn, zeia_id, None, object_kind, name, "object_name", source_path, metadata
+            conn,
+            EntityRecord(zeia_id, None, object_kind, name, "object_name", source_path, metadata),
         )
 
 
@@ -758,77 +796,77 @@ def _index_worklist(
     )
     _insert_entity(
         conn,
-        zeia_id,
-        None,
-        "worklist",
-        Path(source_path).name or source_path,
-        source_path,
-        source_path,
-        {
-            "line_count": gwl.get("line_count") or 0,
-            "transfer_pairs_estimate": gwl.get("transfer_pairs_estimate") or 0,
-            "record_counts": gwl.get("record_counts", {}),
-        },
+        EntityRecord(
+            zeia_id,
+            None,
+            "worklist",
+            Path(source_path).name or source_path,
+            source_path,
+            source_path,
+            {
+                "line_count": gwl.get("line_count") or 0,
+                "transfer_pairs_estimate": gwl.get("transfer_pairs_estimate") or 0,
+                "record_counts": gwl.get("record_counts", {}),
+            },
+        ),
     )
     for example in gwl.get("pipette_examples", []):
         if example.get("rack_label"):
             _insert_entity(
                 conn,
-                zeia_id,
-                None,
-                "labware",
-                example["rack_label"],
-                "gwl_rack_label",
-                source_path,
-                {
-                    "line": example.get("line") or "",
-                    "operation": example.get("operation") or "",
-                },
+                EntityRecord(
+                    zeia_id,
+                    None,
+                    "labware",
+                    example["rack_label"],
+                    "gwl_rack_label",
+                    source_path,
+                    {
+                        "line": example.get("line") or "",
+                        "operation": example.get("operation") or "",
+                    },
+                ),
             )
         if example.get("rack_type"):
             _insert_entity(
                 conn,
-                zeia_id,
-                None,
-                "carrier",
-                example["rack_type"],
-                "gwl_rack_type",
-                source_path,
-                {
-                    "line": example.get("line") or "",
-                    "operation": example.get("operation") or "",
-                },
+                EntityRecord(
+                    zeia_id,
+                    None,
+                    "carrier",
+                    example["rack_type"],
+                    "gwl_rack_type",
+                    source_path,
+                    {
+                        "line": example.get("line") or "",
+                        "operation": example.get("operation") or "",
+                    },
+                ),
             )
         if example.get("liquid_class"):
             _insert_entity(
                 conn,
-                zeia_id,
-                None,
-                "liquid_class",
-                example["liquid_class"],
-                "gwl_liquid_class",
-                source_path,
-                {
-                    "line": example.get("line") or "",
-                    "operation": example.get("operation") or "",
-                },
+                EntityRecord(
+                    zeia_id,
+                    None,
+                    "liquid_class",
+                    example["liquid_class"],
+                    "gwl_liquid_class",
+                    source_path,
+                    {
+                        "line": example.get("line") or "",
+                        "operation": example.get("operation") or "",
+                    },
+                ),
             )
 
 
 def _insert_entity(
     conn: sqlite3.Connection,
-    zeia_id: int,
-    script_id: int | None,
-    kind: str,
-    name: str,
-    value: str,
-    source_path: str,
-    metadata: dict[str, Any],
-    *,
-    command_index: int | None = None,
+    entity: EntityRecord,
 ) -> None:
-    name = str(name or "").strip()
-    value = str(value or "").strip()
+    name = str(entity.name or "").strip()
+    value = str(entity.value or "").strip()
     if not name and not value:
         return
     conn.execute(
@@ -840,14 +878,14 @@ def _insert_entity(
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
-            zeia_id,
-            script_id,
-            kind,
+            entity.zeia_id,
+            entity.script_id,
+            entity.kind,
             name,
             value,
-            source_path,
-            command_index,
-            _dump(metadata),
+            entity.source_path,
+            entity.command_index,
+            _dump(entity.metadata),
         ),
     )
 
