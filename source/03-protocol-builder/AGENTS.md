@@ -367,3 +367,11 @@ long text. For verification toggles, use exactly:
 ## Long Runs vs. Hangs
 
 > Detailed rules: [AGENTS.details/long-runs-vs-hangs.md](AGENTS.details/long-runs-vs-hangs.md). Read them before working in this area.
+   <!-- BEGIN GENERATED: readiness-gate-summary -->
+   Readiness registry summary (generated from `fluent_pipeline/data/readiness_gate_registry.json`):
+   - Required offline ready-to-import gates: `26`
+   - Optional diagnostics: `1` (`Gate 27`)
+   - Current active entries: `27`
+   - Stable IDs are the contract; gate numbers are display labels only.
+   - Authoritative table: [Readiness Gate Registry](docs/READINESS_GATES.md)
+   <!-- END GENERATED: readiness-gate-summary -->
