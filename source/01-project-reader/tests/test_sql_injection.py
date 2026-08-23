@@ -37,23 +37,23 @@ def test_project_index_count_sqli(db_conn):
     # which does not exist, and should raise an OperationalError about no such table.
 
     malicious_table = "dummy; DROP TABLE dummy; --"
-    with pytest.raises(sqlite3.OperationalError) as exc_info:
+    with pytest.raises(ValueError) as exc_info:
         pi_count(db_conn, malicious_table)
-    assert "no such table" in str(exc_info.value)
+    assert "Invalid table name" in str(exc_info.value)
 
     # Also verify it handles quotes correctly
     malicious_table = 'dummy" OR 1=1; --'
-    with pytest.raises(sqlite3.OperationalError) as exc_info:
+    with pytest.raises(ValueError) as exc_info:
         pi_count(db_conn, malicious_table)
-    assert "no such table" in str(exc_info.value)
+    assert "Invalid table name" in str(exc_info.value)
 
 def test_pattern_library_count_sqli(db_conn):
     malicious_table = "dummy; DROP TABLE dummy; --"
-    with pytest.raises(sqlite3.OperationalError) as exc_info:
+    with pytest.raises(ValueError) as exc_info:
         pl_count(db_conn, malicious_table)
-    assert "no such table" in str(exc_info.value)
+    assert "Invalid table name" in str(exc_info.value)
 
     malicious_table = 'dummy" OR 1=1; --'
-    with pytest.raises(sqlite3.OperationalError) as exc_info:
+    with pytest.raises(ValueError) as exc_info:
         pl_count(db_conn, malicious_table)
-    assert "no such table" in str(exc_info.value)
+    assert "Invalid table name" in str(exc_info.value)
