@@ -2887,10 +2887,9 @@ def _value_label(node: ast.AST, reagent_by_var: dict[str, str], labware_by_var: 
 
 
 def _literal_text(node: ast.AST) -> Any:
-    try:
-        return ast.literal_eval(node)
-    except (TypeError, ValueError, SyntaxError):
-        return None
+    if isinstance(node, ast.Constant):
+        return node.value
+    return None
 
 
 def _source_path(draft_name: str, current_group: str, source: str, node: ast.AST) -> str:
