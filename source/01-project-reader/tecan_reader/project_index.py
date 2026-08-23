@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Iterable
 import hashlib
 import json
+import re
 import sqlite3
 
 from .archive import inspect_archive
@@ -525,29 +526,35 @@ def _index_commands(
     script: dict[str, Any],
 ) -> None:
     source_path = script.get("source") or ""
-    for command in script.get("commands", []):
-        command_index = int(command.get("index") or 0)
-        fields = command.get("fields", {})
-        conn.execute(
-            """
-            INSERT INTO commands(
-                zeia_file_id, script_id, command_index, command_type, raw_type,
-                family, line, name, fields_json
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
+    commands = script.get("commands", [])
+
+    conn.executemany(
+        """
+        INSERT INTO commands(
+            zeia_file_id, script_id, command_index, command_type, raw_type,
+            family, line, name, fields_json
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
             (
                 zeia_id,
                 script_id,
-                command_index,
+                int(command.get("index") or 0),
                 command.get("type") or "",
                 command.get("raw_type") or "",
                 command.get("family") or "",
                 command.get("line") or "",
                 command.get("name") or "",
-                _dump(fields),
-            ),
-        )
+                _dump(command.get("fields", {})),
+            )
+            for command in commands
+        ),
+    )
+
+    for command in commands:
+        command_index = int(command.get("index") or 0)
+        fields = command.get("fields", {})
         _index_command_field_entities(
             conn,
             zeia_id,
@@ -1085,6 +1092,8 @@ def _metadata_value(conn: sqlite3.Connection, key: str) -> str:
 
 
 def _count(conn: sqlite3.Connection, table: str) -> int:
+    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", table):
+        raise ValueError(f"Invalid table name: {table}")
     row = conn.execute(f"SELECT COUNT(*) AS count FROM {table}").fetchone()
     return int(row["count"] or 0)
 

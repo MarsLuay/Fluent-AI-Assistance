@@ -2,6 +2,15 @@
 
 Project entrypoint (layout + layer order): [`../../AGENTS.md`](../../AGENTS.md).
 
+   <!-- BEGIN GENERATED: readiness-gate-summary -->
+   Readiness registry summary (generated from `fluent_pipeline/data/readiness_gate_registry.json`):
+   - Required offline ready-to-import gates: `26`
+   - Optional diagnostics: `1` (`Gate 27`)
+   - Current active entries: `27`
+   - Stable IDs are the contract; gate numbers are display labels only.
+   - Authoritative table: [Readiness Gate Registry](docs/READINESS_GATES.md)
+   <!-- END GENERATED: readiness-gate-summary -->
+
 ## Hard start gate (required)
 
 This file is large. Do **not** read it top-to-bottom.
@@ -311,6 +320,32 @@ spec auto-upgrade and media seeding.
   RECREATE_SCRIPT.md
   media_placeholders.md
   ```
+   <!-- BEGIN GENERATED: readiness-gate-summary -->
+   Readiness registry summary (generated from `fluent_pipeline/data/readiness_gate_registry.json`):
+   - Required offline ready-to-import gates: `26`
+   - Optional diagnostics: `1` (`Gate 27`)
+   - Current active entries: `27`
+   - Stable IDs are the contract; gate numbers are display labels only.
+   - Authoritative table: [Readiness Gate Registry](docs/READINESS_GATES.md)
+   <!-- END GENERATED: readiness-gate-summary -->
+
+   <!-- BEGIN GENERATED: readiness-gate-summary -->
+   Readiness registry summary (generated from `fluent_pipeline/data/readiness_gate_registry.json`):
+   - Required offline ready-to-import gates: `26`
+   - Optional diagnostics: `1` (`Gate 27`)
+   - Current active entries: `27`
+   - Stable IDs are the contract; gate numbers are display labels only.
+   - Authoritative table: [Readiness Gate Registry](docs/READINESS_GATES.md)
+   <!-- END GENERATED: readiness-gate-summary -->
+
+   <!-- BEGIN GENERATED: readiness-gate-summary -->
+   Readiness registry summary (generated from `fluent_pipeline/data/readiness_gate_registry.json`):
+   - Required offline ready-to-import gates: `26`
+   - Optional diagnostics: `1` (`Gate 27`)
+   - Current active entries: `27`
+   - Stable IDs are the contract; gate numbers are display labels only.
+   - Authoritative table: [Readiness Gate Registry](docs/READINESS_GATES.md)
+   <!-- END GENERATED: readiness-gate-summary -->
 
 - If validation fails, leave artifacts in the build folder and report the
   blocking gates. Do not copy or hand-create a ready-to-import bundle.
@@ -376,3 +411,11 @@ long text. For verification toggles, use exactly:
 ## Long Runs vs. Hangs
 
 > Detailed rules: [AGENTS.details/long-runs-vs-hangs.md](AGENTS.details/long-runs-vs-hangs.md). Read them before working in this area.
+   <!-- BEGIN GENERATED: readiness-gate-summary -->
+   Readiness registry summary (generated from `fluent_pipeline/data/readiness_gate_registry.json`):
+   - Required offline ready-to-import gates: `26`
+   - Optional diagnostics: `1` (`Gate 27`)
+   - Current active entries: `27`
+   - Stable IDs are the contract; gate numbers are display labels only.
+   - Authoritative table: [Readiness Gate Registry](docs/READINESS_GATES.md)
+   <!-- END GENERATED: readiness-gate-summary -->
