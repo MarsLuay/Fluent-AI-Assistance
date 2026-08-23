@@ -26,7 +26,9 @@ from typing import Any, Callable
 SCRIPT_PATH = Path(__file__).resolve()
 PROJECT_ROOT = SCRIPT_PATH.parents[3]
 DEFAULT_INSTALL = Path(r"C:\ProgramData\Tecan\VisionX\Database")
-DEFAULT_FLUENT_MODELS = PROJECT_ROOT / "source/04-protocol-simulator/public/models/fluent"
+DEFAULT_FLUENT_MODELS = (
+    PROJECT_ROOT / "source/04-protocol-simulator/public/models/fluent"
+)
 DEFAULT_LOCAL_MODELS = DEFAULT_FLUENT_MODELS / "local"
 DEFAULT_REGISTRY = DEFAULT_LOCAL_MODELS / "registry.json"
 DEFAULT_OUTPUT = DEFAULT_LOCAL_MODELS / "connector-graph.json"
@@ -48,10 +50,14 @@ GRAPH_KIND = "fluent-connector-graph"
 try:
     from fluent_pipeline.connector_coverage_export import (  # type: ignore
         CONNECTOR_COUNT_PROFILES as _PIPELINE_CONNECTOR_COUNT_PROFILES,
+    )
+    from fluent_pipeline.connector_coverage_export import (
         build_profiles_from_component_counts as _build_profiles_from_component_counts,
     )
 
-    CONNECTOR_COUNT_PROFILES: tuple[dict[str, Any], ...] = tuple(_PIPELINE_CONNECTOR_COUNT_PROFILES)
+    CONNECTOR_COUNT_PROFILES: tuple[dict[str, Any], ...] = tuple(
+        _PIPELINE_CONNECTOR_COUNT_PROFILES
+    )
 
     def build_profiles_from_component_counts(
         component_names: dict[str, str],
@@ -83,7 +89,10 @@ except ImportError:
             if actual <= 0:
                 continue
             name = str(component_names.get(guid) or "").strip() or guid
-            slug = re.sub(r"[^a-z0-9]+", "_", name.casefold()).strip("_") or f"component_{guid[:8]}"
+            slug = (
+                re.sub(r"[^a-z0-9]+", "_", name.casefold()).strip("_")
+                or f"component_{guid[:8]}"
+            )
             rows.append(
                 {
                     "id": slug[:80],
@@ -99,17 +108,24 @@ except ImportError:
                     "source": source,
                 }
             )
-        rows.sort(key=lambda row: (str(row.get("componentName") or ""), str(row.get("id") or "")))
+        rows.sort(
+            key=lambda row: (
+                str(row.get("componentName") or ""),
+                str(row.get("id") or ""),
+            )
+        )
         return rows
 
 
 GUID_RE = re.compile(
     r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-    re.I,
+    re.IGNORECASE,
 )
 
 
-def name_matches_any(name: str | None, patterns: list[str] | tuple[str, ...] | None) -> bool:
+def name_matches_any(
+    name: str | None, patterns: list[str] | tuple[str, ...] | None
+) -> bool:
     text = (name or "").casefold()
     if not text or not patterns:
         return False
@@ -202,6 +218,77 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _build_site_and_connector_maps(
+    connector_rows: list[dict[str, Any]],
+    site_owner: dict[str, str],
+    component_names: dict[str, str],
+    sites_dir: Path,
+) -> tuple[
+    dict[str, dict[str, Any]],
+    dict[str, list[dict[str, Any]]],
+    dict[str, list[dict[str, Any]]],
+]:
+    sites_by_guid: dict[str, dict[str, Any]] = {}
+    child_connectors_by_component: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    snap_anchors_by_component: dict[str, list[dict[str, Any]]] = defaultdict(list)
+
+    for row in connector_rows:
+        child_guid = normalize_guid(row["childComponentGuid"])
+        site_guid = normalize_guid(row["siteGuid"])
+        parent_guid = site_owner.get(site_guid)
+        child_connectors_by_component[child_guid].append(row)
+        site_entry = sites_by_guid.setdefault(
+            site_guid,
+            {
+                "siteGuid": site_guid,
+                "parentComponentGuid": parent_guid,
+                "parentComponentName": component_names.get(
+                    parent_guid or "", parent_guid
+                ),
+                "compatibleChildGuids": [],
+                "connectors": [],
+            },
+        )
+        site_entry["connectors"].append(row)
+        if child_guid and child_guid not in site_entry["compatibleChildGuids"]:
+            site_entry["compatibleChildGuids"].append(child_guid)
+
+    for site_guid, site_entry in sites_by_guid.items():
+        site_meta = load_site_metadata(sites_dir, site_guid)
+        site_entry.update(site_meta)
+        site_entry["compatibleChildGuids"] = sorted(site_entry["compatibleChildGuids"])
+        parent_guid = site_entry.get("parentComponentGuid")
+        if parent_guid:
+            snap_anchors_by_component[parent_guid].append(
+                site_entry_to_snap_anchor(site_entry)
+            )
+
+    for parent_guid in snap_anchors_by_component:
+        snap_anchors_by_component[parent_guid] = sorted(
+            snap_anchors_by_component[parent_guid],
+            key=lambda row: row.get("siteGuid") or "",
+        )
+
+    return sites_by_guid, child_connectors_by_component, snap_anchors_by_component
+
+
+def _load_component_names(
+    catalog_rows: dict[str, Any], registry_path: Path | None
+) -> dict[str, str]:
+    component_names = {
+        normalize_guid(row["guid"]): row.get("name")
+        for row in catalog_rows.get("components", [])
+        if row.get("guid")
+    }
+    if registry_path and registry_path.exists():
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        for entry in registry.get("entries", []):
+            guid = normalize_guid(entry.get("componentGuid"))
+            if guid and entry.get("componentName"):
+                component_names[guid] = entry.get("componentName")
+    return component_names
+
+
 def build_connector_graph(
     *,
     install_path: Path,
@@ -218,18 +305,7 @@ def build_connector_graph(
         refresh_index=refresh_index,
         include_all_connectors=include_all_connectors,
     )
-    component_names = {
-        normalize_guid(row["guid"]): row.get("name")
-        for row in catalog_rows.get("components", [])
-        if row.get("guid")
-    }
-    registry: dict[str, Any] | None = None
-    if registry_path and registry_path.exists():
-        registry = json.loads(registry_path.read_text(encoding="utf-8"))
-        for entry in registry.get("entries", []):
-            guid = normalize_guid(entry.get("componentGuid"))
-            if guid and entry.get("componentName"):
-                component_names[guid] = entry.get("componentName")
+    component_names = _load_component_names(catalog_rows, registry_path)
 
     connector_rows = load_connector_rows(datastore_root, catalog_rows, connectors_dir)
     needed_site_guids = {
@@ -243,42 +319,11 @@ def build_connector_graph(
         needed_site_guids=needed_site_guids,
     )
 
-    sites_by_guid: dict[str, dict[str, Any]] = {}
-    child_connectors_by_component: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    snap_anchors_by_component: dict[str, list[dict[str, Any]]] = defaultdict(list)
-
-    for row in connector_rows:
-        child_guid = normalize_guid(row["childComponentGuid"])
-        site_guid = normalize_guid(row["siteGuid"])
-        parent_guid = site_owner.get(site_guid)
-        child_connectors_by_component[child_guid].append(row)
-        site_entry = sites_by_guid.setdefault(
-            site_guid,
-            {
-                "siteGuid": site_guid,
-                "parentComponentGuid": parent_guid,
-                "parentComponentName": component_names.get(parent_guid or "", parent_guid),
-                "compatibleChildGuids": [],
-                "connectors": [],
-            },
+    sites_by_guid, child_connectors_by_component, snap_anchors_by_component = (
+        _build_site_and_connector_maps(
+            connector_rows, site_owner, component_names, sites_dir
         )
-        site_entry["connectors"].append(row)
-        if child_guid and child_guid not in site_entry["compatibleChildGuids"]:
-            site_entry["compatibleChildGuids"].append(child_guid)
-
-    for site_guid, site_entry in sites_by_guid.items():
-        site_meta = load_site_metadata(sites_dir, site_guid)
-        site_entry.update(site_meta)
-        site_entry["compatibleChildGuids"] = sorted(site_entry["compatibleChildGuids"])
-        parent_guid = site_entry.get("parentComponentGuid")
-        if parent_guid:
-            snap_anchors_by_component[parent_guid].append(site_entry_to_snap_anchor(site_entry))
-
-    for parent_guid in snap_anchors_by_component:
-        snap_anchors_by_component[parent_guid] = sorted(
-            snap_anchors_by_component[parent_guid],
-            key=lambda row: row.get("siteGuid") or "",
-        )
+    )
 
     per_component_counts = {
         guid: len(rows) for guid, rows in child_connectors_by_component.items()
@@ -311,11 +356,15 @@ def build_connector_graph(
             "siteCount": len(sites_by_guid),
             "componentCount": len(component_names),
             "compatibilityCheckCount": len(compatibility_checks),
-            "verifiedChecks": sum(1 for row in compatibility_checks if row.get("verified")),
+            "verifiedChecks": sum(
+                1 for row in compatibility_checks if row.get("verified")
+            ),
         },
         "verification": verification,
         "connectors": connector_rows,
-        "sites": sorted(sites_by_guid.values(), key=lambda row: row.get("siteGuid") or ""),
+        "sites": sorted(
+            sites_by_guid.values(), key=lambda row: row.get("siteGuid") or ""
+        ),
         "snapAnchorsByComponent": {
             guid: anchors for guid, anchors in sorted(snap_anchors_by_component.items())
         },
@@ -354,7 +403,10 @@ def load_connector_rows(
         connector_guid = normalize_guid(db_row["guid"])
         child_guid = normalize_guid(db_row["component_guid"])
         site_guid = normalize_guid(db_row["site_guid"])
-        rel_path = db_row["file_path"] or f"SystemSpecific/Worktable/Connectors/{connector_guid}.xcon"
+        rel_path = (
+            db_row["file_path"]
+            or f"SystemSpecific/Worktable/Connectors/{connector_guid}.xcon"
+        )
         xcon_path = datastore_root / rel_path
         if not xcon_path.exists():
             xcon_path = connectors_dir / f"{connector_guid}.xcon"
@@ -382,7 +434,13 @@ def load_connector_rows(
             except Exception as exc:  # noqa: BLE001
                 row["parseError"] = str(exc)
         rows.append(row)
-    rows.sort(key=lambda item: (item.get("childComponentGuid") or "", item.get("siteGuid") or "", item.get("guid") or ""))
+    rows.sort(
+        key=lambda item: (
+            item.get("childComponentGuid") or "",
+            item.get("siteGuid") or "",
+            item.get("guid") or "",
+        )
+    )
     return rows
 
 
@@ -399,7 +457,8 @@ def build_owned_site_owner_map(
     candidates = [
         row
         for row in catalog_components
-        if normalize_guid(row.get("guid")) and row.get("site_count") not in (None, 0, "0")
+        if normalize_guid(row.get("guid"))
+        and row.get("site_count") not in (None, 0, "0")
     ]
     candidates.sort(key=lambda row: int(row.get("site_count") or 0), reverse=True)
 
@@ -408,7 +467,11 @@ def build_owned_site_owner_map(
             break
         component_guid = normalize_guid(row.get("guid"))
         rel_path = row.get("file_path")
-        xcmp_path = datastore_root / rel_path if rel_path else components_dir / f"{component_guid}.xcmp"
+        xcmp_path = (
+            datastore_root / rel_path
+            if rel_path
+            else components_dir / f"{component_guid}.xcmp"
+        )
         if not xcmp_path.exists():
             continue
         try:
@@ -473,7 +536,11 @@ def parse_xsit_dimensions(path: Path) -> list[float] | None:
                 if name in {"X", "Y", "Z"} and child.text:
                     coords[name] = float(child.text)
             if {"X", "Y", "Z"}.issubset(coords):
-                return [round(coords["X"], 3), round(coords["Y"], 3), round(coords["Z"], 3)]
+                return [
+                    round(coords["X"], 3),
+                    round(coords["Y"], 3),
+                    round(coords["Z"], 3),
+                ]
     except Exception:
         return None
     return None
@@ -482,7 +549,11 @@ def parse_xsit_dimensions(path: Path) -> list[float] | None:
 def site_entry_to_snap_anchor(site_entry: dict[str, Any]) -> dict[str, Any]:
     default_connector = next(
         (row for row in site_entry.get("connectors", []) if row.get("isDefault")),
-        site_entry.get("connectors", [None])[0] if site_entry.get("connectors") else None,
+        (
+            site_entry.get("connectors", [None])[0]
+            if site_entry.get("connectors")
+            else None
+        ),
     )
     anchor = {
         "siteGuid": site_entry.get("siteGuid"),
@@ -534,7 +605,13 @@ def build_compatibility_checks(
     package ``connector_coverage.json`` / geometry Snap edges from full ZEIA.
     Host rebuilds still emit connector rows; soft family checks stay empty.
     """
-    del connector_rows, component_names, site_owner, snap_anchors_by_component, sites_dir
+    del (
+        connector_rows,
+        component_names,
+        site_owner,
+        snap_anchors_by_component,
+        sites_dir,
+    )
     return []
 
 
@@ -634,8 +711,12 @@ def build_pair_check(
     child_pattern = [pattern.lower() for pattern in (child_name_patterns or [])]
     child_exclude = [pattern.lower() for pattern in (child_name_exclude_patterns or [])]
     parent_pattern = [pattern.lower() for pattern in parent_name_patterns]
-    site_type_pattern = [pattern.lower() for pattern in (parent_site_type_patterns or [])]
-    site_location_pattern = [pattern.lower() for pattern in (parent_site_location_patterns or [])]
+    site_type_pattern = [
+        pattern.lower() for pattern in (parent_site_type_patterns or [])
+    ]
+    site_location_pattern = [
+        pattern.lower() for pattern in (parent_site_location_patterns or [])
+    ]
 
     def parent_matches(parent: str | None, site_guid: str) -> bool:
         if parent_guid_set and parent in parent_guid_set:
@@ -648,9 +729,13 @@ def build_pair_check(
         type_name = (site_info.get("typeName") or "").lower()
         location_name = (site_info.get("locationGroupName") or "").lower()
         # Prefer ZEIA/install xsit TypeName over hardcoded location tokens.
-        if site_type_pattern and any(pattern in type_name for pattern in site_type_pattern):
+        if site_type_pattern and any(
+            pattern in type_name for pattern in site_type_pattern
+        ):
             return True
-        if site_location_pattern and any(pattern in location_name for pattern in site_location_pattern):
+        if site_location_pattern and any(
+            pattern in location_name for pattern in site_location_pattern
+        ):
             return True
         parent_name = (component_names.get(parent or "") or "").lower()
         return any(pattern in parent_name for pattern in parent_pattern)
@@ -660,7 +745,9 @@ def build_pair_check(
             return True
         if child_pattern:
             child_name = (component_names.get(child or "") or "").lower()
-            if child_exclude and any(pattern in child_name for pattern in child_exclude):
+            if child_exclude and any(
+                pattern in child_name for pattern in child_exclude
+            ):
                 return False
             return any(pattern in child_name for pattern in child_pattern)
         return bool(child_guid) and child == child_guid
@@ -696,7 +783,9 @@ def build_pair_check(
     }
 
 
-def enrich_registry_entries(registry: dict[str, Any], graph: dict[str, Any]) -> dict[str, Any]:
+def enrich_registry_entries(
+    registry: dict[str, Any], graph: dict[str, Any]
+) -> dict[str, Any]:
     snap_by_component = graph.get("snapAnchorsByComponent") or {}
     child_by_component = graph.get("childConnectorsByComponent") or {}
     for entry in registry.get("entries", []):
@@ -709,8 +798,12 @@ def enrich_registry_entries(registry: dict[str, Any], graph: dict[str, Any]) -> 
     registry["compatibilityChecks"] = graph.get("compatibilityChecks", [])
     registry["connectorVerification"] = graph.get("verification", [])
     summary = registry.setdefault("summary", {})
-    summary["entriesWithSnapAnchors"] = sum(1 for row in registry.get("entries", []) if row.get("snapAnchors"))
-    summary["entriesWithChildConnectors"] = sum(1 for row in registry.get("entries", []) if row.get("childConnectors"))
+    summary["entriesWithSnapAnchors"] = sum(
+        1 for row in registry.get("entries", []) if row.get("snapAnchors")
+    )
+    summary["entriesWithChildConnectors"] = sum(
+        1 for row in registry.get("entries", []) if row.get("childConnectors")
+    )
     return registry
 
 
@@ -721,7 +814,14 @@ def vec3_to_list(value: tuple[float, float, float] | None) -> list[float] | None
 
 
 def matrix_to_list(
-    value: tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]] | None,
+    value: (
+        tuple[
+            tuple[float, float, float],
+            tuple[float, float, float],
+            tuple[float, float, float],
+        ]
+        | None
+    ),
 ) -> list[list[float]] | None:
     if value is None:
         return None

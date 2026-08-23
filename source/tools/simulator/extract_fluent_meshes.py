@@ -1254,37 +1254,43 @@ def build_glb(
             binary,
             buffer_views,
             accessors,
-            pack_floats(positions),
-            GL_ARRAY_BUFFER,
-            GL_FLOAT,
-            "VEC3",
-            len(positions) // 3,
-            min_max_vectors(positions),
+            AccessorSpec(
+                payload=pack_floats(positions),
+                target=GL_ARRAY_BUFFER,
+                component_type=GL_FLOAT,
+                accessor_type="VEC3",
+                count=len(positions) // 3,
+                bounds=min_max_vectors(positions),
+            )
         )
         normal_accessor = append_accessor(
             binary,
             buffer_views,
             accessors,
-            pack_floats(normals),
-            GL_ARRAY_BUFFER,
-            GL_FLOAT,
-            "VEC3",
-            len(normals) // 3,
-            None,
+            AccessorSpec(
+                payload=pack_floats(normals),
+                target=GL_ARRAY_BUFFER,
+                component_type=GL_FLOAT,
+                accessor_type="VEC3",
+                count=len(normals) // 3,
+                bounds=None,
+            )
         )
         index_accessor = append_accessor(
             binary,
             buffer_views,
             accessors,
-            pack_uint32(indices),
-            GL_ELEMENT_ARRAY_BUFFER,
-            GL_UNSIGNED_INT,
-            "SCALAR",
-            len(indices),
-            {
-                "min": [min(indices) if indices else 0],
-                "max": [max(indices) if indices else 0],
-            },
+            AccessorSpec(
+                payload=pack_uint32(indices),
+                target=GL_ELEMENT_ARRAY_BUFFER,
+                component_type=GL_UNSIGNED_INT,
+                accessor_type="SCALAR",
+                count=len(indices),
+                bounds={
+                    "min": [min(indices) if indices else 0],
+                    "max": [max(indices) if indices else 0],
+                },
+            )
         )
 
         material_index = len(materials)
@@ -1344,38 +1350,43 @@ def build_glb(
     return write_glb(gltf, bytes(binary)), bounds, unit_metadata
 
 
+@dataclass
+class AccessorSpec:
+    payload: bytes
+    target: int
+    component_type: int
+    accessor_type: str
+    count: int
+    bounds: dict[str, Any] | None = None
+
+
 def append_accessor(
     binary: bytearray,
     buffer_views: list[dict[str, Any]],
     accessors: list[dict[str, Any]],
-    payload: bytes,
-    target: int,
-    component_type: int,
-    accessor_type: str,
-    count: int,
-    bounds: dict[str, Any] | None,
+    spec: AccessorSpec,
 ) -> int:
     align_binary(binary)
     byte_offset = len(binary)
-    binary.extend(payload)
+    binary.extend(spec.payload)
     buffer_view_index = len(buffer_views)
     buffer_views.append(
         {
             "buffer": 0,
             "byteOffset": byte_offset,
-            "byteLength": len(payload),
-            "target": target,
+            "byteLength": len(spec.payload),
+            "target": spec.target,
         }
     )
     accessor: dict[str, Any] = {
         "bufferView": buffer_view_index,
         "byteOffset": 0,
-        "componentType": component_type,
-        "count": count,
-        "type": accessor_type,
+        "componentType": spec.component_type,
+        "count": spec.count,
+        "type": spec.accessor_type,
     }
-    if bounds:
-        accessor.update(bounds)
+    if spec.bounds:
+        accessor.update(spec.bounds)
     accessors.append(accessor)
     return len(accessors) - 1
 
