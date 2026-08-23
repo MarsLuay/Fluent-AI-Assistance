@@ -92,11 +92,15 @@ class RepairPlan:
     def to_dict(self) -> dict[str, Any]:
         ready = [action for action in self.actions if action.status == "ready"]
         suggested = [action for action in self.actions if action.status == "suggested"]
-        needs_review = [action for action in self.actions if action.status == "needs_review"]
+        needs_review = [
+            action for action in self.actions if action.status == "needs_review"
+        ]
         return {
             "draft_path": str(self.draft_path),
             "context_name": self.context_name,
-            "simulation_json_path": str(self.simulation_json_path) if self.simulation_json_path else None,
+            "simulation_json_path": (
+                str(self.simulation_json_path) if self.simulation_json_path else None
+            ),
             "summary": {
                 "action_count": len(self.actions),
                 "ready_count": len(ready),
@@ -141,13 +145,19 @@ def build_repair_plan(
     )
 
 
-def applicable_repair_actions(plan: RepairPlan, *, apply_modeling: bool = False) -> list[RepairAction]:
+def applicable_repair_actions(
+    plan: RepairPlan, *, apply_modeling: bool = False
+) -> list[RepairAction]:
     """Return the repairs that should be applied under the current approval mode."""
     return [
         action
         for action in plan.actions
         if action.status == "ready"
-        or (apply_modeling and action.kind == "model_raw_xml_step" and action.status == "suggested")
+        or (
+            apply_modeling
+            and action.kind == "model_raw_xml_step"
+            and action.status == "suggested"
+        )
     ]
 
 
@@ -161,7 +171,13 @@ def _index_python_source(source: str) -> PythonSourceIndex:
     for parent in ast.walk(tree):
         for child in ast.iter_child_nodes(parent):
             parents[child] = parent
-    return PythonSourceIndex(source=source, tree=tree, lines=lines, line_offsets=tuple(line_offsets), parents=parents)
+    return PythonSourceIndex(
+        source=source,
+        tree=tree,
+        lines=lines,
+        line_offsets=tuple(line_offsets),
+        parents=parents,
+    )
 
 
 def _apply_structured_edits(source: str, edits: list[RepairEdit]) -> str:
@@ -173,7 +189,9 @@ def _apply_structured_edits(source: str, edits: list[RepairEdit]) -> str:
         start = _span_to_offset(indexed.line_offsets, edit.line, edit.column_start)
         end = _span_to_offset(indexed.line_offsets, edit.line, edit.column_end)
         if end < start:
-            raise RepairApplicationError(f"repair {edit.repair_id or '<pending>'} has an invalid span")
+            raise RepairApplicationError(
+                f"repair {edit.repair_id or '<pending>'} has an invalid span"
+            )
         spans.append((start, end, edit))
 
     spans_sorted = sorted(spans, key=lambda item: (item[0], item[1]))
@@ -184,7 +202,9 @@ def _apply_structured_edits(source: str, edits: list[RepairEdit]) -> str:
             )
 
     updated = source
-    for start, end, edit in sorted(spans_sorted, key=lambda item: (item[0], item[1]), reverse=True):
+    for start, end, edit in sorted(
+        spans_sorted, key=lambda item: (item[0], item[1]), reverse=True
+    ):
         current = updated[start:end]
         if current != edit.expected_source_text:
             raise RepairApplicationError(
@@ -204,8 +224,13 @@ def _span_to_offset(line_offsets: tuple[int, ...], line: int, column: int) -> in
 
 
 def _node_span(node: ast.AST) -> tuple[int, int, int, int]:
-    if not all(hasattr(node, attr) for attr in ("lineno", "col_offset", "end_lineno", "end_col_offset")):
-        raise RepairApplicationError(f"AST node {type(node).__name__} is missing span information")
+    if not all(
+        hasattr(node, attr)
+        for attr in ("lineno", "col_offset", "end_lineno", "end_col_offset")
+    ):
+        raise RepairApplicationError(
+            f"AST node {type(node).__name__} is missing span information"
+        )
     return (
         int(getattr(node, "lineno")),
         int(getattr(node, "col_offset")) + 1,
@@ -247,18 +272,26 @@ def _build_repair_edit(
         replacement=replacement,
         expected_occurrences=expected_occurrences,
         preconditions=preconditions or ["recorded AST span still matches the source"],
-        postconditions=postconditions or [f"{target_node} updated to the canonical value"],
-        inverse_patch=inverse_patch or {"expected_old_value": replacement, "replacement": expected_old_value},
+        postconditions=postconditions
+        or [f"{target_node} updated to the canonical value"],
+        inverse_patch=inverse_patch
+        or {"expected_old_value": replacement, "replacement": expected_old_value},
         expected_source_text=_node_text(index, node),
         replacement_source_text=replacement_source_text or replacement,
     )
 
 
-def _number_edits(action_kind: str, edits: list[RepairEdit], counters: dict[str, int]) -> list[RepairEdit]:
+def _number_edits(
+    action_kind: str, edits: list[RepairEdit], counters: dict[str, int]
+) -> list[RepairEdit]:
     numbered = []
     for edit in edits:
         counters[action_kind] = counters.get(action_kind, 0) + 1
-        numbered.append(dataclass_replace(edit, repair_id=f"{action_kind}_{counters[action_kind]:03d}"))
+        numbered.append(
+            dataclass_replace(
+                edit, repair_id=f"{action_kind}_{counters[action_kind]:03d}"
+            )
+        )
     return numbered
 
 
@@ -369,7 +402,12 @@ def _alias_repair_edits(
     allowed_names = _alias_target_names(kind)
     edits: list[RepairEdit] = []
     seen: set[tuple[int, int, int, str, str]] = set()
-    confidence = 0.98 if kind in {"catalog_alias", "labware_alias", "liquid_class_alias", "device_alias"} else 0.9
+    confidence = (
+        0.98
+        if kind
+        in {"catalog_alias", "labware_alias", "liquid_class_alias", "device_alias"}
+        else 0.9
+    )
 
     for node in ast.walk(index.tree):
         if isinstance(node, ast.Assign):
@@ -377,8 +415,16 @@ def _alias_repair_edits(
             for target in node.targets:
                 target_names.update(_assignment_target_names(target))
             matched = sorted(target_names & allowed_names, key=str.casefold)
-            if matched and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str) and node.value.value == project_name:
-                key = _node_span(node.value) + ("python_ast_assignment", f"Assign.value[{matched[0]}]")
+            if (
+                matched
+                and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, str)
+                and node.value.value == project_name
+            ):
+                key = _node_span(node.value) + (
+                    "python_ast_assignment",
+                    f"Assign.value[{matched[0]}]",
+                )
                 if key not in seen:
                     seen.add(key)
                     edits.append(
@@ -390,8 +436,12 @@ def _alias_repair_edits(
                             expected_old_value=project_name,
                             replacement=base_name,
                             confidence=confidence,
-                            preconditions=[f"assignment target {matched[0]!r} still matches the alias"],
-                            postconditions=[f"assignment target {matched[0]!r} now uses the canonical value"],
+                            preconditions=[
+                                f"assignment target {matched[0]!r} still matches the alias"
+                            ],
+                            postconditions=[
+                                f"assignment target {matched[0]!r} now uses the canonical value"
+                            ],
                             inverse_patch={
                                 "expected_old_value": base_name,
                                 "replacement": project_name,
@@ -405,8 +455,16 @@ def _alias_repair_edits(
         if isinstance(node, ast.AnnAssign):
             target_names = _assignment_target_names(node.target)
             matched = sorted(target_names & allowed_names, key=str.casefold)
-            if matched and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str) and node.value.value == project_name:
-                key = _node_span(node.value) + ("python_ast_assignment", f"Assign.value[{matched[0]}]")
+            if (
+                matched
+                and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, str)
+                and node.value.value == project_name
+            ):
+                key = _node_span(node.value) + (
+                    "python_ast_assignment",
+                    f"Assign.value[{matched[0]}]",
+                )
                 if key not in seen:
                     seen.add(key)
                     edits.append(
@@ -418,8 +476,12 @@ def _alias_repair_edits(
                             expected_old_value=project_name,
                             replacement=base_name,
                             confidence=confidence,
-                            preconditions=[f"assignment target {matched[0]!r} still matches the alias"],
-                            postconditions=[f"assignment target {matched[0]!r} now uses the canonical value"],
+                            preconditions=[
+                                f"assignment target {matched[0]!r} still matches the alias"
+                            ],
+                            postconditions=[
+                                f"assignment target {matched[0]!r} now uses the canonical value"
+                            ],
                             inverse_patch={
                                 "expected_old_value": base_name,
                                 "replacement": project_name,
@@ -431,8 +493,16 @@ def _alias_repair_edits(
                     )
             continue
         if isinstance(node, ast.keyword):
-            if node.arg in allowed_names and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str) and node.value.value == project_name:
-                key = _node_span(node.value) + ("python_ast_keyword", f"Call.keyword[{node.arg}]")
+            if (
+                node.arg in allowed_names
+                and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, str)
+                and node.value.value == project_name
+            ):
+                key = _node_span(node.value) + (
+                    "python_ast_keyword",
+                    f"Call.keyword[{node.arg}]",
+                )
                 if key not in seen:
                     seen.add(key)
                     edits.append(
@@ -444,8 +514,12 @@ def _alias_repair_edits(
                             expected_old_value=project_name,
                             replacement=base_name,
                             confidence=confidence,
-                            preconditions=[f"keyword {node.arg!r} still matches the alias"],
-                            postconditions=[f"keyword {node.arg!r} now uses the canonical value"],
+                            preconditions=[
+                                f"keyword {node.arg!r} still matches the alias"
+                            ],
+                            postconditions=[
+                                f"keyword {node.arg!r} now uses the canonical value"
+                            ],
                             inverse_patch={
                                 "expected_old_value": base_name,
                                 "replacement": project_name,
@@ -459,15 +533,24 @@ def _alias_repair_edits(
         if isinstance(node, ast.Dict):
             for key_node, value_node in zip(node.keys, node.values):
                 key_name = None
-                if isinstance(key_node, ast.Constant) and isinstance(key_node.value, str):
+                if isinstance(key_node, ast.Constant) and isinstance(
+                    key_node.value, str
+                ):
                     key_name = key_node.value
                 elif isinstance(key_node, ast.Name):
                     key_name = key_node.id
                 if key_name not in allowed_names:
                     continue
-                if not isinstance(value_node, ast.Constant) or not isinstance(value_node.value, str) or value_node.value != project_name:
+                if (
+                    not isinstance(value_node, ast.Constant)
+                    or not isinstance(value_node.value, str)
+                    or value_node.value != project_name
+                ):
                     continue
-                key = _node_span(value_node) + ("python_ast_dict_value", f"Dict.value[{key_name}]")
+                key = _node_span(value_node) + (
+                    "python_ast_dict_value",
+                    f"Dict.value[{key_name}]",
+                )
                 if key in seen:
                     continue
                 seen.add(key)
@@ -480,8 +563,12 @@ def _alias_repair_edits(
                         expected_old_value=project_name,
                         replacement=base_name,
                         confidence=confidence,
-                        preconditions=[f"mapping key {key_name!r} still matches the alias"],
-                        postconditions=[f"mapping key {key_name!r} now uses the canonical value"],
+                        preconditions=[
+                            f"mapping key {key_name!r} still matches the alias"
+                        ],
+                        postconditions=[
+                            f"mapping key {key_name!r} now uses the canonical value"
+                        ],
                         inverse_patch={
                             "expected_old_value": base_name,
                             "replacement": project_name,
@@ -492,11 +579,20 @@ def _alias_repair_edits(
                     )
                 )
             continue
-        if isinstance(node, ast.Call) and _call_supports_positional_alias(node, kind=kind):
+        if isinstance(node, ast.Call) and _call_supports_positional_alias(
+            node, kind=kind
+        ):
             for arg_index, arg in enumerate(node.args):
-                if not isinstance(arg, ast.Constant) or not isinstance(arg.value, str) or arg.value != project_name:
+                if (
+                    not isinstance(arg, ast.Constant)
+                    or not isinstance(arg.value, str)
+                    or arg.value != project_name
+                ):
                     continue
-                key = _node_span(arg) + ("python_ast_argument", f"Call.args[{arg_index}]")
+                key = _node_span(arg) + (
+                    "python_ast_argument",
+                    f"Call.args[{arg_index}]",
+                )
                 if key in seen:
                     continue
                 seen.add(key)
@@ -509,8 +605,12 @@ def _alias_repair_edits(
                         expected_old_value=project_name,
                         replacement=base_name,
                         confidence=confidence,
-                        preconditions=[f"positional argument {arg_index} still matches the alias"],
-                        postconditions=[f"positional argument {arg_index} now uses the canonical value"],
+                        preconditions=[
+                            f"positional argument {arg_index} still matches the alias"
+                        ],
+                        postconditions=[
+                            f"positional argument {arg_index} now uses the canonical value"
+                        ],
                         inverse_patch={
                             "expected_old_value": base_name,
                             "replacement": project_name,
@@ -522,7 +622,15 @@ def _alias_repair_edits(
                 )
             continue
 
-    edits.sort(key=lambda edit: (edit.line, edit.column_start, edit.column_end, edit.target_type, edit.target_node))
+    edits.sort(
+        key=lambda edit: (
+            edit.line,
+            edit.column_start,
+            edit.column_end,
+            edit.target_type,
+            edit.target_node,
+        )
+    )
     return edits
 
 
@@ -590,7 +698,11 @@ def render_repair_markdown(plan: RepairPlan) -> str:
             lines.extend(["- New:", "", "```python", action.new, "```"])
         if action.edits:
             lines.extend(["- Structured edits:", "", "```json"])
-            lines.append(json.dumps([edit.to_dict() for edit in action.edits], indent=2, sort_keys=True))
+            lines.append(
+                json.dumps(
+                    [edit.to_dict() for edit in action.edits], indent=2, sort_keys=True
+                )
+            )
             lines.append("```")
         if action.details:
             lines.extend(["- Details:", "", "```json"])
@@ -600,7 +712,9 @@ def render_repair_markdown(plan: RepairPlan) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _catalog_alias_actions(index: PythonSourceIndex, context: ProjectContext | None) -> list[RepairAction]:
+def _catalog_alias_actions(
+    index: PythonSourceIndex, context: ProjectContext | None
+) -> list[RepairAction]:
     source = index.source
     actions: list[RepairAction] = []
     seen: set[tuple[str, str]] = set()
@@ -615,13 +729,19 @@ def _catalog_alias_actions(index: PythonSourceIndex, context: ProjectContext | N
             if key in seen:
                 continue
             seen.add(key)
-            edits = _alias_repair_edits(index, kind=action_kind, project_name=project_name, base_name=base_name)
+            edits = _alias_repair_edits(
+                index, kind=action_kind, project_name=project_name, base_name=base_name
+            )
             if not edits:
                 continue
             numbered_edits = _number_edits(action_kind, edits, repair_counts)
             if kind == "catalog_aliases":
                 status = "ready" if _catalog_name_exists(base_name) else "needs_review"
-                detail = "global catalog contains the base name" if status == "ready" else "base name was not found in the global catalog"
+                detail = (
+                    "global catalog contains the base name"
+                    if status == "ready"
+                    else "base name was not found in the global catalog"
+                )
             else:
                 status = "ready"
                 detail = "alias is configured in the protocol-builder alias map"
@@ -641,7 +761,9 @@ def _catalog_alias_actions(index: PythonSourceIndex, context: ProjectContext | N
                         "line_numbers": [edit.line for edit in numbered_edits],
                         "repair_ids": [edit.repair_id for edit in numbered_edits],
                         "target_nodes": [edit.target_node for edit in numbered_edits],
-                        "target_types": sorted({edit.target_type for edit in numbered_edits}),
+                        "target_types": sorted(
+                            {edit.target_type for edit in numbered_edits}
+                        ),
                         "project_alias": project_name,
                         "base_name": base_name,
                         "source": "config/aliases",
@@ -669,7 +791,9 @@ def _catalog_alias_actions(index: PythonSourceIndex, context: ProjectContext | N
         if key in seen:
             continue
         seen.add(key)
-        edits = _alias_repair_edits(index, kind="catalog_alias", project_name=project_name, base_name=base_name)
+        edits = _alias_repair_edits(
+            index, kind="catalog_alias", project_name=project_name, base_name=base_name
+        )
         if not edits:
             continue
         if not _catalog_name_exists(base_name):
@@ -694,7 +818,9 @@ def _catalog_alias_actions(index: PythonSourceIndex, context: ProjectContext | N
                     "line_numbers": [edit.line for edit in numbered_edits],
                     "repair_ids": [edit.repair_id for edit in numbered_edits],
                     "target_nodes": [edit.target_node for edit in numbered_edits],
-                    "target_types": sorted({edit.target_type for edit in numbered_edits}),
+                    "target_types": sorted(
+                        {edit.target_type for edit in numbered_edits}
+                    ),
                     "project_alias": project_name,
                     "base_name": base_name,
                     "source": "project_context.manifest",
@@ -704,7 +830,9 @@ def _catalog_alias_actions(index: PythonSourceIndex, context: ProjectContext | N
     return actions
 
 
-def _raw_xml_modeling_actions(index: PythonSourceIndex, simulation: dict[str, Any] | None) -> list[RepairAction]:
+def _raw_xml_modeling_actions(
+    index: PythonSourceIndex, simulation: dict[str, Any] | None
+) -> list[RepairAction]:
     source = index.source
     unsupported = set()
     if simulation:
@@ -717,7 +845,9 @@ def _raw_xml_modeling_actions(index: PythonSourceIndex, simulation: dict[str, An
         if unsupported and command_id not in unsupported:
             continue
         fields = _xml_fields(step["xml"])
-        replacement = _replacement_for_raw_xml(command_id, fields, label_vars, step["indent"])
+        replacement = _replacement_for_raw_xml(
+            command_id, fields, label_vars, step["indent"]
+        )
         if replacement:
             edit = _build_repair_edit(
                 index,
@@ -727,8 +857,12 @@ def _raw_xml_modeling_actions(index: PythonSourceIndex, simulation: dict[str, An
                 expected_old_value=command_id,
                 replacement=replacement,
                 confidence=0.85,
-                preconditions=[f"raw_xml_step call {command_id!r} still matches the recorded span"],
-                postconditions=[f"raw_xml_step call {command_id!r} replaced with a modeled fluentcoder DSL call"],
+                preconditions=[
+                    f"raw_xml_step call {command_id!r} still matches the recorded span"
+                ],
+                postconditions=[
+                    f"raw_xml_step call {command_id!r} replaced with a modeled fluentcoder DSL call"
+                ],
                 inverse_patch={
                     "expected_old_value": replacement,
                     "replacement": step["source_line"].strip(),
@@ -772,7 +906,9 @@ def _raw_xml_modeling_actions(index: PythonSourceIndex, simulation: dict[str, An
     return actions
 
 
-def _failure_repair_actions(index: PythonSourceIndex, simulation: dict[str, Any] | None) -> list[RepairAction]:
+def _failure_repair_actions(
+    index: PythonSourceIndex, simulation: dict[str, Any] | None
+) -> list[RepairAction]:
     if not simulation:
         return []
     failure = simulation.get("failure") or {}
@@ -841,13 +977,13 @@ def _raw_xml_steps(index: PythonSourceIndex) -> list[dict[str, Any]]:
             and len(node.args) >= 2
         ):
             continue
-        try:
-            command_id = ast.literal_eval(node.args[0])
-            xml = ast.literal_eval(node.args[1])
-        except Exception:
+        arg0, arg1 = node.args[0], node.args[1]
+        if not (isinstance(arg0, ast.Constant) and isinstance(arg0.value, str)):
             continue
-        if not isinstance(command_id, str) or not isinstance(xml, str):
+        if not (isinstance(arg1, ast.Constant) and isinstance(arg1.value, str)):
             continue
+        command_id = arg0.value
+        xml = arg1.value
         source_line = lines[node.lineno - 1] if 0 < node.lineno <= len(lines) else ""
         indent = source_line[: len(source_line) - len(source_line.lstrip())]
         out.append(
@@ -894,7 +1030,11 @@ def _generic_tipbox_lines(index: PythonSourceIndex) -> list[dict[str, Any]]:
     lines = index.lines
     out = []
     for node in ast.walk(root):
-        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute) or node.func.attr != "place":
+        if (
+            not isinstance(node, ast.Call)
+            or not isinstance(node.func, ast.Attribute)
+            or node.func.attr != "place"
+        ):
             continue
         if not node.args:
             continue
@@ -959,12 +1099,16 @@ def _replacement_for_raw_xml(
     return None
 
 
-def _pipetting_replacement(indent: str, method: str, variable: str, fields: dict[str, Any]) -> str | None:
+def _pipetting_replacement(
+    indent: str, method: str, variable: str, fields: dict[str, Any]
+) -> str | None:
     volume = fields.get("volume")
     liquid_class = fields.get("liquid_class")
     if volume is None or not liquid_class:
         return None
-    return f"{indent}head.{method}({variable}, {volume!r}, liquid_class={liquid_class!r})"
+    return (
+        f"{indent}head.{method}({variable}, {volume!r}, liquid_class={liquid_class!r})"
+    )
 
 
 def _xml_fields(xml: str) -> dict[str, Any]:
@@ -1031,7 +1175,9 @@ def _catalog_name_exists_in_vendored_index(name: str) -> bool:
     conn: sqlite3.Connection | None = None
     try:
         conn = sqlite3.connect(str(db_path))
-        row = conn.execute("SELECT 1 FROM components WHERE name = ? LIMIT 1", (name,)).fetchone()
+        row = conn.execute(
+            "SELECT 1 FROM components WHERE name = ? LIMIT 1", (name,)
+        ).fetchone()
     except sqlite3.DatabaseError:
         return False
     finally:
@@ -1047,7 +1193,10 @@ def _ensure_fluentcoder_import(source: str, symbol: str) -> str:
         if not stripped.startswith("from fluentcoder import "):
             continue
         prefix = line[: len(line) - len(line.lstrip())]
-        names = [name.strip() for name in stripped[len("from fluentcoder import "):].split(",")]
+        names = [
+            name.strip()
+            for name in stripped[len("from fluentcoder import ") :].split(",")
+        ]
         if symbol not in names:
             names.append(symbol)
         names = sorted(name for name in names if name)

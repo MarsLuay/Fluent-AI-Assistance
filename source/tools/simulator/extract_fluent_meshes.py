@@ -23,17 +23,22 @@ from pathlib import Path
 from typing import Any, Iterable
 from xml.etree import ElementTree
 
-
 SCRIPT_PATH = Path(__file__).resolve()
 PROJECT_ROOT = SCRIPT_PATH.parents[3]
 DEFAULT_SOURCE = None  # resolved via --source or ready-to-import discovery
-DEFAULT_FLUENT_MODELS = PROJECT_ROOT / "source/04-protocol-simulator/public/models/fluent"
+DEFAULT_FLUENT_MODELS = (
+    PROJECT_ROOT / "source/04-protocol-simulator/public/models/fluent"
+)
 # Host/ZEIA mesh GLBs + manifest are local-only (gitignored) — not product law.
 DEFAULT_OUTPUT = DEFAULT_FLUENT_MODELS / "local"
 FLUENT_MESH_ASSET_PREFIX = "/models/fluent/local"
 
-GUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
-WORKTABLE_MESH_PATH_RE = re.compile(r"(?:^|/)DataStore/SystemSpecific/Worktable/Meshes/[^/]+\.xmsh$", re.I)
+GUID_RE = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I
+)
+WORKTABLE_MESH_PATH_RE = re.compile(
+    r"(?:^|/)DataStore/SystemSpecific/Worktable/Meshes/[^/]+\.xmsh$", re.I
+)
 
 
 LOCAL_PRESERVE_PINLIST_NAME = "preserve-mesh-guids.json"
@@ -71,7 +76,9 @@ def mesh_guids_from_catalog_or_pinlist(path: Path) -> set[str]:
         values = payload.get(key)
         if isinstance(values, list):
             for item in values:
-                guid = normalize_guid(item if isinstance(item, str) else str(item or ""))
+                guid = normalize_guid(
+                    item if isinstance(item, str) else str(item or "")
+                )
                 if guid:
                     guids.add(guid)
     for entry in payload.get("entries") or []:
@@ -100,7 +107,9 @@ def resolve_mesh_guid_filter(
     ``only_listed`` / any CLI list is present, also ``local/preserve-mesh-guids.json``.
     """
     path_args = [str(raw) for raw in from_paths]
-    guids: set[str] = {normalize_guid(value) for value in cli_guids if normalize_guid(value)}
+    guids: set[str] = {
+        normalize_guid(value) for value in cli_guids if normalize_guid(value)
+    }
     for raw in path_args:
         path = Path(raw).expanduser()
         if not path.is_absolute():
@@ -135,7 +144,9 @@ def portable_source_label(source: Path) -> str:
         return source.name
 
 
-def filter_source_meshes(source_meshes: list[SourceMesh], allowed: set[str] | None) -> list[SourceMesh]:
+def filter_source_meshes(
+    source_meshes: list[SourceMesh], allowed: set[str] | None
+) -> list[SourceMesh]:
     if allowed is None:
         return source_meshes
     selected: list[SourceMesh] = []
@@ -285,7 +296,13 @@ class BinaryFormatterReader:
         record_type = self.u8()
 
         if record_type == 0:
-            return ("SerializedStreamHeader", self.i32(), self.i32(), self.i32(), self.i32())
+            return (
+                "SerializedStreamHeader",
+                self.i32(),
+                self.i32(),
+                self.i32(),
+                self.i32(),
+            )
         if record_type == 1:
             return self.read_class_with_id()
         if record_type == 2:
@@ -327,14 +344,18 @@ class BinaryFormatterReader:
         if record_type == 17:
             return self.read_array_single_string()
 
-        raise BinaryFormatterError(f"Unsupported BinaryFormatter record {record_type} at byte {start}")
+        raise BinaryFormatterError(
+            f"Unsupported BinaryFormatter record {record_type} at byte {start}"
+        )
 
     def read_class_with_id(self) -> NetObject:
         object_id = self.i32()
         metadata_id = self.i32()
         metadata = self.class_metadata.get(metadata_id)
         if metadata is None:
-            raise BinaryFormatterError(f"Class metadata {metadata_id} not found for object {object_id}")
+            raise BinaryFormatterError(
+                f"Class metadata {metadata_id} not found for object {object_id}"
+            )
         return self.read_object_values(object_id, metadata)
 
     def read_class_with_members(self, has_types: bool, has_library: bool) -> NetObject:
@@ -347,10 +368,14 @@ class BinaryFormatterReader:
 
         if has_types:
             binary_types = [self.u8() for _ in range(member_count)]
-            additional_infos = [self.read_additional_info(binary_type) for binary_type in binary_types]
+            additional_infos = [
+                self.read_additional_info(binary_type) for binary_type in binary_types
+            ]
 
         library_id = self.i32() if has_library else None
-        metadata = ClassMetadata(class_name, member_names, binary_types, additional_infos, library_id)
+        metadata = ClassMetadata(
+            class_name, member_names, binary_types, additional_infos, library_id
+        )
         self.class_metadata[object_id] = metadata
         return self.read_object_values(object_id, metadata)
 
@@ -360,7 +385,9 @@ class BinaryFormatterReader:
         for member_name, binary_type, additional_info in zip(
             metadata.member_names, metadata.binary_types, metadata.additional_infos
         ):
-            obj.fields[member_name] = self.read_member_value(binary_type, additional_info)
+            obj.fields[member_name] = self.read_member_value(
+                binary_type, additional_info
+            )
         return obj
 
     def read_member_value(self, binary_type: int | None, additional_info: Any) -> Any:
@@ -407,7 +434,9 @@ class BinaryFormatterReader:
         length = self.i32()
         primitive_type = self.u8()
         values = self.primitive_array_values(length, primitive_type)
-        array = NetArray(object_id=object_id, values=values, primitive_type=primitive_type)
+        array = NetArray(
+            object_id=object_id, values=values, primitive_type=primitive_type
+        )
         self.objects[object_id] = array
         return array
 
@@ -477,13 +506,17 @@ class BinaryFormatterReader:
             return self.u32()
         if primitive_type == PRIMITIVE_UINT64:
             return self.u64()
-        raise BinaryFormatterError(f"Unsupported primitive type {primitive_type} at byte {self.offset}")
+        raise BinaryFormatterError(
+            f"Unsupported primitive type {primitive_type} at byte {self.offset}"
+        )
 
     def unpack_many(self, fmt: str, count: int) -> Iterable[Any]:
         size = struct.calcsize(fmt)
         end = self.offset + size * count
         if end > len(self.data):
-            raise BinaryFormatterError("Primitive array extends past the end of the stream")
+            raise BinaryFormatterError(
+                "Primitive array extends past the end of the stream"
+            )
         unpack_fmt = "<" + fmt[-1] * count
         values = struct.unpack_from(unpack_fmt, self.data, self.offset)
         self.offset = end
@@ -553,19 +586,126 @@ class BinaryFormatterReader:
         return self.take("<d")
 
 
+def resolve_source(args_source: str | None) -> Path | None:
+    if str(args_source or "").strip():
+        return Path(str(args_source)).expanduser().resolve()
+    discovered = discover_ready_zeia(PROJECT_ROOT)
+    return discovered.resolve() if discovered else None
+
+
+def process_single_mesh(
+    item: SourceMesh,
+    output_dir: Path,
+    manifest: dict[str, Any],
+) -> tuple[int, int, int]:
+    """Processes a single mesh item and returns counts for (converted, placeholders, failures)."""
+    converted_count, placeholders_count, failures_count = 0, 0, 0
+    try:
+        metadata = parse_xmsh(item)
+        decoded = decode_fluent_mesh(metadata)
+        if decoded.glb_bytes:
+            conversion_status = "copied-glb"
+            converted_count += 1
+            glb_bytes = decoded.glb_bytes
+            bounds = {"min": [0, 0, 0], "max": [0, 0, 0], "size": [0, 0, 0]}
+            unit_metadata = infer_unit_metadata(bounds, conversion_status)
+        elif decoded.primitives:
+            conversion_status = "converted"
+            converted_count += 1
+            primitives = decoded.primitives
+            glb_bytes, bounds, unit_metadata = build_glb(
+                metadata, primitives, decoded, conversion_status
+            )
+        else:
+            conversion_status = "placeholder"
+            placeholders_count += 1
+            decoded.notes.append(
+                "No Mesh3D primitive arrays were decoded; wrote a diagnostic placeholder."
+            )
+            primitives = [placeholder_primitive(metadata.name)]
+            glb_bytes, bounds, unit_metadata = build_glb(
+                metadata, primitives, decoded, conversion_status
+            )
+
+        asset_stem = metadata.guid or slug(metadata.name or Path(item.path).stem)
+        output_path = output_dir / f"{asset_stem}.glb"
+        output_path.write_bytes(glb_bytes)
+
+        manifest["models"].append(
+            {
+                "guid": metadata.guid,
+                "name": metadata.name,
+                "sourcePath": metadata.source_path.replace("\\", "/"),
+                "archivePath": (
+                    Path(item.archive_path).name if item.archive_path else None
+                ),
+                "assetPath": f"{FLUENT_MESH_ASSET_PREFIX}/{output_path.name}",
+                "outputFile": output_path.name,
+                "conversionStatus": conversion_status,
+                "nativeFormat": decoded.native_format,
+                "compression": decoded.compression,
+                "deflateOffset": decoded.deflate_offset,
+                "payloadBytes": len(metadata.payload),
+                "innerPayloadBytes": decoded.inner_payload_bytes,
+                "base64Length": metadata.base64_length,
+                "version": metadata.version,
+                "dataVersion": metadata.data_version,
+                "checksum": metadata.checksum,
+                "meshParts": len(decoded.primitives),
+                "vertexCount": sum(
+                    len(primitive.positions) // 3 for primitive in decoded.primitives
+                ),
+                "triangleCount": sum(
+                    len(primitive.indices) // 3 for primitive in decoded.primitives
+                ),
+                "bounds": bounds,
+                "boundsMm": scale_bounds(bounds, unit_metadata["unitScaleToMm"]),
+                "unitScaleToMm": unit_metadata["unitScaleToMm"],
+                "unitScaleSource": unit_metadata["unitScaleSource"],
+                "nativeUnit": unit_metadata["nativeUnit"],
+                "notes": decoded.notes,
+            }
+        )
+    except Exception as error:  # noqa: BLE001 - CLI should keep converting the rest.
+        failures_count += 1
+        manifest["models"].append(
+            {
+                "sourcePath": item.path.replace("\\", "/"),
+                "archivePath": (
+                    Path(item.archive_path).name if item.archive_path else None
+                ),
+                "conversionStatus": "failed",
+                "error": str(error),
+            }
+        )
+        print(f"Failed to convert {item.path}: {error}", file=sys.stderr)
+    return converted_count, placeholders_count, failures_count
+
+
+def init_manifest(source: Path, allowed_guids: set[str] | None) -> dict[str, Any]:
+    """Initializes the manifest dictionary for the extraction process."""
+    return {
+        "source": portable_source_label(source),
+        "generatedAt": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "nativeFormat": "Tecan VisionX Worktable MeshArchive BinaryFormatter",
+        "productAuthority": False,
+        "localRebuildOnly": True,
+        "assetBasePath": FLUENT_MESH_ASSET_PREFIX,
+        "meshGuidFilter": sorted(allowed_guids) if allowed_guids is not None else None,
+        "models": [],
+    }
+
+
 def main() -> int:
     args = parse_args()
-    if str(args.source or "").strip():
-        source = Path(args.source).expanduser().resolve()
-    else:
-        discovered = discover_ready_zeia(PROJECT_ROOT)
-        if discovered is None:
-            print(
-                "No source ZEIA provided. Pass a path or set TECAN_SIMULATOR_SAMPLE_ZEIA / place a .zeia under ready-to-import.",
-                file=sys.stderr,
-            )
-            return 1
-        source = discovered.resolve()
+    source = resolve_source(args.source)
+    if source is None:
+        print(
+            "No source ZEIA provided. Pass a path or set TECAN_SIMULATOR_SAMPLE_ZEIA / place a .zeia under ready-to-import.",
+            file=sys.stderr,
+        )
+        return 1
+
     output_dir = Path(args.out).expanduser().resolve()
     refuse_tracked_fluent_mesh_root(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -589,87 +729,17 @@ def main() -> int:
         )
         return 1
 
-    manifest: dict[str, Any] = {
-        "source": portable_source_label(source),
-        "generatedAt": dt.datetime.now(dt.timezone.utc).isoformat(),
-        "nativeFormat": "Tecan VisionX Worktable MeshArchive BinaryFormatter",
-        "productAuthority": False,
-        "localRebuildOnly": True,
-        "assetBasePath": FLUENT_MESH_ASSET_PREFIX,
-        "meshGuidFilter": sorted(allowed_guids) if allowed_guids is not None else None,
-        "models": []
-    }
+    manifest = init_manifest(source, allowed_guids)
 
     converted = 0
     placeholders = 0
     failures = 0
 
     for item in source_meshes:
-        try:
-            metadata = parse_xmsh(item)
-            decoded = decode_fluent_mesh(metadata)
-            if decoded.glb_bytes:
-                conversion_status = "copied-glb"
-                converted += 1
-                glb_bytes = decoded.glb_bytes
-                bounds = {"min": [0, 0, 0], "max": [0, 0, 0], "size": [0, 0, 0]}
-                unit_metadata = infer_unit_metadata(bounds, conversion_status)
-            elif decoded.primitives:
-                conversion_status = "converted"
-                converted += 1
-                primitives = decoded.primitives
-                glb_bytes, bounds, unit_metadata = build_glb(metadata, primitives, decoded, conversion_status)
-            else:
-                conversion_status = "placeholder"
-                placeholders += 1
-                decoded.notes.append("No Mesh3D primitive arrays were decoded; wrote a diagnostic placeholder.")
-                primitives = [placeholder_primitive(metadata.name)]
-                glb_bytes, bounds, unit_metadata = build_glb(metadata, primitives, decoded, conversion_status)
-
-            asset_stem = metadata.guid or slug(metadata.name or Path(item.path).stem)
-            output_path = output_dir / f"{asset_stem}.glb"
-            output_path.write_bytes(glb_bytes)
-
-            manifest["models"].append(
-                {
-                    "guid": metadata.guid,
-                    "name": metadata.name,
-                    "sourcePath": metadata.source_path.replace("\\", "/"),
-                    "archivePath": Path(item.archive_path).name if item.archive_path else None,
-                    "assetPath": f"{FLUENT_MESH_ASSET_PREFIX}/{output_path.name}",
-                    "outputFile": output_path.name,
-                    "conversionStatus": conversion_status,
-                    "nativeFormat": decoded.native_format,
-                    "compression": decoded.compression,
-                    "deflateOffset": decoded.deflate_offset,
-                    "payloadBytes": len(metadata.payload),
-                    "innerPayloadBytes": decoded.inner_payload_bytes,
-                    "base64Length": metadata.base64_length,
-                    "version": metadata.version,
-                    "dataVersion": metadata.data_version,
-                    "checksum": metadata.checksum,
-                    "meshParts": len(decoded.primitives),
-                    "vertexCount": sum(len(primitive.positions) // 3 for primitive in decoded.primitives),
-                    "triangleCount": sum(len(primitive.indices) // 3 for primitive in decoded.primitives),
-                    "bounds": bounds,
-                    "boundsMm": scale_bounds(bounds, unit_metadata["unitScaleToMm"]),
-                    "unitScaleToMm": unit_metadata["unitScaleToMm"],
-                    "unitScaleSource": unit_metadata["unitScaleSource"],
-                    "nativeUnit": unit_metadata["nativeUnit"],
-                    "notes": decoded.notes
-                }
-            )
-        except Exception as error:  # noqa: BLE001 - CLI should keep converting the rest.
-            failures += 1
-            manifest["models"].append(
-                {
-                    "sourcePath": item.path.replace("\\", "/"),
-                    "archivePath": Path(item.archive_path).name if item.archive_path else None,
-                    "conversionStatus": "failed",
-                    "error": str(error)
-                }
-            )
-            print(f"Failed to convert {item.path}: {error}", file=sys.stderr)
+        c, p, f = process_single_mesh(item, output_dir, manifest)
+        converted += c
+        placeholders += p
+        failures += f
 
     manifest["summary"] = {
         "entries": len(source_meshes),
@@ -678,7 +748,9 @@ def main() -> int:
         "failed": failures,
         "filterSize": len(allowed_guids) if allowed_guids is not None else None,
     }
-    (output_dir / args.manifest_name).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    (output_dir / args.manifest_name).write_text(
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+    )
 
     print(
         f"Fluent mesh extraction complete: {converted} converted, {placeholders} placeholders, "
@@ -686,7 +758,6 @@ def main() -> int:
         + (f" (filter {len(allowed_guids)} GUIDs)" if allowed_guids is not None else "")
     )
     return 1 if failures and args.fail_on_error else 0
-
 
 
 def discover_ready_zeia(repo_root: Path) -> Path | None:
@@ -703,11 +774,16 @@ def discover_ready_zeia(repo_root: Path) -> Path | None:
     for bundle in sorted(ready_root.iterdir()):
         if not bundle.is_dir() or bundle.name.startswith("."):
             continue
-        for rel in (("source", "original-sources"), ("original_sources",), ("source", "original_sources")):
+        for rel in (
+            ("source", "original-sources"),
+            ("original_sources",),
+            ("source", "original_sources"),
+        ):
             folder = bundle.joinpath(*rel)
             if folder.is_dir():
                 found.extend(sorted(folder.glob("*.zeia")))
     return found[0] if found else None
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -715,14 +791,18 @@ def parse_args() -> argparse.Namespace:
         "source",
         nargs="?",
         default="",
-        help="ZEIA/zip archive, extracted directory, or single .xmsh file."
+        help="ZEIA/zip archive, extracted directory, or single .xmsh file.",
     )
     parser.add_argument(
         "--out",
         default=str(DEFAULT_OUTPUT),
         help="Directory for generated .glb files and the manifest (default: local/).",
     )
-    parser.add_argument("--manifest-name", default="manifest.json", help="Manifest filename to write inside --out.")
+    parser.add_argument(
+        "--manifest-name",
+        default="manifest.json",
+        help="Manifest filename to write inside --out.",
+    )
     parser.add_argument(
         "--mesh-guid",
         action="append",
@@ -743,33 +823,55 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Fail unless a mesh GUID list is provided (CLI / catalog / preserve-mesh-guids.json).",
     )
-    parser.add_argument("--fail-on-error", action="store_true", help="Exit non-zero if any mesh entry fails.")
+    parser.add_argument(
+        "--fail-on-error",
+        action="store_true",
+        help="Exit non-zero if any mesh entry fails.",
+    )
     return parser.parse_args()
 
 
 def read_source_meshes(source: Path) -> list[SourceMesh]:
     if source.is_dir():
         paths = sorted(source.rglob("*.xmsh"))
-        return [SourceMesh(path=str(path.relative_to(source)), text=path.read_text(encoding="utf-8-sig")) for path in paths]
+        return [
+            SourceMesh(
+                path=str(path.relative_to(source)),
+                text=path.read_text(encoding="utf-8-sig"),
+            )
+            for path in paths
+        ]
 
     if source.is_file() and source.suffix.lower() == ".xmsh":
-        return [SourceMesh(path=source.name, text=source.read_text(encoding="utf-8-sig"))]
+        return [
+            SourceMesh(path=source.name, text=source.read_text(encoding="utf-8-sig"))
+        ]
 
     if source.is_file() and zipfile.is_zipfile(source):
         with zipfile.ZipFile(source) as archive:
-            names = [name for name in archive.namelist() if not name.endswith("/") and name.lower().endswith(".xmsh")]
-            worktable_names = [name for name in names if WORKTABLE_MESH_PATH_RE.search(name.replace("\\", "/"))]
+            names = [
+                name
+                for name in archive.namelist()
+                if not name.endswith("/") and name.lower().endswith(".xmsh")
+            ]
+            worktable_names = [
+                name
+                for name in names
+                if WORKTABLE_MESH_PATH_RE.search(name.replace("\\", "/"))
+            ]
             selected_names = sorted(worktable_names or names)
             return [
                 SourceMesh(
                     path=name,
                     archive_path=str(source),
-                    text=archive.read(name).decode("utf-8-sig", errors="replace")
+                    text=archive.read(name).decode("utf-8-sig", errors="replace"),
                 )
                 for name in selected_names
             ]
 
-    raise FileNotFoundError(f"Source is not a ZEIA/zip archive, directory, or .xmsh file: {source}")
+    raise FileNotFoundError(
+        f"Source is not a ZEIA/zip archive, directory, or .xmsh file: {source}"
+    )
 
 
 def parse_xmsh(item: SourceMesh) -> XmshMetadata:
@@ -789,10 +891,12 @@ def parse_xmsh(item: SourceMesh) -> XmshMetadata:
         name=name,
         source_path=item.path,
         version=mesh_node.attrib.get("version", "") if mesh_node is not None else "",
-        data_version=mesh_node.attrib.get("dataVersion", "") if mesh_node is not None else "",
+        data_version=(
+            mesh_node.attrib.get("dataVersion", "") if mesh_node is not None else ""
+        ),
         checksum=xml_text(root, "Checksum"),
         base64_length=len(re.sub(r"\s+", "", mesh_text)),
-        payload=payload
+        payload=payload,
     )
 
 
@@ -806,7 +910,9 @@ def decode_fluent_mesh(metadata: XmshMetadata) -> DecodedMesh:
 
     inner_payload, deflate_offset = find_inner_mesh_stream(payload)
     if inner_payload is None:
-        notes.append("Outer payload did not contain a raw-deflate Mesh3D BinaryFormatter stream.")
+        notes.append(
+            "Outer payload did not contain a raw-deflate Mesh3D BinaryFormatter stream."
+        )
         return DecodedMesh([], "unknown", "unknown", None, None, notes)
 
     reader = BinaryFormatterReader(inner_payload)
@@ -818,7 +924,7 @@ def decode_fluent_mesh(metadata: XmshMetadata) -> DecodedMesh:
         compression="raw-deflate",
         inner_payload_bytes=len(inner_payload),
         deflate_offset=deflate_offset,
-        notes=notes
+        notes=notes,
     )
 
 
@@ -830,12 +936,18 @@ def find_inner_mesh_stream(payload: bytes) -> tuple[bytes | None, int | None]:
             inflated = decompressor.decompress(payload[offset:]) + decompressor.flush()
         except zlib.error:
             continue
-        if len(inflated) > 256 and inflated.startswith(b"\x00\x01\x00\x00") and b"Mesh3D" in inflated[:4096]:
+        if (
+            len(inflated) > 256
+            and inflated.startswith(b"\x00\x01\x00\x00")
+            and b"Mesh3D" in inflated[:4096]
+        ):
             return inflated, offset
     return None, None
 
 
-def mesh_primitives_from_objects(objects: dict[int, Any], notes: list[str]) -> list[MeshPrimitive]:
+def mesh_primitives_from_objects(
+    objects: dict[int, Any], notes: list[str]
+) -> list[MeshPrimitive]:
     primitives: list[MeshPrimitive] = []
     seen_signatures: set[tuple[int, int, int]] = set()
 
@@ -850,10 +962,14 @@ def mesh_primitives_from_objects(objects: dict[int, Any], notes: list[str]) -> l
         if not vertices or not triangles:
             continue
         if len(vertices) % 3:
-            notes.append(f"Skipped {obj.class_name} with vertex array length {len(vertices)} not divisible by 3.")
+            notes.append(
+                f"Skipped {obj.class_name} with vertex array length {len(vertices)} not divisible by 3."
+            )
             continue
 
-        decoded_geometry = decode_triangle_geometry(vertices, normals or [], triangles, notes, obj.class_name)
+        decoded_geometry = decode_triangle_geometry(
+            vertices, normals or [], triangles, notes, obj.class_name
+        )
         if decoded_geometry is None:
             continue
         positions, output_normals, indices = decoded_geometry
@@ -869,7 +985,7 @@ def mesh_primitives_from_objects(objects: dict[int, Any], notes: list[str]) -> l
                 positions=positions,
                 indices=indices,
                 color=mesh_color(obj, objects),
-                normals=output_normals
+                normals=output_normals,
             )
         )
 
@@ -884,7 +1000,7 @@ def decode_triangle_geometry(
     normals: list[float] | list[int],
     triangles: list[float] | list[int],
     notes: list[str],
-    class_name: str
+    class_name: str,
 ) -> tuple[list[float], list[float] | None, list[int]] | None:
     vertex_count = len(vertices) // 3
     normal_count = len(normals) // 3 if len(normals) % 3 == 0 else 0
@@ -893,15 +1009,29 @@ def decode_triangle_geometry(
     if len(raw) % 6 == 0 and fluent_face_vertices_are_valid(raw, vertex_count):
         vertex_positions = fluent_vertices_to_three(vertices)
         if normal_count and fluent_face_normals_are_valid(raw, normal_count):
-            add_unique_note(notes, "Decoded Fluent triangle records as 3 vertex indices plus 3 normal indices per face.")
-            return expand_vertices_with_native_normals(vertex_positions, fluent_normals_to_three(normals), raw)
+            add_unique_note(
+                notes,
+                "Decoded Fluent triangle records as 3 vertex indices plus 3 normal indices per face.",
+            )
+            return expand_vertices_with_native_normals(
+                vertex_positions, fluent_normals_to_three(normals), raw
+            )
 
-        add_unique_note(notes, "Decoded Fluent triangle records as 3 vertex indices per 6-int face; native normals were unavailable.")
-        indices = [raw[index + corner] for index in range(0, len(raw), 6) for corner in range(3)]
+        add_unique_note(
+            notes,
+            "Decoded Fluent triangle records as 3 vertex indices per 6-int face; native normals were unavailable.",
+        )
+        indices = [
+            raw[index + corner]
+            for index in range(0, len(raw), 6)
+            for corner in range(3)
+        ]
         return vertex_positions, None, indices
 
     if len(raw) % 3 == 0 and all(0 <= index < vertex_count for index in raw):
-        add_unique_note(notes, "Decoded triangle records as plain 3-int vertex-index faces.")
+        add_unique_note(
+            notes, "Decoded triangle records as plain 3-int vertex-index faces."
+        )
         return fluent_vertices_to_three(vertices), None, raw
 
     notes.append(f"Skipped {class_name} with unsupported triangle index layout.")
@@ -909,17 +1039,23 @@ def decode_triangle_geometry(
 
 
 def fluent_face_vertices_are_valid(raw: list[int], vertex_count: int) -> bool:
-    return all(0 <= raw[index + corner] < vertex_count for index in range(0, len(raw), 6) for corner in range(3))
+    return all(
+        0 <= raw[index + corner] < vertex_count
+        for index in range(0, len(raw), 6)
+        for corner in range(3)
+    )
 
 
 def fluent_face_normals_are_valid(raw: list[int], normal_count: int) -> bool:
-    return all(0 <= raw[index + corner] < normal_count for index in range(0, len(raw), 6) for corner in range(3, 6))
+    return all(
+        0 <= raw[index + corner] < normal_count
+        for index in range(0, len(raw), 6)
+        for corner in range(3, 6)
+    )
 
 
 def expand_vertices_with_native_normals(
-    vertex_positions: list[float],
-    normal_vectors: list[float],
-    raw: list[int]
+    vertex_positions: list[float], normal_vectors: list[float], raw: list[int]
 ) -> tuple[list[float], list[float], list[int]]:
     positions: list[float] = []
     normals: list[float] = []
@@ -942,7 +1078,9 @@ def expand_vertices_with_native_normals(
     return positions, normals, indices
 
 
-def dereference(value: Any, objects: dict[int, Any], seen: set[int] | None = None) -> Any:
+def dereference(
+    value: Any, objects: dict[int, Any], seen: set[int] | None = None
+) -> Any:
     if not isinstance(value, Reference):
         return value
     seen = seen or set()
@@ -952,7 +1090,9 @@ def dereference(value: Any, objects: dict[int, Any], seen: set[int] | None = Non
     return dereference(objects.get(value.object_id), objects, seen)
 
 
-def numeric_array(value: Any, objects: dict[int, Any]) -> list[float] | list[int] | None:
+def numeric_array(
+    value: Any, objects: dict[int, Any]
+) -> list[float] | list[int] | None:
     resolved = dereference(value, objects)
     if isinstance(resolved, NetArray):
         return [item for item in resolved.values if isinstance(item, (int, float))]
@@ -1016,31 +1156,82 @@ def placeholder_primitive(name: str) -> MeshPrimitive:
     size = 0.08
     height = 0.025
     positions = [
-        -size, 0.0, -size,
-        size, 0.0, -size,
-        size, 0.0, size,
-        -size, 0.0, size,
-        -size, height, -size,
-        size, height, -size,
-        size, height, size,
-        -size, height, size
+        -size,
+        0.0,
+        -size,
+        size,
+        0.0,
+        -size,
+        size,
+        0.0,
+        size,
+        -size,
+        0.0,
+        size,
+        -size,
+        height,
+        -size,
+        size,
+        height,
+        -size,
+        size,
+        height,
+        size,
+        -size,
+        height,
+        size,
     ]
     indices = [
-        0, 1, 2, 0, 2, 3,
-        4, 6, 5, 4, 7, 6,
-        0, 4, 5, 0, 5, 1,
-        1, 5, 6, 1, 6, 2,
-        2, 6, 7, 2, 7, 3,
-        3, 7, 4, 3, 4, 0
+        0,
+        1,
+        2,
+        0,
+        2,
+        3,
+        4,
+        6,
+        5,
+        4,
+        7,
+        6,
+        0,
+        4,
+        5,
+        0,
+        5,
+        1,
+        1,
+        5,
+        6,
+        1,
+        6,
+        2,
+        2,
+        6,
+        7,
+        2,
+        7,
+        3,
+        3,
+        7,
+        4,
+        3,
+        4,
+        0,
     ]
-    return MeshPrimitive(name=f"{name}_placeholder", positions=positions, indices=indices, color=[0.84, 0.58, 0.22, 0.92])
+    return MeshPrimitive(
+        name=f"{name}_placeholder",
+        positions=positions,
+        indices=indices,
+        color=[0.84, 0.58, 0.22, 0.92],
+    )
 
 
 def build_glb(
     metadata: XmshMetadata,
     primitives: list[MeshPrimitive],
     decoded: DecodedMesh,
-    conversion_status: str
+    conversion_status: str,
 ) -> tuple[bytes, dict[str, Any], dict[str, Any]]:
     binary = bytearray()
     buffer_views: list[dict[str, Any]] = []
@@ -1052,41 +1243,54 @@ def build_glb(
     for primitive in primitives:
         positions = primitive.positions
         indices = primitive.indices
-        normals = primitive.normals if primitive.normals and len(primitive.normals) == len(positions) else compute_vertex_normals(positions, indices)
+        normals = (
+            primitive.normals
+            if primitive.normals and len(primitive.normals) == len(positions)
+            else compute_vertex_normals(positions, indices)
+        )
         all_positions.extend(positions)
 
         position_accessor = append_accessor(
             binary,
             buffer_views,
             accessors,
-            pack_floats(positions),
-            GL_ARRAY_BUFFER,
-            GL_FLOAT,
-            "VEC3",
-            len(positions) // 3,
-            min_max_vectors(positions)
+            AccessorSpec(
+                payload=pack_floats(positions),
+                target=GL_ARRAY_BUFFER,
+                component_type=GL_FLOAT,
+                accessor_type="VEC3",
+                count=len(positions) // 3,
+                bounds=min_max_vectors(positions),
+            )
         )
         normal_accessor = append_accessor(
             binary,
             buffer_views,
             accessors,
-            pack_floats(normals),
-            GL_ARRAY_BUFFER,
-            GL_FLOAT,
-            "VEC3",
-            len(normals) // 3,
-            None
+            AccessorSpec(
+                payload=pack_floats(normals),
+                target=GL_ARRAY_BUFFER,
+                component_type=GL_FLOAT,
+                accessor_type="VEC3",
+                count=len(normals) // 3,
+                bounds=None,
+            )
         )
         index_accessor = append_accessor(
             binary,
             buffer_views,
             accessors,
-            pack_uint32(indices),
-            GL_ELEMENT_ARRAY_BUFFER,
-            GL_UNSIGNED_INT,
-            "SCALAR",
-            len(indices),
-            {"min": [min(indices) if indices else 0], "max": [max(indices) if indices else 0]}
+            AccessorSpec(
+                payload=pack_uint32(indices),
+                target=GL_ELEMENT_ARRAY_BUFFER,
+                component_type=GL_UNSIGNED_INT,
+                accessor_type="SCALAR",
+                count=len(indices),
+                bounds={
+                    "min": [min(indices) if indices else 0],
+                    "max": [max(indices) if indices else 0],
+                },
+            )
         )
 
         material_index = len(materials)
@@ -1096,16 +1300,19 @@ def build_glb(
                 "pbrMetallicRoughness": {
                     "baseColorFactor": primitive.color,
                     "metallicFactor": 0.05,
-                    "roughnessFactor": 0.55
-                }
+                    "roughnessFactor": 0.55,
+                },
             }
         )
 
         gltf_primitives.append(
             {
-                "attributes": {"POSITION": position_accessor, "NORMAL": normal_accessor},
+                "attributes": {
+                    "POSITION": position_accessor,
+                    "NORMAL": normal_accessor,
+                },
                 "indices": index_accessor,
-                "material": material_index
+                "material": material_index,
             }
         )
 
@@ -1116,8 +1323,12 @@ def build_glb(
         "asset": {"version": "2.0", "generator": "extract_fluent_meshes.py"},
         "scene": 0,
         "scenes": [{"nodes": [0], "extras": unit_metadata}],
-        "nodes": [{"name": metadata.name or asset_stem, "mesh": 0, "extras": unit_metadata}],
-        "meshes": [{"name": metadata.name or asset_stem, "primitives": gltf_primitives}],
+        "nodes": [
+            {"name": metadata.name or asset_stem, "mesh": 0, "extras": unit_metadata}
+        ],
+        "meshes": [
+            {"name": metadata.name or asset_stem, "primitives": gltf_primitives}
+        ],
         "materials": materials,
         "buffers": [{"byteLength": len(binary)}],
         "bufferViews": buffer_views,
@@ -1133,37 +1344,49 @@ def build_glb(
             "bounds": bounds,
             "boundsMm": scale_bounds(bounds, unit_metadata["unitScaleToMm"]),
             **unit_metadata,
-            "notes": decoded.notes
-        }
+            "notes": decoded.notes,
+        },
     }
     return write_glb(gltf, bytes(binary)), bounds, unit_metadata
+
+
+@dataclass
+class AccessorSpec:
+    payload: bytes
+    target: int
+    component_type: int
+    accessor_type: str
+    count: int
+    bounds: dict[str, Any] | None = None
 
 
 def append_accessor(
     binary: bytearray,
     buffer_views: list[dict[str, Any]],
     accessors: list[dict[str, Any]],
-    payload: bytes,
-    target: int,
-    component_type: int,
-    accessor_type: str,
-    count: int,
-    bounds: dict[str, Any] | None
+    spec: AccessorSpec,
 ) -> int:
     align_binary(binary)
     byte_offset = len(binary)
-    binary.extend(payload)
+    binary.extend(spec.payload)
     buffer_view_index = len(buffer_views)
-    buffer_views.append({"buffer": 0, "byteOffset": byte_offset, "byteLength": len(payload), "target": target})
+    buffer_views.append(
+        {
+            "buffer": 0,
+            "byteOffset": byte_offset,
+            "byteLength": len(spec.payload),
+            "target": spec.target,
+        }
+    )
     accessor: dict[str, Any] = {
         "bufferView": buffer_view_index,
         "byteOffset": 0,
-        "componentType": component_type,
-        "count": count,
-        "type": accessor_type
+        "componentType": spec.component_type,
+        "count": spec.count,
+        "type": spec.accessor_type,
     }
-    if bounds:
-        accessor.update(bounds)
+    if spec.bounds:
+        accessor.update(spec.bounds)
     accessors.append(accessor)
     return len(accessors) - 1
 
@@ -1180,7 +1403,7 @@ def write_glb(gltf: dict[str, Any], binary: bytes) -> bytes:
             struct.pack("<I4s", len(json_payload), b"JSON"),
             json_payload,
             struct.pack("<I4s", len(binary_payload), b"BIN\x00"),
-            binary_payload
+            binary_payload,
         ]
     )
 
@@ -1236,10 +1459,7 @@ def min_max_vectors(values: list[float]) -> dict[str, Any]:
     xs = values[0::3]
     ys = values[1::3]
     zs = values[2::3]
-    return {
-        "min": [min(xs), min(ys), min(zs)],
-        "max": [max(xs), max(ys), max(zs)]
-    }
+    return {"min": [min(xs), min(ys), min(zs)], "max": [max(xs), max(ys), max(zs)]}
 
 
 def bounds_for_positions(values: list[float]) -> dict[str, Any]:
@@ -1248,29 +1468,35 @@ def bounds_for_positions(values: list[float]) -> dict[str, Any]:
     bounds = min_max_vectors(values)
     return {
         **bounds,
-        "size": [bounds["max"][index] - bounds["min"][index] for index in range(3)]
+        "size": [bounds["max"][index] - bounds["min"][index] for index in range(3)],
     }
 
 
-def infer_unit_metadata(bounds: dict[str, Any], conversion_status: str) -> dict[str, Any]:
-    sizes = [float(value) for value in bounds.get("size", []) if isinstance(value, (int, float)) and math.isfinite(value)]
+def infer_unit_metadata(
+    bounds: dict[str, Any], conversion_status: str
+) -> dict[str, Any]:
+    sizes = [
+        float(value)
+        for value in bounds.get("size", [])
+        if isinstance(value, (int, float)) and math.isfinite(value)
+    ]
     max_extent = max(sizes, default=0.0)
     if max_extent <= 0:
         return {
             "unitScaleToMm": 1,
             "unitScaleSource": f"{conversion_status}:unknown-bounds-assumed-mm",
-            "nativeUnit": "mm"
+            "nativeUnit": "mm",
         }
     if max_extent < 10:
         return {
             "unitScaleToMm": 1000,
             "unitScaleSource": "inferred:max-native-extent-under-10",
-            "nativeUnit": "m"
+            "nativeUnit": "m",
         }
     return {
         "unitScaleToMm": 1,
         "unitScaleSource": "inferred:max-native-extent-at-least-10",
-        "nativeUnit": "mm"
+        "nativeUnit": "mm",
     }
 
 

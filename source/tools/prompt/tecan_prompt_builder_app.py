@@ -1035,9 +1035,9 @@ def print_source_summary(source: SourceChoice) -> None:
 def clear_screen() -> None:
     if os.environ.get("TECAN_PROMPT_NO_CLEAR"):
         return
-    command = "cls" if platform.system().lower() == "windows" else "clear"
+    command = ["cmd.exe", "/c", "cls"] if platform.system().lower() == "windows" else ["clear"]
     try:
-        subprocess.run(command, shell=True, check=False)
+        subprocess.run(command, check=False)
     except Exception:
         pass
 
