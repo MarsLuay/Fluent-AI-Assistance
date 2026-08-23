@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Iterable
 import hashlib
 import json
+import re
 import sqlite3
 
 from .archive import inspect_archive
@@ -1012,6 +1013,8 @@ def _metadata_value(conn: sqlite3.Connection, key: str) -> str:
 
 
 def _count(conn: sqlite3.Connection, table: str) -> int:
+    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", table):
+        raise ValueError(f"Invalid table name: {table}")
     row = conn.execute(f"SELECT COUNT(*) AS count FROM {table}").fetchone()
     return int(row["count"] or 0)
 
