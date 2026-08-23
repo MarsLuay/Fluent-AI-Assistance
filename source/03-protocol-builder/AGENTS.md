@@ -286,7 +286,25 @@ spec auto-upgrade and media seeding.
 - Do not expand `tests/fixtures/**` into real lab verification recipes or
   confidential goldens. Keep private goldens outside the public tree.
 
+   <!-- BEGIN GENERATED: readiness-gate-summary -->
+   Readiness registry summary (generated from `fluent_pipeline/data/readiness_gate_registry.json`):
+   - Required offline ready-to-import gates: `26`
+   - Optional diagnostics: `1` (`Gate 27`)
+   - Current active entries: `27`
+   - Stable IDs are the contract; gate numbers are display labels only.
+   - Authoritative table: [Readiness Gate Registry](docs/READINESS_GATES.md)
+   <!-- END GENERATED: readiness-gate-summary -->
+
 ## Required Verification
+
+   <!-- BEGIN GENERATED: readiness-gate-summary -->
+   Readiness registry summary (generated from `fluent_pipeline/data/readiness_gate_registry.json`):
+   - Required offline ready-to-import gates: `26`
+   - Optional diagnostics: `1` (`Gate 27`)
+   - Current active entries: `27`
+   - Stable IDs are the contract; gate numbers are display labels only.
+   - Authoritative table: [Readiness Gate Registry](docs/READINESS_GATES.md)
+   <!-- END GENERATED: readiness-gate-summary -->
 
 - For code changes, run:
 
@@ -329,8 +347,26 @@ spec auto-upgrade and media seeding.
    - Authoritative table: [Readiness Gate Registry](docs/READINESS_GATES.md)
    <!-- END GENERATED: readiness-gate-summary -->
 
+   <!-- BEGIN GENERATED: readiness-gate-summary -->
+   Readiness registry summary (generated from `fluent_pipeline/data/readiness_gate_registry.json`):
+   - Required offline ready-to-import gates: `26`
+   - Optional diagnostics: `1` (`Gate 27`)
+   - Current active entries: `27`
+   - Stable IDs are the contract; gate numbers are display labels only.
+   - Authoritative table: [Readiness Gate Registry](docs/READINESS_GATES.md)
+   <!-- END GENERATED: readiness-gate-summary -->
+
 - If validation fails, leave artifacts in the build folder and report the
   blocking gates. Do not copy or hand-create a ready-to-import bundle.
+
+   <!-- BEGIN GENERATED: readiness-gate-summary -->
+   Readiness registry summary (generated from `fluent_pipeline/data/readiness_gate_registry.json`):
+   - Required offline ready-to-import gates: `26`
+   - Optional diagnostics: `1` (`Gate 27`)
+   - Current active entries: `27`
+   - Stable IDs are the contract; gate numbers are display labels only.
+   - Authoritative table: [Readiness Gate Registry](docs/READINESS_GATES.md)
+   <!-- END GENERATED: readiness-gate-summary -->
 
 ## Declarative Verification Recipe (skip hand-built IR)
 

@@ -2083,8 +2083,15 @@ class Renderer:
                 # Config/site overlay only — never invent FCA tip TOOLNAME placeholders.
                 diti_type_id = str(liha_config.get("diti_type") or "").strip()
             if diti_type_id:
+                # Replace <DitiType><AvailableID>...</AvailableID></DitiType>
                 xml = re.sub(
                     r'(<DitiType>\s*<AvailableID>)[^<]*(</AvailableID>)',
+                    lambda m: m.group(1) + diti_type_id + m.group(2),
+                    xml
+                )
+                # Replace <DitiType>...</DitiType> without <AvailableID>
+                xml = re.sub(
+                    r'(<DitiType>)(?![\s\n]*<AvailableID>)[^<]*(</DitiType>)',
                     lambda m: m.group(1) + diti_type_id + m.group(2),
                     xml
                 )
