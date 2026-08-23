@@ -61,6 +61,26 @@ class WorklistGeneratorTests(unittest.TestCase):
             "A;Source;;96 Well Flat;1;;20;Water Free Single;;;\nW5;\nX;unsupported;field\n",
         )
 
+    def test_row_to_transfer_invalid_position(self) -> None:
+        from tecan_worklist.transfer import _row_to_transfer
+        row = {
+            "source_position": "invalid",
+            "dest_position": "A1",
+            "volume_ul": "10",
+        }
+        with self.assertRaisesRegex(ValueError, "CSV row 2: Invalid well/position value: 'invalid'"):
+            _row_to_transfer(row, row_number=2, well_rows=8)
+
+    def test_row_to_transfer_invalid_volume(self) -> None:
+        from tecan_worklist.transfer import _row_to_transfer
+        row = {
+            "source_position": "A1",
+            "dest_position": "A2",
+            "volume_ul": "not_a_number",
+        }
+        with self.assertRaisesRegex(ValueError, "CSV row 3: volume_ul must be numeric."):
+            _row_to_transfer(row, row_number=3, well_rows=8)
+
 
 if __name__ == "__main__":
     unittest.main()

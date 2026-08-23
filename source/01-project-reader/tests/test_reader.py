@@ -10,7 +10,8 @@ from tecan_reader.archive import inspect_archive
 from tecan_reader.common import parse_xml_text
 from tecan_reader.gwl import inspect_gwl_lines
 from tecan_reader.pattern_library import mine_script_patterns, search_script_patterns, summarize_script_patterns
-from tecan_reader.project_index import build_project_index, search_project_index, summarize_project_index
+import sqlite3
+from tecan_reader.project_index import build_project_index, search_project_index, summarize_project_index, _initialize_database
 from tecan_reader.script import inspect_xscr_text
 
 
@@ -340,6 +341,40 @@ class ReaderTests(unittest.TestCase):
         self.assertTrue(any(hit["name"] == "Base Worktable" for hit in worktable_hits["results"]))
         self.assertTrue(any(hit["name"] == "sample.gwl" for hit in worklist_hits["results"]))
         self.assertEqual(first.name, "first.zeia")
+
+    def test_summarize_project_index(self) -> None:
+        conn = sqlite3.connect(":memory:")
+        _initialize_database(conn)
+
+        # Insert test data
+        conn.execute("INSERT INTO zeia_files(id, path, file_name, sha256, indexed_at) VALUES (1, '/path/to/archive.zeia', 'archive.zeia', 'hash', '2023-01-01')")
+        conn.execute("INSERT INTO scripts(id, zeia_file_id, entry_path, object_name) VALUES (1, 1, 'script1.xscr', 'Script 1')")
+        conn.execute("INSERT INTO scripts(id, zeia_file_id, entry_path, object_name) VALUES (2, 1, 'script2.xscr', 'Script 2')")
+
+        conn.execute("INSERT INTO commands(id, zeia_file_id, script_id, command_index, command_type, family) VALUES (1, 1, 1, 0, 'LiquidHandling', 'pipette')")
+        conn.execute("INSERT INTO commands(id, zeia_file_id, script_id, command_index, command_type, family) VALUES (2, 1, 1, 1, 'Comment', 'misc')")
+        conn.execute("INSERT INTO commands(id, zeia_file_id, script_id, command_index, command_type, family) VALUES (3, 1, 2, 0, 'LiquidHandling', 'pipette')")
+
+        conn.execute("INSERT INTO entities(id, zeia_file_id, script_id, kind, name) VALUES (1, 1, 1, 'labware', 'Plate1')")
+        conn.execute("INSERT INTO entities(id, zeia_file_id, script_id, kind, name) VALUES (2, 1, 1, 'labware', 'Plate2')")
+        conn.execute("INSERT INTO entities(id, zeia_file_id, script_id, kind, name) VALUES (3, 1, 2, 'liquid_class', 'Water')")
+
+        conn.execute("INSERT INTO catalog_objects(id, zeia_file_id, entry_path, kind) VALUES (1, 1, 'plate.xml', 'plate')")
+        conn.execute("INSERT INTO catalog_objects(id, zeia_file_id, entry_path, kind) VALUES (2, 1, 'tip.xml', 'tip')")
+
+        summary = summarize_project_index(conn)
+
+        self.assertEqual(summary["kind"], "project_index_summary")
+        self.assertEqual(summary["zeia_file_count"], 1)
+        self.assertEqual(summary["script_count"], 2)
+        self.assertEqual(summary["command_count"], 3)
+        self.assertEqual(summary["catalog_object_count"], 2)
+        self.assertEqual(summary["entity_counts"]["labware"], 2)
+        self.assertEqual(summary["entity_counts"]["liquid_class"], 1)
+        self.assertEqual(summary["command_family_counts"]["pipette"], 2)
+        self.assertEqual(summary["command_family_counts"]["misc"], 1)
+        self.assertEqual(len(summary["files"]), 1)
+        self.assertEqual(summary["files"][0]["file_name"], "archive.zeia")
 
     def test_script_pattern_library_mines_reusable_patterns(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
