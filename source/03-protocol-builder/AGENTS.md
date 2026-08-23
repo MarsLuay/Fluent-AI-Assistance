@@ -306,6 +306,15 @@ spec auto-upgrade and media seeding.
 - If validation fails, leave artifacts in the build folder and report the
   blocking gates. Do not copy or hand-create a ready-to-import bundle.
 
+   <!-- BEGIN GENERATED: readiness-gate-summary -->
+   Readiness registry summary (generated from `fluent_pipeline/data/readiness_gate_registry.json`):
+   - Required offline ready-to-import gates: `26`
+   - Optional diagnostics: `1` (`Gate 27`)
+   - Current active entries: `27`
+   - Stable IDs are the contract; gate numbers are display labels only.
+   - Authoritative table: [Readiness Gate Registry](docs/READINESS_GATES.md)
+   <!-- END GENERATED: readiness-gate-summary -->
+
 ## Declarative Verification Recipe (skip hand-built IR)
 
 > Detailed rules: [AGENTS.details/declarative-verification-recipe-skip-hand-built-ir.md](AGENTS.details/declarative-verification-recipe-skip-hand-built-ir.md). Read them before working in this area.
