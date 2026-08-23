@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 import json
+import re
 import sqlite3
 
 from .command_registry import registry_manual_step, registry_pattern_type
@@ -742,6 +743,8 @@ def _metadata_value(conn: sqlite3.Connection, key: str) -> str:
 
 
 def _count(conn: sqlite3.Connection, table: str) -> int:
+    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", table):
+        raise ValueError(f"Invalid table name: {table}")
     row = conn.execute(f"SELECT COUNT(*) AS count FROM {table}").fetchone()
     return int(row["count"] or 0)
 
