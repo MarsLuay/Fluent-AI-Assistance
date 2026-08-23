@@ -1999,13 +1999,32 @@ class Renderer:
         meta["type"] = labware_type
         return meta
 
+    def _build_liha_liquid_class_names_xml(self, liquid_class: str, num_channels: int) -> str:
+        """Build the <LiquidClassNames> block for all channels."""
+        objects = []
+        for _ in range(num_channels):
+            objects.append(
+                '          <Object Type="System.String">\n'
+                f'            <string>{liquid_class}</string>\n'
+                '          </Object>'
+            )
+        return "\n".join(objects)
+
     def _post_process_liha_xml(self, xml: str, step: Step, params: dict) -> str:
         """Replace hardcoded values in LiHa template XML with actual values."""
         num_channels = 8
         volume = params.get("Volume", "10")
+        liquid_class = params.get("LiquidClassName", "")
 
         # Replace hardcoded volumes block (8 entries of <string>NNN</string>)
         if step.step_type in (StepType.LIHA_ASPIRATE, StepType.LIHA_DISPENSE, StepType.LIHA_MIX):
+            new_lc_names = self._build_liha_liquid_class_names_xml(liquid_class, num_channels)
+            xml = re.sub(
+                r'(<LiquidClassNames>\s*)(?:<Object Type="System\.String">\s*<string\s*/>\s*</Object>\s*|<Object Type="System\.String">\s*<string>[^<]*</string>\s*</Object>\s*)+(\s*</LiquidClassNames>)',
+                lambda m: m.group(1) + "\n" + new_lc_names + "\n        " + m.group(2).strip(),
+                xml,
+                flags=re.DOTALL
+            )
             new_volumes = self._build_liha_volumes_xml(volume, num_channels, getattr(step, "volumes", None))
             # Match the <Volumes>...</Volumes> block and replace its content
             xml = re.sub(
