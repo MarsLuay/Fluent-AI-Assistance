@@ -2390,10 +2390,21 @@ def _render_python_step(step: dict[str, Any], labware_vars: dict[str, str]) -> l
         return [f"wt.call_subroutine({', '.join(parts)})"]
     params = step.get("parameters") or {}
     raw_xml = params.get("raw_xml")
+    command_id = step.get("command_id") or operation
     if raw_xml:
-        command_id = step.get("command_id") or operation
         return [f"wt.raw_xml_step({str(command_id)!r}, {str(raw_xml)!r})"]
-    return [f"# TODO: render unsupported IR operation {operation!r}: {json.dumps(step, sort_keys=True)}"]
+
+    args_list = []
+    for k, v in sorted(params.items()):
+        if isinstance(k, str) and k.isidentifier():
+            args_list.append(f"{k}={v!r}")
+        else:
+            args_list.append(f"**{{{k!r}: {v!r}}}")
+
+    if args_list:
+        args_str = ", ".join(args_list)
+        return [f"wt.generic_step({str(command_id)!r}, {args_str})"]
+    return [f"wt.generic_step({str(command_id)!r})"]
 
 
 def _preserve_raw_xml_for_operation(operation: str) -> bool:
@@ -2876,10 +2887,9 @@ def _value_label(node: ast.AST, reagent_by_var: dict[str, str], labware_by_var: 
 
 
 def _literal_text(node: ast.AST) -> Any:
-    try:
-        return ast.literal_eval(node)
-    except (TypeError, ValueError, SyntaxError):
-        return None
+    if isinstance(node, ast.Constant):
+        return node.value
+    return None
 
 
 def _source_path(draft_name: str, current_group: str, source: str, node: ast.AST) -> str:
