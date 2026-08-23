@@ -1012,7 +1012,8 @@ def _metadata_value(conn: sqlite3.Connection, key: str) -> str:
 
 
 def _count(conn: sqlite3.Connection, table: str) -> int:
-    row = conn.execute(f"SELECT COUNT(*) AS count FROM {table}").fetchone()
+    escaped_table = '"' + table.replace('"', '""') + '"'
+    row = conn.execute(f"SELECT COUNT(*) AS count FROM {escaped_table}").fetchone()
     return int(row["count"] or 0)
 
 
