@@ -129,13 +129,16 @@ class ExternalFileDependencyTests(unittest.TestCase):
             self.assertIn(r"C:\TubeEye\bin\GetLastBarcode.vb", text)
 
     def test_default_search_roots_include_documents(self):
+        # Create a real temporary directory to represent the home folder
         with tempfile.TemporaryDirectory() as tmp:
             tmp_home = Path(tmp)
             docs = tmp_home / "Documents"
             docs.mkdir()
 
-            with patch("pathlib.Path.home", return_value=tmp_home):
-                roots = default_external_file_search_roots()
+            # Mock Path.home() to return our temporary home
+            with patch("fluent_pipeline.external_file_dependencies.Path.home", return_value=tmp_home):
+                with patch.dict("os.environ", {}, clear=False):
+                    roots = default_external_file_search_roots()
 
             self.assertTrue(any(path.name == "Documents" for path in roots))
 
