@@ -1404,9 +1404,9 @@ def compute_vertex_normals(positions: list[float], indices: list[int]) -> list[f
         ax, ay, az = vector_at(positions, ia)
         bx, by, bz = vector_at(positions, ib)
         cx, cy, cz = vector_at(positions, ic)
-        ux, uy, uz = bx - ax, by - ay, bz - az
-        vx, vy, vz = cx - ax, cy - ay, cz - az
-        nx, ny, nz = cross(ux, uy, uz, vx, vy, vz)
+        u = (bx - ax, by - ay, bz - az)
+        v = (cx - ax, cy - ay, cz - az)
+        nx, ny, nz = cross(u, v)
         for vertex_index in (ia, ib, ic):
             base = vertex_index * 3
             normals[base] += nx
@@ -1438,9 +1438,9 @@ def normalized(vector: tuple[float, float, float]) -> tuple[float, float, float]
     return x / length, y / length, z / length
 
 
-def cross(
-    ax: float, ay: float, az: float, bx: float, by: float, bz: float
-) -> tuple[float, float, float]:
+def cross(a: tuple[float, float, float], b: tuple[float, float, float]) -> tuple[float, float, float]:
+    ax, ay, az = a
+    bx, by, bz = b
     return ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx
 
 
