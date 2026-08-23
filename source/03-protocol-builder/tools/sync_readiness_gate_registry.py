@@ -21,7 +21,6 @@ SIMULATOR_ROOT = ROOT.parent / "04-protocol-simulator"
 
 SUMMARY_MARKERS = {
     "README.md": ("docs/READINESS_GATES.md", "fluent_pipeline/data/readiness_gate_registry.json", ""),
-    "AGENTS.md": ("docs/READINESS_GATES.md", "fluent_pipeline/data/readiness_gate_registry.json", "   "),
     "docs/CODEX_WORKFLOW.md": ("READINESS_GATES.md", "../fluent_pipeline/data/readiness_gate_registry.json", "    "),
     "docs/PROTOCOL_BUILDER_GUIDE.md": ("READINESS_GATES.md", "../fluent_pipeline/data/readiness_gate_registry.json", ""),
 }
