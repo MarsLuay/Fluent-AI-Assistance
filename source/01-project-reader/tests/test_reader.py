@@ -404,17 +404,12 @@ class ReaderTests(unittest.TestCase):
                 build_project_index([zeia_path], db_path, force=True)
 
             # The dummy data should have been overwritten by a new sqlite database
-            with sqlite3.connect(db_path) as conn:
+            conn = sqlite3.connect(db_path)
+            try:
                 res = conn.execute("SELECT count(*) FROM sqlite_master").fetchone()
                 self.assertIsNotNone(res)
-
-            # Explicitly force garbage collection to release the file handle,
-            # though standard context manager should be enough.
-            # But wait, Windows might still hold it. We can try unlinking manually.
-            try:
-                db_path.unlink()
-            except OSError:
-                pass
+            finally:
+                conn.close()
 
     def test_build_project_index_closes_connection_on_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
