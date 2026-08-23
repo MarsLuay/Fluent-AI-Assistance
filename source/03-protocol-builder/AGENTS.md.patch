@@ -1,0 +1,10 @@
+--- source/03-protocol-builder/AGENTS.md
++++ source/03-protocol-builder/AGENTS.md
+@@ -107,6 +107,8 @@
+   handled Pegasus/TouchTools warnings separate from the stop condition unless
+   they occur at the same command and halt execution.
+
++<!-- BEGIN GENERATED: readiness-gate-summary -->
++<!-- END GENERATED: readiness-gate-summary -->
+
+ ## Default New-Script Workflow

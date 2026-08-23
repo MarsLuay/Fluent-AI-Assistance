@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections import Counter
 from pathlib import Path
 from typing import Any
 import json
+import re
 import sqlite3
 
 from .command_registry import registry_manual_step, registry_pattern_type
@@ -93,8 +93,10 @@ def mine_script_patterns(
             for anchor_position, command in enumerate(commands):
                 for pattern_type in classify_command_pattern(command):
                     start_pos = max(0, anchor_position - max(context_before, 0))
-                    end_pos = min(len(commands) - 1, anchor_position + max(context_after, 0))
-                    window = commands[start_pos:end_pos + 1]
+                    end_pos = min(
+                        len(commands) - 1, anchor_position + max(context_after, 0)
+                    )
+                    window = commands[start_pos : end_pos + 1]
                     signature = " > ".join(step["command_type"] for step in window)
                     key = (
                         int(script["script_id"]),
@@ -121,7 +123,9 @@ def mine_script_patterns(
         conn.close()
 
 
-def summarize_script_patterns(db_path_or_conn: str | Path | sqlite3.Connection) -> dict[str, Any]:
+def summarize_script_patterns(
+    db_path_or_conn: str | Path | sqlite3.Connection,
+) -> dict[str, Any]:
     """Summarize the reusable script-pattern library."""
     conn, should_close, database = _connection_arg(db_path_or_conn)
     try:
@@ -160,8 +164,7 @@ def summarize_script_patterns(db_path_or_conn: str | Path | sqlite3.Connection) 
             "step_count": _count(conn, "script_pattern_steps"),
             "pattern_type_counts": type_counts,
             "pattern_types": [
-                {"pattern_type": key, **value}
-                for key, value in PATTERN_TYPES.items()
+                {"pattern_type": key, **value} for key, value in PATTERN_TYPES.items()
             ],
             "top_sources": top_sources,
         }
@@ -209,8 +212,7 @@ def list_script_pattern_types() -> dict[str, Any]:
     return {
         "kind": "script_pattern_types",
         "pattern_types": [
-            {"pattern_type": key, **value}
-            for key, value in PATTERN_TYPES.items()
+            {"pattern_type": key, **value} for key, value in PATTERN_TYPES.items()
         ],
     }
 
@@ -231,9 +233,13 @@ def classify_command_pattern(command: dict[str, Any]) -> list[str]:
 
     haystack = _command_haystack(command)
     matches: list[str] = []
-    if ("pickup" in haystack or "pick_up" in haystack or "pick up" in haystack) and "tip" in haystack:
+    if (
+        "pickup" in haystack or "pick_up" in haystack or "pick up" in haystack
+    ) and "tip" in haystack:
         matches.append("pick_up_tips")
-    if ("drop" in haystack or "eject" in haystack or "discard" in haystack) and "tip" in haystack:
+    if (
+        "drop" in haystack or "eject" in haystack or "discard" in haystack
+    ) and "tip" in haystack:
         matches.append("drop_tips")
     if "aspirate" in haystack:
         matches.append("aspirate")
@@ -243,17 +249,32 @@ def classify_command_pattern(command: dict[str, Any]) -> list[str]:
         matches.append("mix")
     if any(token in haystack for token in ("wash", "flush", "clean", "decontam")):
         matches.append("wash")
-    if any(token in haystack for token in ("prompt", "queryvariable", "confirmation", "confirm")):
+    if any(
+        token in haystack
+        for token in ("prompt", "queryvariable", "confirmation", "confirm")
+    ):
         matches.append("prompt_user")
-    if "loop" in haystack and ("well" in haystack or "control flow" in haystack or "numberofloops" in haystack):
+    if "loop" in haystack and (
+        "well" in haystack or "control flow" in haystack or "numberofloops" in haystack
+    ):
         matches.append("loop_over_wells")
     if "worklist" in haystack:
         matches.append("read_worklist")
-    if ("move" in haystack and any(token in haystack for token in ("plate", "labware", "rack"))) or "gripper" in haystack:
+    if (
+        "move" in haystack
+        and any(token in haystack for token in ("plate", "labware", "rack"))
+    ) or "gripper" in haystack:
         matches.append("move_plate")
-    if "addlabware" in haystack or "loadlabware" in haystack or ("load" in haystack and "labware" in haystack):
+    if (
+        "addlabware" in haystack
+        or "loadlabware" in haystack
+        or ("load" in haystack and "labware" in haystack)
+    ):
         matches.append("load_labware")
-    if any(token in haystack for token in ("initialize", "initialise", "home", "reset", "prime")):
+    if any(
+        token in haystack
+        for token in ("initialize", "initialise", "home", "reset", "prime")
+    ):
         matches.append("initialize_device")
     return matches
 
@@ -265,7 +286,9 @@ def _connect(path: str | Path) -> sqlite3.Connection:
     return conn
 
 
-def _connection_arg(value: str | Path | sqlite3.Connection) -> tuple[sqlite3.Connection, bool, str]:
+def _connection_arg(
+    value: str | Path | sqlite3.Connection,
+) -> tuple[sqlite3.Connection, bool, str]:
     if isinstance(value, sqlite3.Connection):
         value.row_factory = sqlite3.Row
         return value, False, ""
@@ -396,33 +419,38 @@ def _insert_pattern(
         ),
     )
     pattern_id = int(cursor.lastrowid)
-    for step_number, command in enumerate(steps, start=1):
-        conn.execute(
-            """
-            INSERT INTO script_pattern_steps(
-                pattern_id, step_number, command_index, command_name,
-                command_family, line, summary, fields_json
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                pattern_id,
-                step_number,
-                command["command_index"],
-                command["command_type"],
-                command["family"],
-                command["line"],
-                summarize_pattern_step(command),
-                _dump(command["fields"]),
-            ),
+    step_params = [
+        (
+            pattern_id,
+            step_number,
+            command["command_index"],
+            command["command_type"],
+            command["family"],
+            command["line"],
+            summarize_pattern_step(command),
+            _dump(command["fields"]),
         )
+        for step_number, command in enumerate(steps, start=1)
+    ]
+    conn.executemany(
+        """
+        INSERT INTO script_pattern_steps(
+            pattern_id, step_number, command_index, command_name,
+            command_family, line, summary, fields_json
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        step_params,
+    )
 
 
 def summarize_pattern_step(command: dict[str, Any]) -> str:
     """Create a readable, specific step summary for one command."""
     command_type = command.get("command_type") or "Command"
     fields = command.get("fields", {})
-    registry_summary = registry_manual_step(command_type, fields) or registry_manual_step(command.get("raw_type"), fields)
+    registry_summary = registry_manual_step(
+        command_type, fields
+    ) or registry_manual_step(command.get("raw_type"), fields)
     if registry_summary:
         return registry_summary
     lower_type = command_type.lower()
@@ -434,16 +462,26 @@ def summarize_pattern_step(command: dict[str, Any]) -> str:
         or fields.get("RackType")
         or ""
     )
-    liquid_class = fields.get("LiquidClassName") or fields.get("LiquidClassNameBySelection") or ""
+    liquid_class = (
+        fields.get("LiquidClassName") or fields.get("LiquidClassNameBySelection") or ""
+    )
     volume = fields.get("Volume") or ""
-    worklist = fields.get("WorklistName") or fields.get("FileName") or fields.get("Path") or ""
-    prompt = fields.get("QueryPrompt") or fields.get("Comment") or fields.get("Name") or ""
+    worklist = (
+        fields.get("WorklistName") or fields.get("FileName") or fields.get("Path") or ""
+    )
+    prompt = (
+        fields.get("QueryPrompt") or fields.get("Comment") or fields.get("Name") or ""
+    )
     device = fields.get("DeviceAlias") or ""
 
     if "comment" in lower_type and prompt:
         return f"Comment: {prompt}"
     if "prompt" in lower_type or "queryvariable" in lower_type:
-        return _join_summary("Prompt user", prompt, f"variable {fields.get('Name')}" if fields.get("Name") else "")
+        return _join_summary(
+            "Prompt user",
+            prompt,
+            f"variable {fields.get('Name')}" if fields.get("Name") else "",
+        )
     if "pickup" in lower_type and "tip" in lower_type:
         return _join_summary("Pick up tips", f"from {labware}" if labware else "")
     if ("drop" in lower_type or "eject" in lower_type) and "tip" in lower_type:
@@ -457,10 +495,15 @@ def summarize_pattern_step(command: dict[str, Any]) -> str:
     if "worklist" in lower_type:
         return _join_summary("Read or execute worklist", worklist)
     if "move" in lower_type:
-        return _join_summary("Move plate or labware", labware, f"with {device}" if device else "")
+        return _join_summary(
+            "Move plate or labware", labware, f"with {device}" if device else ""
+        )
     if "loadlabware" in lower_type or "addlabware" in lower_type:
         return _join_summary("Load labware", labware)
-    if any(token in lower_type for token in ("initialize", "initialise", "home", "reset", "prime")):
+    if any(
+        token in lower_type
+        for token in ("initialize", "initialise", "home", "reset", "prime")
+    ):
         return _join_summary("Initialize device", device)
     return _join_summary(command_type, labware, liquid_class, worklist)
 
@@ -504,7 +547,9 @@ def _collect_specifications(steps: list[dict[str, Any]]) -> dict[str, list[str]]
         _append_unique(specs["rack_labels"], fields.get("RackLabel"))
         _append_unique(specs["rack_types"], fields.get("RackType"))
         _append_unique(specs["liquid_classes"], fields.get("LiquidClassName"))
-        _append_unique(specs["liquid_classes"], fields.get("LiquidClassNameBySelection"))
+        _append_unique(
+            specs["liquid_classes"], fields.get("LiquidClassNameBySelection")
+        )
         _append_unique(specs["volumes"], fields.get("Volume"))
         _append_unique(specs["device_aliases"], fields.get("DeviceAlias"))
         _append_unique(specs["worklists"], fields.get("WorklistName"))
@@ -518,7 +563,9 @@ def _collect_specifications(steps: list[dict[str, Any]]) -> dict[str, list[str]]
 
 
 def _confidence(pattern_type: str, steps: list[dict[str, Any]]) -> float:
-    anchor_hits = sum(1 for step in steps if pattern_type in classify_command_pattern(step))
+    anchor_hits = sum(
+        1 for step in steps if pattern_type in classify_command_pattern(step)
+    )
     return 1.0 if anchor_hits else 0.75
 
 
@@ -530,14 +577,24 @@ def _safety_notes(
     notes = [
         "Reuse as FluentControl structure only; verify deck positions, labware definitions, and liquid classes before import."
     ]
-    if pattern_type in {"aspirate", "dispense", "mix"} and not specifications.get("liquid_classes"):
+    if pattern_type in {"aspirate", "dispense", "mix"} and not specifications.get(
+        "liquid_classes"
+    ):
         notes.append("No liquid class was detected in this pattern window.")
-    if pattern_type in {"pick_up_tips", "drop_tips"} and not specifications.get("labware"):
-        notes.append("No tip labware or rack label was detected in this pattern window.")
+    if pattern_type in {"pick_up_tips", "drop_tips"} and not specifications.get(
+        "labware"
+    ):
+        notes.append(
+            "No tip labware or rack label was detected in this pattern window."
+        )
     if pattern_type in {"move_plate", "gripper"}:
-        notes.append("Physical RGA/CGA motion pattern; reuse only after verifying worktable positions and finger compatibility.")
+        notes.append(
+            "Physical RGA/CGA motion pattern; reuse only after verifying worktable positions and finger compatibility."
+        )
     if any(step["family"] == "Other" for step in steps):
-        notes.append("Pattern includes commands outside the current command family classifier.")
+        notes.append(
+            "Pattern includes commands outside the current command family classifier."
+        )
     return notes
 
 
@@ -587,7 +644,7 @@ def _search_pattern_rows(
         SELECT p.*, z.path AS zeia_file
         FROM script_patterns p
         JOIN zeia_files z ON z.id = p.zeia_file_id
-        WHERE {' AND '.join(clauses)}
+        WHERE {" AND ".join(clauses)}
         ORDER BY p.pattern_type, p.source_script, p.start_command_index
         LIMIT ?
         """,
@@ -621,7 +678,9 @@ def _pattern_result(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any
     return {
         "id": row["id"],
         "pattern_type": row["pattern_type"],
-        "label": PATTERN_TYPES.get(row["pattern_type"], {}).get("label", row["pattern_type"]),
+        "label": PATTERN_TYPES.get(row["pattern_type"], {}).get(
+            "label", row["pattern_type"]
+        ),
         "name": row["name"],
         "source_script": row["source_script"],
         "source_path": row["source_path"],
@@ -684,7 +743,10 @@ def _metadata_value(conn: sqlite3.Connection, key: str) -> str:
 
 
 def _count(conn: sqlite3.Connection, table: str) -> int:
-    row = conn.execute(f"SELECT COUNT(*) AS count FROM {table}").fetchone()
+    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", table):
+        raise ValueError(f"Invalid table name: {table}")
+    escaped_table = '"' + table.replace('"', '""') + '"'
+    row = conn.execute(f"SELECT COUNT(*) AS count FROM {escaped_table}").fetchone()
     return int(row["count"] or 0)
 
 
