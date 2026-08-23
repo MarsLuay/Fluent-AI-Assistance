@@ -238,59 +238,22 @@ def resolve_install_default() -> Path:
     return Path(env) if env else DEFAULT_INSTALL
 
 
-def build_registry(
+
+
+def _build_component_entries(
     *,
-    install_path: Path,
-    manifest_path: Path | None,
-    aliases_path: Path | None,
-    procedural_catalog_path: Path | None,
-    hardware_manifest_path: Path | None,
-    texture_manifest_path: Path | None,
-    refresh_index: bool,
-    include_all_connectors: bool,
-) -> dict[str, Any]:
-    datastore_root, install_source_type = resolve_datastore_root(install_path)
-    worktable_root = datastore_root / "SystemSpecific" / "Worktable"
-    components_dir = worktable_root / "Components"
-    meshes_dir = worktable_root / "Meshes"
-    if not components_dir.exists():
-        raise FileNotFoundError(f"Components directory not found at {components_dir}")
-
-    mesh_manifest = load_mesh_manifest(manifest_path) if manifest_path and manifest_path.exists() else {}
-    alias_map = load_alias_map(aliases_path) if aliases_path and aliases_path.exists() else {}
-    hardware_textures = (
-        load_hardware_texture_refs(hardware_manifest_path)
-        if hardware_manifest_path and hardware_manifest_path.exists()
-        else {}
-    )
-    procedural_assets = (
-        load_procedural_catalog(procedural_catalog_path)
-        if procedural_catalog_path and procedural_catalog_path.exists()
-        else []
-    )
-    texture_catalog = (
-        load_texture_manifest(texture_manifest_path)
-        if texture_manifest_path and texture_manifest_path.exists()
-        else {"textures": [], "byGuid": {}, "byName": {}}
-    )
-
-    catalog_rows = load_catalog_rows(
-        datastore_root,
-        refresh_index=refresh_index,
-        include_all_connectors=include_all_connectors,
-    )
-    components_by_guid = {row["guid"]: row for row in catalog_rows["components"]}
-    connectors_by_component = catalog_rows["connectors_by_component"]
-    sites_by_component = catalog_rows["sites_by_component"]
-
-    parsed_components = [
-        parse_xcmp_file(path, install_source_type)
-        for path in sorted(components_dir.glob("*.xcmp"))
-    ]
-
-    entries: dict[str, dict[str, Any]] = {}
-    mesh_component_pairs: set[tuple[str, str | None]] = set()
-
+    parsed_components: list[dict[str, Any]],
+    components_by_guid: dict[str, Any],
+    sites_by_component: dict[str, list[str]],
+    connectors_by_component: dict[str, list[str]],
+    hardware_textures: dict[str, list[str]],
+    texture_catalog: dict[str, Any],
+    alias_map: dict[str, list[str]],
+    mesh_manifest: dict[str, Any],
+    install_source_type: str,
+    entries: dict[str, dict[str, Any]],
+    mesh_component_pairs: set[tuple[str, str | None]],
+) -> None:
     for component in parsed_components:
         component_guid = component["componentGuid"]
         catalog = components_by_guid.get(component_guid, {})
@@ -361,6 +324,14 @@ def build_registry(
                 aliases=aliases,
             )
 
+
+def _build_manifest_mesh_entries(
+    *,
+    mesh_manifest: dict[str, Any],
+    mesh_component_pairs: set[tuple[str, str | None]],
+    alias_map: dict[str, list[str]],
+    entries: dict[str, dict[str, Any]],
+) -> None:
     for mesh_guid, mesh_row in mesh_manifest.items():
         if any(pair[0] == mesh_guid for pair in mesh_component_pairs):
             continue
@@ -386,6 +357,16 @@ def build_registry(
             aliases=sorted(alias_map.get(mesh_row.get("name", ""), [])),
         )
 
+
+def _build_directory_mesh_entries(
+    *,
+    meshes_dir: Path,
+    datastore_root: Path,
+    mesh_manifest: dict[str, Any],
+    mesh_component_pairs: set[tuple[str, str | None]],
+    install_source_type: str,
+    entries: dict[str, dict[str, Any]],
+) -> None:
     for mesh_path in sorted(meshes_dir.glob("*.xmsh")):
         mesh_guid = normalize_guid(mesh_path.stem)
         if not mesh_guid or mesh_guid in mesh_manifest or any(pair[0] == mesh_guid for pair in mesh_component_pairs):
@@ -413,6 +394,13 @@ def build_registry(
             aliases=[],
         )
 
+
+def _build_procedural_entries(
+    *,
+    procedural_assets: list[dict[str, Any]],
+    mesh_manifest: dict[str, Any],
+    entries: dict[str, dict[str, Any]],
+) -> None:
     for procedural in procedural_assets:
         mesh_guid = procedural.get("meshGuid")
         component_guid = None
@@ -438,6 +426,96 @@ def build_registry(
             textures=[],
             aliases=sorted(set(procedural.get("aliases", []))),
         )
+
+
+def build_registry(
+    *,
+    install_path: Path,
+    manifest_path: Path | None,
+    aliases_path: Path | None,
+    procedural_catalog_path: Path | None,
+    hardware_manifest_path: Path | None,
+    texture_manifest_path: Path | None,
+    refresh_index: bool,
+    include_all_connectors: bool,
+) -> dict[str, Any]:
+    datastore_root, install_source_type = resolve_datastore_root(install_path)
+    worktable_root = datastore_root / "SystemSpecific" / "Worktable"
+    components_dir = worktable_root / "Components"
+    meshes_dir = worktable_root / "Meshes"
+    if not components_dir.exists():
+        raise FileNotFoundError(f"Components directory not found at {components_dir}")
+
+    mesh_manifest = load_mesh_manifest(manifest_path) if manifest_path and manifest_path.exists() else {}
+    alias_map = load_alias_map(aliases_path) if aliases_path and aliases_path.exists() else {}
+    hardware_textures = (
+        load_hardware_texture_refs(hardware_manifest_path)
+        if hardware_manifest_path and hardware_manifest_path.exists()
+        else {}
+    )
+    procedural_assets = (
+        load_procedural_catalog(procedural_catalog_path)
+        if procedural_catalog_path and procedural_catalog_path.exists()
+        else []
+    )
+    texture_catalog = (
+        load_texture_manifest(texture_manifest_path)
+        if texture_manifest_path and texture_manifest_path.exists()
+        else {"textures": [], "byGuid": {}, "byName": {}}
+    )
+
+    catalog_rows = load_catalog_rows(
+        datastore_root,
+        refresh_index=refresh_index,
+        include_all_connectors=include_all_connectors,
+    )
+    components_by_guid = {row["guid"]: row for row in catalog_rows["components"]}
+    connectors_by_component = catalog_rows["connectors_by_component"]
+    sites_by_component = catalog_rows["sites_by_component"]
+
+    parsed_components = [
+        parse_xcmp_file(path, install_source_type)
+        for path in sorted(components_dir.glob("*.xcmp"))
+    ]
+
+    entries: dict[str, dict[str, Any]] = {}
+    mesh_component_pairs: set[tuple[str, str | None]] = set()
+
+    _build_component_entries(
+        parsed_components=parsed_components,
+        components_by_guid=components_by_guid,
+        sites_by_component=sites_by_component,
+        connectors_by_component=connectors_by_component,
+        hardware_textures=hardware_textures,
+        texture_catalog=texture_catalog,
+        alias_map=alias_map,
+        mesh_manifest=mesh_manifest,
+        install_source_type=install_source_type,
+        entries=entries,
+        mesh_component_pairs=mesh_component_pairs,
+    )
+
+    _build_manifest_mesh_entries(
+        mesh_manifest=mesh_manifest,
+        mesh_component_pairs=mesh_component_pairs,
+        alias_map=alias_map,
+        entries=entries,
+    )
+
+    _build_directory_mesh_entries(
+        meshes_dir=meshes_dir,
+        datastore_root=datastore_root,
+        mesh_manifest=mesh_manifest,
+        mesh_component_pairs=mesh_component_pairs,
+        install_source_type=install_source_type,
+        entries=entries,
+    )
+
+    _build_procedural_entries(
+        procedural_assets=procedural_assets,
+        mesh_manifest=mesh_manifest,
+        entries=entries,
+    )
 
     ordered_entries = sorted(
         entries.values(),
