@@ -14,6 +14,109 @@ from .archive import inspect_archive
 from .common import to_jsonable
 
 SCHEMA_VERSION = "1"
+SCHEMA_SQL = """
+        CREATE TABLE IF NOT EXISTS metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS zeia_files (
+            id INTEGER PRIMARY KEY,
+            path TEXT NOT NULL UNIQUE,
+            file_name TEXT NOT NULL,
+            sha256 TEXT NOT NULL,
+            indexed_at TEXT NOT NULL,
+            entry_count INTEGER NOT NULL DEFAULT 0,
+            script_count_total INTEGER NOT NULL DEFAULT 0,
+            script_count_summarized INTEGER NOT NULL DEFAULT 0,
+            object_count_summarized INTEGER NOT NULL DEFAULT 0,
+            gwl_count_summarized INTEGER NOT NULL DEFAULT 0,
+            extension_counts_json TEXT NOT NULL DEFAULT '{}'
+        );
+
+        CREATE TABLE IF NOT EXISTS scripts (
+            id INTEGER PRIMARY KEY,
+            zeia_file_id INTEGER NOT NULL REFERENCES zeia_files(id) ON DELETE CASCADE,
+            entry_path TEXT NOT NULL,
+            object_name TEXT NOT NULL DEFAULT '',
+            script_version TEXT NOT NULL DEFAULT '',
+            checksum TEXT NOT NULL DEFAULT '',
+            command_count INTEGER NOT NULL DEFAULT 0,
+            family_counts_json TEXT NOT NULL DEFAULT '{}',
+            command_counts_json TEXT NOT NULL DEFAULT '{}',
+            warnings_json TEXT NOT NULL DEFAULT '[]',
+            dependencies_json TEXT NOT NULL DEFAULT '{}'
+        );
+
+        CREATE TABLE IF NOT EXISTS commands (
+            id INTEGER PRIMARY KEY,
+            zeia_file_id INTEGER NOT NULL REFERENCES zeia_files(id) ON DELETE CASCADE,
+            script_id INTEGER NOT NULL REFERENCES scripts(id) ON DELETE CASCADE,
+            command_index INTEGER NOT NULL,
+            command_type TEXT NOT NULL DEFAULT '',
+            raw_type TEXT NOT NULL DEFAULT '',
+            family TEXT NOT NULL DEFAULT '',
+            line TEXT NOT NULL DEFAULT '',
+            name TEXT NOT NULL DEFAULT '',
+            fields_json TEXT NOT NULL DEFAULT '{}'
+        );
+
+        CREATE TABLE IF NOT EXISTS command_sequences (
+            id INTEGER PRIMARY KEY,
+            zeia_file_id INTEGER NOT NULL REFERENCES zeia_files(id) ON DELETE CASCADE,
+            script_id INTEGER NOT NULL REFERENCES scripts(id) ON DELETE CASCADE,
+            start_index INTEGER NOT NULL,
+            length INTEGER NOT NULL,
+            command_names TEXT NOT NULL,
+            command_families TEXT NOT NULL,
+            source_path TEXT NOT NULL DEFAULT '',
+            metadata_json TEXT NOT NULL DEFAULT '{}'
+        );
+
+        CREATE TABLE IF NOT EXISTS catalog_objects (
+            id INTEGER PRIMARY KEY,
+            zeia_file_id INTEGER NOT NULL REFERENCES zeia_files(id) ON DELETE CASCADE,
+            entry_path TEXT NOT NULL,
+            kind TEXT NOT NULL DEFAULT '',
+            object_name TEXT NOT NULL DEFAULT '',
+            type_id TEXT NOT NULL DEFAULT '',
+            functional_group TEXT NOT NULL DEFAULT '',
+            footprint TEXT NOT NULL DEFAULT '',
+            renderer TEXT NOT NULL DEFAULT '',
+            names_json TEXT NOT NULL DEFAULT '[]',
+            guids_json TEXT NOT NULL DEFAULT '[]'
+        );
+
+        CREATE TABLE IF NOT EXISTS worklists (
+            id INTEGER PRIMARY KEY,
+            zeia_file_id INTEGER NOT NULL REFERENCES zeia_files(id) ON DELETE CASCADE,
+            entry_path TEXT NOT NULL,
+            line_count INTEGER NOT NULL DEFAULT 0,
+            transfer_pairs_estimate INTEGER NOT NULL DEFAULT 0,
+            record_counts_json TEXT NOT NULL DEFAULT '{}',
+            pipette_examples_json TEXT NOT NULL DEFAULT '[]'
+        );
+
+        CREATE TABLE IF NOT EXISTS entities (
+            id INTEGER PRIMARY KEY,
+            zeia_file_id INTEGER NOT NULL REFERENCES zeia_files(id) ON DELETE CASCADE,
+            script_id INTEGER REFERENCES scripts(id) ON DELETE CASCADE,
+            kind TEXT NOT NULL,
+            name TEXT NOT NULL DEFAULT '',
+            value TEXT NOT NULL DEFAULT '',
+            source_path TEXT NOT NULL DEFAULT '',
+            command_index INTEGER,
+            metadata_json TEXT NOT NULL DEFAULT '{}'
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_zeia_path ON zeia_files(path);
+        CREATE INDEX IF NOT EXISTS idx_scripts_name ON scripts(object_name);
+        CREATE INDEX IF NOT EXISTS idx_commands_type ON commands(command_type);
+        CREATE INDEX IF NOT EXISTS idx_commands_family ON commands(family);
+        CREATE INDEX IF NOT EXISTS idx_sequences_names ON command_sequences(command_names);
+        CREATE INDEX IF NOT EXISTS idx_entities_kind_name ON entities(kind, name);
+        CREATE INDEX IF NOT EXISTS idx_entities_value ON entities(value);
+"""
 # Repo root: .../source/01-project-reader/tecan_reader/project_index.py → parents[3]
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_INDEX_PATH = (
@@ -197,109 +300,7 @@ def _connection_arg(
 
 
 def _initialize_database(conn: sqlite3.Connection) -> None:
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS metadata (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS zeia_files (
-            id INTEGER PRIMARY KEY,
-            path TEXT NOT NULL UNIQUE,
-            file_name TEXT NOT NULL,
-            sha256 TEXT NOT NULL,
-            indexed_at TEXT NOT NULL,
-            entry_count INTEGER NOT NULL DEFAULT 0,
-            script_count_total INTEGER NOT NULL DEFAULT 0,
-            script_count_summarized INTEGER NOT NULL DEFAULT 0,
-            object_count_summarized INTEGER NOT NULL DEFAULT 0,
-            gwl_count_summarized INTEGER NOT NULL DEFAULT 0,
-            extension_counts_json TEXT NOT NULL DEFAULT '{}'
-        );
-
-        CREATE TABLE IF NOT EXISTS scripts (
-            id INTEGER PRIMARY KEY,
-            zeia_file_id INTEGER NOT NULL REFERENCES zeia_files(id) ON DELETE CASCADE,
-            entry_path TEXT NOT NULL,
-            object_name TEXT NOT NULL DEFAULT '',
-            script_version TEXT NOT NULL DEFAULT '',
-            checksum TEXT NOT NULL DEFAULT '',
-            command_count INTEGER NOT NULL DEFAULT 0,
-            family_counts_json TEXT NOT NULL DEFAULT '{}',
-            command_counts_json TEXT NOT NULL DEFAULT '{}',
-            warnings_json TEXT NOT NULL DEFAULT '[]',
-            dependencies_json TEXT NOT NULL DEFAULT '{}'
-        );
-
-        CREATE TABLE IF NOT EXISTS commands (
-            id INTEGER PRIMARY KEY,
-            zeia_file_id INTEGER NOT NULL REFERENCES zeia_files(id) ON DELETE CASCADE,
-            script_id INTEGER NOT NULL REFERENCES scripts(id) ON DELETE CASCADE,
-            command_index INTEGER NOT NULL,
-            command_type TEXT NOT NULL DEFAULT '',
-            raw_type TEXT NOT NULL DEFAULT '',
-            family TEXT NOT NULL DEFAULT '',
-            line TEXT NOT NULL DEFAULT '',
-            name TEXT NOT NULL DEFAULT '',
-            fields_json TEXT NOT NULL DEFAULT '{}'
-        );
-
-        CREATE TABLE IF NOT EXISTS command_sequences (
-            id INTEGER PRIMARY KEY,
-            zeia_file_id INTEGER NOT NULL REFERENCES zeia_files(id) ON DELETE CASCADE,
-            script_id INTEGER NOT NULL REFERENCES scripts(id) ON DELETE CASCADE,
-            start_index INTEGER NOT NULL,
-            length INTEGER NOT NULL,
-            command_names TEXT NOT NULL,
-            command_families TEXT NOT NULL,
-            source_path TEXT NOT NULL DEFAULT '',
-            metadata_json TEXT NOT NULL DEFAULT '{}'
-        );
-
-        CREATE TABLE IF NOT EXISTS catalog_objects (
-            id INTEGER PRIMARY KEY,
-            zeia_file_id INTEGER NOT NULL REFERENCES zeia_files(id) ON DELETE CASCADE,
-            entry_path TEXT NOT NULL,
-            kind TEXT NOT NULL DEFAULT '',
-            object_name TEXT NOT NULL DEFAULT '',
-            type_id TEXT NOT NULL DEFAULT '',
-            functional_group TEXT NOT NULL DEFAULT '',
-            footprint TEXT NOT NULL DEFAULT '',
-            renderer TEXT NOT NULL DEFAULT '',
-            names_json TEXT NOT NULL DEFAULT '[]',
-            guids_json TEXT NOT NULL DEFAULT '[]'
-        );
-
-        CREATE TABLE IF NOT EXISTS worklists (
-            id INTEGER PRIMARY KEY,
-            zeia_file_id INTEGER NOT NULL REFERENCES zeia_files(id) ON DELETE CASCADE,
-            entry_path TEXT NOT NULL,
-            line_count INTEGER NOT NULL DEFAULT 0,
-            transfer_pairs_estimate INTEGER NOT NULL DEFAULT 0,
-            record_counts_json TEXT NOT NULL DEFAULT '{}',
-            pipette_examples_json TEXT NOT NULL DEFAULT '[]'
-        );
-
-        CREATE TABLE IF NOT EXISTS entities (
-            id INTEGER PRIMARY KEY,
-            zeia_file_id INTEGER NOT NULL REFERENCES zeia_files(id) ON DELETE CASCADE,
-            script_id INTEGER REFERENCES scripts(id) ON DELETE CASCADE,
-            kind TEXT NOT NULL,
-            name TEXT NOT NULL DEFAULT '',
-            value TEXT NOT NULL DEFAULT '',
-            source_path TEXT NOT NULL DEFAULT '',
-            command_index INTEGER,
-            metadata_json TEXT NOT NULL DEFAULT '{}'
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_zeia_path ON zeia_files(path);
-        CREATE INDEX IF NOT EXISTS idx_scripts_name ON scripts(object_name);
-        CREATE INDEX IF NOT EXISTS idx_commands_type ON commands(command_type);
-        CREATE INDEX IF NOT EXISTS idx_commands_family ON commands(family);
-        CREATE INDEX IF NOT EXISTS idx_sequences_names ON command_sequences(command_names);
-        CREATE INDEX IF NOT EXISTS idx_entities_kind_name ON entities(kind, name);
-        CREATE INDEX IF NOT EXISTS idx_entities_value ON entities(value);
-        """)
+    conn.executescript(SCHEMA_SQL)
     conn.execute(
         "INSERT OR REPLACE INTO metadata(key, value) VALUES('schema_version', ?)",
         (SCHEMA_VERSION,),
