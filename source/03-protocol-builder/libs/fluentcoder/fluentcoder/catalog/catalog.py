@@ -414,6 +414,11 @@ def resolve_install_key(conn: sqlite3.Connection) -> Optional[str]:
 # ── Helpers ────────────────────────────────────────────────────────
 
 
+def _escape_identifier(name: str) -> str:
+    """Escapes a SQLite identifier (e.g. table or column name)."""
+    return '"' + name.replace('"', '""') + '"'
+
+
 def _connector_entry_from_row(row: sqlite3.Row) -> ConnectorEntry:
     return ConnectorEntry(
         guid=row["guid"],
@@ -575,18 +580,19 @@ def _migrate_install_key_schema(conn: sqlite3.Connection) -> None:
             """,
         ),
     ):
+        table_esc = _escape_identifier(table)
         conn.execute(columns_sql)
         old_cols = {
-            row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+            row["name"] for row in conn.execute(f"PRAGMA table_info({table_esc})").fetchall()
         }
-        select_cols = [f'"{col}"' for col in old_cols if col != "install_key"]
+        select_cols = [_escape_identifier(col) for col in old_cols if col != "install_key"]
         conn.execute(
-            f'INSERT INTO "{table}_new" ("install_key", {", ".join(select_cols)}) '
-            f'SELECT ?, {", ".join(select_cols)} FROM "{table}"',
+            f'INSERT INTO {_escape_identifier(table + "_new")} ("install_key", {", ".join(select_cols)}) '
+            f'SELECT ?, {", ".join(select_cols)} FROM {table_esc}',
             (legacy_key,),
         )
-        conn.execute(f'DROP TABLE "{table}"')
-        conn.execute(f'ALTER TABLE "{table}_new" RENAME TO "{table}"')
+        conn.execute(f'DROP TABLE {table_esc}')
+        conn.execute(f'ALTER TABLE {_escape_identifier(table + "_new")} RENAME TO {table_esc}')
 
     indexed_columns = {
         row["name"] for row in conn.execute("PRAGMA table_info(indexed_sources)").fetchall()
