@@ -279,6 +279,15 @@ spec auto-upgrade and media seeding.
 
 ## Required Verification
 
+   <!-- BEGIN GENERATED: readiness-gate-summary -->
+   Readiness registry summary (generated from `fluent_pipeline/data/readiness_gate_registry.json`):
+   - Required offline ready-to-import gates: `26`
+   - Optional diagnostics: `1` (`Gate 27`)
+   - Current active entries: `27`
+   - Stable IDs are the contract; gate numbers are display labels only.
+   - Authoritative table: [Readiness Gate Registry](docs/READINESS_GATES.md)
+   <!-- END GENERATED: readiness-gate-summary -->
+
 - For code changes, run:
 
   ```powershell
