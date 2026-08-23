@@ -2266,3 +2266,22 @@ class SubroutineAdditionsGateTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TestRawXmlCallCommandId(unittest.TestCase):
+    def test_raw_xml_call_command_id_constant(self):
+        from fluent_pipeline.validation import _raw_xml_call_command_id
+        import ast
+        node = ast.parse('raw_xml_step("my_command_id", 123)').body[0].value
+        self.assertEqual(_raw_xml_call_command_id(node), "my_command_id")
+
+    def test_raw_xml_call_command_id_non_constant(self):
+        from fluent_pipeline.validation import _raw_xml_call_command_id
+        import ast
+        node = ast.parse('raw_xml_step(variable_name)').body[0].value
+        self.assertIsNone(_raw_xml_call_command_id(node))
+
+    def test_raw_xml_call_command_id_complex_call(self):
+        from fluent_pipeline.validation import _raw_xml_call_command_id
+        import ast
+        node = ast.parse('raw_xml_step(get_cmd())').body[0].value
+        self.assertIsNone(_raw_xml_call_command_id(node))

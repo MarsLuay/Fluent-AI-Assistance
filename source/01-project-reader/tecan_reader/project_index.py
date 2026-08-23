@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
+import dataclasses
 import hashlib
 import json
 import re
@@ -13,203 +14,8 @@ import sqlite3
 from .archive import inspect_archive
 from .common import to_jsonable
 
-
 SCHEMA_VERSION = "1"
-# Repo root: .../source/01-project-reader/tecan_reader/project_index.py → parents[3]
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_INDEX_PATH = (
-    _REPO_ROOT
-    / "ready-to-import"
-    / "_shared"
-    / "temp_files"
-    / "build"
-    / "tecan_project_index.sqlite"
-)
-
-ENTITY_KINDS = {
-    "script",
-    "worktable",
-    "labware",
-    "liquid_class",
-    "carrier",
-    "device_alias",
-    "variable",
-    "worklist",
-    "subroutine",
-    "hardware_pin",
-    "custom_asset",
-    "barcode",
-    "dependency",
-    "reference",
-    "catalog_object",
-}
-
-
-def discover_zeia_paths(paths: Iterable[str | Path]) -> list[Path]:
-    """Return unique `.zeia` files from explicit files or recursive directories."""
-    discovered: list[Path] = []
-    for raw_path in paths:
-        path = Path(raw_path).expanduser()
-        if path.is_dir():
-            discovered.extend(
-                sorted(item for item in path.rglob("*.zeia") if item.is_file())
-            )
-            continue
-        if path.is_file() and path.suffix.lower() == ".zeia":
-            discovered.append(path)
-            continue
-        raise FileNotFoundError(f"No .zeia file found at {path}")
-
-    unique: dict[str, Path] = {}
-    for path in discovered:
-        resolved = path.resolve()
-        unique[str(resolved)] = resolved
-    if not unique:
-        raise FileNotFoundError("No .zeia files found")
-    return [unique[key] for key in sorted(unique)]
-
-
-def build_project_index(
-    paths: Iterable[str | Path],
-    db_path: str | Path = DEFAULT_INDEX_PATH,
-    *,
-    force: bool = False,
-    script_limit: int | None = None,
-    object_limit: int | None = None,
-) -> dict[str, Any]:
-    """Build or refresh a searchable SQLite index for one or more ZEIA files."""
-    zeia_paths = discover_zeia_paths(paths)
-    database = Path(db_path)
-    if force and database.exists():
-        database.unlink()
-    database.parent.mkdir(parents=True, exist_ok=True)
-
-    conn = _connect(database)
-    try:
-        _initialize_database(conn)
-        indexed_files = []
-        for zeia_path in zeia_paths:
-            report = inspect_archive(
-                zeia_path,
-                script_limit=script_limit,
-                object_limit=object_limit,
-            )
-            _index_archive(conn, zeia_path, report)
-            indexed_files.append(str(zeia_path))
-        conn.commit()
-        summary = summarize_project_index(conn)
-    finally:
-        conn.close()
-
-    return {
-        **summary,
-        "kind": "project_index_build",
-        "database": str(database),
-        "indexed_files": indexed_files,
-    }
-
-
-def summarize_project_index(
-    db_path_or_conn: str | Path | sqlite3.Connection,
-) -> dict[str, Any]:
-    """Return project-level counts and file summaries from an index."""
-    conn, should_close, database = _connection_arg(db_path_or_conn)
-    try:
-        entity_counts = {
-            row["kind"]: row["count"]
-            for row in conn.execute(
-                "SELECT kind, COUNT(*) AS count FROM entities GROUP BY kind ORDER BY kind"
-            )
-        }
-        command_family_counts = {
-            row["family"]: row["count"]
-            for row in conn.execute(
-                """
-                SELECT family, COUNT(*) AS count
-                FROM commands
-                GROUP BY family
-                ORDER BY count DESC, family
-                """
-            )
-        }
-        files = [
-            dict(row)
-            for row in conn.execute(
-                """
-                SELECT path, file_name, sha256, indexed_at, entry_count,
-                       script_count_total, script_count_summarized,
-                       object_count_summarized, gwl_count_summarized
-                FROM zeia_files
-                ORDER BY file_name, path
-                """
-            )
-        ]
-        return {
-            "kind": "project_index_summary",
-            "database": database,
-            "schema_version": _metadata_value(conn, "schema_version"),
-            "zeia_file_count": _count(conn, "zeia_files"),
-            "script_count": _count(conn, "scripts"),
-            "command_count": _count(conn, "commands"),
-            "catalog_object_count": _count(conn, "catalog_objects"),
-            "worklist_count": _count(conn, "worklists"),
-            "command_sequence_count": _count(conn, "command_sequences"),
-            "entity_counts": entity_counts,
-            "command_family_counts": command_family_counts,
-            "files": files,
-        }
-    finally:
-        if should_close:
-            conn.close()
-
-
-def search_project_index(
-    db_path: str | Path,
-    query: str,
-    *,
-    kind: str | None = None,
-    limit: int = 25,
-) -> dict[str, Any]:
-    """Search indexed ZEIA files, scripts, entities, commands, and sequences."""
-    database = Path(db_path)
-    conn = _connect(database)
-    try:
-        normalized_kind = (
-            kind.strip().lower().replace("-", "_").replace(" ", "_") if kind else None
-        )
-        rows = _search_rows(conn, query=query, kind=normalized_kind, limit=limit)
-        return {
-            "kind": "project_index_search",
-            "database": str(database),
-            "query": query,
-            "kind_filter": normalized_kind or "",
-            "result_count": len(rows),
-            "results": rows,
-        }
-    finally:
-        conn.close()
-
-
-def _connect(path: str | Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(path)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
-
-
-def _connection_arg(
-    value: str | Path | sqlite3.Connection,
-) -> tuple[sqlite3.Connection, bool, str]:
-    if isinstance(value, sqlite3.Connection):
-        value.row_factory = sqlite3.Row
-        return value, False, ""
-    path = Path(value)
-    return _connect(path), True, str(path)
-
-
-def _initialize_database(conn: sqlite3.Connection) -> None:
-    conn.executescript(
-        """
+SCHEMA_SQL = """
         CREATE TABLE IF NOT EXISTS metadata (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
@@ -311,8 +117,201 @@ def _initialize_database(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_sequences_names ON command_sequences(command_names);
         CREATE INDEX IF NOT EXISTS idx_entities_kind_name ON entities(kind, name);
         CREATE INDEX IF NOT EXISTS idx_entities_value ON entities(value);
-        """
-    )
+"""
+# Repo root: .../source/01-project-reader/tecan_reader/project_index.py → parents[3]
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_INDEX_PATH = (
+    _REPO_ROOT
+    / "ready-to-import"
+    / "_shared"
+    / "temp_files"
+    / "build"
+    / "tecan_project_index.sqlite"
+)
+
+ENTITY_KINDS = {
+    "script",
+    "worktable",
+    "labware",
+    "liquid_class",
+    "carrier",
+    "device_alias",
+    "variable",
+    "worklist",
+    "subroutine",
+    "hardware_pin",
+    "custom_asset",
+    "barcode",
+    "dependency",
+    "reference",
+    "catalog_object",
+}
+
+
+@dataclasses.dataclass
+class IndexContext:
+    """Context for indexing operations."""
+
+    conn: sqlite3.Connection
+    zeia_id: int
+    script_id: int
+    source_path: str
+
+
+def discover_zeia_paths(paths: Iterable[str | Path]) -> list[Path]:
+    """Return unique `.zeia` files from explicit files or recursive directories."""
+    discovered: list[Path] = []
+    for raw_path in paths:
+        path = Path(raw_path).expanduser()
+        if path.is_dir():
+            discovered.extend(
+                sorted(item for item in path.rglob("*.zeia") if item.is_file())
+            )
+            continue
+        if path.is_file() and path.suffix.lower() == ".zeia":
+            discovered.append(path)
+            continue
+        raise FileNotFoundError(f"No .zeia file found at {path}")
+
+    unique: dict[str, Path] = {}
+    for path in discovered:
+        resolved = path.resolve()
+        unique[str(resolved)] = resolved
+    if not unique:
+        raise FileNotFoundError("No .zeia files found")
+    return [unique[key] for key in sorted(unique)]
+
+
+def build_project_index(
+    paths: Iterable[str | Path],
+    db_path: str | Path = DEFAULT_INDEX_PATH,
+    *,
+    force: bool = False,
+    script_limit: int | None = None,
+    object_limit: int | None = None,
+) -> dict[str, Any]:
+    """Build or refresh a searchable SQLite index for one or more ZEIA files."""
+    zeia_paths = discover_zeia_paths(paths)
+    database = Path(db_path)
+    if force and database.exists():
+        database.unlink()
+    database.parent.mkdir(parents=True, exist_ok=True)
+
+    conn = _connect(database)
+    try:
+        _initialize_database(conn)
+        indexed_files = []
+        for zeia_path in zeia_paths:
+            report = inspect_archive(
+                zeia_path,
+                script_limit=script_limit,
+                object_limit=object_limit,
+            )
+            _index_archive(conn, zeia_path, report)
+            indexed_files.append(str(zeia_path))
+        conn.commit()
+        summary = summarize_project_index(conn)
+    finally:
+        conn.close()
+
+    return {
+        **summary,
+        "kind": "project_index_build",
+        "database": str(database),
+        "indexed_files": indexed_files,
+    }
+
+
+def summarize_project_index(
+    db_path_or_conn: str | Path | sqlite3.Connection,
+) -> dict[str, Any]:
+    """Return project-level counts and file summaries from an index."""
+    conn, should_close, database = _connection_arg(db_path_or_conn)
+    try:
+        entity_counts = {
+            row["kind"]: row["count"]
+            for row in conn.execute(
+                "SELECT kind, COUNT(*) AS count FROM entities GROUP BY kind ORDER BY kind"
+            )
+        }
+        command_family_counts = {row["family"]: row["count"] for row in conn.execute("""
+                SELECT family, COUNT(*) AS count
+                FROM commands
+                GROUP BY family
+                ORDER BY count DESC, family
+                """)}
+        files = [dict(row) for row in conn.execute("""
+                SELECT path, file_name, sha256, indexed_at, entry_count,
+                       script_count_total, script_count_summarized,
+                       object_count_summarized, gwl_count_summarized
+                FROM zeia_files
+                ORDER BY file_name, path
+                """)]
+        return {
+            "kind": "project_index_summary",
+            "database": database,
+            "schema_version": _metadata_value(conn, "schema_version"),
+            "zeia_file_count": _count(conn, "zeia_files"),
+            "script_count": _count(conn, "scripts"),
+            "command_count": _count(conn, "commands"),
+            "catalog_object_count": _count(conn, "catalog_objects"),
+            "worklist_count": _count(conn, "worklists"),
+            "command_sequence_count": _count(conn, "command_sequences"),
+            "entity_counts": entity_counts,
+            "command_family_counts": command_family_counts,
+            "files": files,
+        }
+    finally:
+        if should_close:
+            conn.close()
+
+
+def search_project_index(
+    db_path: str | Path,
+    query: str,
+    *,
+    kind: str | None = None,
+    limit: int = 25,
+) -> dict[str, Any]:
+    """Search indexed ZEIA files, scripts, entities, commands, and sequences."""
+    database = Path(db_path)
+    conn = _connect(database)
+    try:
+        normalized_kind = (
+            kind.strip().lower().replace("-", "_").replace(" ", "_") if kind else None
+        )
+        rows = _search_rows(conn, query=query, kind=normalized_kind, limit=limit)
+        return {
+            "kind": "project_index_search",
+            "database": str(database),
+            "query": query,
+            "kind_filter": normalized_kind or "",
+            "result_count": len(rows),
+            "results": rows,
+        }
+    finally:
+        conn.close()
+
+
+def _connect(path: str | Path) -> sqlite3.Connection:
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+def _connection_arg(
+    value: str | Path | sqlite3.Connection,
+) -> tuple[sqlite3.Connection, bool, str]:
+    if isinstance(value, sqlite3.Connection):
+        value.row_factory = sqlite3.Row
+        return value, False, ""
+    path = Path(value)
+    return _connect(path), True, str(path)
+
+
+def _initialize_database(conn: sqlite3.Connection) -> None:
+    conn.executescript(SCHEMA_SQL)
     conn.execute(
         "INSERT OR REPLACE INTO metadata(key, value) VALUES('schema_version', ?)",
         (SCHEMA_VERSION,),
@@ -540,6 +539,7 @@ def _index_commands(
 ) -> None:
     source_path = script.get("source") or ""
     commands = script.get("commands", [])
+    ctx = IndexContext(conn, zeia_id, script_id, source_path)
 
     conn.executemany(
         """
@@ -569,10 +569,7 @@ def _index_commands(
         command_index = int(command.get("index") or 0)
         fields = command.get("fields", {})
         _index_command_field_entities(
-            conn,
-            zeia_id,
-            script_id,
-            source_path,
+            ctx,
             command_index,
             fields,
             command.get("family") or "",
@@ -580,10 +577,7 @@ def _index_commands(
 
 
 def _index_command_field_entities(
-    conn: sqlite3.Connection,
-    zeia_id: int,
-    script_id: int,
-    source_path: str,
+    ctx: IndexContext,
     command_index: int,
     fields: dict[str, Any],
     family: str,
@@ -602,13 +596,13 @@ def _index_command_field_entities(
         if not value:
             continue
         _insert_entity(
-            conn,
-            zeia_id,
-            script_id,
+            ctx.conn,
+            ctx.zeia_id,
+            ctx.script_id,
             kind,
             value,
             field_name,
-            source_path,
+            ctx.source_path,
             {"field": field_name, "family": family},
             command_index=command_index,
         )
@@ -622,13 +616,13 @@ def _index_command_field_entities(
             else "dependency"
         )
         _insert_entity(
-            conn,
-            zeia_id,
-            script_id,
+            ctx.conn,
+            ctx.zeia_id,
+            ctx.script_id,
             kind,
             value,
             field_name,
-            source_path,
+            ctx.source_path,
             {"field": field_name, "family": family},
             command_index=command_index,
         )
@@ -642,41 +636,43 @@ def _index_command_sequences(
 ) -> None:
     commands = script.get("commands", [])
     source_path = script.get("source") or ""
+    sequence_data = []
+
     for window_size in (2, 3, 4, 5):
         if len(commands) < window_size:
             continue
         for start in range(0, len(commands) - window_size + 1):
             window = commands[start : start + window_size]
             command_names = " > ".join(command.get("type") or "" for command in window)
-            command_families = " > ".join(
-                command.get("family") or "" for command in window
-            )
-            conn.execute(
-                """
-                INSERT INTO command_sequences(
-                    zeia_file_id, script_id, start_index, length,
-                    command_names, command_families, source_path, metadata_json
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    zeia_id,
-                    script_id,
-                    int(window[0].get("index") or start + 1),
-                    window_size,
-                    command_names,
-                    command_families,
-                    source_path,
-                    _dump(
-                        {
-                            "lines": [command.get("line") or "" for command in window],
-                            "raw_types": [
-                                command.get("raw_type") or "" for command in window
-                            ],
-                        }
-                    ),
+            command_families = " > ".join(command.get("family") or "" for command in window)
+
+            sequence_data.append((
+                zeia_id,
+                script_id,
+                int(window[0].get("index") or start + 1),
+                window_size,
+                command_names,
+                command_families,
+                source_path,
+                _dump(
+                    {
+                        "lines": [command.get("line") or "" for command in window],
+                        "raw_types": [command.get("raw_type") or "" for command in window],
+                    }
                 ),
+            ))
+
+    if sequence_data:
+        conn.executemany(
+            """
+            INSERT INTO command_sequences(
+                zeia_file_id, script_id, start_index, length,
+                command_names, command_families, source_path, metadata_json
             )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            sequence_data
+        )
 
 
 def _index_object(conn: sqlite3.Connection, zeia_id: int, obj: dict[str, Any]) -> None:
@@ -1100,7 +1096,8 @@ def _metadata_value(conn: sqlite3.Connection, key: str) -> str:
 def _count(conn: sqlite3.Connection, table: str) -> int:
     if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", table):
         raise ValueError(f"Invalid table name: {table}")
-    row = conn.execute(f"SELECT COUNT(*) AS count FROM {table}").fetchone()
+    escaped_table = '"' + table.replace('"', '""') + '"'
+    row = conn.execute(f"SELECT COUNT(*) AS count FROM {escaped_table}").fetchone()
     return int(row["count"] or 0)
 
 

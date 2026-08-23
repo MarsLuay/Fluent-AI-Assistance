@@ -12,7 +12,6 @@ import base64
 import json
 import re
 import struct
-import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -240,31 +239,20 @@ def resolve_texture_guid_filter(
     return {guid for guid in guids if guid}
 
 
-def extract_textures(
+def _process_xtx_files(
     *,
-    install_path: Path,
+    xtx_paths: list[Path],
+    source_type: str,
     out_dir: Path,
-    registry_path: Path | None,
-    mesh_dir: Path,
+    texture_guid_filter: set[str] | None,
     priority_only: bool,
-    attach_glbs: bool,
-    beside_glbs: bool,
     overwrite: bool,
-    texture_guid_filter: set[str] | None = None,
-) -> dict[str, Any]:
-    datastore_root, source_type = resolve_datastore_root(install_path)
-    textures_dir = datastore_root / "SystemSpecific" / "Worktable" / "Textures"
-    if not textures_dir.exists():
-        raise FileNotFoundError(f"Textures directory not found at {textures_dir}")
-
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
     decoded_rows: list[dict[str, Any]] = []
     failed_rows: list[dict[str, Any]] = []
     by_guid: dict[str, dict[str, Any]] = {}
     by_name: dict[str, dict[str, Any]] = {}
 
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    xtx_paths = sorted(textures_dir.glob("*.xtx"))
     for path in xtx_paths:
         try:
             decoded = parse_xtx_file(path, source_type)
@@ -297,27 +285,22 @@ def extract_textures(
         by_guid[decoded.texture_guid] = row
         by_name[canonical_texture_key(decoded.object_name)] = row
 
-    registry_payload = load_registry(registry_path) if registry_path and registry_path.exists() else None
-    glb_attached = 0
-    beside_glb_count = 0
-    if registry_payload and decoded_rows and (attach_glbs or beside_glbs):
-        glb_attached, beside_glb_count = apply_registry_texture_links(
-            registry_payload,
-            by_guid,
-            by_name,
-            out_dir=out_dir,
-            mesh_dir=mesh_dir,
-            attach_glbs=attach_glbs,
-            beside_glbs=beside_glbs,
-            overwrite=overwrite,
-        )
+    return decoded_rows, failed_rows, by_guid, by_name
 
-    if texture_guid_filter is not None and not decoded_rows and not failed_rows:
-        raise SystemExit(
-            f"No .xtx entries matched texture GUID filter ({len(texture_guid_filter)} listed) in {textures_dir}"
-        )
 
-    manifest = {
+def _build_manifest(
+    *,
+    install_path: Path,
+    source_type: str,
+    registry_path: Path | None,
+    texture_guid_filter: set[str] | None,
+    xtx_paths: list[Path],
+    decoded_rows: list[dict[str, Any]],
+    failed_rows: list[dict[str, Any]],
+    glb_attached: int,
+    beside_glb_count: int,
+) -> dict[str, Any]:
+    return {
         "schemaVersion": TEXTURE_MANIFEST_SCHEMA_VERSION,
         "kind": TEXTURE_MANIFEST_KIND,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
@@ -344,6 +327,68 @@ def extract_textures(
         "textures": sorted(decoded_rows, key=lambda row: (row.get("objectName") or "", row.get("textureGuid") or "")),
         "failed": failed_rows,
     }
+
+
+def extract_textures(
+    *,
+    install_path: Path,
+    out_dir: Path,
+    registry_path: Path | None,
+    mesh_dir: Path,
+    priority_only: bool,
+    attach_glbs: bool,
+    beside_glbs: bool,
+    overwrite: bool,
+    texture_guid_filter: set[str] | None = None,
+) -> dict[str, Any]:
+    datastore_root, source_type = resolve_datastore_root(install_path)
+    textures_dir = datastore_root / "SystemSpecific" / "Worktable" / "Textures"
+    if not textures_dir.exists():
+        raise FileNotFoundError(f"Textures directory not found at {textures_dir}")
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    xtx_paths = sorted(textures_dir.glob("*.xtx"))
+
+    decoded_rows, failed_rows, by_guid, by_name = _process_xtx_files(
+        xtx_paths=xtx_paths,
+        source_type=source_type,
+        out_dir=out_dir,
+        texture_guid_filter=texture_guid_filter,
+        priority_only=priority_only,
+        overwrite=overwrite,
+    )
+
+    registry_payload = load_registry(registry_path) if registry_path and registry_path.exists() else None
+    glb_attached = 0
+    beside_glb_count = 0
+    if registry_payload and decoded_rows and (attach_glbs or beside_glbs):
+        glb_attached, beside_glb_count = apply_registry_texture_links(
+            registry_payload,
+            by_guid,
+            by_name,
+            out_dir=out_dir,
+            mesh_dir=mesh_dir,
+            attach_glbs=attach_glbs,
+            beside_glbs=beside_glbs,
+            overwrite=overwrite,
+        )
+
+    if texture_guid_filter is not None and not decoded_rows and not failed_rows:
+        raise SystemExit(
+            f"No .xtx entries matched texture GUID filter ({len(texture_guid_filter)} listed) in {textures_dir}"
+        )
+
+    manifest = _build_manifest(
+        install_path=install_path,
+        source_type=source_type,
+        registry_path=registry_path,
+        texture_guid_filter=texture_guid_filter,
+        xtx_paths=xtx_paths,
+        decoded_rows=decoded_rows,
+        failed_rows=failed_rows,
+        glb_attached=glb_attached,
+        beside_glb_count=beside_glb_count,
+    )
     refuse_host_paths_in_manifest(manifest)
     manifest_path = out_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")

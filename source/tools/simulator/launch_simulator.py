@@ -14,7 +14,11 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
-from tecan_tools.common.terminal_progress import StepProgress, run_subprocess_with_fraction, wait_with_fraction
+from tecan_tools.common.terminal_progress import (
+    StepProgress,
+    run_subprocess_with_fraction,
+    wait_with_fraction,
+)
 
 SOURCE_ROOT = Path(__file__).resolve().parents[2]
 REPO_ROOT = SOURCE_ROOT.parent if SOURCE_ROOT.name == "source" else SOURCE_ROOT
@@ -54,7 +58,13 @@ def discover_sample_zeia(repo_root: Path) -> Path | None:
 def sample_zeia_cache_manifest(repo_root: Path, zeia_path: Path) -> Path:
     stem = zeia_path.stem.lower()
     safe = "".join(ch if ch.isalnum() else "-" for ch in stem).strip("-") or "sample"
-    return repo_root / "source/04-protocol-simulator/.cache/zeia-samples" / safe / "manifest.json"
+    return (
+        repo_root
+        / "source/04-protocol-simulator/.cache/zeia-samples"
+        / safe
+        / "manifest.json"
+    )
+
 
 STARTUP_STEPS = [
     "Locate simulator app",
@@ -93,40 +103,51 @@ def validated_port(port: int) -> int:
     return value
 
 
-def main() -> int:
+def _parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Launch the Tecan Protocol Simulator.")
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--no-open", action="store_true", help="do not open a browser")
-    parser.add_argument("--skip-install", action="store_true", help="skip npm install when node_modules is missing")
-    parser.add_argument("--app-dir", type=Path, default=None, help="override path to 04-protocol-simulator")
-    args = parser.parse_args()
-    host = validated_host(args.host)
-    port = validated_port(args.port)
+    parser.add_argument(
+        "--skip-install",
+        action="store_true",
+        help="skip npm install when node_modules is missing",
+    )
+    parser.add_argument(
+        "--app-dir",
+        type=Path,
+        default=None,
+        help="override path to 04-protocol-simulator",
+    )
+    return parser.parse_args()
 
-    progress = StepProgress(STARTUP_STEPS, title="Tecan Protocol Simulator", weights=STARTUP_STEP_WEIGHTS)
 
+def _verify_app_directory(
+    app_dir_arg: Path | None, progress: StepProgress
+) -> Path | None:
     progress.begin()
-    app_dir = resolve_app_dir(args.app_dir) or prompt_for_app_dir()
+    app_dir = resolve_app_dir(app_dir_arg) or prompt_for_app_dir()
     if app_dir is None:
         print("Could not find source/04-protocol-simulator/package.json.")
-        print("Put the launcher inside the Fluent AI-Assistance folder, or pass --app-dir.")
-        return 1
+        print(
+            "Put the launcher inside the Fluent AI-Assistance folder, or pass --app-dir."
+        )
+        return None
     if shutil.which("npm") is None:
-        print("Node.js/npm was not found on PATH. Install Node.js LTS, then reopen this launcher.")
-        return 1
+        print(
+            "Node.js/npm was not found on PATH. Install Node.js LTS, then reopen this launcher."
+        )
+        return None
     progress.done(f"found {app_dir}")
+    return app_dir
 
-    base_url = f"http://{host}:{port}/"
-    samples_url = f"{base_url}api/samples"
 
-    progress.begin()
-    stopped = stop_existing_server(port)
-    progress.done("stopped existing server" if stopped else "no server was running")
-
+def _install_dependencies(
+    app_dir: Path, skip_install: bool, progress: StepProgress
+) -> int:
     progress.begin()
     if not (app_dir / "node_modules").exists():
-        if args.skip_install:
+        if skip_install:
             print("  node_modules is missing and --skip-install was set.")
             return 1
         result = run_subprocess_with_fraction(
@@ -142,30 +163,29 @@ def main() -> int:
         progress.done("dependencies installed")
     else:
         progress.done("dependencies already installed")
+    return 0
 
-    progress.detail("Checking optional ZEIA sample cache")
-    cache_result = ensure_zeia_sample_cache(app_dir, REPO_ROOT.resolve(), progress)
-    if cache_result == "built":
-        progress.detail("Built ZEIA sample cache for faster startup")
-    elif cache_result == "ready":
-        progress.detail("ZEIA sample cache is ready")
-    else:
-        progress.detail("No local sample ZEIA; skipping sample cache")
 
+def _start_dev_server(
+    app_dir: Path, host: str, port: int, base_url: str, progress: StepProgress
+) -> subprocess.Popen | None:
     progress.begin()
     # Host/port are validated above and passed only via env so Popen argv stays constant.
     command = npm_command("run", "dev:no-open")
     progress.detail(f"App folder: {app_dir}")
     progress.detail("Keep this window open while using the simulator.")
+
     server_env = os.environ.copy()
     server_env["TECAN_LAUNCHER_PROGRESS"] = "1"
     server_env["TECAN_SIMULATOR_HOST"] = host
     server_env["TECAN_SIMULATOR_PORT"] = str(port)
     server_env["TECAN_SIMULATOR_STRICT_PORT"] = "1"
+
     bundle_path = resolve_simulator_bundle_path(REPO_ROOT.resolve())
     if bundle_path is not None:
         server_env["TECAN_SIMULATOR_BUNDLE"] = str(bundle_path)
         progress.detail(f"Launch bundle: {bundle_path}")
+
     server = subprocess.Popen(
         command,
         cwd=app_dir,
@@ -174,6 +194,7 @@ def main() -> int:
         env=server_env,
         shell=False,
     )
+
     if not wait_with_fraction(
         progress,
         label="Starting Vite dev server",
@@ -187,9 +208,13 @@ def main() -> int:
         except subprocess.TimeoutExpired:
             server.kill()
         print("  The dev server did not become ready.")
-        return 1
-    progress.done(f"server ready at {base_url}")
+        return None
 
+    progress.done(f"server ready at {base_url}")
+    return server
+
+
+def _warmup_sample_registry(samples_url: str, progress: StepProgress) -> None:
     progress.begin()
     if not wait_with_fraction(
         progress,
@@ -198,16 +223,15 @@ def main() -> int:
         interval=SAMPLE_REGISTRY_POLL_SECONDS,
         ready=lambda: ping_url(samples_url),
     ):
-        print("  Sample registry warmup did not finish in time; the app may still load slowly.")
+        print(
+            "  Sample registry warmup did not finish in time; the app may still load slowly."
+        )
         progress.done("warmup timed out")
     else:
         progress.done("sample registry ready")
 
-    progress.finish(label="Simulator ready")
 
-    if not args.no_open:
-        webbrowser.open(base_url, new=0, autoraise=True)
-
+def _wait_for_server(server: subprocess.Popen) -> int:
     print()
     print("Simulator is running. Press Ctrl+C to stop.")
     try:
@@ -221,13 +245,64 @@ def main() -> int:
             return 130
 
 
-def ensure_zeia_sample_cache(app_dir: Path, repo_root: Path, progress: StepProgress) -> str:
+def main() -> int:
+    args = _parse_arguments()
+    host = validated_host(args.host)
+    port = validated_port(args.port)
+
+    progress = StepProgress(
+        STARTUP_STEPS, title="Tecan Protocol Simulator", weights=STARTUP_STEP_WEIGHTS
+    )
+
+    app_dir = _verify_app_directory(args.app_dir, progress)
+    if app_dir is None:
+        return 1
+
+    base_url = f"http://{host}:{port}/"
+    samples_url = f"{base_url}api/samples"
+
+    progress.begin()
+    stopped = stop_existing_server(port)
+    progress.done("stopped existing server" if stopped else "no server was running")
+
+    install_result = _install_dependencies(app_dir, args.skip_install, progress)
+    if install_result != 0:
+        return install_result
+
+    progress.detail("Checking optional ZEIA sample cache")
+    cache_result = ensure_zeia_sample_cache(app_dir, REPO_ROOT.resolve(), progress)
+    if cache_result == "built":
+        progress.detail("Built ZEIA sample cache for faster startup")
+    elif cache_result == "ready":
+        progress.detail("ZEIA sample cache is ready")
+    else:
+        progress.detail("No local sample ZEIA; skipping sample cache")
+
+    server = _start_dev_server(app_dir, host, port, base_url, progress)
+    if server is None:
+        return 1
+
+    _warmup_sample_registry(samples_url, progress)
+
+    progress.finish(label="Simulator ready")
+
+    if not args.no_open:
+        webbrowser.open(base_url, new=0, autoraise=True)
+
+    return _wait_for_server(server)
+
+
+def ensure_zeia_sample_cache(
+    app_dir: Path, repo_root: Path, progress: StepProgress
+) -> str:
     """Return 'ready', 'built', or 'skipped'."""
     zeia_path = discover_sample_zeia(repo_root)
     if zeia_path is None:
         return "skipped"
     manifest_path = sample_zeia_cache_manifest(repo_root, zeia_path)
-    if manifest_path.is_file() and zeia_cache_matches_source(manifest_path, zeia_path, repo_root):
+    if manifest_path.is_file() and zeia_cache_matches_source(
+        manifest_path, zeia_path, repo_root
+    ):
         return "ready"
 
     progress.detail("Building ZEIA sample cache (one-time; speeds up later launches)")
@@ -244,7 +319,9 @@ def ensure_zeia_sample_cache(app_dir: Path, repo_root: Path, progress: StepProgr
     return "built"
 
 
-def zeia_cache_matches_source(manifest_path: Path, zeia_path: Path, repo_root: Path) -> bool:
+def zeia_cache_matches_source(
+    manifest_path: Path, zeia_path: Path, repo_root: Path
+) -> bool:
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         fingerprint = manifest.get("sourceFingerprint") or {}
@@ -341,7 +418,9 @@ def choose_folder_dialog() -> str:
         return result.stdout.strip()
 
     try:
-        return input("Enter path to Fluent AI-Assistance or source/04-protocol-simulator: ").strip()
+        return input(
+            "Enter path to Fluent AI-Assistance or source/04-protocol-simulator: "
+        ).strip()
     except EOFError:
         return ""
 
@@ -378,7 +457,9 @@ def stop_existing_server(port: int) -> bool:
             ),
         ]
         try:
-            result = subprocess.run(command, capture_output=True, text=True, check=False)
+            result = subprocess.run(
+                command, capture_output=True, text=True, check=False
+            )
             for line in result.stdout.splitlines():
                 pid = line.strip()
                 if not pid.isdigit():

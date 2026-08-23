@@ -11,6 +11,8 @@ from tecan_reader.common import parse_xml_text
 from tecan_reader.gwl import inspect_gwl_lines
 from tecan_reader.pattern_library import mine_script_patterns, search_script_patterns, summarize_script_patterns
 import sqlite3
+from unittest.mock import patch, MagicMock
+
 from tecan_reader.project_index import build_project_index, search_project_index, summarize_project_index, _initialize_database
 from tecan_reader.script import inspect_xscr_text
 
@@ -229,6 +231,28 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(report["pipette_examples"][0]["rack_label"], "Source")
         self.assertEqual(report["line_count"], 3)
 
+
+    def test_inspect_archive_collects_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = Path(tmp) / "errors.zeia"
+            with zipfile.ZipFile(archive, "w") as zf:
+                # Malformed XML to cause inspect_xscr_text to fail
+                zf.writestr("DataStore/UserSpecific/bad.xscr", "<malformed")
+                # Invalid UTF-8 to cause .decode("utf-8-sig") to fail
+                zf.writestr("Worklists/bad.gwl", b"\xff\xfe")
+
+            report = inspect_archive(archive)
+
+        self.assertEqual(len(report["errors"]), 2)
+
+        errors = {e["entry"]: e["error"] for e in report["errors"]}
+
+        self.assertIn("DataStore/UserSpecific/bad.xscr", errors)
+        self.assertIn("Worklists/bad.gwl", errors)
+
+        self.assertTrue("ParseError" in errors["DataStore/UserSpecific/bad.xscr"] or "unclosed token" in errors["DataStore/UserSpecific/bad.xscr"])
+        self.assertTrue("codec can't decode" in errors["Worklists/bad.gwl"])
+
     def test_inspect_archive_rejects_entry_count_over_limit(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             archive = Path(tmp) / "too_many_entries.zeia"
@@ -403,6 +427,85 @@ class ReaderTests(unittest.TestCase):
         self.assertTrue(drop_hits["results"])
         self.assertTrue(gripper_hits["results"])
         self.assertIn("Physical RGA/CGA motion pattern", gripper_hits["results"][0]["safety_notes"][-1])
+
+    def test_build_project_index_creates_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            zeia_path = tmp_path / "test.zeia"
+            with zipfile.ZipFile(zeia_path, "w") as zf:
+                zf.writestr("DataStore/UserSpecific/sample.xscr", "<sd:VxData />")
+
+            db_path = tmp_path / "new_dir" / "nested" / "test.db"
+            self.assertFalse(db_path.parent.exists())
+
+            with patch("tecan_reader.project_index.inspect_archive") as mock_inspect:
+                mock_inspect.return_value = {"scripts": []}
+                build_project_index([zeia_path], db_path)
+
+            self.assertTrue(db_path.parent.exists())
+            self.assertTrue(db_path.exists())
+
+    def test_build_project_index_force_deletes_existing_db(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            zeia_path = tmp_path / "test.zeia"
+            with zipfile.ZipFile(zeia_path, "w") as zf:
+                zf.writestr("DataStore/UserSpecific/sample.xscr", "<sd:VxData />")
+
+            db_path = tmp_path / "test.db"
+            db_path.write_text("dummy data")
+
+            with patch("tecan_reader.project_index.inspect_archive") as mock_inspect:
+                mock_inspect.return_value = {"scripts": []}
+                build_project_index([zeia_path], db_path, force=True)
+
+            # The dummy data should have been overwritten by a new sqlite database
+            with sqlite3.connect(db_path) as conn:
+                res = conn.execute("SELECT count(*) FROM sqlite_master").fetchone()
+                self.assertIsNotNone(res)
+
+            # Windows CI issue with file locks: connection context manager closes it,
+            # but sometimes it takes a bit. Let's explicitly close any dangling refs just in case
+            # and unlink it so TemporaryDirectory cleanup does not fail with PermissionError.
+            try:
+                conn.close()
+                import time
+                time.sleep(0.1)
+                db_path.unlink()
+            except OSError:
+                pass
+
+    def test_build_project_index_closes_connection_on_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            zeia_path = tmp_path / "test.zeia"
+            with zipfile.ZipFile(zeia_path, "w") as zf:
+                zf.writestr("DataStore/UserSpecific/sample.xscr", "<sd:VxData />")
+
+            db_path = tmp_path / "test.db"
+
+            with patch("tecan_reader.project_index.inspect_archive") as mock_inspect:
+                mock_inspect.side_effect = ValueError("Simulated error")
+                with patch("tecan_reader.project_index._connect") as mock_connect:
+                    mock_conn = MagicMock()
+                    mock_connect.return_value = mock_conn
+                    with self.assertRaises(ValueError):
+                        build_project_index([zeia_path], db_path)
+                    mock_conn.close.assert_called_once()
+
+    def test_build_project_index_passes_limits(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            zeia_path = tmp_path / "test.zeia"
+            with zipfile.ZipFile(zeia_path, "w") as zf:
+                zf.writestr("DataStore/UserSpecific/sample.xscr", "<sd:VxData />")
+
+            db_path = tmp_path / "test.db"
+
+            with patch("tecan_reader.project_index.inspect_archive") as mock_inspect:
+                mock_inspect.return_value = {"scripts": []}
+                build_project_index([zeia_path], db_path, script_limit=42, object_limit=99)
+                mock_inspect.assert_called_once_with(zeia_path.resolve(), script_limit=42, object_limit=99)
 
 
 def _write_sample_archive(path: Path, script: str) -> Path:
