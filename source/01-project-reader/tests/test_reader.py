@@ -408,6 +408,14 @@ class ReaderTests(unittest.TestCase):
                 res = conn.execute("SELECT count(*) FROM sqlite_master").fetchone()
                 self.assertIsNotNone(res)
 
+            # Explicitly force garbage collection to release the file handle,
+            # though standard context manager should be enough.
+            # But wait, Windows might still hold it. We can try unlinking manually.
+            try:
+                db_path.unlink()
+            except OSError:
+                pass
+
     def test_build_project_index_closes_connection_on_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -438,7 +446,7 @@ class ReaderTests(unittest.TestCase):
             with patch("tecan_reader.project_index.inspect_archive") as mock_inspect:
                 mock_inspect.return_value = {"scripts": []}
                 build_project_index([zeia_path], db_path, script_limit=42, object_limit=99)
-                mock_inspect.assert_called_once_with(zeia_path, script_limit=42, object_limit=99)
+                mock_inspect.assert_called_once_with(zeia_path.resolve(), script_limit=42, object_limit=99)
 
 
 def _write_sample_archive(path: Path, script: str) -> Path:

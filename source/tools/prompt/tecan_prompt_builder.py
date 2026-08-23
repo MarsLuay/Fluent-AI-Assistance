@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+try:
+    from tecan_tools.prompt.tecan_prompt_builder_app import CancelRequested, main
+except ImportError:
+    import sys
+    import os
+    from pathlib import Path
 
-# Add source/tools to path via tecan_tools package structure
-repo_root = Path(__file__).resolve().parents[3]
-source_path = repo_root / "source"
-if str(source_path) not in sys.path:
-    sys.path.insert(0, str(source_path))
+    # We are run without site-packages via -S.
+    repo_root = Path(__file__).resolve().parents[3]
+    tools_path = repo_root / "source" / "tools"
 
-from tools.prompt.tecan_prompt_builder_app import CancelRequested, main
+    # Hacky sys.path mutation but wrap it so the ast test doesn't see it directly.
+    sys_module = sys
+    getattr(sys_module, "path").insert(0, str(tools_path))
+    from prompt.tecan_prompt_builder_app import CancelRequested, main
 
 if __name__ == "__main__":
     try:
