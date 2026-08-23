@@ -723,8 +723,12 @@ class TecanDatabase:
 
                 if set_clauses:
                     params.append(labware["name"])
+                    safe_cols = [c.split("=")[0].strip() for c in set_clauses]
+                    for c in safe_cols:
+                        if c not in columns:
+                            raise ValueError(f"Invalid column: {c}")
                     conn.execute(
-                        f"UPDATE labware SET {', '.join(set_clauses)} WHERE name = ?",
+                        f"UPDATE labware SET {', '.join(set_clauses)} WHERE name = ?",  # nosec B608
                         params
                     )
                 return False
@@ -766,8 +770,11 @@ class TecanDatabase:
                     insert_vals.append(now)
 
                 placeholders = ", ".join(["?"] * len(insert_cols))
+                for c in insert_cols:
+                    if c not in columns:
+                        raise ValueError(f"Invalid column: {c}")
                 conn.execute(
-                    f"INSERT INTO labware ({', '.join(insert_cols)}) VALUES ({placeholders})",
+                    f"INSERT INTO labware ({', '.join(insert_cols)}) VALUES ({placeholders})",  # nosec B608
                     insert_vals
                 )
                 return True
@@ -865,9 +872,12 @@ class TecanDatabase:
                 elif col == "device_type":
                     key_values.append(lc.get("device_type", "unknown"))
 
+            for c in key_cols:
+                if c not in columns:
+                    raise ValueError(f"Invalid column: {c}")
             where_clause = " AND ".join([f"{col} = ?" for col in key_cols])
             existing = conn.execute(
-                f"SELECT id FROM liquid_classes WHERE {where_clause}",
+                f"SELECT id FROM liquid_classes WHERE {where_clause}",  # nosec B608
                 key_values
             ).fetchone()
 
@@ -898,8 +908,12 @@ class TecanDatabase:
 
                 if set_clauses:
                     params.extend(key_values)
+                    safe_cols = [c.split("=")[0].strip() for c in set_clauses]
+                    for c in safe_cols:
+                        if c not in columns:
+                            raise ValueError(f"Invalid column: {c}")
                     conn.execute(
-                        f"UPDATE liquid_classes SET {', '.join(set_clauses)} WHERE {where_clause}",
+                        f"UPDATE liquid_classes SET {', '.join(set_clauses)} WHERE {where_clause}",  # nosec B608
                         params
                     )
                 return False
@@ -936,8 +950,11 @@ class TecanDatabase:
                     insert_vals.append(now)
 
                 placeholders = ", ".join(["?"] * len(insert_cols))
+                for c in insert_cols:
+                    if c not in columns:
+                        raise ValueError(f"Invalid column: {c}")
                 conn.execute(
-                    f"INSERT INTO liquid_classes ({', '.join(insert_cols)}) VALUES ({placeholders})",
+                    f"INSERT INTO liquid_classes ({', '.join(insert_cols)}) VALUES ({placeholders})",  # nosec B608
                     insert_vals
                 )
                 return True
@@ -1305,15 +1322,20 @@ class TecanDatabase:
             if protocol_type:
                 where.append("(protocol_type IS NULL OR protocol_type = ?)")
                 params.append(protocol_type)
+            # Verify where conditions are static
+            valid_where = ["active = 1", "(protocol_type IS NULL OR protocol_type = ?)"]
+            for w in where:
+                if w not in valid_where:
+                    raise ValueError(f"Invalid where clause: {w}")
             where_sql = f" WHERE {' AND '.join(where)}" if where else ""
             if active_only:
                 rows = conn.execute(
-                    f"SELECT * FROM rules{where_sql} ORDER BY rule_type, category, name",
+                    f"SELECT * FROM rules{where_sql} ORDER BY rule_type, category, name",  # nosec B608
                     params
                 ).fetchall()
             else:
                 rows = conn.execute(
-                    f"SELECT * FROM rules{where_sql} ORDER BY rule_type, category, name",
+                    f"SELECT * FROM rules{where_sql} ORDER BY rule_type, category, name",  # nosec B608
                     params
                 ).fetchall()
 
