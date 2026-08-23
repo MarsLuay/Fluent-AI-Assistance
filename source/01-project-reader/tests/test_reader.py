@@ -10,6 +10,9 @@ from tecan_reader.archive import inspect_archive
 from tecan_reader.common import parse_xml_text
 from tecan_reader.gwl import inspect_gwl_lines
 from tecan_reader.pattern_library import mine_script_patterns, search_script_patterns, summarize_script_patterns
+import sqlite3
+from unittest.mock import patch, MagicMock
+
 from tecan_reader.project_index import build_project_index, search_project_index, summarize_project_index
 from tecan_reader.script import inspect_xscr_text
 
@@ -368,6 +371,74 @@ class ReaderTests(unittest.TestCase):
         self.assertTrue(drop_hits["results"])
         self.assertTrue(gripper_hits["results"])
         self.assertIn("Physical RGA/CGA motion pattern", gripper_hits["results"][0]["safety_notes"][-1])
+
+    def test_build_project_index_creates_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            zeia_path = tmp_path / "test.zeia"
+            with zipfile.ZipFile(zeia_path, "w") as zf:
+                zf.writestr("DataStore/UserSpecific/sample.xscr", "<sd:VxData />")
+
+            db_path = tmp_path / "new_dir" / "nested" / "test.db"
+            self.assertFalse(db_path.parent.exists())
+
+            with patch("tecan_reader.project_index.inspect_archive") as mock_inspect:
+                mock_inspect.return_value = {"scripts": []}
+                build_project_index([zeia_path], db_path)
+
+            self.assertTrue(db_path.parent.exists())
+            self.assertTrue(db_path.exists())
+
+    def test_build_project_index_force_deletes_existing_db(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            zeia_path = tmp_path / "test.zeia"
+            with zipfile.ZipFile(zeia_path, "w") as zf:
+                zf.writestr("DataStore/UserSpecific/sample.xscr", "<sd:VxData />")
+
+            db_path = tmp_path / "test.db"
+            db_path.write_text("dummy data")
+
+            with patch("tecan_reader.project_index.inspect_archive") as mock_inspect:
+                mock_inspect.return_value = {"scripts": []}
+                build_project_index([zeia_path], db_path, force=True)
+
+            # The dummy data should have been overwritten by a new sqlite database
+            with sqlite3.connect(db_path) as conn:
+                res = conn.execute("SELECT count(*) FROM sqlite_master").fetchone()
+                self.assertIsNotNone(res)
+
+    def test_build_project_index_closes_connection_on_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            zeia_path = tmp_path / "test.zeia"
+            with zipfile.ZipFile(zeia_path, "w") as zf:
+                zf.writestr("DataStore/UserSpecific/sample.xscr", "<sd:VxData />")
+
+            db_path = tmp_path / "test.db"
+
+            with patch("tecan_reader.project_index.inspect_archive") as mock_inspect:
+                mock_inspect.side_effect = ValueError("Simulated error")
+                with patch("tecan_reader.project_index._connect") as mock_connect:
+                    mock_conn = MagicMock()
+                    mock_connect.return_value = mock_conn
+                    with self.assertRaises(ValueError):
+                        build_project_index([zeia_path], db_path)
+                    mock_conn.close.assert_called_once()
+
+    def test_build_project_index_passes_limits(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            zeia_path = tmp_path / "test.zeia"
+            with zipfile.ZipFile(zeia_path, "w") as zf:
+                zf.writestr("DataStore/UserSpecific/sample.xscr", "<sd:VxData />")
+
+            db_path = tmp_path / "test.db"
+
+            with patch("tecan_reader.project_index.inspect_archive") as mock_inspect:
+                mock_inspect.return_value = {"scripts": []}
+                build_project_index([zeia_path], db_path, script_limit=42, object_limit=99)
+                mock_inspect.assert_called_once_with(zeia_path, script_limit=42, object_limit=99)
 
 
 def _write_sample_archive(path: Path, script: str) -> Path:
