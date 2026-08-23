@@ -420,6 +420,7 @@ long text. For verification toggles, use exactly:
 ## Long Runs vs. Hangs
 
 > Detailed rules: [AGENTS.details/long-runs-vs-hangs.md](AGENTS.details/long-runs-vs-hangs.md). Read them before working in this area.
+
    <!-- BEGIN GENERATED: readiness-gate-summary -->
    Readiness registry summary (generated from `fluent_pipeline/data/readiness_gate_registry.json`):
    - Required offline ready-to-import gates: `26`
