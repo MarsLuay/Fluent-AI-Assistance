@@ -1,0 +1,37 @@
+{
+  "backup": "/Users/mars/.local/share/agents-md/backups/094bd6906e4d/AGENTS.md.a23b2242fd7a.bak",
+  "original_sha256": "a23b2242fd7a91cc7e46e6f6c2f4cced8ea86f1e2a2886d59cb1500ead26548e",
+  "references": [
+    {
+      "heading": "## Regeneration Preflight (mandatory)",
+      "path": "/Users/mars/ObsidianNotes/.Projects/Fluent-AI-Assistance/source/03-protocol-builder/AGENTS.details/regeneration-preflight-mandatory.md"
+    },
+    {
+      "heading": "## Existing Script Media Refresh",
+      "path": "/Users/mars/ObsidianNotes/.Projects/Fluent-AI-Assistance/source/03-protocol-builder/AGENTS.details/existing-script-media-refresh.md"
+    },
+    {
+      "heading": "## Declarative Verification Recipe (skip hand-built IR)",
+      "path": "/Users/mars/ObsidianNotes/.Projects/Fluent-AI-Assistance/source/03-protocol-builder/AGENTS.details/declarative-verification-recipe-skip-hand-built-ir.md"
+    },
+    {
+      "heading": "## Verification / Teaching Prompts and Prompt Media",
+      "path": "/Users/mars/ObsidianNotes/.Projects/Fluent-AI-Assistance/source/03-protocol-builder/AGENTS.details/verification-teaching-prompts-and-prompt-media.md"
+    },
+    {
+      "heading": "## Manual Step Locations (RECREATE_SCRIPT.md)",
+      "path": "/Users/mars/ObsidianNotes/.Projects/Fluent-AI-Assistance/source/03-protocol-builder/AGENTS.details/manual-step-locations-recreate-script-md.md"
+    },
+    {
+      "heading": "## Catalog Index Cache",
+      "path": "/Users/mars/ObsidianNotes/.Projects/Fluent-AI-Assistance/source/03-protocol-builder/AGENTS.details/catalog-index-cache.md"
+    },
+    {
+      "heading": "## Long Runs vs. Hangs",
+      "path": "/Users/mars/ObsidianNotes/.Projects/Fluent-AI-Assistance/source/03-protocol-builder/AGENTS.details/long-runs-vs-hangs.md"
+    }
+  ],
+  "result_sha256": "ff3b8a74322604d758babbc3c0b7bd4e9cf7436345be55611dfabb1d858da996",
+  "schema_version": 1,
+  "source": "/Users/mars/ObsidianNotes/.Projects/Fluent-AI-Assistance/source/03-protocol-builder/AGENTS.md"
+}

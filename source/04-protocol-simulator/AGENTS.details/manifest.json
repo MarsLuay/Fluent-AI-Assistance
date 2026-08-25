@@ -1,0 +1,13 @@
+{
+  "backup": "/Users/mars/.local/share/agents-md/backups/e2e7a1b28565/AGENTS.md.fc4999c6ff5d.bak",
+  "original_sha256": "fc4999c6ff5d9c6e8f4b390f065ef93f1fe49a5a51c6fc835a53d909f3e66980",
+  "references": [
+    {
+      "heading": "## Edit Boundaries",
+      "path": "/Users/mars/ObsidianNotes/.Projects/Fluent-AI-Assistance/source/04-protocol-simulator/AGENTS.details/edit-boundaries.md"
+    }
+  ],
+  "result_sha256": "6c5644cdb1094821dea8e08c24e3a1a7052e17451a74062bf96231eab66bfb26",
+  "schema_version": 1,
+  "source": "/Users/mars/ObsidianNotes/.Projects/Fluent-AI-Assistance/source/04-protocol-simulator/AGENTS.md"
+}

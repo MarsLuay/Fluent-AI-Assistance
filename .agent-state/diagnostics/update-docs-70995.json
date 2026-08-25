@@ -1,0 +1,820 @@
+{
+  "schema": 2,
+  "status": "review",
+  "mode": "check",
+  "root": "/Users/mars/ObsidianNotes/.Projects/Fluent-AI-Assistance",
+  "docs_root": "/Users/mars/ObsidianNotes/.Projects/Fluent-AI-Assistance/docs/source-of-truth",
+  "source_root": "/Users/mars/ObsidianNotes/.Projects/Fluent-AI-Assistance",
+  "changed_files": [],
+  "changed_files_truncated": false,
+  "changed": [],
+  "changed_truncated": false,
+  "baseline": {
+    "ok": true,
+    "strict": false,
+    "pages": 49,
+    "errors": [],
+    "warnings": [],
+    "affected_pages": []
+  },
+  "final": {
+    "ok": true,
+    "strict": false,
+    "pages": 49,
+    "errors": [],
+    "warnings": [],
+    "affected_pages": []
+  },
+  "source_references": {
+    "references": 176,
+    "search_roots": [
+      "/Users/mars/ObsidianNotes/.Projects/Fluent-AI-Assistance"
+    ],
+    "missing": [
+      {
+        "page": "README.md",
+        "reference": "scripts/docs_nav.py"
+      },
+      {
+        "page": "conflicts.md",
+        "reference": "fluent_pipeline/fluent_naming.py"
+      },
+      {
+        "page": "conflicts.md",
+        "reference": "fluent_pipeline/worktable_datastore.py"
+      },
+      {
+        "page": "conflicts.md",
+        "reference": "policies/prompt_text.py"
+      },
+      {
+        "page": "conflicts.md",
+        "reference": "api_v2/validate_runtime.runtime_error_for_validate_failure(..., kind=…)"
+      },
+      {
+        "page": "conflicts.md",
+        "reference": "api_v2/validate_runtime.py"
+      },
+      {
+        "page": "conflicts.md",
+        "reference": "workflows/generation/workflow.py"
+      },
+      {
+        "page": "cross-cutting.md",
+        "reference": "libs/fluentcoder/fluentcoder/_assets/config/generation.yaml"
+      },
+      {
+        "page": "cross-cutting.md",
+        "reference": "fluent_pipeline/config.py"
+      },
+      {
+        "page": "cross-cutting.md",
+        "reference": "ready-to-import/_shared/temp_files/build/tecan_project_index.sqlite"
+      },
+      {
+        "page": "cross-cutting.md",
+        "reference": "cli/runtime.py"
+      },
+      {
+        "page": "entrypoints.md",
+        "reference": "fluent_pipeline/cli/__main__.py"
+      },
+      {
+        "page": "entrypoints.md",
+        "reference": "fluent_pipeline/mcp_server.py"
+      },
+      {
+        "page": "entrypoints.md",
+        "reference": "fluent_pipeline/mcp_gateway.py"
+      },
+      {
+        "page": "entrypoints.md",
+        "reference": "fluent_pipeline/application_services.py"
+      },
+      {
+        "page": "entrypoints.md",
+        "reference": "fluent_pipeline/workflows/generation/workflow.py"
+      },
+      {
+        "page": "entrypoints.md",
+        "reference": "fluent_pipeline/exports.py"
+      },
+      {
+        "page": "entrypoints.md",
+        "reference": "fluent_pipeline/bootstrap.py"
+      },
+      {
+        "page": "entrypoints.md",
+        "reference": "libs/fluentcoder/.../compiler/renderer.py"
+      },
+      {
+        "page": "entrypoints.md",
+        "reference": "libs/fluentcoder/.../catalog/indexer.py"
+      },
+      {
+        "page": "entrypoints.md",
+        "reference": "tools/simulator/launch_simulator.py"
+      },
+      {
+        "page": "entrypoints.md",
+        "reference": "fluent_pipeline/cli/parser.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/add_labware_golden.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/ced.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/command_summary.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/command_tracing.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/command_validate.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/commands.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/context_enrichment.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/events.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/expressions.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/generic_command_validate.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/generic_passthrough.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/golden_compare.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/legacy_sila.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/native_provider.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/progress_policy.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/run_control.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/runtime.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/runtime_events.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/runtime_session.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/state.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/subroutine_identity.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/types.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/verification_helpers.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/xml_compare.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/validate_runtime.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-cli.md",
+        "reference": "cli/commands/diagnostics.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-cli.md",
+        "reference": "cli/commands/generation.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-cli.md",
+        "reference": "cli/commands/projects.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-cli.md",
+        "reference": "cli/commands/validation.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-cli.md",
+        "reference": "cli/parser.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-cli.md",
+        "reference": "cli/rendering.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-cli.md",
+        "reference": "cli/requests.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-cli.md",
+        "reference": "cli/runtime.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-exports-mining.md",
+        "reference": "source/delivery_manifest.json"
+      },
+      {
+        "page": "functions/fluent-pipeline-exports-mining.md",
+        "reference": "| Persist ZEIA-derived connector coverage (name profiles → resolved GUIDs/counts). | see source |\n|"
+      },
+      {
+        "page": "functions/fluent-pipeline-exports-mining.md",
+        "reference": "| Persist ZEIA-mined Legacy/Application driver macro inventory (soft-empty OK). | see source |\n|"
+      },
+      {
+        "page": "functions/fluent-pipeline-exports-mining.md",
+        "reference": "| Unique local GUID for name+folder, or None if missing/ambiguous. | see source |\n|"
+      },
+      {
+        "page": "functions/fluent-pipeline-exports-mining.md",
+        "reference": "| Report referenced workspaces/LCs/components missing from SystemSpecific + base. | see source |\n|"
+      },
+      {
+        "page": "functions/fluent-pipeline-exports-mining.md",
+        "reference": "| Derive labware/catalog alias maps from a ZEIA-built catalog (instance → type). | see source |\n|"
+      },
+      {
+        "page": "functions/fluent-pipeline-exports-mining.md",
+        "reference": "| Emit guid/name refs without inventing guid↔name pairings. | see source |\n|"
+      },
+      {
+        "page": "functions/fluent-pipeline-exports-mining.md",
+        "reference": "| Backward-compatible alias , now includes nest/cap TypeName families. | see source |\n|"
+      },
+      {
+        "page": "functions/fluent-pipeline-exports-mining.md",
+        "reference": "fs/mapping.xml"
+      },
+      {
+        "page": "functions/fluent-pipeline-exports-mining.md",
+        "reference": "meta/content.xml"
+      },
+      {
+        "page": "functions/fluent-pipeline-exports-mining.md",
+        "reference": "| Drop TouchTools media FileReferences not used by prompt image/sound fields.  Regeneration that repla | see source |\n|"
+      },
+      {
+        "page": "functions/fluent-pipeline-gates-validation.md",
+        "reference": "gates/archive.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-gates-validation.md",
+        "reference": "gates/ir.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-gates-validation.md",
+        "reference": "gates/evaluators.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-gates-validation.md",
+        "reference": "gates/models.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-gates-validation.md",
+        "reference": "gates/registry.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-gates-validation.md",
+        "reference": "gates/worktable.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-generation.md",
+        "reference": "workflows/generation/workflow.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-generation.md",
+        "reference": "workflows/generation/runner.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-generation.md",
+        "reference": "workflows/generation/stages.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-generation.md",
+        "reference": "workflows/generation/state.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-liquid-classes.md",
+        "reference": "fluent_pipeline/liquid_classes_export.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-protocol-ir.md",
+        "reference": "ir/rga_move_policy.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-support.md",
+        "reference": "policies/prompt_text.py"
+      },
+      {
+        "page": "functions/fluentcoder-renderer-device-lc.md",
+        "reference": "libs/fluentcoder/fluentcoder/compiler/renderer.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/__init__.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/add_labware_golden.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/ced.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/command_summary.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/command_tracing.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/command_validate.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/commands.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/context_enrichment.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/events.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/expressions.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/generic_command_validate.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/generic_passthrough.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/golden_compare.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/legacy_sila.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/native_provider.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/progress_policy.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/run_control.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/runtime.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/runtime_events.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/runtime_session.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/state.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/subroutine_identity.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/types.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/validate_runtime.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/verification_helpers.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/xml_compare.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-cli.md",
+        "reference": "cli/__init__.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-cli.md",
+        "reference": "cli/__main__.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-cli.md",
+        "reference": "cli/commands/__init__.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-cli.md",
+        "reference": "cli/commands/diagnostics.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-cli.md",
+        "reference": "cli/commands/doctor.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-cli.md",
+        "reference": "cli/commands/generation.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-cli.md",
+        "reference": "cli/commands/projects.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-cli.md",
+        "reference": "cli/commands/simulator.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-cli.md",
+        "reference": "cli/commands/validation.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-cli.md",
+        "reference": "cli/parser.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-cli.md",
+        "reference": "cli/rendering.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-cli.md",
+        "reference": "cli/requests.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-cli.md",
+        "reference": "cli/runtime.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-gates-validation.md",
+        "reference": "gates/__init__.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-gates-validation.md",
+        "reference": "gates/archive.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-gates-validation.md",
+        "reference": "gates/evaluators.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-gates-validation.md",
+        "reference": "gates/ir.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-gates-validation.md",
+        "reference": "gates/models.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-gates-validation.md",
+        "reference": "gates/registry.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-gates-validation.md",
+        "reference": "gates/worktable.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-generation.md",
+        "reference": "workflows/__init__.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-generation.md",
+        "reference": "workflows/generation/__init__.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-generation.md",
+        "reference": "workflows/generation/runner.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-generation.md",
+        "reference": "workflows/generation/stages.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-generation.md",
+        "reference": "workflows/generation/state.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-generation.md",
+        "reference": "workflows/generation/workflow.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-protocol-ir.md",
+        "reference": "ir/__init__.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-protocol-ir.md",
+        "reference": "ir/rga_move_policy.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-support.md",
+        "reference": "policies/__init__.py"
+      },
+      {
+        "page": "modules/fluent-pipeline-support.md",
+        "reference": "policies/prompt_text.py"
+      },
+      {
+        "page": "modules/fluentcoder-catalog-xlqc.md",
+        "reference": "catalog/catalog.py"
+      },
+      {
+        "page": "modules/fluentcoder-catalog-xlqc.md",
+        "reference": "catalog/indexer.py"
+      },
+      {
+        "page": "types/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/command_tracing.py"
+      },
+      {
+        "page": "types/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/commands.py"
+      },
+      {
+        "page": "types/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/types.py"
+      },
+      {
+        "page": "types/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/run_control.py"
+      },
+      {
+        "page": "types/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/ced.py"
+      },
+      {
+        "page": "types/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/command_validate.py"
+      },
+      {
+        "page": "types/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/xml_compare.py"
+      },
+      {
+        "page": "types/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/events.py"
+      },
+      {
+        "page": "types/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/expressions.py"
+      },
+      {
+        "page": "types/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/generic_command_validate.py"
+      },
+      {
+        "page": "types/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/verification_helpers.py"
+      },
+      {
+        "page": "types/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/runtime.py"
+      },
+      {
+        "page": "types/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/native_provider.py"
+      },
+      {
+        "page": "types/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/progress_policy.py"
+      },
+      {
+        "page": "types/fluent-pipeline-api-v2.md",
+        "reference": "api_v2/runtime_events.py"
+      },
+      {
+        "page": "types/fluent-pipeline-gates-validation.md",
+        "reference": "gates/registry.py"
+      },
+      {
+        "page": "types/fluent-pipeline-gates-validation.md",
+        "reference": "gates/models.py"
+      },
+      {
+        "page": "types/fluent-pipeline-generation.md",
+        "reference": "workflows/generation/workflow.py"
+      },
+      {
+        "page": "types/fluent-pipeline-generation.md",
+        "reference": "workflows/generation/runner.py"
+      },
+      {
+        "page": "types/fluent-pipeline-generation.md",
+        "reference": "workflows/generation/state.py"
+      },
+      {
+        "page": "types/fluent-pipeline-generation.md",
+        "reference": "workflows/generation/stages.py"
+      },
+      {
+        "page": "types/fluentcoder-catalog-xlqc.md",
+        "reference": "catalog/xlqc.py"
+      },
+      {
+        "page": "types/fluentcoder-catalog-xlqc.md",
+        "reference": "catalog/catalog.py"
+      }
+    ],
+    "missing_truncated": false,
+    "outside_root": [],
+    "outside_root_truncated": false,
+    "dynamic": [
+      {
+        "page": "README.md",
+        "reference": "source/*/AGENTS.md"
+      },
+      {
+        "page": "conflicts.md",
+        "reference": "source/tools/*.py"
+      },
+      {
+        "page": "functions/fluent-pipeline-exports-mining.md",
+        "reference": "Connectors/*.x | see source |\n|"
+      },
+      {
+        "page": "functions/fluent-pipeline-exports-mining.md",
+        "reference": "Components/*.xcmp"
+      }
+    ],
+    "dynamic_truncated": false
+  },
+  "project_memory": {
+    "status": "passed",
+    "contract": {
+      "path": "PROJECT-CONTRACT.json",
+      "status": "valid",
+      "checker": "fallback-contract-validation",
+      "contract_id": "fluent-ai-assistance-context-v1",
+      "contract_hash": null,
+      "schema_version": 1,
+      "route_count": 1,
+      "errors": []
+    },
+    "task_ledger": {
+      "json_path": "PROJECT-TASKS.json",
+      "markdown_path": "PROJECT-TASKS.md",
+      "task_count": 4,
+      "active_count": 4,
+      "statuses": {
+        "pending": 4
+      }
+    },
+    "managed_paths": [
+      "PROJECT-CONTRACT.json",
+      "PROJECT-TASKS.json",
+      "PROJECT-TASKS.md",
+      "project-memory/architecture.md",
+      "project-memory/candidates.jsonl",
+      "project-memory/decisions.md",
+      "project-memory/known-failures.md",
+      "project-memory/quirks.md",
+      "project-memory/verified.jsonl"
+    ],
+    "changed_paths": [],
+    "unknown_paths": [],
+    "memory_files": [
+      {
+        "path": "PROJECT-TASKS.json",
+        "kind": "task_json",
+        "ok": true,
+        "errors": []
+      },
+      {
+        "path": "PROJECT-TASKS.md",
+        "kind": "task_markdown",
+        "ok": true,
+        "errors": []
+      },
+      {
+        "path": "project-memory/architecture.md",
+        "kind": "human_readable",
+        "ok": true,
+        "errors": []
+      },
+      {
+        "path": "project-memory/decisions.md",
+        "kind": "human_readable",
+        "ok": true,
+        "errors": []
+      },
+      {
+        "path": "project-memory/quirks.md",
+        "kind": "human_readable",
+        "ok": true,
+        "errors": []
+      },
+      {
+        "path": "project-memory/known-failures.md",
+        "kind": "human_readable",
+        "ok": true,
+        "errors": []
+      },
+      {
+        "path": "project-memory/candidates.jsonl",
+        "kind": "candidate",
+        "ok": true,
+        "errors": []
+      },
+      {
+        "path": "project-memory/verified.jsonl",
+        "kind": "verified",
+        "ok": true,
+        "errors": []
+      }
+    ],
+    "route_selection": {
+      "status": "not_requested"
+    },
+    "errors": [],
+    "errors_truncated": false
+  },
+  "context_contract": {
+    "path": "PROJECT-CONTRACT.json",
+    "status": "valid",
+    "checker": "fallback-contract-validation",
+    "contract_id": "fluent-ai-assistance-context-v1",
+    "contract_hash": null,
+    "schema_version": 1,
+    "route_count": 1,
+    "errors": []
+  },
+  "task": "",
+  "strict_references": false,
+  "agent_markdown": {
+    "files": [
+      "AGENTS.md",
+      "source/03-protocol-builder/AGENTS.md",
+      "source/04-protocol-simulator/AGENTS.md"
+    ],
+    "conflicts": [],
+    "conflicts_truncated": false
+  },
+  "errors": [],
+  "errors_truncated": false,
+  "affected_pages": [],
+  "unmapped_changed_files": [],
+  "unmapped_changed_files_truncated": false,
+  "review_required": true,
+  "report_path": "/Users/mars/ObsidianNotes/.Projects/Fluent-AI-Assistance/.agent-state/diagnostics/update-docs-70995.json"
+}
