@@ -1,7 +1,12 @@
 # AGENTS.md
 
+## Documentation and memory authority
+
+- Serena is the only current-code documentation authority: use it for symbols, references, implementations, and diagnostics.
+- The contract-listed memory bank is the only durable agent documentation and memory authority. Do not create parallel inventories or duplicate agent documentation.
+
 <!-- project-memory-bootstrap:v1 -->
-## Project memory bootstrap
+## Memory bank bootstrap (technical name: project-memory)
 
 From this project root, before any task, run:
 
@@ -78,4 +83,4 @@ Command registry (before new string heuristics):
 - Install / MCP → root `README.md`, `scripts/install/install.ps1`, `.mcp/`
 - Method-source incorporation map (instrument dump) → under a bundle's
   `temp_files/tecan_method_source/INCORPORATION_MAP.md` when that collect exists
-- Derived inventory → `docs/source-of-truth/`
+- Current-code structure and implementation detail belong in Serena; durable project knowledge belongs in `project-memory/`.

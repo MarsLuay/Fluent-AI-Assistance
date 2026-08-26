@@ -1,5 +1,6 @@
 {
   "schemaVersion": 1,
+  "sourceOfTruth": "project-memory/architecture.md",
   "projectMemory": {
     "taskPath": "PROJECT-TASKS.json",
     "candidatePath": "project-memory/candidates.jsonl",

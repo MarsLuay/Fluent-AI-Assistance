@@ -79,4 +79,4 @@ MCP uses local stdio. ZEIA files, logs, generated scripts, and instrument data
 stay on the same computer as the client. The server does not open a network
 listener.
 
-Deeper derived inventory: [source-of-truth/](source-of-truth/README.md).
+Durable agent architecture: [project memory](../project-memory/architecture.md). Current-code detail belongs in Serena.
