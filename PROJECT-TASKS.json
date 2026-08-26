@@ -46,7 +46,7 @@
         "AGENTS.md",
         "docs/ARCHITECTURE.md",
         "docs/SAFETY.md",
-        "project-memory/architecture.md"
+        "docs/project-memory/architecture.md"
       ],
       "invariants": [
         "CLI, MCP, and direct Python access the same pipeline services.",
@@ -68,12 +68,12 @@
         "source/03-protocol-builder/fluent_pipeline/validation.py",
         "source/03-protocol-builder/fluent_pipeline/exports.py",
         "docs/SAFETY.md",
-        "project-memory/architecture.md"
+        "docs/project-memory/architecture.md"
       ],
       "requiredReads": [
         "docs/SAFETY.md",
         "docs/MCP_TOOLS.md",
-        "project-memory/architecture.md"
+        "docs/project-memory/architecture.md"
       ],
       "invariants": [
         "Readiness evaluators run through the shared validation path.",
@@ -101,7 +101,7 @@
       "requiredReads": [
         "AGENTS.md",
         "docs/ARCHITECTURE.md",
-        "project-memory/architecture.md"
+        "docs/project-memory/architecture.md"
       ],
       "invariants": [
         "Keep shared command definitions and mined source patterns ahead of string heuristics.",

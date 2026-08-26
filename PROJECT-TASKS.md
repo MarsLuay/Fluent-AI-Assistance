@@ -53,7 +53,7 @@ Required reads:
 - `AGENTS.md`
 - `docs/ARCHITECTURE.md`
 - `docs/SAFETY.md`
-- `project-memory/architecture.md`
+- `docs/project-memory/architecture.md`
 
 Invariants:
 
@@ -74,13 +74,13 @@ Task paths:
 - `source/03-protocol-builder/fluent_pipeline/validation.py`
 - `source/03-protocol-builder/fluent_pipeline/exports.py`
 - `docs/SAFETY.md`
-- `project-memory/architecture.md`
+- `docs/project-memory/architecture.md`
 
 Required reads:
 
 - `docs/SAFETY.md`
 - `docs/MCP_TOOLS.md`
-- `project-memory/architecture.md`
+- `docs/project-memory/architecture.md`
 
 Invariants:
 
@@ -109,7 +109,7 @@ Required reads:
 
 - `AGENTS.md`
 - `docs/ARCHITECTURE.md`
-- `project-memory/architecture.md`
+- `docs/project-memory/architecture.md`
 
 Invariants:
 

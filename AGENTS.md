@@ -83,4 +83,4 @@ Command registry (before new string heuristics):
 - Install / MCP → root `README.md`, `scripts/install/install.ps1`, `.mcp/`
 - Method-source incorporation map (instrument dump) → under a bundle's
   `temp_files/tecan_method_source/INCORPORATION_MAP.md` when that collect exists
-- Current-code structure and implementation detail belong in Serena; durable project knowledge belongs in `project-memory/`.
+- Current-code structure and implementation detail belong in Serena; durable project knowledge belongs in `docs/project-memory/`.
