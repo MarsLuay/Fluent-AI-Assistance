@@ -1,7 +1,5 @@
 """Transfer CSV loading, validation, and GWL generation."""
 
-from __future__ import annotations
-
 import csv
 import re
 from dataclasses import dataclass
@@ -84,7 +82,9 @@ def load_transfers(path: str | Path, *, well_rows: int = 8) -> list[Transfer]:
             raise ValueError("CSV missing required columns: " + ", ".join(missing))
         transfers = []
         for row_number, row in enumerate(reader, start=2):
-            transfers.append(_row_to_transfer(row, row_number=row_number, well_rows=well_rows))
+            transfers.append(
+                _row_to_transfer(row, row_number=row_number, well_rows=well_rows)
+            )
     return transfers
 
 
@@ -140,12 +140,16 @@ def build_worklist(
             should_wash = wash_policy == "each"
         if should_wash:
             worklist.add(Wash())
-        if transfer.break_after or (batch_size is not None and transfer_count % batch_size == 0):
+        if transfer.break_after or (
+            batch_size is not None and transfer_count % batch_size == 0
+        ):
             worklist.add(Break())
     return worklist
 
 
-def validate_transfers(transfers: Iterable[Transfer], *, strict: bool = False) -> ValidationResult:
+def validate_transfers(
+    transfers: Iterable[Transfer], *, strict: bool = False
+) -> ValidationResult:
     errors: list[str] = []
     warnings: list[str] = []
     seen = list(transfers)
@@ -162,12 +166,22 @@ def validate_transfers(transfers: Iterable[Transfer], *, strict: bool = False) -
         for attr in ("source_position", "dest_position"):
             if getattr(transfer, attr) < 1:
                 errors.append(f"{prefix}: {attr} must be >= 1.")
-        for attr in ("source_label", "source_type", "dest_label", "dest_type", "liquid_class"):
+        for attr in (
+            "source_label",
+            "source_type",
+            "dest_label",
+            "dest_type",
+            "liquid_class",
+        ):
             value = getattr(transfer, attr)
             if value and len(value) > 32:
-                warnings.append(f"{prefix}: {attr} is longer than 32 characters: {value!r}.")
+                warnings.append(
+                    f"{prefix}: {attr} is longer than 32 characters: {value!r}."
+                )
         if transfer.volume_ul > 1000:
-            warnings.append(f"{prefix}: volume_ul is high for a single transfer: {transfer.volume_ul:g}.")
+            warnings.append(
+                f"{prefix}: volume_ul is high for a single transfer: {transfer.volume_ul:g}."
+            )
 
     if strict and warnings:
         errors.extend(f"Strict warning: {warning}" for warning in warnings)
@@ -188,7 +202,9 @@ def well_to_position(value: str, *, rows: int = 8) -> int:
     return (column - 1) * inferred_rows + row_index + 1
 
 
-def _row_to_transfer(row: dict[str, str], *, row_number: int, well_rows: int) -> Transfer:
+def _row_to_transfer(
+    row: dict[str, str], *, row_number: int, well_rows: int
+) -> Transfer:
     def get(name: str) -> str:
         value = row.get(name, "")
         return "" if value is None else value.strip()
