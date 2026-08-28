@@ -1,7 +1,5 @@
 """Reusable script-pattern mining for indexed Tecan projects."""
 
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Any
 import json
