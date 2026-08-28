@@ -3372,6 +3372,38 @@ class ProjectAuditMergeTests(unittest.TestCase):
 
 
 class ArchiveWindowsNameRestorationTests(unittest.TestCase):
+    def test_eocd_without_start_dir(self):
+        """
+        Verify that `_restore_windows_datastore_zip_names` works correctly
+        even when `start_dir` is removed (simulating Python 3.13+ compatibility).
+        """
+        from fluent_pipeline.exports import _restore_windows_datastore_zip_names
+
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "test.zip"
+            with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_STORED) as zf:
+                zf.writestr("DataStore/file1.txt", b"hello world")
+
+            # Monkeypatch zipfile.ZipFile to remove start_dir to simulate Python 3.13
+            orig_init = zipfile.ZipFile.__init__
+
+            def patched_init(self, *args, **kwargs):
+                orig_init(self, *args, **kwargs)
+                if hasattr(self, "start_dir"):
+                    delattr(self, "start_dir")
+
+            zipfile.ZipFile.__init__ = patched_init
+            try:
+                _restore_windows_datastore_zip_names(p)
+            finally:
+                zipfile.ZipFile.__init__ = orig_init
+
+            with zipfile.ZipFile(p, "r") as zf:
+                self.assertIsNone(zf.testzip())
+            data = p.read_bytes()
+            # zipfile.namelist() normalizes backslashes to forward slashes.
+            self.assertIn(b"DataStore\\file1.txt", data)
+
     def test_rewrite_zip_filename_records_false_signature_payload(self):
         """
         Verify that `_restore_windows_datastore_zip_names` does not corrupt the ZIP
@@ -3417,13 +3449,7 @@ class ArchiveWindowsNameRestorationTests(unittest.TestCase):
             # If the patch failed (i.e. skipped past the actual header or corrupted
             # the payload inside file1.txt), testzip will return the corrupted file name.
             with zipfile.ZipFile(p, "r") as zf:
-                ret = zf.testzip()
-                self.assertIsNone(ret)
-                names = zf.namelist()
-                # Verify that it correctly processed `meta/file2.txt` to `meta\\file2.txt` (or the system-equivalent representation inside python zipfile logic, but since Python normalizes to `/` on reading... wait, ZipInfo.filename might retain backslashes depending on OS/version. Let's just check that `_restore_windows_datastore_zip_names` ran and changed it by verifying that it is rewritten).
-                # Actually, in newer Python versions on Windows/Linux, `zf.namelist()` preserves the exact bytes if read as bytes, but when decoding to string, Python's zipfile module normalizes backslashes to forward slashes.
-                # So we must verify the raw bytes from the file instead.
-                pass
+                self.assertIsNone(zf.testzip())
 
             data = p.read_bytes()
             # Verify that `meta\file2.txt` exists in the raw byte stream
