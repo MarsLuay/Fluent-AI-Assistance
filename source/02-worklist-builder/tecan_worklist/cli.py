@@ -1,7 +1,5 @@
 """Command-line interface for local Tecan worklist generation."""
 
-from __future__ import annotations
-
 import argparse
 import json
 import sys
