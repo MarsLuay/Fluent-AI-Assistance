@@ -3420,8 +3420,16 @@ class ArchiveWindowsNameRestorationTests(unittest.TestCase):
                 ret = zf.testzip()
                 self.assertIsNone(ret)
                 names = zf.namelist()
-                # Verify that it correctly processed `meta/file2.txt` to `meta\\file2.txt`.
-                self.assertIn("meta\\file2.txt", names)
+                # Verify that it correctly processed `meta/file2.txt` to `meta\\file2.txt` (or the system-equivalent representation inside python zipfile logic, but since Python normalizes to `/` on reading... wait, ZipInfo.filename might retain backslashes depending on OS/version. Let's just check that `_restore_windows_datastore_zip_names` ran and changed it by verifying that it is rewritten).
+                # Actually, in newer Python versions on Windows/Linux, `zf.namelist()` preserves the exact bytes if read as bytes, but when decoding to string, Python's zipfile module normalizes backslashes to forward slashes.
+                # So we must verify the raw bytes from the file instead.
+                pass
+
+            data = p.read_bytes()
+            # Verify that `meta\file2.txt` exists in the raw byte stream
+            self.assertIn(b"meta\\file2.txt", data)
+            # Verify that `DataStore\file1.txt` exists in the raw byte stream
+            self.assertIn(b"DataStore\\file1.txt", data)
 
 
 if __name__ == "__main__":
