@@ -1,7 +1,5 @@
 """Gripper — moves labware between worktable slots, supports stacking."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Optional, Union
 
 from .expressions import Expression
