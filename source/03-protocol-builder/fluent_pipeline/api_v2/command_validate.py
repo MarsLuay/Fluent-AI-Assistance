@@ -35,6 +35,10 @@ _PASCAL_BOOL_IN_CONFIGURE_DATA_LABWARE_RE = re.compile(
     r"<ConfigureDataLabwareDataModel\b[\s\S]*?</ConfigureDataLabwareDataModel>",
     re.MULTILINE,
 )
+_CONFIGURE_DATA_LABWARE_BOOL_PATTERNS = {
+    tag: re.compile(rf"(<{tag}>)(True|False)(</{tag}>)")
+    for tag in CONFIGURE_DATA_LABWARE_BOOL_TAGS
+}
 
 
 @dataclass(frozen=True)
@@ -403,9 +407,7 @@ def normalize_configure_data_labware_boolean_casing(text: str) -> tuple[str, lis
 
     def replace_block(block: str) -> str:
         updated = block
-        for tag in CONFIGURE_DATA_LABWARE_BOOL_TAGS:
-            pattern = re.compile(rf"(<{tag}>)(True|False)(</{tag}>)")
-
+        for tag, pattern in _CONFIGURE_DATA_LABWARE_BOOL_PATTERNS.items():
             def replacer(match: re.Match[str], *, tag_name: str = tag) -> str:
                 fixups.append(
                     {
