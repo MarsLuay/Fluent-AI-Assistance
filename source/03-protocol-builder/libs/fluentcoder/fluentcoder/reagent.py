@@ -5,8 +5,6 @@ The simulator tracks reagent identity through aspirate/dispense, layered well
 contents, and tip carry-over.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from typing import Any
 
