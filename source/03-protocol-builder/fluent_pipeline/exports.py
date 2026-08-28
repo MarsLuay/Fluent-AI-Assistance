@@ -4825,8 +4825,18 @@ def _restore_windows_datastore_zip_names(archive_path: Path) -> None:
                         data[local_header_offset + 30 : local_header_offset + 30 + name_len] = rewritten
                         changed = True
 
-            cd_offset = zf.start_dir
-            for _ in zf.infolist():
+            # Locate the start of the Central Directory safely from the end of the file.
+            cd_offset = -1
+            # Search backwards for the End of Central Directory (EOCD) signature
+            for i in range(len(data) - 22, -1, -1):
+                if data[i : i + 4] == b"PK\x05\x06":
+                    cd_offset = int.from_bytes(data[i + 16 : i + 20], "little")
+                    break
+
+            if cd_offset < 0:
+                cd_offset = getattr(zf, 'start_dir', 0)
+
+            for _ in range(len(zf.infolist())):
                 if cd_offset >= len(data):
                     break
 
