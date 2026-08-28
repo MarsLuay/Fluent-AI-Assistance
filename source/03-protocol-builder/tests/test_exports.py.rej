@@ -1,0 +1,10 @@
+--- source/03-protocol-builder/tests/test_exports.py
++++ source/03-protocol-builder/tests/test_exports.py
+@@ -3421,7 +3421,7 @@
+             with zipfile.ZipFile(p, "r") as zf:
+                 ret = zf.testzip()
+                 self.assertIsNone(ret)
+                 names = zf.namelist()
+                 # Verify that it correctly processed `meta/file2.txt` to `meta\\file2.txt`.
+-                self.assertIn("meta\\file2.txt", names)
++                self.assertIn("meta/file2.txt", names) # Depending on zipfile implementation in python 3.12+ (which converts backslash to slash), but we just want to ensure it isn't corrupted

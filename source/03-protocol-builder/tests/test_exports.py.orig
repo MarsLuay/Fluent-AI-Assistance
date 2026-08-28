@@ -58,9 +58,7 @@ class ProjectScriptPayloadTests(unittest.TestCase):
                 target_folder="Demo scripts",
             ).decode("utf-8-sig")
 
-            self.assertIn(
-                "<ObjectSubfolderPath>Demo scripts</ObjectSubfolderPath>", payload
-            )
+            self.assertIn("<ObjectSubfolderPath>Demo scripts</ObjectSubfolderPath>", payload)
             self.assertNotIn("<ObjectSubfolderPath>Demo</ObjectSubfolderPath>", payload)
             self.assertIn("<Checksum></Checksum>", payload)
 
@@ -89,10 +87,7 @@ class SubroutineResolutionTests(unittest.TestCase):
     def test_same_context_parent_disambiguates(self):
         scripts = self._scripts()
         match, alternatives = exports._find_subroutine_record(
-            {"root": "/a"},
-            scripts,
-            "HelperSub",
-            {"source_context": "ctxB", "context_root": "/b"},
+            {"root": "/a"}, scripts, "HelperSub", {"source_context": "ctxB", "context_root": "/b"}
         )
         self.assertEqual(match["source_context"], "ctxB")
         self.assertEqual(alternatives, [])
@@ -101,10 +96,7 @@ class SubroutineResolutionTests(unittest.TestCase):
         scripts = self._scripts()
         # Parent context not present among matches -> genuinely ambiguous.
         match, alternatives = exports._find_subroutine_record(
-            {"root": "/c"},
-            scripts,
-            "HelperSub",
-            {"source_context": "ctxC", "context_root": "/c"},
+            {"root": "/c"}, scripts, "HelperSub", {"source_context": "ctxC", "context_root": "/c"}
         )
         self.assertIsNotNone(match)
         self.assertEqual(len(alternatives), 1)
@@ -113,16 +105,8 @@ class SubroutineResolutionTests(unittest.TestCase):
 
     def test_exact_object_name_beats_stem_collision(self):
         scripts = [
-            {
-                "object_name": "Spin",
-                "entry": "Subroutines/SUB_Spin_Tube_v0.1.xscr",
-                "source_context": "ctxA",
-            },
-            {
-                "object_name": "SUB_Spin_Tube_v0.1",
-                "entry": "Subroutines/SUB_Spin_Tube_v0.1.xscr",
-                "source_context": "ctxA",
-            },
+            {"object_name": "Spin", "entry": "Subroutines/SUB_Spin_Tube_v0.1.xscr", "source_context": "ctxA"},
+            {"object_name": "SUB_Spin_Tube_v0.1", "entry": "Subroutines/SUB_Spin_Tube_v0.1.xscr", "source_context": "ctxA"},
         ]
         match, alternatives = exports._find_subroutine_record(
             {"root": "/a"}, scripts, "SUB_Spin_Tube_v0.1", {"source_context": "ctxA"}
@@ -135,10 +119,7 @@ class SubroutineResolutionTests(unittest.TestCase):
         for script in scripts:
             script["guid"] = "11111111-2222-4333-8444-555555555555"
         match, alternatives = exports._find_subroutine_record(
-            {"root": "/c"},
-            scripts,
-            "HelperSub",
-            {"source_context": "ctxC", "context_root": "/c"},
+            {"root": "/c"}, scripts, "HelperSub", {"source_context": "ctxC", "context_root": "/c"}
         )
         self.assertIsNotNone(match)
         self.assertEqual(alternatives, [])
@@ -220,38 +201,26 @@ class ExportFinalizationTests(unittest.TestCase):
                         raise PermissionError(5, "Access is denied", str(source))
                 return real_replace(source, destination)
 
-            with mock.patch.object(
-                exports.os, "replace", side_effect=replace_with_one_lock
-            ), mock.patch.object(exports.time, "sleep") as sleep:
-                exports._publish_bundle_replacement(
-                    staged, published, backup_bundle=backup
-                )
+            with mock.patch.object(exports.os, "replace", side_effect=replace_with_one_lock), mock.patch.object(
+                exports.time, "sleep"
+            ) as sleep:
+                exports._publish_bundle_replacement(staged, published, backup_bundle=backup)
 
             self.assertEqual(staged_publish_attempts, 2)
             sleep.assert_called_once_with(0.5)
-            self.assertEqual(
-                (published / "state.txt").read_text(encoding="utf-8"), "new"
-            )
+            self.assertEqual((published / "state.txt").read_text(encoding="utf-8"), "new")
             self.assertEqual((backup / "state.txt").read_text(encoding="utf-8"), "old")
 
     def test_next_available_bundle_name_enforces_versioned_folder_suffix(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
 
-            self.assertEqual(
-                exports._next_available_bundle_name(root, "demo"), "demo_v1"
-            )
+            self.assertEqual(exports._next_available_bundle_name(root, "demo"), "demo_v1")
             (root / "demo").mkdir()
-            self.assertEqual(
-                exports._next_available_bundle_name(root, "demo"), "demo_v2"
-            )
+            self.assertEqual(exports._next_available_bundle_name(root, "demo"), "demo_v2")
             (root / "demo_v2").mkdir()
-            self.assertEqual(
-                exports._next_available_bundle_name(root, "demo"), "demo_v3"
-            )
-            self.assertEqual(
-                exports._next_available_bundle_name(root, "other_v2"), "other_v2"
-            )
+            self.assertEqual(exports._next_available_bundle_name(root, "demo"), "demo_v3")
+            self.assertEqual(exports._next_available_bundle_name(root, "other_v2"), "other_v2")
 
     def test_stages_external_payloads_with_exact_manifest_paths_and_hashes(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -264,10 +233,7 @@ class ExportFinalizationTests(unittest.TestCase):
                     "fs/mapping.xml",
                     build_fs_mapping_xml(
                         [
-                            (
-                                1,
-                                r"C:\ProgramData\Tecan\VisionX\TouchToolsData\Images\demo_media",
-                            ),
+                            (1, r"C:\ProgramData\Tecan\VisionX\TouchToolsData\Images\demo_media"),
                             (16, r"C:\TecanInformation\Labware Images"),
                         ]
                     ),
@@ -275,9 +241,7 @@ class ExportFinalizationTests(unittest.TestCase):
                 output.writestr("fs/1/prompt.png", b"prompt")
                 output.writestr("fs/16/shared.png", b"external")
 
-            deployments = exports._stage_external_file_deployments(
-                archive, bundle_dir=bundle
-            )
+            deployments = exports._stage_external_file_deployments(archive, bundle_dir=bundle)
 
             self.assertEqual(
                 deployments,
@@ -290,9 +254,7 @@ class ExportFinalizationTests(unittest.TestCase):
                 ],
             )
             self.assertEqual(
-                (
-                    bundle / "source" / "external-files" / "16" / "shared.png"
-                ).read_bytes(),
+                (bundle / "source" / "external-files" / "16" / "shared.png").read_bytes(),
                 b"external",
             )
 
@@ -302,9 +264,7 @@ class ExportFinalizationTests(unittest.TestCase):
             compiled_xscr = tmp_path / "compiled.xscr"
             draft_path = tmp_path / "draft.py"
             compiled_xscr.write_text("<VxData />", encoding="utf-8")
-            draft_path.write_text(
-                "def build_worktable():\n    return None\n", encoding="utf-8"
-            )
+            draft_path.write_text("def build_worktable():\n    return None\n", encoding="utf-8")
             finalization_report = FinalizationReport(
                 ok=True,
                 checksum_before="valid",
@@ -314,9 +274,7 @@ class ExportFinalizationTests(unittest.TestCase):
                 generic_command_validation={"failure_count": 0},
             )
 
-            with mock.patch.object(
-                exports, "finalize_compiled_xscr", return_value=finalization_report
-            ) as finalize_mock, mock.patch.object(
+            with mock.patch.object(exports, "finalize_compiled_xscr", return_value=finalization_report) as finalize_mock, mock.patch.object(
                 exports,
                 "validate_ready_to_import",
                 return_value=scaffold_validation_report("synthetic validation stop"),
@@ -344,9 +302,7 @@ class ExportFinalizationTests(unittest.TestCase):
             compiled_xscr = tmp_path / "compiled.xscr"
             draft_path = tmp_path / "draft.py"
             compiled_xscr.write_text("<VxData />", encoding="utf-8")
-            draft_path.write_text(
-                "def build_worktable():\n    return None\n", encoding="utf-8"
-            )
+            draft_path.write_text("def build_worktable():\n    return None\n", encoding="utf-8")
             finalization_report = FinalizationReport(
                 ok=True,
                 checksum_before="valid",
@@ -381,9 +337,7 @@ class ExportFinalizationTests(unittest.TestCase):
             }
 
             try:
-                with mock.patch.object(
-                    exports, "finalize_compiled_xscr", return_value=finalization_report
-                ), mock.patch.object(
+                with mock.patch.object(exports, "finalize_compiled_xscr", return_value=finalization_report), mock.patch.object(
                     exports,
                     "validate_ready_to_import",
                     return_value=ready_validation,
@@ -405,19 +359,11 @@ class ExportFinalizationTests(unittest.TestCase):
                     "ready_to_import_artifacts": [
                         str(stage.final_bundle_dir / "source" / "protocol.ir.json"),
                         str(stage.final_bundle_dir / "source" / "metadata.json"),
-                        str(
-                            stage.final_bundle_dir
-                            / "source"
-                            / "generation_manifest.json"
-                        ),
-                        str(
-                            stage.final_bundle_dir / "source" / "GENERATION_WORKFLOW.md"
-                        ),
+                        str(stage.final_bundle_dir / "source" / "generation_manifest.json"),
+                        str(stage.final_bundle_dir / "source" / "GENERATION_WORKFLOW.md"),
                     ],
                 }
-                generation_manifest.write_text(
-                    json.dumps(manifest_payload, indent=2), encoding="utf-8"
-                )
+                generation_manifest.write_text(json.dumps(manifest_payload, indent=2), encoding="utf-8")
                 workflow_report.write_text("# Generation Workflow\n", encoding="utf-8")
 
                 attached = exports.attach_generation_reports_to_bundle(
@@ -435,49 +381,31 @@ class ExportFinalizationTests(unittest.TestCase):
                 )
                 self.assertEqual(audit["status"], "passed")
                 self.assertEqual(audit["blocking"], [])
-                self.assertTrue(
-                    (stage.script_dir / "source" / "generation_manifest.json").exists()
-                )
-                self.assertTrue(
-                    (stage.script_dir / "source" / "GENERATION_WORKFLOW.md").exists()
-                )
+                self.assertTrue((stage.script_dir / "source" / "generation_manifest.json").exists())
+                self.assertTrue((stage.script_dir / "source" / "GENERATION_WORKFLOW.md").exists())
 
                 zeia = stage.script_dir / "generated_project.zeia"
                 zeia.write_bytes(b"generated zeia")
-                stage.exports.append(
-                    exports.ExportedArtifact(zeia, zeia, "generated-project-archive")
-                )
-                (stage.script_dir / "RECREATE_SCRIPT.md").write_text(
-                    "# Recreate\n", encoding="utf-8"
-                )
+                stage.exports.append(exports.ExportedArtifact(zeia, zeia, "generated-project-archive"))
+                (stage.script_dir / "RECREATE_SCRIPT.md").write_text("# Recreate\n", encoding="utf-8")
                 (stage.script_dir / "source" / "request.spec.yaml").write_text(
                     "schema_version: tecan.request_spec.v1\nrequest:\n  intent: test\n",
                     encoding="utf-8",
                 )
                 if not (stage.script_dir / "source" / "protocol.ir.json").exists():
-                    (stage.script_dir / "source" / "protocol.ir.json").write_text(
-                        "{}", encoding="utf-8"
-                    )
+                    (stage.script_dir / "source" / "protocol.ir.json").write_text("{}", encoding="utf-8")
                 if not (stage.script_dir / "source" / "protocol_draft.py").exists():
                     (stage.script_dir / "source" / "protocol_draft.py").write_text(
                         "def build_worktable():\n    pass\n",
                         encoding="utf-8",
                     )
-                (stage.script_dir / "source" / "reports").mkdir(
-                    parents=True, exist_ok=True
-                )
+                (stage.script_dir / "source" / "reports").mkdir(parents=True, exist_ok=True)
 
                 published = exports.publish_ready_to_import_zeia(stage)
                 published_root = published[0].destination.parent
-                self.assertTrue(
-                    any(item.kind == "fluent-project-archive" for item in published)
-                )
-                self.assertTrue(
-                    (published_root / f"{published_root.name}.zeia").exists()
-                )
-                self.assertTrue(
-                    (published_root / "run_tecan_bundle_setup.bat").exists()
-                )
+                self.assertTrue(any(item.kind == "fluent-project-archive" for item in published))
+                self.assertTrue((published_root / f"{published_root.name}.zeia").exists())
+                self.assertTrue((published_root / "run_tecan_bundle_setup.bat").exists())
             finally:
                 exports.READY_TO_IMPORT_DIR = old_ready_dir
 
@@ -515,19 +443,11 @@ class ExportFinalizationTests(unittest.TestCase):
                 xscr.write_text("<Root />", encoding="utf-8")
                 zeia.write_bytes(b"generated zeia")
                 metadata.write_text("{}", encoding="utf-8")
-                (script_dir / "RECREATE_SCRIPT.md").write_text(
-                    "# Recreate\n", encoding="utf-8"
-                )
-                (source_dir / "request.spec.yaml").write_text(
-                    "request: {}\n", encoding="utf-8"
-                )
+                (script_dir / "RECREATE_SCRIPT.md").write_text("# Recreate\n", encoding="utf-8")
+                (source_dir / "request.spec.yaml").write_text("request: {}\n", encoding="utf-8")
                 (source_dir / "protocol.ir.json").write_text("{}", encoding="utf-8")
-                (source_dir / "protocol_draft.py").write_text(
-                    "def build_worktable():\n    pass\n", encoding="utf-8"
-                )
-                (reports_dir / "validation_report.json").write_text(
-                    "{}", encoding="utf-8"
-                )
+                (source_dir / "protocol_draft.py").write_text("def build_worktable():\n    pass\n", encoding="utf-8")
+                (reports_dir / "validation_report.json").write_text("{}", encoding="utf-8")
                 stage = exports.ReadyBundleStage(
                     staging_root=staging_root,
                     script_dir=script_dir,
@@ -538,79 +458,49 @@ class ExportFinalizationTests(unittest.TestCase):
                     verification_state="offline_validated",
                     exports=[
                         exports.ExportedArtifact(xscr, xscr, "compiled-script"),
-                        exports.ExportedArtifact(
-                            zeia, zeia, "generated-project-archive"
-                        ),
+                        exports.ExportedArtifact(zeia, zeia, "generated-project-archive"),
                     ],
                     metadata_path=metadata,
                 )
 
                 published = exports.publish_ready_to_import_zeia(stage)
 
-                self.assertEqual(
-                    [item.destination.name for item in published], ["demo_v1.zeia"]
-                )
-                self.assertEqual(
-                    [item.destination.parent.name for item in published], ["demo_v1"]
-                )
+                self.assertEqual([item.destination.name for item in published], ["demo_v1.zeia"])
+                self.assertEqual([item.destination.parent.name for item in published], ["demo_v1"])
                 self.assertEqual(
                     [item.name for item in exports.READY_TO_IMPORT_DIR.iterdir()],
                     ["demo_v1"],
                 )
                 published_root = exports.READY_TO_IMPORT_DIR / "demo_v1"
-                self.assertEqual(
-                    (published_root / "demo_v1.zeia").read_bytes(), b"generated zeia"
-                )
+                self.assertEqual((published_root / "demo_v1.zeia").read_bytes(), b"generated zeia")
                 self.assertTrue((published_root / "RECREATE_SCRIPT.md").exists())
                 self.assertFalse((published_root / "request.spec.yaml").exists())
                 self.assertFalse((published_root / "protocol.ir.json").exists())
                 self.assertFalse((published_root / "generated").exists())
                 self.assertFalse((published_root / "reports").exists())
                 self.assertFalse((published_root / "delivery_manifest.json").exists())
-                self.assertTrue(
-                    (published_root / "source" / "request.spec.yaml").exists()
-                )
-                self.assertTrue(
-                    (published_root / "source" / "protocol.ir.json").exists()
-                )
-                self.assertTrue(
-                    (published_root / "source" / "generated" / "protocol.py").exists()
-                )
-                self.assertTrue(
-                    (
-                        published_root / "source" / "reports" / "validation_report.json"
-                    ).exists()
-                )
-                self.assertTrue(
-                    (published_root / "source" / "delivery_manifest.json").exists()
-                )
+                self.assertTrue((published_root / "source" / "request.spec.yaml").exists())
+                self.assertTrue((published_root / "source" / "protocol.ir.json").exists())
+                self.assertTrue((published_root / "source" / "generated" / "protocol.py").exists())
+                self.assertTrue((published_root / "source" / "reports" / "validation_report.json").exists())
+                self.assertTrue((published_root / "source" / "delivery_manifest.json").exists())
                 self.assertTrue((published_root / "source" / "metadata.json").exists())
-                self.assertTrue(
-                    (published_root / "media" / "media_manifest.json").exists()
-                )
+                self.assertTrue((published_root / "media" / "media_manifest.json").exists())
                 setup_bat = published_root / "run_tecan_bundle_setup.bat"
                 self.assertEqual(
                     [path.name for path in published_root.glob("*.bat")],
                     ["run_tecan_bundle_setup.bat"],
                 )
                 setup_text = setup_bat.read_text(encoding="utf-8")
-                helper = (
-                    published_root / "source" / "collect_tecan_diagnostic_bundle.ps1"
-                )
+                helper = published_root / "source" / "collect_tecan_diagnostic_bundle.ps1"
                 self.assertTrue(helper.exists())
-                progress_helper = (
-                    published_root / "source" / "copy_tree_with_progress.ps1"
-                )
+                progress_helper = published_root / "source" / "copy_tree_with_progress.ps1"
                 self.assertTrue(progress_helper.exists())
                 stall_helper = published_root / "source" / "stall_watchdog.ps1"
                 self.assertTrue(stall_helper.exists())
-                install_helper = (
-                    published_root / "source" / "install_external_files.ps1"
-                )
+                install_helper = published_root / "source" / "install_external_files.ps1"
                 self.assertTrue(install_helper.exists())
-                deploy_helper = (
-                    published_root / "source" / "deploy_touchtools_media.ps1"
-                )
+                deploy_helper = published_root / "source" / "deploy_touchtools_media.ps1"
                 self.assertTrue(deploy_helper.exists())
                 self.assertIn("copy_tree_with_progress.ps1", setup_text)
                 self.assertIn("stall_watchdog.ps1", setup_text)
@@ -660,15 +550,11 @@ class ExportFinalizationTests(unittest.TestCase):
             (ready_root / "demo_v2").mkdir()
             (ready_root / "demo_v3.zeia").write_bytes(b"legacy loose")
 
-            plan = exports.plan_ready_to_import_publish(
-                ready_root, "demo", run_id="test-run"
-            )
+            plan = exports.plan_ready_to_import_publish(ready_root, "demo", run_id="test-run")
 
             self.assertEqual(plan.bundle_name, "demo_v4")
             self.assertEqual(plan.bundle_dir, ready_root.resolve() / "demo_v4")
-            self.assertEqual(
-                plan.archive_path, ready_root.resolve() / "demo_v4" / "demo_v4.zeia"
-            )
+            self.assertEqual(plan.archive_path, ready_root.resolve() / "demo_v4" / "demo_v4.zeia")
             self.assertEqual(plan.staging_dir.name, ".demo_v4.test-run.staging")
             self.assertEqual(plan.backup_dir.name, ".demo_v4.test-run.backup")
 
@@ -693,19 +579,11 @@ class ExportFinalizationTests(unittest.TestCase):
                 reports_dir.mkdir(parents=True)
                 zeia.write_bytes(b"new zeia")
                 metadata.write_text("{}", encoding="utf-8")
-                (script_dir / "RECREATE_SCRIPT.md").write_text(
-                    "# Recreate\n", encoding="utf-8"
-                )
-                (source_dir / "request.spec.yaml").write_text(
-                    "request: {}\n", encoding="utf-8"
-                )
+                (script_dir / "RECREATE_SCRIPT.md").write_text("# Recreate\n", encoding="utf-8")
+                (source_dir / "request.spec.yaml").write_text("request: {}\n", encoding="utf-8")
                 (source_dir / "protocol.ir.json").write_text("{}", encoding="utf-8")
-                (source_dir / "protocol_draft.py").write_text(
-                    "def build_worktable():\n    pass\n", encoding="utf-8"
-                )
-                (reports_dir / "validation_report.json").write_text(
-                    "{}", encoding="utf-8"
-                )
+                (source_dir / "protocol_draft.py").write_text("def build_worktable():\n    pass\n", encoding="utf-8")
+                (reports_dir / "validation_report.json").write_text("{}", encoding="utf-8")
                 stage = exports.ReadyBundleStage(
                     staging_root=staging_root,
                     script_dir=script_dir,
@@ -714,11 +592,7 @@ class ExportFinalizationTests(unittest.TestCase):
                     failed_bundle_dir=tmp_path / "failed" / "demo",
                     validation_report={"ready": True},
                     verification_state="offline_validated",
-                    exports=[
-                        exports.ExportedArtifact(
-                            zeia, zeia, "generated-project-archive"
-                        )
-                    ],
+                    exports=[exports.ExportedArtifact(zeia, zeia, "generated-project-archive")],
                     metadata_path=metadata,
                     protocol_name="demo",
                 )
@@ -726,21 +600,11 @@ class ExportFinalizationTests(unittest.TestCase):
                 published = exports.publish_ready_to_import_zeia(stage)
 
                 published_root = exports.READY_TO_IMPORT_DIR / "demo_v2"
-                self.assertEqual(
-                    published[0].destination.resolve(),
-                    (published_root / "demo_v2.zeia").resolve(),
-                )
-                self.assertEqual(
-                    (published_root / "demo_v2.zeia").read_bytes(), b"new zeia"
-                )
-                self.assertEqual(
-                    (exports.READY_TO_IMPORT_DIR / "demo" / "demo.zeia").read_bytes(),
-                    b"old zeia",
-                )
+                self.assertEqual(published[0].destination.resolve(), (published_root / "demo_v2.zeia").resolve())
+                self.assertEqual((published_root / "demo_v2.zeia").read_bytes(), b"new zeia")
+                self.assertEqual((exports.READY_TO_IMPORT_DIR / "demo" / "demo.zeia").read_bytes(), b"old zeia")
                 self.assertTrue((published_root / "RECREATE_SCRIPT.md").exists())
-                self.assertTrue(
-                    (published_root / "source" / "generated" / "protocol.py").exists()
-                )
+                self.assertTrue((published_root / "source" / "generated" / "protocol.py").exists())
                 self.assertFalse((exports.READY_TO_IMPORT_DIR / "demo.zeia").exists())
                 self.assertFalse(staging_root.exists())
             finally:
@@ -763,9 +627,7 @@ class ExportFinalizationTests(unittest.TestCase):
                     raise OSError("swap failed")
                 return real_move(source, destination)
 
-            with mock.patch.object(
-                exports, "_move_protocol_directory", side_effect=fail_new_publish
-            ):
+            with mock.patch.object(exports, "_move_protocol_directory", side_effect=fail_new_publish):
                 with self.assertRaisesRegex(PipelineError, "swap failed"):
                     exports._publish_protocol_folder_replacement(
                         staged,
@@ -790,20 +652,12 @@ class ExportFinalizationTests(unittest.TestCase):
             media_dir.mkdir()
             zeia = protocol_dir / "demo.zeia"
             zeia.write_bytes(b"zeia")
-            (protocol_dir / "RECREATE_SCRIPT.md").write_text(
-                "# Recreate\n", encoding="utf-8"
-            )
-            (source_dir / "request.spec.yaml").write_text(
-                "request: {}\n", encoding="utf-8"
-            )
+            (protocol_dir / "RECREATE_SCRIPT.md").write_text("# Recreate\n", encoding="utf-8")
+            (source_dir / "request.spec.yaml").write_text("request: {}\n", encoding="utf-8")
             (source_dir / "protocol.ir.json").write_text("{}", encoding="utf-8")
             (source_dir / "metadata.json").write_text("{}", encoding="utf-8")
-            (generated_dir / "protocol.py").write_text(
-                "def build_worktable():\n    pass\n", encoding="utf-8"
-            )
-            (protocol_dir / "run_tecan_bundle_setup.bat").write_text(
-                "@echo off\n", encoding="utf-8"
-            )
+            (generated_dir / "protocol.py").write_text("def build_worktable():\n    pass\n", encoding="utf-8")
+            (protocol_dir / "run_tecan_bundle_setup.bat").write_text("@echo off\n", encoding="utf-8")
             for helper in (
                 "collect_tecan_diagnostic_bundle.ps1",
                 "copy_tree_with_progress.ps1",
@@ -819,9 +673,7 @@ class ExportFinalizationTests(unittest.TestCase):
                         "bundle_schema_version": "tecan.ready_to_import.bundle.v2",
                         "protocol_name": "demo",
                         "external_file_deployments": [],
-                        "deliverables": [
-                            {"kind": "fluent_project_archive", "path": "demo.zeia"}
-                        ],
+                        "deliverables": [{"kind": "fluent_project_archive", "path": "demo.zeia"}],
                         "companion_artifacts": [],
                     }
                 ),
@@ -831,9 +683,7 @@ class ExportFinalizationTests(unittest.TestCase):
             workflow_report = tmp_path / "GENERATION_WORKFLOW.md"
             validation_json = tmp_path / "validation.json"
             xscr = tmp_path / "internal.xscr"
-            generation_manifest.write_text(
-                '{"workflow_status": "ready_to_import"}', encoding="utf-8"
-            )
+            generation_manifest.write_text('{"workflow_status": "ready_to_import"}', encoding="utf-8")
             workflow_report.write_text("# Workflow\n", encoding="utf-8")
             validation_json.write_text('{"ready": true}', encoding="utf-8")
             xscr.write_text("<Root />", encoding="utf-8")
@@ -851,31 +701,14 @@ class ExportFinalizationTests(unittest.TestCase):
 
             self.assertFalse((protocol_dir / "generation_manifest.json").exists())
             self.assertFalse((protocol_dir / "GENERATION_WORKFLOW.md").exists())
-            self.assertTrue(
-                (protocol_dir / "source" / "generation_manifest.json").exists()
-            )
-            self.assertTrue(
-                (protocol_dir / "source" / "GENERATION_WORKFLOW.md").exists()
-            )
-            self.assertTrue(
-                (protocol_dir / "source" / "reports" / "validation.json").exists()
-            )
-            self.assertFalse(
-                (protocol_dir / "source" / "reports" / "internal.xscr").exists()
-            )
-            self.assertTrue(
-                any(item.kind == "generation-manifest" for item in attached)
-            )
-            delivery_manifest = json.loads(
-                (protocol_dir / "source" / "delivery_manifest.json").read_text(
-                    encoding="utf-8"
-                )
-            )
+            self.assertTrue((protocol_dir / "source" / "generation_manifest.json").exists())
+            self.assertTrue((protocol_dir / "source" / "GENERATION_WORKFLOW.md").exists())
+            self.assertTrue((protocol_dir / "source" / "reports" / "validation.json").exists())
+            self.assertFalse((protocol_dir / "source" / "reports" / "internal.xscr").exists())
+            self.assertTrue(any(item.kind == "generation-manifest" for item in attached))
+            delivery_manifest = json.loads((protocol_dir / "source" / "delivery_manifest.json").read_text(encoding="utf-8"))
             self.assertIn(
-                {
-                    "kind": "generation_manifest",
-                    "path": "source/generation_manifest.json",
-                },
+                {"kind": "generation_manifest", "path": "source/generation_manifest.json"},
                 delivery_manifest["companion_artifacts"],
             )
 
@@ -904,9 +737,7 @@ class ExportFinalizationTests(unittest.TestCase):
                     metadata_path=metadata,
                 )
 
-                with self.assertRaisesRegex(
-                    PipelineError, "Only generated ZEIA archives"
-                ):
+                with self.assertRaisesRegex(PipelineError, "Only generated ZEIA archives"):
                     exports.publish_ready_to_import_zeia(stage)
 
                 self.assertFalse(exports.READY_TO_IMPORT_DIR.exists())
@@ -919,11 +750,7 @@ class UnresolvedReferenceTests(unittest.TestCase):
     LC_GUID = "0be7658e-f376-40ee-ad88-1f9e772c47be"
 
     def _payload(self, *, use_liquid_class: bool) -> bytes:
-        usage = (
-            "<LiquidClassName>Water Free Single</LiquidClassName>"
-            if use_liquid_class
-            else ""
-        )
+        usage = "<LiquidClassName>Water Free Single</LiquidClassName>" if use_liquid_class else ""
         return (
             "<VxData><Payload>"
             f"<Reference><Guid>{self.LC_GUID}</Guid><TypeId>LiquidClass</TypeId>"
@@ -950,9 +777,7 @@ class UnresolvedReferenceTests(unittest.TestCase):
         self.assertEqual(data, original)
 
     def test_resolved_reference_is_left_untouched(self):
-        archive = {
-            f"DataStore/SystemSpecific/LiquidClasses/{self.LC_GUID}.xlqc": b"<x/>"
-        }
+        archive = {f"DataStore/SystemSpecific/LiquidClasses/{self.LC_GUID}.xlqc": b"<x/>"}
         data, findings = exports._strip_unavailable_optional_references(
             self._payload(use_liquid_class=True), archive
         )
@@ -1063,9 +888,7 @@ class FluentArchiveWriterPackagingTests(unittest.TestCase):
                     f"""<ArchiveContent><Payload><DatastoreEntries><Entry>UserSpecific\\{script_guid}.xscr</Entry><Entry>SystemSpecific\\Worktable\\Workspaces\\{workspace_guid}.xwsp</Entry><Entry>SystemSpecific\\Worktable\\Sites\\{site_guid}.xsite</Entry><Entry>nodedescription.xml</Entry></DatastoreEntries></Payload><Checksum>valid</Checksum></ArchiveContent>""",
                 )
 
-            def fake_writer(
-                *, script_path, archive_path, datastore_root, metadata_json
-            ):
+            def fake_writer(*, script_path, archive_path, datastore_root, metadata_json):
                 records = json.loads(Path(metadata_json).read_text(encoding="utf-8"))
                 with zipfile.ZipFile(archive_path, "w") as zf:
                     for record in records:
@@ -1077,9 +900,7 @@ class FluentArchiveWriterPackagingTests(unittest.TestCase):
                     for record in records:
                         relative = record["relative_path"]
                         content_entries.append(f"<Entry>{relative}</Entry>")
-                        refs = "".join(
-                            f"<Ref>{ref}</Ref>" for ref in record.get("refs") or []
-                        )
+                        refs = "".join(f"<Ref>{ref}</Ref>" for ref in record.get("refs") or [])
                         node_records.append(
                             f"""<S isRootNode="True"><Id>{record['guid']}</Id><N>{record['object_name']}</N><P>{record['object_path']}</P><T>{record['type']}</T><V>{record['version']}</V><TV>{record['type_version']}</TV>{refs}</S>"""
                         )
@@ -1093,9 +914,7 @@ class FluentArchiveWriterPackagingTests(unittest.TestCase):
                     )
                 return {"success": True, "numberOfDataobjectsInserted": len(records)}
 
-            with mock.patch.object(
-                exports, "_fluent_archive_writer_available", return_value=True
-            ), mock.patch.object(
+            with mock.patch.object(exports, "_fluent_archive_writer_available", return_value=True), mock.patch.object(
                 exports, "_run_fluent_archive_writer", side_effect=fake_writer
             ):
                 record = exports._write_generated_project_archive(
@@ -1127,18 +946,11 @@ class FluentArchiveWriterPackagingTests(unittest.TestCase):
                 {item["guid"] for item in record["dependencies_not_packaged"]},
                 {workspace_guid},
             )
-            self.assertEqual(
-                record["dependencies_not_packaged"][0]["type"], "WorktableWorkspace"
-            )
+            self.assertEqual(record["dependencies_not_packaged"][0]["type"], "WorktableWorkspace")
             with zipfile.ZipFile(destination) as zf:
                 names = zf.namelist()
                 normalized = [name.replace("/", "\\") for name in names]
-                self.assertTrue(
-                    any(
-                        name.startswith("DataStore\\UserSpecific\\")
-                        for name in normalized
-                    )
-                )
+                self.assertTrue(any(name.startswith("DataStore\\UserSpecific\\") for name in normalized))
                 self.assertNotIn(
                     f"DataStore\\SystemSpecific\\Worktable\\Workspaces\\{workspace_guid}.xwsp",
                     normalized,
@@ -1161,7 +973,7 @@ class FluentArchiveWriterPackagingTests(unittest.TestCase):
                 f"DataStore\\UserSpecific\\{main_guid}.xscr": b"<VxData />",
                 "DataStore\\nodedescription.xml": (
                     f"<NodeDescription><TypeMap><Map><Type>Script</Type><Short>2</Short></Map></TypeMap>"
-                    f'<Payload><S isRootNode="True"><Id>{main_guid}</Id><N>Main</N><P></P><T>2</T><V>1</V><TV>2.0</TV></S></Payload>'
+                    f"<Payload><S isRootNode=\"True\"><Id>{main_guid}</Id><N>Main</N><P></P><T>2</T><V>1</V><TV>2.0</TV></S></Payload>"
                     "<Checksum>valid</Checksum></NodeDescription>"
                 ).encode(),
             }
@@ -1174,7 +986,7 @@ class FluentArchiveWriterPackagingTests(unittest.TestCase):
                     "DataStore\\nodedescription.xml",
                     (
                         "<NodeDescription><TypeMap><Map><Type>LiquidClass</Type><Short>5</Short></Map></TypeMap>"
-                        f'<Payload><S isRootNode="True"><Id>{liquid_guid}</Id><N>Water Free Single</N><P></P><T>5</T><V>1</V><TV>1</TV></S></Payload>'
+                        f"<Payload><S isRootNode=\"True\"><Id>{liquid_guid}</Id><N>Water Free Single</N><P></P><T>5</T><V>1</V><TV>1</TV></S></Payload>"
                         "<Checksum>valid</Checksum></NodeDescription>"
                     ),
                 )
@@ -1195,9 +1007,7 @@ class FluentArchiveWriterPackagingTests(unittest.TestCase):
 
 
 class PortableArchiveWriterPackagingTests(unittest.TestCase):
-    def test_generated_project_archive_uses_portable_writer_when_fluent_unavailable(
-        self,
-    ):
+    def test_generated_project_archive_uses_portable_writer_when_fluent_unavailable(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             source_project = tmp_path / "source.zeia"
@@ -1252,9 +1062,7 @@ class PortableArchiveWriterPackagingTests(unittest.TestCase):
                     f"""<ArchiveContent><Payload><DatastoreEntries><Entry>UserSpecific\\{script_guid}.xscr</Entry><Entry>UserSpecific\\{unrelated_guid}.xscr</Entry><Entry>SystemSpecific\\Worktable\\Workspaces\\{workspace_guid}.xwsp</Entry><Entry>SystemSpecific\\Worktable\\Sites\\{site_guid}.xsite</Entry><Entry>nodedescription.xml</Entry></DatastoreEntries></Payload><Checksum>valid</Checksum></ArchiveContent>""",
                 )
 
-            with mock.patch.object(
-                exports, "_fluent_archive_writer_available", return_value=False
-            ):
+            with mock.patch.object(exports, "_fluent_archive_writer_available", return_value=False):
                 record = exports._write_generated_project_archive(
                     source_project,
                     destination,
@@ -1283,25 +1091,12 @@ class PortableArchiveWriterPackagingTests(unittest.TestCase):
                 {item["guid"] for item in record["dependencies_not_packaged"]},
                 {workspace_guid},
             )
-            self.assertEqual(
-                record["dependencies_not_packaged"][0]["type"], "WorktableWorkspace"
-            )
+            self.assertEqual(record["dependencies_not_packaged"][0]["type"], "WorktableWorkspace")
             with zipfile.ZipFile(destination) as zf:
                 names = [name.replace("/", "\\") for name in zf.namelist()]
-                self.assertTrue(
-                    any(name.startswith("DataStore\\UserSpecific\\") for name in names)
-                )
-                self.assertTrue(
-                    any(name.endswith("nodedescription.xml") for name in names)
-                )
-                self.assertTrue(
-                    any(
-                        name.endswith("meta\\content.xml")
-                        or name.endswith("meta/content.xml")
-                        for name in names
-                    )
-                    or any("meta" in n and "content.xml" in n for n in names)
-                )
+                self.assertTrue(any(name.startswith("DataStore\\UserSpecific\\") for name in names))
+                self.assertTrue(any(name.endswith("nodedescription.xml") for name in names))
+                self.assertTrue(any(name.endswith("meta\\content.xml") or name.endswith("meta/content.xml") for name in names) or any("meta" in n and "content.xml" in n for n in names))
                 self.assertNotIn(
                     f"DataStore\\SystemSpecific\\Worktable\\Workspaces\\{workspace_guid}.xwsp",
                     names,
@@ -1358,9 +1153,7 @@ class PortableArchiveWriterPackagingTests(unittest.TestCase):
                     f"""<ArchiveContent><Payload><DatastoreEntries><Entry>UserSpecific\\{script_guid}.xscr</Entry><Entry>UserSpecific\\{unrelated_guid}.xscr</Entry><Entry>nodedescription.xml</Entry></DatastoreEntries></Payload><Checksum>valid</Checksum></ArchiveContent>""",
                 )
 
-            with mock.patch.object(
-                exports, "_fluent_archive_writer_available", return_value=False
-            ), _force_full_zeia_copy_env():
+            with mock.patch.object(exports, "_fluent_archive_writer_available", return_value=False), _force_full_zeia_copy_env():
                 record = exports._write_generated_project_archive(
                     source_project,
                     destination,
@@ -1388,9 +1181,7 @@ class PortableArchiveWriterPackagingTests(unittest.TestCase):
 
 
 def _force_full_zeia_copy_env():
-    return mock.patch.dict(
-        os.environ, {"TECAN_PACKAGE_FULL_ZEIA_COPY": "1"}, clear=False
-    )
+    return mock.patch.dict(os.environ, {"TECAN_PACKAGE_FULL_ZEIA_COPY": "1"}, clear=False)
 
 
 class ExportTests(unittest.TestCase):
@@ -1505,7 +1296,9 @@ class ExportTests(unittest.TestCase):
                     b"preserved-script-asset",
                 )
                 self.assertIn("Scripts/unreachable.xscr", zf.namelist())
-                archive_data = {name: zf.read(name) for name in zf.namelist()}
+                archive_data = {
+                    name: zf.read(name) for name in zf.namelist()
+                }
             self.assertTrue(record["filesystem_packaging"]["complete"])
             self.assertEqual(
                 record["filesystem_packaging"]["referenced_path_count"],
@@ -1616,9 +1409,7 @@ class ExportTests(unittest.TestCase):
 
             with zipfile.ZipFile(destination) as zf:
                 node = _read_archive_text(zf, "DataStore\\nodedescription.xml")
-                script = _read_archive_text(
-                    zf, f"DataStore\\UserSpecific\\{script_guid}.xscr"
-                )
+                script = _read_archive_text(zf, f"DataStore\\UserSpecific\\{script_guid}.xscr")
 
             self.assertIn("<N>WorkspaceOne</N>", node)
             self.assertIn("<N>GeneratedScript</N>", node)
@@ -1821,12 +1612,8 @@ def build_worktable():
                     "schema_version: tecan.request_spec.v1\nrequest:\n  intent: preserve TouchTools prompts\n",
                     encoding="utf-8",
                 )
-                validation_diff.write_text(
-                    "# Request Validation Diff\n", encoding="utf-8"
-                )
-                validation_diff_json.write_text(
-                    '{"kind": "request_validation_diff"}', encoding="utf-8"
-                )
+                validation_diff.write_text("# Request Validation Diff\n", encoding="utf-8")
+                validation_diff_json.write_text('{"kind": "request_validation_diff"}', encoding="utf-8")
 
                 stage_root = exports.PACKAGE_STAGING_DIR.resolve()
                 ready_root = exports.READY_TO_IMPORT_DIR.resolve()
@@ -1840,10 +1627,7 @@ def build_worktable():
                     # Publish staging lives under ready-to-import as a hidden
                     # ".{bundle}.{run}.staging" directory (not PACKAGE_STAGING_DIR).
                     self.assertEqual(source_path.parent, ready_root)
-                    self.assertTrue(
-                        source_path.name.startswith(".")
-                        and source_path.name.endswith(".staging")
-                    )
+                    self.assertTrue(source_path.name.startswith(".") and source_path.name.endswith(".staging"))
                     self.assertEqual(destination_path.parent, ready_root)
                     self.assertFalse(destination_path.exists())
                     return real_rename(src, dst)
@@ -1859,12 +1643,7 @@ def build_worktable():
                             "name": "My Project",
                             "root": str(tmp_path),
                             "errors": [],
-                            "workspaces": [
-                                {
-                                    "object_name": "780_Empty",
-                                    "guids": ["workspace-guid"],
-                                }
-                            ],
+                            "workspaces": [{"object_name": "780_Empty", "guids": ["workspace-guid"]}],
                             "labware_names": ["SourcePlate"],
                             "liquid_classes": ["Water Free Single"],
                             "rack_types": [],
@@ -1877,12 +1656,8 @@ def build_worktable():
                                     "dependencies": {
                                         "subroutine_refs": ['"Subroutines\\HelperSub"'],
                                         "pin_refs": ["GIO1_Pin20"],
-                                        "worktable_pin_locations": [
-                                            "WorktablePin_MiddleFront"
-                                        ],
-                                        "custom_asset_refs": [
-                                            "C:\\ProgramData\\Tecan\\Images\\sourcecapholder.jpg"
-                                        ],
+                                        "worktable_pin_locations": ["WorktablePin_MiddleFront"],
+                                        "custom_asset_refs": ["C:\\ProgramData\\Tecan\\Images\\sourcecapholder.jpg"],
                                         "barcode_refs": ["FakeBarcode"],
                                     },
                                 },
@@ -1890,9 +1665,7 @@ def build_worktable():
                                     "object_name": "HelperSub",
                                     "entry": "Subroutines/helper_subroutine.xscr",
                                     "extracted_path": str(subroutine_script),
-                                    "dependencies": {
-                                        "subroutine_refs": ['"Subroutines\\NestedSub"']
-                                    },
+                                    "dependencies": {"subroutine_refs": ['"Subroutines\\NestedSub"']},
                                 },
                                 {
                                     "object_name": "NestedSub",
@@ -1907,9 +1680,7 @@ def build_worktable():
                                     "object_name": "Generated connector for Worktable_Segment_WorktablePin_MiddleFront and custom cap holder",
                                     "entry": "Worktable/connector.xcon",
                                     "extracted_path": str(connector),
-                                    "pin_refs": [
-                                        "Worktable_Segment_WorktablePin_MiddleFront"
-                                    ],
+                                    "pin_refs": ["Worktable_Segment_WorktablePin_MiddleFront"],
                                     "asset_refs": [],
                                     "custom_part": True,
                                     "component_guid": "component-guid",
@@ -1946,132 +1717,52 @@ def build_worktable():
                 destinations = [item.destination for item in copied]
                 published_root = exports.READY_TO_IMPORT_DIR / "draft_v1"
                 self.assertTrue(published_root.is_dir())
-                self.assertEqual(
-                    destinations, [(published_root / "draft_v1.zeia").resolve()]
-                )
-                self.assertTrue(
-                    (published_root / "source" / "protocol.ir.json").exists()
-                )
-                self.assertTrue(
-                    (published_root / "source" / "protocol_draft.py").exists()
-                )
+                self.assertEqual(destinations, [(published_root / "draft_v1.zeia").resolve()])
+                self.assertTrue((published_root / "source" / "protocol.ir.json").exists())
+                self.assertTrue((published_root / "source" / "protocol_draft.py").exists())
                 project_archive = published_root / "draft_v1.zeia"
                 self.assertTrue(zipfile.is_zipfile(project_archive))
                 with zipfile.ZipFile(project_archive) as zf:
                     generated_project_entries = zf.namelist()
-                    self.assertIn(
-                        "Scripts/source_script.xscr", generated_project_entries
-                    )
+                    self.assertIn("Scripts/source_script.xscr", generated_project_entries)
                     self.assertIn("Scripts/HelperSub.xscr", generated_project_entries)
                     self.assertIn("Scripts/NestedSub.xscr", generated_project_entries)
-                    generated_project_script = zf.read(
-                        "Scripts/source_script.xscr"
-                    ).decode(
+                    generated_project_script = zf.read("Scripts/source_script.xscr").decode(
                         "utf-8-sig",
                         errors="replace",
                     )
-                    self.assertIn(
-                        "<ObjectName>Pipeline simple transfer</ObjectName>",
-                        generated_project_script,
-                    )
+                    self.assertIn("<ObjectName>Pipeline simple transfer</ObjectName>", generated_project_script)
                 # V2 delivery forbids publishing standalone XSCR trees.
                 self.assertFalse((published_root / "direct-imports").exists())
-                self.assertTrue(
-                    (
-                        published_root / "source" / "subroutines" / "SUBROUTINES.md"
-                    ).exists()
-                )
-                self.assertTrue(
-                    (published_root / "source" / "HARDWARE_PINS.md").exists()
-                )
-                self.assertTrue(
-                    (
-                        published_root
-                        / "source"
-                        / "hardware"
-                        / "hardware_manifest.json"
-                    ).exists()
-                )
-                self.assertTrue(
-                    (
-                        published_root / "source" / "METHOD_TOUCHTOOLS_READINESS.md"
-                    ).exists()
-                )
-                self.assertTrue(
-                    (
-                        published_root
-                        / "source"
-                        / "reports"
-                        / "method_touchtools_readiness.json"
-                    ).exists()
-                )
-                self.assertTrue(
-                    (
-                        published_root / "source" / "reports" / "project_report.md"
-                    ).exists()
-                )
-                self.assertTrue(
-                    (
-                        published_root / "source" / "reports" / "simulation_report.md"
-                    ).exists()
-                )
-                self.assertTrue(
-                    (published_root / "source" / "reports" / "repair_plan.md").exists()
-                )
-                self.assertTrue(
-                    (
-                        published_root / "source" / "reports" / "compile_report.md"
-                    ).exists()
-                )
-                self.assertTrue(
-                    (
-                        published_root / "source" / "reports" / "validation_report.md"
-                    ).exists()
-                )
-                self.assertTrue(
-                    (
-                        published_root / "source" / "reports" / "validation_report.json"
-                    ).exists()
-                )
-                self.assertTrue(
-                    (published_root / "source" / "worktable_changes.md").exists()
-                )
-                self.assertTrue(
-                    (published_root / "source" / "worktable.patch.json").exists()
-                )
-                self.assertTrue(
-                    (published_root / "source" / "request.spec.yaml").exists()
-                )
-                self.assertTrue(
-                    (published_root / "source" / "validation_diff.md").exists()
-                )
+                self.assertTrue((published_root / "source" / "subroutines" / "SUBROUTINES.md").exists())
+                self.assertTrue((published_root / "source" / "HARDWARE_PINS.md").exists())
+                self.assertTrue((published_root / "source" / "hardware" / "hardware_manifest.json").exists())
+                self.assertTrue((published_root / "source" / "METHOD_TOUCHTOOLS_READINESS.md").exists())
+                self.assertTrue((published_root / "source" / "reports" / "method_touchtools_readiness.json").exists())
+                self.assertTrue((published_root / "source" / "reports" / "project_report.md").exists())
+                self.assertTrue((published_root / "source" / "reports" / "simulation_report.md").exists())
+                self.assertTrue((published_root / "source" / "reports" / "repair_plan.md").exists())
+                self.assertTrue((published_root / "source" / "reports" / "compile_report.md").exists())
+                self.assertTrue((published_root / "source" / "reports" / "validation_report.md").exists())
+                self.assertTrue((published_root / "source" / "reports" / "validation_report.json").exists())
+                self.assertTrue((published_root / "source" / "worktable_changes.md").exists())
+                self.assertTrue((published_root / "source" / "worktable.patch.json").exists())
+                self.assertTrue((published_root / "source" / "request.spec.yaml").exists())
+                self.assertTrue((published_root / "source" / "validation_diff.md").exists())
                 self.assertTrue((published_root / "source" / "metadata.json").exists())
                 self.assertTrue((published_root / "RECREATE_SCRIPT.md").exists())
-                self.assertTrue(
-                    (
-                        published_root / "source" / "subroutines" / "SUBROUTINES.md"
-                    ).exists()
-                )
-                self.assertTrue(
-                    (published_root / "source" / "HARDWARE_PINS.md").exists()
-                )
-                self.assertTrue(
-                    (published_root / "source" / "hardware" / "assets").exists()
-                )
+                self.assertTrue((published_root / "source" / "subroutines" / "SUBROUTINES.md").exists())
+                self.assertTrue((published_root / "source" / "HARDWARE_PINS.md").exists())
+                self.assertTrue((published_root / "source" / "hardware" / "assets").exists())
                 metadata = (published_root / "source" / "metadata.json").read_text(
                     encoding="utf-8"
                 )
                 metadata_payload = json.loads(metadata)
                 validation_payload = json.loads(
-                    (
-                        published_root / "source" / "reports" / "validation_report.json"
-                    ).read_text(encoding="utf-8")
+                    (published_root / "source" / "reports" / "validation_report.json").read_text(encoding="utf-8")
                 )
                 canonical_readiness = validation_payload["readiness"]
-                self.assertIn(
-                    '"bundle_schema_version": "tecan.ready_to_import.bundle.v2"',
-                    metadata,
-                )
+                self.assertIn('"bundle_schema_version": "tecan.ready_to_import.bundle.v2"', metadata)
                 self.assertIn('"ready_to_import": true', metadata)
                 self.assertIn('"direct_xscr_import"', metadata)
                 self.assertIn('"zeia_import"', metadata)
@@ -2085,100 +1776,39 @@ def build_worktable():
                 self.assertIn("Script Editor load certificate", metadata)
                 self.assertIn('"kind": "direct-xscr-import"', metadata)
                 self.assertIn('"kind": "generated-zeia-import"', metadata)
-                self.assertIn(
-                    '"relative_path": "direct-imports/scripts/full-script/generated_script.xscr"',
-                    metadata,
-                )
+                self.assertIn('"relative_path": "direct-imports/scripts/full-script/generated_script.xscr"', metadata)
                 self.assertNotIn("corrected_script_duplicate.xscr", metadata)
                 self.assertNotIn("corrected_xscr_duplicate", metadata)
                 self.assertNotIn("corrected-script-duplicate", metadata)
-                self.assertIn(
-                    '"relative_path": "direct-imports/scripts/subroutines/subroutine_1_HelperSub.xscr"',
-                    metadata,
-                )
-                self.assertIn(
-                    '"relative_path": "direct-imports/scripts/subroutines/subroutine_2_NestedSub.xscr"',
-                    metadata,
-                )
-                self.assertIn(
-                    '"subroutines": "direct-imports/scripts/subroutines/"', metadata
-                )
+                self.assertIn('"relative_path": "direct-imports/scripts/subroutines/subroutine_1_HelperSub.xscr"', metadata)
+                self.assertIn('"relative_path": "direct-imports/scripts/subroutines/subroutine_2_NestedSub.xscr"', metadata)
+                self.assertIn('"subroutines": "direct-imports/scripts/subroutines/"', metadata)
                 self.assertIn('"hardware": "source/hardware/"', metadata)
-                self.assertIn(
-                    '"hardware_manifest": "source/hardware/hardware_manifest.json"',
-                    metadata,
-                )
-                self.assertIn(
-                    '"hardware_pins_checklist": "source/HARDWARE_PINS.md"', metadata
-                )
-                self.assertIn(
-                    '"method_touchtools_readiness": "source/METHOD_TOUCHTOOLS_READINESS.md"',
-                    metadata,
-                )
-                self.assertIn(
-                    '"method_touchtools_readiness_json": "source/reports/method_touchtools_readiness.json"',
-                    metadata,
-                )
-                self.assertIn(
-                    '"generated_project": "direct-imports/projects/full-project/generated_project.zeia"',
-                    metadata,
-                )
+                self.assertIn('"hardware_manifest": "source/hardware/hardware_manifest.json"', metadata)
+                self.assertIn('"hardware_pins_checklist": "source/HARDWARE_PINS.md"', metadata)
+                self.assertIn('"method_touchtools_readiness": "source/METHOD_TOUCHTOOLS_READINESS.md"', metadata)
+                self.assertIn('"method_touchtools_readiness_json": "source/reports/method_touchtools_readiness.json"', metadata)
+                self.assertIn('"generated_project": "direct-imports/projects/full-project/generated_project.zeia"', metadata)
                 self.assertIn('"project_imports": "direct-imports/projects/"', metadata)
-                self.assertIn(
-                    '"project_import_report": "source/reports/project_import_report.md"',
-                    metadata,
-                )
-                self.assertIn(
-                    '"relative_path": "direct-imports/projects/full-project/generated_project.zeia"',
-                    metadata,
-                )
-                self.assertIn(
-                    '"relative_path": "source/hardware/hardware_manifest.json"',
-                    metadata,
-                )
+                self.assertIn('"project_import_report": "source/reports/project_import_report.md"', metadata)
+                self.assertIn('"relative_path": "direct-imports/projects/full-project/generated_project.zeia"', metadata)
+                self.assertIn('"relative_path": "source/hardware/hardware_manifest.json"', metadata)
                 self.assertIn('"relative_path": "source/HARDWARE_PINS.md"', metadata)
-                self.assertIn(
-                    '"relative_path": "source/METHOD_TOUCHTOOLS_READINESS.md"', metadata
-                )
-                self.assertIn(
-                    '"relative_path": "source/reports/method_touchtools_readiness.json"',
-                    metadata,
-                )
-                self.assertIn(
-                    '"relative_path": "direct-imports/hardware-connectors/connector_1_connector.xcon"',
-                    metadata,
-                )
-                self.assertIn(
-                    '"relative_path": "source/hardware/assets/asset_1_sourcecapholder.jpg"',
-                    metadata,
-                )
-                self.assertIn(
-                    '"relative_path": "source/reports/simulation_report.md"', metadata
-                )
-                self.assertIn(
-                    '"relative_path": "source/reports/validation_report.md"', metadata
-                )
-                self.assertIn(
-                    '"relative_path": "source/reports/validation_report.json"', metadata
-                )
-                self.assertIn(
-                    '"relative_path": "source/worktable.patch.json"', metadata
-                )
+                self.assertIn('"relative_path": "source/METHOD_TOUCHTOOLS_READINESS.md"', metadata)
+                self.assertIn('"relative_path": "source/reports/method_touchtools_readiness.json"', metadata)
+                self.assertIn('"relative_path": "direct-imports/hardware-connectors/connector_1_connector.xcon"', metadata)
+                self.assertIn('"relative_path": "source/hardware/assets/asset_1_sourcecapholder.jpg"', metadata)
+                self.assertIn('"relative_path": "source/reports/simulation_report.md"', metadata)
+                self.assertIn('"relative_path": "source/reports/validation_report.md"', metadata)
+                self.assertIn('"relative_path": "source/reports/validation_report.json"', metadata)
+                self.assertIn('"relative_path": "source/worktable.patch.json"', metadata)
                 self.assertIn('"relative_path": "source/request.spec.yaml"', metadata)
                 self.assertIn('"relative_path": "source/validation_diff.md"', metadata)
                 self.assertIn('"generated_worklist_present": false', metadata)
-                self.assertEqual(
-                    metadata_payload["readiness_status"],
-                    validation_payload["readiness_status"],
-                )
+                self.assertEqual(metadata_payload["readiness_status"], validation_payload["readiness_status"])
                 self.assertEqual(metadata_payload["readiness"], canonical_readiness)
-                self.assertEqual(
-                    metadata_payload["readiness"]["script_editor_load"]["status"],
-                    "not_run",
-                )
-                self.assertEqual(
-                    validation_payload["readiness_status"], "import_ready_needs_review"
-                )
+                self.assertEqual(metadata_payload["readiness"]["script_editor_load"]["status"], "not_run")
+                self.assertEqual(validation_payload["readiness_status"], "import_ready_needs_review")
                 self.assertEqual(len(replace_calls), 1)
                 self.assertEqual(exports.READY_TO_IMPORT_DIR.resolve(), ready_root)
                 self.assertTrue(stage_root.exists())
@@ -2233,105 +1863,62 @@ def build_worktable():
                     {item["relative_path"] for item in updated_metadata["files"]},
                 )
                 attached_manifest = json.loads(
-                    (published_root / "source" / "generation_manifest.json").read_text(
-                        encoding="utf-8"
-                    )
+                    (published_root / "source" / "generation_manifest.json").read_text(encoding="utf-8")
                 )
                 self.assertEqual(attached_manifest["readiness"], canonical_readiness)
                 self.assertEqual(updated_metadata["readiness"], canonical_readiness)
+                self.assertEqual(updated_metadata["readiness_status"], validation_payload["readiness_status"])
                 self.assertEqual(
-                    updated_metadata["readiness_status"],
-                    validation_payload["readiness_status"],
-                )
-                self.assertEqual(
-                    (
-                        published_root / "source" / "reports" / "project_report.md"
-                    ).read_text(encoding="utf-8"),
+                    (published_root / "source" / "reports" / "project_report.md").read_text(
+                        encoding="utf-8"
+                    ),
                     "# Project Report\n\nThis report was not produced for this bundle.\n",
                 )
-                subroutines = (
-                    published_root / "source" / "subroutines" / "SUBROUTINES.md"
-                ).read_text(encoding="utf-8")
+                subroutines = (published_root / "source" / "subroutines" / "SUBROUTINES.md").read_text(
+                    encoding="utf-8"
+                )
                 self.assertIn("HelperSub", subroutines)
-                self.assertIn(
-                    "direct-imports/scripts/subroutines/subroutine_1_HelperSub.xscr",
-                    subroutines,
-                )
+                self.assertIn("direct-imports/scripts/subroutines/subroutine_1_HelperSub.xscr", subroutines)
                 self.assertIn("NestedSub", subroutines)
-                self.assertIn(
-                    "direct-imports/scripts/subroutines/subroutine_2_NestedSub.xscr",
-                    subroutines,
-                )
+                self.assertIn("direct-imports/scripts/subroutines/subroutine_2_NestedSub.xscr", subroutines)
                 hardware = (published_root / "source" / "HARDWARE_PINS.md").read_text(
                     encoding="utf-8"
                 )
                 self.assertIn("GIO1_Pin20", hardware)
                 self.assertIn("WorktablePin_MiddleFront", hardware)
-                self.assertIn(
-                    "direct-imports/hardware-connectors/connector_1_connector.xcon",
-                    hardware,
-                )
+                self.assertIn("direct-imports/hardware-connectors/connector_1_connector.xcon", hardware)
                 self.assertIn("sourcecapholder.jpg", hardware)
-                hardware_manifest = (
-                    published_root / "source" / "hardware" / "hardware_manifest.json"
-                ).read_text(encoding="utf-8")
-                self.assertIn(
-                    '"schema_version": "tecan.hardware_manifest.v1"', hardware_manifest
+                hardware_manifest = (published_root / "source" / "hardware" / "hardware_manifest.json").read_text(
+                    encoding="utf-8"
                 )
-                self.assertIn(
-                    '"status": "connector_evidence_packaged"', hardware_manifest
-                )
-                self.assertIn(
-                    '"status": "runtime_pin_verification_required"', hardware_manifest
-                )
+                self.assertIn('"schema_version": "tecan.hardware_manifest.v1"', hardware_manifest)
+                self.assertIn('"status": "connector_evidence_packaged"', hardware_manifest)
+                self.assertIn('"status": "runtime_pin_verification_required"', hardware_manifest)
                 self.assertIn('"status": "asset_packaged"', hardware_manifest)
                 method_touchtools = (
                     published_root / "source" / "METHOD_TOUCHTOOLS_READINESS.md"
                 ).read_text(encoding="utf-8")
                 self.assertIn("# Method and TouchTools Readiness", method_touchtools)
-                self.assertIn(
-                    "Method required before TouchTools use: `yes`", method_touchtools
-                )
-                self.assertIn(
-                    "TouchTools-visible method setting required: `yes`",
-                    method_touchtools,
-                )
+                self.assertIn("Method required before TouchTools use: `yes`", method_touchtools)
+                self.assertIn("TouchTools-visible method setting required: `yes`", method_touchtools)
                 self.assertIn("OperatorMode", method_touchtools)
                 self.assertIn("User Input", method_touchtools)
                 method_touchtools_json = (
-                    published_root
-                    / "source"
-                    / "reports"
-                    / "method_touchtools_readiness.json"
+                    published_root / "source" / "reports" / "method_touchtools_readiness.json"
                 ).read_text(encoding="utf-8")
-                self.assertIn(
-                    '"schema_version": "tecan.method_touchtools_readiness.v1"',
-                    method_touchtools_json,
-                )
-                self.assertIn(
-                    '"method_required_before_touchtools": true', method_touchtools_json
-                )
+                self.assertIn('"schema_version": "tecan.method_touchtools_readiness.v1"', method_touchtools_json)
+                self.assertIn('"method_required_before_touchtools": true', method_touchtools_json)
                 guide = (published_root / "RECREATE_SCRIPT.md").read_text(
                     encoding="utf-8"
                 )
                 self.assertIn("# Recreate Script: draft", guide)
-                self.assertIn(
-                    "This guide is generated from the same canonical protocol IR", guide
-                )
+                self.assertIn("This guide is generated from the same canonical protocol IR", guide)
                 self.assertIn("- Source of truth: `source/protocol.ir.json`", guide)
                 self.assertIn("- Script name: `draft`", guide)
-                self.assertIn(
-                    "- Request spec / prompt: `source/request.spec.yaml`", guide
-                )
+                self.assertIn("- Request spec / prompt: `source/request.spec.yaml`", guide)
                 self.assertIn("- Python draft: `source/protocol_draft.py`", guide)
-                self.assertIn(
-                    "- Direct import file: `direct-imports/scripts/full-script/generated_script.xscr`",
-                    guide,
-                )
-                self.assertIn(
-                    "- One-file project import: `direct-imports/projects/full-project/generated_project.zeia`",
-                    guide,
-                )
+                self.assertIn("- Direct import file: `direct-imports/scripts/full-script/generated_script.xscr`", guide)
+                self.assertIn("- One-file project import: `direct-imports/projects/full-project/generated_project.zeia`", guide)
                 self.assertIn("## Manual FluentControl Steps", guide)
                 self.assertIn("Load worktable: `780_Empty`", guide)
                 self.assertIn("Confirm labware:", guide)
@@ -2344,19 +1931,17 @@ def build_worktable():
                 self.assertIn("   - Specifications:", guide)
                 self.assertIn("Volume: `20 uL`", guide)
                 self.assertIn("   - Path to find it:", guide)
-                self.assertIn(
-                    "draft.py -> build_worktable() -> Transfer -> head.aspirate", guide
+                self.assertIn("draft.py -> build_worktable() -> Transfer -> head.aspirate", guide)
+                worktable_changes = (published_root / "source" / "worktable_changes.md").read_text(
+                    encoding="utf-8"
                 )
-                worktable_changes = (
-                    published_root / "source" / "worktable_changes.md"
-                ).read_text(encoding="utf-8")
                 self.assertIn("# Worktable Changes", worktable_changes)
                 self.assertIn("## Missing Labware", worktable_changes)
                 self.assertIn("## Required Liquid Classes", worktable_changes)
                 self.assertIn("## Manual FluentControl Setup Steps", worktable_changes)
-                worktable_patch = (
-                    published_root / "source" / "worktable.patch.json"
-                ).read_text(encoding="utf-8")
+                worktable_patch = (published_root / "source" / "worktable.patch.json").read_text(
+                    encoding="utf-8"
+                )
                 self.assertIn('"kind": "worktable_patch"', worktable_patch)
                 self.assertIn('"overall_severity"', worktable_patch)
             finally:
@@ -2373,9 +1958,7 @@ class ExportTransactionFailureTests(unittest.TestCase):
     def tearDown(self):
         self._full_copy_env.stop()
 
-    def _restore_export_roots(
-        self, ready_root: Path, staging_root: Path, failed_root: Path
-    ) -> None:
+    def _restore_export_roots(self, ready_root: Path, staging_root: Path, failed_root: Path) -> None:
         exports.READY_TO_IMPORT_DIR = ready_root
         exports.PACKAGE_STAGING_DIR = staging_root
         exports.FAILED_PACKAGES_DIR = failed_root
@@ -2453,9 +2036,7 @@ class ExportTransactionFailureTests(unittest.TestCase):
             "layout": {"metadata": "source/metadata.json"},
             "files": [],
         }
-        metadata_path.write_text(
-            json.dumps(metadata, indent=2, sort_keys=True), encoding="utf-8"
-        )
+        metadata_path.write_text(json.dumps(metadata, indent=2, sort_keys=True), encoding="utf-8")
         return {
             "bundle_dir": bundle_dir,
             "metadata_path": metadata_path,
@@ -2514,10 +2095,7 @@ def build_worktable():
             encoding="utf-8",
         )
         with zipfile.ZipFile(source_project, "w") as zf:
-            zf.writestr(
-                "Scripts/source_script.xscr",
-                "<Root><ObjectName>SourceScript</ObjectName></Root>",
-            )
+            zf.writestr("Scripts/source_script.xscr", "<Root><ObjectName>SourceScript</ObjectName></Root>")
 
         source_manifest = {
             "name": "My Project",
@@ -2568,17 +2146,11 @@ def build_worktable():
             "source_manifest": fixture["source_manifest"],
         }
 
-    def _assert_existing_bundle_unchanged(
-        self, existing_bundle: dict[str, object]
-    ) -> None:
+    def _assert_existing_bundle_unchanged(self, existing_bundle: dict[str, object]) -> None:
         metadata_path = existing_bundle["metadata_path"]
         marker_path = existing_bundle["marker_path"]
-        self.assertEqual(
-            metadata_path.read_text(encoding="utf-8"), existing_bundle["metadata_text"]
-        )
-        self.assertEqual(
-            marker_path.read_text(encoding="utf-8"), existing_bundle["marker_text"]
-        )
+        self.assertEqual(metadata_path.read_text(encoding="utf-8"), existing_bundle["metadata_text"])
+        self.assertEqual(marker_path.read_text(encoding="utf-8"), existing_bundle["marker_text"])
 
     def _assert_quarantined_failure(
         self,
@@ -2598,9 +2170,7 @@ def build_worktable():
         self.assertEqual(ready_names, sorted(expected_ready_bundle_names))
         self._assert_existing_bundle_unchanged(fixture["existing_bundle"])
 
-        failed_metadata_paths = list(
-            fixture["failed_root"].rglob("source/metadata.json")
-        )
+        failed_metadata_paths = list(fixture["failed_root"].rglob("source/metadata.json"))
         self.assertEqual(len(failed_metadata_paths), 1)
         metadata_path = failed_metadata_paths[0]
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -2608,16 +2178,10 @@ def build_worktable():
         self.assertFalse(metadata["ready_to_import"])
         self.assertEqual(metadata["verification_state"], expected_verification_state)
         self.assertEqual(metadata["lifecycle"]["bundle_role"], "debug")
-        self.assertEqual(
-            metadata["lifecycle"]["verification_state"], expected_verification_state
-        )
+        self.assertEqual(metadata["lifecycle"]["verification_state"], expected_verification_state)
         if expected_transaction_stage is not None:
-            self.assertEqual(
-                metadata["transaction_failure"]["stage"], expected_transaction_stage
-            )
-            self.assertIn(
-                failure_message_substring, metadata["transaction_failure"]["message"]
-            )
+            self.assertEqual(metadata["transaction_failure"]["stage"], expected_transaction_stage)
+            self.assertIn(failure_message_substring, metadata["transaction_failure"]["message"])
         return metadata_path, metadata
 
     def _run_export_failure(
@@ -2634,11 +2198,7 @@ def build_worktable():
     ) -> tuple[Path, dict[str, object]]:
         with ExitStack() as stack:
             stack.enter_context(
-                mock.patch.object(
-                    exports,
-                    "finalize_compiled_xscr",
-                    return_value=_ok_finalization_report(),
-                )
+                mock.patch.object(exports, "finalize_compiled_xscr", return_value=_ok_finalization_report())
             )
             if validate_side_effect is None:
                 stack.enter_context(
@@ -2672,12 +2232,8 @@ def build_worktable():
             failure_message_substring=failure_message_substring,
         )
 
-    def _publish_ready_bundle(
-        self, fixture: dict[str, object]
-    ) -> list[exports.ExportedArtifact]:
-        with mock.patch.object(
-            exports, "finalize_compiled_xscr", return_value=_ok_finalization_report()
-        ), mock.patch.object(
+    def _publish_ready_bundle(self, fixture: dict[str, object]) -> list[exports.ExportedArtifact]:
+        with mock.patch.object(exports, "finalize_compiled_xscr", return_value=_ok_finalization_report()), mock.patch.object(
             exports,
             "validate_ready_to_import",
             return_value=self._ready_validation_report(),
@@ -2699,11 +2255,7 @@ def build_worktable():
 
             self._run_export_failure(
                 fixture,
-                patchers=[
-                    mock.patch.object(
-                        exports, "_copy", side_effect=fail_original_source_copy
-                    )
-                ],
+                patchers=[mock.patch.object(exports, "_copy", side_effect=fail_original_source_copy)],
                 expected_exception_substring="failed package moved to",
                 expected_ready_bundle_names=["existing-bundle"],
                 expected_transaction_stage="archive_copying",
@@ -2746,11 +2298,7 @@ def build_worktable():
             self._run_export_failure(
                 fixture,
                 patchers=[
-                    mock.patch.object(
-                        exports,
-                        "_resolved_subroutine_artifacts",
-                        return_value=[subroutine_artifact],
-                    ),
+                    mock.patch.object(exports, "_resolved_subroutine_artifacts", return_value=[subroutine_artifact]),
                     mock.patch.object(
                         exports,
                         "_render_subroutine_manifest",
@@ -2795,15 +2343,9 @@ def build_worktable():
                     self._failed_post_package_validation_report(),
                 ],
             )
-            validation_report = json.loads(
-                (metadata_path.parent / "reports" / "validation_report.json").read_text(
-                    encoding="utf-8"
-                )
-            )
+            validation_report = json.loads((metadata_path.parent / "reports" / "validation_report.json").read_text(encoding="utf-8"))
             self.assertFalse(validation_report["ready"])
-            self.assertEqual(
-                validation_report["gates"][0]["summary"], "archive audit failed"
-            )
+            self.assertEqual(validation_report["gates"][0]["summary"], "archive audit failed")
 
     def test_export_quarantines_metadata_generation_failures(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -2823,14 +2365,7 @@ def build_worktable():
 
             self._run_export_failure(
                 fixture,
-                patchers=[
-                    mock.patch.object(
-                        Path,
-                        "write_text",
-                        autospec=True,
-                        side_effect=fail_metadata_write,
-                    )
-                ],
+                patchers=[mock.patch.object(Path, "write_text", autospec=True, side_effect=fail_metadata_write)],
                 expected_exception_substring="failed package moved to",
                 expected_ready_bundle_names=["existing-bundle"],
                 expected_transaction_stage="metadata_generation",
@@ -2844,20 +2379,13 @@ def build_worktable():
 
             def fail_ready_publish(source_root: Path, destination_root: Path) -> None:
                 destination = Path(destination_root)
-                if (
-                    destination.parent.resolve()
-                    == Path(fixture["ready_root"]).resolve()
-                ):
+                if destination.parent.resolve() == Path(fixture["ready_root"]).resolve():
                     raise PipelineError("final publication failed")
                 return real_move_bundle_root(source_root, destination_root)
 
             self._run_export_failure(
                 fixture,
-                patchers=[
-                    mock.patch.object(
-                        exports, "_move_bundle_root", side_effect=fail_ready_publish
-                    )
-                ],
+                patchers=[mock.patch.object(exports, "_move_bundle_root", side_effect=fail_ready_publish)],
                 expected_exception_substring="failed package moved to",
                 expected_ready_bundle_names=["existing-bundle"],
                 expected_transaction_stage="final_publication",
@@ -2873,9 +2401,7 @@ def build_worktable():
             metadata_before = bundle_metadata.read_text(encoding="utf-8")
             generation_manifest = fixture["tmp_path"] / "generation_manifest.json"
             workflow_report = fixture["tmp_path"] / "GENERATION_WORKFLOW.md"
-            generation_manifest.write_text(
-                '{"workflow_status": "ready_to_import"}', encoding="utf-8"
-            )
+            generation_manifest.write_text('{"workflow_status": "ready_to_import"}', encoding="utf-8")
             workflow_report.write_text("# Generation Workflow\n", encoding="utf-8")
             real_copy = exports._copy
 
@@ -2884,9 +2410,7 @@ def build_worktable():
                     raise OSError("generation manifest creation failed")
                 real_copy(source, destination)
 
-            with mock.patch.object(
-                exports, "_copy", side_effect=fail_generation_manifest_copy
-            ):
+            with mock.patch.object(exports, "_copy", side_effect=fail_generation_manifest_copy):
                 with self.assertRaises(PipelineError) as raised:
                     exports.attach_generation_reports_to_ready_bundles(
                         [item.destination for item in published_artifacts],
@@ -2896,15 +2420,9 @@ def build_worktable():
                     )
             self.assertIn("generation manifest creation failed", str(raised.exception))
             self.assertTrue(bundle_dir.exists())
-            self.assertEqual(
-                bundle_metadata.read_text(encoding="utf-8"), metadata_before
-            )
-            self.assertFalse(
-                (bundle_dir / "source" / "generation_manifest.json").exists()
-            )
-            self.assertFalse(
-                (bundle_dir / "source" / "GENERATION_WORKFLOW.md").exists()
-            )
+            self.assertEqual(bundle_metadata.read_text(encoding="utf-8"), metadata_before)
+            self.assertFalse((bundle_dir / "source" / "generation_manifest.json").exists())
+            self.assertFalse((bundle_dir / "source" / "GENERATION_WORKFLOW.md").exists())
             self._assert_quarantined_failure(
                 fixture,
                 expected_ready_bundle_names=["draft_v1", "existing-bundle"],
@@ -2961,10 +2479,7 @@ def build_worktable():
                     encoding="utf-8",
                 )
                 with zipfile.ZipFile(source_project, "w") as zf:
-                    zf.writestr(
-                        "Scripts/source_script.xscr",
-                        "<Root><ObjectName>SourceScript</ObjectName></Root>",
-                    )
+                    zf.writestr("Scripts/source_script.xscr", "<Root><ObjectName>SourceScript</ObjectName></Root>")
 
                 stage_root = exports.PACKAGE_STAGING_DIR.resolve()
                 ready_root = exports.READY_TO_IMPORT_DIR.resolve()
@@ -2981,11 +2496,7 @@ def build_worktable():
                     self.assertFalse(destination_path.exists())
                     return real_rename(src, dst)
 
-                preflight_report = {
-                    "ready": True,
-                    "gates": [],
-                    "validation_version": "test",
-                }
+                preflight_report = {"ready": True, "gates": [], "validation_version": "test"}
                 failed_report = {
                     "ready": False,
                     "gates": [
@@ -3004,9 +2515,7 @@ def build_worktable():
                     "validate_ready_to_import",
                     side_effect=[preflight_report, failed_report],
                 ), mock.patch.object(exports.os, "rename", side_effect=spy_replace):
-                    with self.assertRaisesRegex(
-                        PipelineError, "failed package moved to"
-                    ):
+                    with self.assertRaisesRegex(PipelineError, "failed package moved to"):
                         exports.export_ready_to_import(
                             xscr,
                             context_name="My Project",
@@ -3017,12 +2526,7 @@ def build_worktable():
                                 "name": "My Project",
                                 "root": str(tmp_path),
                                 "errors": [],
-                                "workspaces": [
-                                    {
-                                        "object_name": "780_Empty",
-                                        "guids": ["workspace-guid"],
-                                    }
-                                ],
+                                "workspaces": [{"object_name": "780_Empty", "guids": ["workspace-guid"]}],
                                 "labware_names": [],
                                 "liquid_classes": [],
                                 "rack_types": [],
@@ -3052,9 +2556,7 @@ def build_worktable():
                 self.assertFalse(metadata["ready_to_import"])
                 self.assertEqual(metadata["verification_state"], "failed_validation")
                 self.assertEqual(metadata["lifecycle"]["bundle_role"], "debug")
-                self.assertEqual(
-                    metadata["lifecycle"]["verification_state"], "failed_validation"
-                )
+                self.assertEqual(metadata["lifecycle"]["verification_state"], "failed_validation")
             finally:
                 exports.READY_TO_IMPORT_DIR = old_export_dir
                 exports.PACKAGE_STAGING_DIR = old_staging_dir
@@ -3072,12 +2574,8 @@ class ArchiveVerifierTests(unittest.TestCase):
     def tearDown(self):
         self._full_copy_env.stop()
 
-    def _write_datastore_archive(
-        self, path: Path, *, content_entries: list[str]
-    ) -> None:
-        entries_xml = "".join(
-            f"\t\t\t<Entry>{entry}</Entry>\r\n" for entry in content_entries
-        )
+    def _write_datastore_archive(self, path: Path, *, content_entries: list[str]) -> None:
+        entries_xml = "".join(f"\t\t\t<Entry>{entry}</Entry>\r\n" for entry in content_entries)
         script_payload = f"""<?xml version="1.0" encoding="utf-8"?>
 <sd:VxData>
   <Payload>
@@ -3142,9 +2640,7 @@ class ArchiveVerifierTests(unittest.TestCase):
                     "nodedescription.xml",
                 ],
             )
-            audit = exports.verify_generated_project_archive(
-                archive, bundle_root=archive.parent
-            )
+            audit = exports.verify_generated_project_archive(archive, bundle_root=archive.parent)
             self.assertTrue(audit["zip_ok"])
             self.assertEqual(audit["blocking"], [])
             self.assertEqual(audit["needs_review"], [])
@@ -3181,14 +2677,11 @@ class ArchiveVerifierTests(unittest.TestCase):
                 for name, payload in entries.items():
                     destination.writestr(name, payload)
 
-            audit = exports.verify_generated_project_archive(
-                archive, bundle_root=archive.parent
-            )
+            audit = exports.verify_generated_project_archive(archive, bundle_root=archive.parent)
 
             self.assertTrue(
                 any(item["kind"] == "invalid_checksum" for item in audit["blocking"])
             )
-
     def test_verify_metadata_entry_missing_is_blocking(self):
         with tempfile.TemporaryDirectory() as tmp:
             archive = Path(tmp) / "generated_project.zeia"
@@ -3200,15 +2693,8 @@ class ArchiveVerifierTests(unittest.TestCase):
                     "nodedescription.xml",
                 ],
             )
-            audit = exports.verify_generated_project_archive(
-                archive, bundle_root=archive.parent
-            )
-            self.assertTrue(
-                any(
-                    item["kind"] == "metadata_entry_missing"
-                    for item in audit["blocking"]
-                )
-            )
+            audit = exports.verify_generated_project_archive(archive, bundle_root=archive.parent)
+            self.assertTrue(any(item["kind"] == "metadata_entry_missing" for item in audit["blocking"]))
 
     def test_verify_unresolved_reference_is_needs_review(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -3223,15 +2709,9 @@ class ArchiveVerifierTests(unittest.TestCase):
 <LiquidClassName>Water Free Single</LiquidClassName>
 </Payload></VxData>""",
                 )
-            audit = exports.verify_generated_project_archive(
-                archive, bundle_root=archive.parent
-            )
+            audit = exports.verify_generated_project_archive(archive, bundle_root=archive.parent)
             self.assertEqual(audit["blocking"], [])
-            unresolved = [
-                item
-                for item in audit["needs_review"]
-                if item["kind"] == "unresolved_reference"
-            ]
+            unresolved = [item for item in audit["needs_review"] if item["kind"] == "unresolved_reference"]
             self.assertEqual(len(unresolved), 1)
             self.assertEqual(unresolved[0]["guid"], lc_guid)
 
@@ -3294,10 +2774,7 @@ class ArchiveVerifierTests(unittest.TestCase):
                 {
                     "relative_path": "direct-imports/projects/full-project/generated_project.zeia",
                     "source_project": "source.zeia",
-                    "main_script": {
-                        "replaced_entry": "",
-                        "object_name": "GeneratedScript",
-                    },
+                    "main_script": {"replaced_entry": "", "object_name": "GeneratedScript"},
                     "zip_valid": True,
                     "archive_audit": {
                         "zip_ok": True,
@@ -3322,9 +2799,7 @@ class ArchiveVerifierTests(unittest.TestCase):
         self.assertIn("WorkspaceOne", report)
         self.assertIn("import health only", report)
         self.assertIn("Gate 27 FluentControl import/load diagnostic", report)
-        self.assertIn(
-            "open the generated script in FluentControl Script Editor", report
-        )
+        self.assertIn("open the generated script in FluentControl Script Editor", report)
 
 
 class ArchiveWriterPostprocessTests(unittest.TestCase):
@@ -3344,10 +2819,12 @@ class ArchiveScriptIdentityAuditTests(unittest.TestCase):
     GUID = "41e40175-5ead-5db6-ac71-5a91505bbe50"
 
     def _write_archive(self, path: Path, *, node_folder: str) -> None:
-        script = stamp_checksum("""<sd:VxData><Payload>
+        script = stamp_checksum(
+            f"""<sd:VxData><Payload>
 <ObjectName>Verification_Script2</ObjectName>
 <ObjectSubfolderPath>Demo</ObjectSubfolderPath>
-</Payload><Checksum></Checksum></sd:VxData>""".encode())
+</Payload><Checksum></Checksum></sd:VxData>""".encode()
+        )
         assert script is not None
         with zipfile.ZipFile(path, "w") as archive:
             archive.writestr(f"DataStore/UserSpecific/{self.GUID}.xscr", script)
@@ -3373,9 +2850,7 @@ class ArchiveScriptIdentityAuditTests(unittest.TestCase):
             archive = Path(tmp) / "mismatch.zeia"
             self._write_archive(archive, node_folder="Alternate folder scripts")
 
-            audit = exports.verify_generated_project_archive(
-                archive, bundle_root=archive.parent
-            )
+            audit = exports.verify_generated_project_archive(archive, bundle_root=archive.parent)
 
         mismatches = [
             finding
@@ -3392,9 +2867,7 @@ class ArchiveScriptIdentityAuditTests(unittest.TestCase):
             archive = Path(tmp) / "matching.zeia"
             self._write_archive(archive, node_folder="Demo")
 
-            audit = exports.verify_generated_project_archive(
-                archive, bundle_root=archive.parent
-            )
+            audit = exports.verify_generated_project_archive(archive, bundle_root=archive.parent)
 
         self.assertFalse(
             any(
@@ -3509,9 +2982,7 @@ class DatastoreSubroutineMetadataTests(unittest.TestCase):
         self.assertEqual(
             exports._next_nodedescription_version("<V>5</V> <V>7</V> <V>3</V>"), 8
         )
-        self.assertEqual(
-            exports._next_nodedescription_version("<Payload></Payload>"), 1
-        )
+        self.assertEqual(exports._next_nodedescription_version("<Payload></Payload>"), 1)
 
     def test_replace_or_insert_simple_tag_treats_windows_paths_literally(self):
         block = "<S><Id>1</Id><N>MainScript</N><P>Demo</P></S>"
@@ -3562,13 +3033,7 @@ class DatastoreSubroutineMetadataTests(unittest.TestCase):
             source_dir = bundle_root / "source"
             reports_dir = source_dir / "reports"
             script_dir = bundle_root
-            compiled_xscr = (
-                bundle_root
-                / "direct-imports"
-                / "scripts"
-                / "full-script"
-                / "generated_script.xscr"
-            )
+            compiled_xscr = bundle_root / "direct-imports" / "scripts" / "full-script" / "generated_script.xscr"
             compiled_xscr.parent.mkdir(parents=True)
             source_dir.mkdir(parents=True)
             self._write_source_datastore_archive(source_project)
@@ -3649,23 +3114,14 @@ class DatastoreSubroutineMetadataTests(unittest.TestCase):
             self.assertEqual(record["filesystem_packaging"]["unresolved_paths"], [])
             with zipfile.ZipFile(destination) as zf:
                 names = {name.replace("\\", "/") for name in zf.namelist()}
-                self.assertTrue(
-                    any(
-                        name.startswith("fs/") and name.endswith("/step_001_image.png")
-                        for name in names
-                    )
-                )
-                script_text = _read_archive_text(
-                    zf, f"DataStore/UserSpecific/{self.MAIN_GUID}.xscr"
-                )
+                self.assertTrue(any(name.startswith("fs/") and name.endswith("/step_001_image.png") for name in names))
+                script_text = _read_archive_text(zf, f"DataStore/UserSpecific/{self.MAIN_GUID}.xscr")
 
             expected_path = (
                 r"C:\ProgramData\Tecan\VisionX\TouchToolsData\Images"
                 r"\MainScript_media\step_001_image.png"
             )
-            self.assertIn(
-                f"<SelectedImagePath>{expected_path}</SelectedImagePath>", script_text
-            )
+            self.assertIn(f"<SelectedImagePath>{expected_path}</SelectedImagePath>", script_text)
             self.assertIn(f"<File>{expected_path}</File>", script_text)
 
     def test_unique_project_guid_detects_collision(self):
@@ -3772,9 +3228,7 @@ class DatastoreSubroutineMetadataTests(unittest.TestCase):
             self.assertIn("<TV>2.0</TV>", with_dep_block)
 
             # (b) FileRef emitted only for the subroutine that declares a file dep.
-            self.assertIn(
-                "<FileRef>C:\\Tecan\\Images\\holder.jpg</FileRef>", with_dep_block
-            )
+            self.assertIn("<FileRef>C:\\Tecan\\Images\\holder.jpg</FileRef>", with_dep_block)
             self.assertNotIn("<FileRef>", no_dep_block)
             self.assertIn("fs/1/holder.jpg", normalized_names)
             self.assertEqual(packaged_asset, b"subroutine-only-asset")
@@ -3834,9 +3288,7 @@ class DatastoreSubroutineMetadataTests(unittest.TestCase):
             self.assertEqual(audit["blocking"], [])
             self.assertGreater(audit["added"][0]["version"], 0)
             # The "prefer replace over add" risk note is surfaced as a warning.
-            self.assertTrue(
-                any("ADDED to the base ZEIA" in w for w in record["warnings"])
-            )
+            self.assertTrue(any("ADDED to the base ZEIA" in w for w in record["warnings"]))
 
     def test_verify_added_subroutine_metadata_flags_defects(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -3856,11 +3308,7 @@ class DatastoreSubroutineMetadataTests(unittest.TestCase):
                 archive,
                 [
                     # malformed GUID -> blocking
-                    {
-                        "object_name": "BadGuid",
-                        "entry": "DataStore\\UserSpecific\\present.xscr",
-                        "guid": "not-a-guid",
-                    },
+                    {"object_name": "BadGuid", "entry": "DataStore\\UserSpecific\\present.xscr", "guid": "not-a-guid"},
                     # entry missing from archive -> blocking
                     {
                         "object_name": "Missing",
@@ -3881,11 +3329,7 @@ class ProjectAuditMergeTests(unittest.TestCase):
             [
                 {
                     "relative_path": "generated_project.zeia",
-                    "archive_audit": {
-                        "zip_ok": True,
-                        "blocking": [],
-                        "needs_review": [],
-                    },
+                    "archive_audit": {"zip_ok": True, "blocking": [], "needs_review": []},
                     "checksum_audit": {
                         "bridge_available": True,
                         "invalid_entries": ["Scripts/main.xscr"],
@@ -3904,11 +3348,7 @@ class ProjectAuditMergeTests(unittest.TestCase):
             [
                 {
                     "relative_path": "generated_project.zeia",
-                    "archive_audit": {
-                        "zip_ok": True,
-                        "blocking": [],
-                        "needs_review": [],
-                    },
+                    "archive_audit": {"zip_ok": True, "blocking": [], "needs_review": []},
                     "checksum_audit": {"bridge_available": True},
                     "dependencies_packaged": [
                         {
@@ -3950,8 +3390,8 @@ class ArchiveWindowsNameRestorationTests(unittest.TestCase):
                 # The signature starts at offset 6.
                 # name_len_offset is 28, so we need to pad 28 - 4 = 24 bytes (since PK\x01\x02 is 4 bytes).
                 payload.extend(b"\x00" * 24)
-                payload.extend((25).to_bytes(2, "little"))  # fake name_len = 25
-                payload.extend((1000).to_bytes(2, "little"))  # fake extra_len = 1000
+                payload.extend((25).to_bytes(2, "little")) # fake name_len = 25
+                payload.extend((1000).to_bytes(2, "little")) # fake extra_len = 1000
 
                 # extra_len ends at offset 32 relative to the signature.
                 # name_offset is 46, so we need 46 - 32 = 14 bytes padding.
@@ -3980,13 +3420,8 @@ class ArchiveWindowsNameRestorationTests(unittest.TestCase):
                 ret = zf.testzip()
                 self.assertIsNone(ret)
                 names = zf.namelist()
-                # Depending on zipfile implementation in python 3.12+ (which normalizes backslash), checking 'meta/file2.txt' is sufficient to prove no corruption occurred
-                self.assertTrue(
-                    any(
-                        name == "meta/file2.txt" or name == "meta\\file2.txt"
-                        for name in names
-                    )
-                )
+                # Verify that it correctly processed `meta/file2.txt` to `meta\\file2.txt`.
+                self.assertIn("meta\\file2.txt", names)
 
 
 if __name__ == "__main__":
