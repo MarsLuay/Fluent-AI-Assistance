@@ -4812,39 +4812,45 @@ def _restore_windows_datastore_zip_names(archive_path: Path) -> None:
 
     try:
         with zipfile.ZipFile(archive_path, "r") as zf:
-            for info in zf.infolist():
-                local_header_offset = info.header_offset
-                if data[local_header_offset : local_header_offset + 4] == b"PK\x03\x04":
-                    name_len = int.from_bytes(
-                        data[local_header_offset + 26 : local_header_offset + 28], "little"
-                    )
-                    filename = bytes(data[local_header_offset + 30 : local_header_offset + 30 + name_len])
-                    rewritten = _windows_datastore_zip_filename(filename)
+            infolist = zf.infolist()
+            cd_offset = zf.start_dir
 
+        # Process local headers and central directory entries based on parsed info
+        for info in infolist:
+            # Local header
+            local_header_offset = info.header_offset
+            if data[local_header_offset : local_header_offset + 4] == b"PK\x03\x04":
+                name_len = int.from_bytes(
+                    data[local_header_offset + 26 : local_header_offset + 28], "little"
+                )
+                filename = bytes(data[local_header_offset + 30 : local_header_offset + 30 + name_len])
+                # Verify that the filename matches the length and that we're editing the right name
+                if filename == info.orig_filename.encode('utf-8'):
+                    rewritten = _windows_datastore_zip_filename(filename)
                     if rewritten is not None and rewritten != filename and len(rewritten) == len(filename):
                         data[local_header_offset + 30 : local_header_offset + 30 + name_len] = rewritten
                         changed = True
 
-            cd_offset = zf.start_dir
-            for _ in zf.infolist():
-                if cd_offset >= len(data):
-                    break
+        for info in infolist:
+            if cd_offset >= len(data):
+                break
 
-                if data[cd_offset : cd_offset + 4] != b"PK\x01\x02":
-                    break
+            if data[cd_offset : cd_offset + 4] != b"PK\x01\x02":
+                break
 
-                filename_len = int.from_bytes(data[cd_offset + 28 : cd_offset + 30], "little")
-                extra_len = int.from_bytes(data[cd_offset + 30 : cd_offset + 32], "little")
-                comment_len = int.from_bytes(data[cd_offset + 32 : cd_offset + 34], "little")
+            filename_len = int.from_bytes(data[cd_offset + 28 : cd_offset + 30], "little")
+            extra_len = int.from_bytes(data[cd_offset + 30 : cd_offset + 32], "little")
+            comment_len = int.from_bytes(data[cd_offset + 32 : cd_offset + 34], "little")
 
-                filename = bytes(data[cd_offset + 46 : cd_offset + 46 + filename_len])
+            filename = bytes(data[cd_offset + 46 : cd_offset + 46 + filename_len])
+            if filename == info.orig_filename.encode('utf-8'):
                 rewritten = _windows_datastore_zip_filename(filename)
 
                 if rewritten is not None and rewritten != filename and len(rewritten) == len(filename):
                     data[cd_offset + 46 : cd_offset + 46 + filename_len] = rewritten
                     changed = True
 
-                cd_offset += 46 + filename_len + extra_len + comment_len
+            cd_offset += 46 + filename_len + extra_len + comment_len
 
     except zipfile.BadZipFile:
         pass
