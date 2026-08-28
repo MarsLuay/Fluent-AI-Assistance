@@ -985,18 +985,18 @@ def pattern_index_prompt_lines(pattern_index: Any) -> list[str]:
 
 def copy_to_clipboard(text: str) -> bool:
     system = platform.system().lower()
-    commands: list[list[str] | str]
+    commands: list[list[str]]
     if system == "darwin":
         commands = [["pbcopy"]]
     elif system == "windows":
-        commands = ["clip"]
+        commands = [["clip"]]
     else:
         commands = [["wl-copy"], ["xclip", "-selection", "clipboard"], ["xsel", "--clipboard", "--input"]]
     for command in commands:
-        if isinstance(command, list) and shutil.which(command[0]) is None:
+        if shutil.which(command[0]) is None:
             continue
         try:
-            subprocess.run(command, input=text, text=True, check=True, shell=isinstance(command, str))
+            subprocess.run(command, input=text, text=True, check=True)
             return True
         except Exception:
             continue
