@@ -1,10 +1,7 @@
 """FluentControl protocol-variable tokens for compile-time field references."""
 
-from __future__ import annotations
-
 import re
 from dataclasses import dataclass
-from typing import Union
 
 FC_VAR_PREFIX = "@fc:"
 
@@ -39,11 +36,11 @@ def decode_fc_variable(value: str) -> str | None:
     """Return the FC variable name when ``value`` is an encoded IR reference."""
     if not isinstance(value, str) or not value.startswith(FC_VAR_PREFIX):
         return None
-    name = value[len(FC_VAR_PREFIX):]
+    name = value[len(FC_VAR_PREFIX) :]
     return name if name else None
 
 
-def as_labware_type(value: Union[str, FCVariableToken]) -> str:
+def as_labware_type(value: str | FCVariableToken) -> str:
     """Normalize a catalog name or FC variable token for IR storage."""
     if isinstance(value, FCVariableToken):
         return encode_fc_variable(value.name)
