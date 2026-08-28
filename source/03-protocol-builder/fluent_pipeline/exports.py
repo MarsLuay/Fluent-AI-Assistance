@@ -58,7 +58,12 @@ from .expression_provenance import (
     EXPRESSION_PROVENANCE_FILENAME,
     source_preserved_expression_context_from_bundle,
 )
-from .protocol_ir import load_protocol_ir, protocol_ir_from_python, render_recreate_markdown, write_protocol_ir
+from .protocol_ir import (
+    load_protocol_ir,
+    protocol_ir_from_python,
+    render_recreate_markdown,
+    write_protocol_ir,
+)
 from .protocol_ir import (
     apply_touchtools_media_path_map_to_xscr,
     build_media_path_map,
@@ -101,7 +106,6 @@ from .zeia_filesystem import (
     strip_orphan_touchtools_media_file_references,
 )
 
-
 BUNDLE_SCHEMA_VERSION = READY_BUNDLE_SCHEMA_VERSION
 STRICT_REPORT_FILENAMES = {
     "project_report": "project_report.md",
@@ -122,8 +126,14 @@ FLUENT_IMPORT_UNSUPPORTED_DATASTORE_TYPES = frozenset(
 )
 FLUENT_IMPORT_UNSUPPORTED_DATASTORE_KEYS = frozenset({"5", "9", "12"})
 _VERSIONED_FOLDER_RE = re.compile(r"^(?P<base>.+)_v(?P<version>\d+)$", re.IGNORECASE)
-_ARCHIVE_WRITER_SHARED_DLL = Path(r"C:\Program Files (x86)\Common Files\Tecan\Core\Recent\Tecan.VisionX.ExportImportArchive.Shared.dll")
-_ARCHIVE_WRITER_IMPL_DLL = Path(r"C:\Program Files (x86)\Tecan\FluentControl\Tecan.VisionX.ExportImportArchive.dll")
+_ARCHIVE_WRITER_SHARED_DLL = Path(
+    r"C:\Program Files (x86)\Common Files\Tecan\Core\Recent\Tecan.VisionX.ExportImportArchive.Shared.dll"
+)
+_ARCHIVE_WRITER_IMPL_DLL = Path(
+    r"C:\Program Files (x86)\Tecan\FluentControl\Tecan.VisionX.ExportImportArchive.dll"
+)
+
+
 class _ArchiveWriterUnavailable(RuntimeError):
     """Raised when the FluentControl archive writer cannot run locally."""
 
@@ -163,7 +173,9 @@ class ReadyBundlePublishPlan:
 class _ReadyBundleTransactionError(PipelineError):
     """Raised when a staged bundle fails at a specific transaction boundary."""
 
-    def __init__(self, failure_point: str, message: str, *, original: BaseException | None = None):
+    def __init__(
+        self, failure_point: str, message: str, *, original: BaseException | None = None
+    ):
         super().__init__(message)
         self.failure_point = failure_point
         self.original = original
@@ -177,7 +189,9 @@ def _raise_bundle_transaction_error(
 ) -> None:
     if isinstance(exc, _ReadyBundleTransactionError):
         raise exc
-    raise _ReadyBundleTransactionError(failure_point, f"{detail}: {exc}", original=exc) from exc
+    raise _ReadyBundleTransactionError(
+        failure_point, f"{detail}: {exc}", original=exc
+    ) from exc
 
 
 def export_ready_to_import(
@@ -212,11 +226,15 @@ def export_ready_to_import(
     finalization_source = (
         protocol_ir
         if protocol_ir is not None and protocol_ir.exists()
-        else draft_path
-        if draft_path is not None and draft_path.exists()
-        else source_xscr
-        if source_xscr is not None and source_xscr.exists()
-        else compiled_xscr
+        else (
+            draft_path
+            if draft_path is not None and draft_path.exists()
+            else (
+                source_xscr
+                if source_xscr is not None and source_xscr.exists()
+                else compiled_xscr
+            )
+        )
     )
     finalization_report = finalize_compiled_xscr(
         compiled_xscr,
@@ -229,7 +247,10 @@ def export_ready_to_import(
         {"source_ir_origin": "export_ready_to_import"},
     )
     if not finalization_report.ok:
-        summary = "; ".join(finalization_report.errors[:3]) or "mandatory compiled XSCR finalization failed"
+        summary = (
+            "; ".join(finalization_report.errors[:3])
+            or "mandatory compiled XSCR finalization failed"
+        )
         raise PipelineError(f"compiled XSCR finalization failed: {summary}")
 
     script_name = _safe_label(bundle_name or compiled_xscr.stem)
@@ -293,34 +314,74 @@ def export_ready_to_import(
 
         protocol_ir_dest = source_dir / "protocol.ir.json"
         if protocol_ir is not None and protocol_ir.exists():
-            _copy_record(protocol_ir, protocol_ir_dest, "protocol-ir", exports, copied_files, bundle_root=bundle_root)
+            _copy_record(
+                protocol_ir,
+                protocol_ir_dest,
+                "protocol-ir",
+                exports,
+                copied_files,
+                bundle_root=bundle_root,
+            )
         elif draft_path is not None and draft_path.exists():
             _write_protocol_ir_from_draft(draft_path, protocol_ir_dest)
-            exports.append(ExportedArtifact(protocol_ir_dest, protocol_ir_dest, "protocol-ir"))
-            copied_files.append(_file_record("protocol-ir", protocol_ir_dest, protocol_ir_dest, bundle_root=bundle_root))
+            exports.append(
+                ExportedArtifact(protocol_ir_dest, protocol_ir_dest, "protocol-ir")
+            )
+            copied_files.append(
+                _file_record(
+                    "protocol-ir",
+                    protocol_ir_dest,
+                    protocol_ir_dest,
+                    bundle_root=bundle_root,
+                )
+            )
         else:
             _write_unavailable_json(
                 protocol_ir_dest,
                 "canonical protocol IR was not provided and could not be derived",
             )
-            exports.append(ExportedArtifact(protocol_ir_dest, protocol_ir_dest, "protocol-ir"))
-            copied_files.append(_file_record("protocol-ir", protocol_ir_dest, protocol_ir_dest, bundle_root=bundle_root))
+            exports.append(
+                ExportedArtifact(protocol_ir_dest, protocol_ir_dest, "protocol-ir")
+            )
+            copied_files.append(
+                _file_record(
+                    "protocol-ir",
+                    protocol_ir_dest,
+                    protocol_ir_dest,
+                    bundle_root=bundle_root,
+                )
+            )
 
         draft_dest = source_dir / "protocol_draft.py"
         if draft_path is not None and draft_path.exists():
-            _copy_record(draft_path, draft_dest, "protocol-draft", exports, copied_files, bundle_root=bundle_root)
+            _copy_record(
+                draft_path,
+                draft_dest,
+                "protocol-draft",
+                exports,
+                copied_files,
+                bundle_root=bundle_root,
+            )
         else:
             draft_dest.write_text(
                 "# No protocol draft was exported with this bundle.\n",
                 encoding="utf-8",
             )
             exports.append(ExportedArtifact(draft_dest, draft_dest, "protocol-draft"))
-            copied_files.append(_file_record("protocol-draft", draft_dest, draft_dest, bundle_root=bundle_root))
+            copied_files.append(
+                _file_record(
+                    "protocol-draft", draft_dest, draft_dest, bundle_root=bundle_root
+                )
+            )
 
         script_dest = full_script_dir / "generated_script.xscr"
         _copy(compiled_xscr, script_dest)
         exports.append(ExportedArtifact(compiled_xscr, script_dest, "compiled-script"))
-        copied_files.append(_file_record("compiled-script", compiled_xscr, script_dest, bundle_root=bundle_root))
+        copied_files.append(
+            _file_record(
+                "compiled-script", compiled_xscr, script_dest, bundle_root=bundle_root
+            )
+        )
         media_path_map, generated_media_dir = _prepare_generated_touchtools_media(
             protocol_ir_dest,
             script_dest,
@@ -333,7 +394,14 @@ def export_ready_to_import(
         worklist_present = bool(worklist and worklist.exists())
         if worklist_present:
             worklist_dest = direct_worklists_dir / "generated_worklist.gwl"
-            _copy_record(worklist, worklist_dest, "generated-worklist", exports, copied_files, bundle_root=bundle_root)
+            _copy_record(
+                worklist,
+                worklist_dest,
+                "generated-worklist",
+                exports,
+                copied_files,
+                bundle_root=bundle_root,
+            )
 
         source_paths = _dedupe_paths(
             [
@@ -349,9 +417,18 @@ def export_ready_to_import(
                 continue
             kind = _original_source_kind(source)
             source_counters[kind] = source_counters.get(kind, 0) + 1
-            destination = original_sources_dir / _original_source_name(source, kind, source_counters[kind])
+            destination = original_sources_dir / _original_source_name(
+                source, kind, source_counters[kind]
+            )
             try:
-                _copy_record(source, destination, kind, exports, copied_files, bundle_root=bundle_root)
+                _copy_record(
+                    source,
+                    destination,
+                    kind,
+                    exports,
+                    copied_files,
+                    bundle_root=bundle_root,
+                )
             except Exception as exc:
                 _raise_bundle_transaction_error(
                     "archive_copying",
@@ -383,8 +460,17 @@ def export_ready_to_import(
         if subroutine_artifacts:
             for index, item in enumerate(subroutine_artifacts, start=1):
                 source = item["path"]
-                destination = direct_subroutines_dir / _subroutine_artifact_name(item, index)
-                _copy_record(source, destination, "subroutine-script", exports, copied_files, bundle_root=bundle_root)
+                destination = direct_subroutines_dir / _subroutine_artifact_name(
+                    item, index
+                )
+                _copy_record(
+                    source,
+                    destination,
+                    "subroutine-script",
+                    exports,
+                    copied_files,
+                    bundle_root=bundle_root,
+                )
                 subroutine_records.append(
                     {
                         "ref": item.get("ref", ""),
@@ -395,7 +481,9 @@ def export_ready_to_import(
                         "version": item.get("version", ""),
                         "source_context": item.get("source_context", ""),
                         "source_path": str(source),
-                        "relative_path": _bundle_relative_path(destination, bundle_root=bundle_root),
+                        "relative_path": _bundle_relative_path(
+                            destination, bundle_root=bundle_root
+                        ),
                         "ambiguous": bool(item.get("ambiguous")),
                         "alternatives": item.get("alternatives") or [],
                     }
@@ -403,22 +491,37 @@ def export_ready_to_import(
             manifest_dest = source_subroutines_dir / "SUBROUTINES.md"
             ensure_parent(manifest_dest)
             try:
-                manifest_dest.write_text(_render_subroutine_manifest(subroutine_records), encoding="utf-8")
+                manifest_dest.write_text(
+                    _render_subroutine_manifest(subroutine_records), encoding="utf-8"
+                )
             except Exception as exc:
                 _raise_bundle_transaction_error(
                     "manifest_construction",
                     exc,
                     detail=f"Could not write staged subroutine manifest {manifest_dest}",
                 )
-            exports.append(ExportedArtifact(manifest_dest, manifest_dest, "subroutine-manifest"))
-            copied_files.append(_file_record("subroutine-manifest", manifest_dest, manifest_dest, bundle_root=bundle_root))
+            exports.append(
+                ExportedArtifact(manifest_dest, manifest_dest, "subroutine-manifest")
+            )
+            copied_files.append(
+                _file_record(
+                    "subroutine-manifest",
+                    manifest_dest,
+                    manifest_dest,
+                    bundle_root=bundle_root,
+                )
+            )
 
         hardware_report = _resolved_hardware_artifacts(
             source_manifest,
             script_paths=[
                 *(source_scripts or []),
                 *([source_xscr] if source_xscr is not None else []),
-                *[Path(item["path"]) for item in subroutine_artifacts if item.get("path")],
+                *[
+                    Path(item["path"])
+                    for item in subroutine_artifacts
+                    if item.get("path")
+                ],
             ],
         )
         if _has_hardware_evidence(hardware_report):
@@ -481,7 +584,11 @@ def export_ready_to_import(
             script_paths=[
                 *(source_scripts or []),
                 *([source_xscr] if source_xscr is not None else []),
-                *[Path(item["path"]) for item in subroutine_artifacts if item.get("path")],
+                *[
+                    Path(item["path"])
+                    for item in subroutine_artifacts
+                    if item.get("path")
+                ],
             ],
             request_spec=request_spec,
         )
@@ -497,7 +604,9 @@ def export_ready_to_import(
         try:
             project_import_records = _write_project_import_archives(
                 source_projects or [],
-                filesystem_source_archives=filesystem_source_projects or source_projects or [],
+                filesystem_source_archives=filesystem_source_projects
+                or source_projects
+                or [],
                 compiled_xscr=packaged_xscr,
                 destination_dir=direct_projects_dir,
                 bundle_root=bundle_root,
@@ -533,7 +642,10 @@ def export_ready_to_import(
             )
             # Re-validate now that the generated ZEIA exists on disk: the pre-flight run
             # above can only predict, but Gate 23/24 can audit the actual archive.
-            post_package_context = {**(validation_context or {}), **_merge_project_audits(project_import_records)}
+            post_package_context = {
+                **(validation_context or {}),
+                **_merge_project_audits(project_import_records),
+            }
             try:
                 validation_report = validate_ready_to_import(
                     compiled_xscr=packaged_xscr,
@@ -572,7 +684,11 @@ def export_ready_to_import(
         )
         readiness_status = readiness_status_from_readiness(
             readiness,
-            workflow_status="ready_to_import" if validation_report.get("ready") else "validated_not_ready",
+            workflow_status=(
+                "ready_to_import"
+                if validation_report.get("ready")
+                else "validated_not_ready"
+            ),
         )
         embed_readiness(
             validation_report,
@@ -585,27 +701,67 @@ def export_ready_to_import(
             destination = reports_dir / filename
             report_source = report_map.get(key)
             if report_source is not None and report_source.exists():
-                _copy_record(report_source, destination, key, exports, copied_files, bundle_root=bundle_root)
+                _copy_record(
+                    report_source,
+                    destination,
+                    key,
+                    exports,
+                    copied_files,
+                    bundle_root=bundle_root,
+                )
             else:
                 destination.write_text(_placeholder_report(key), encoding="utf-8")
                 exports.append(ExportedArtifact(destination, destination, key))
-                copied_files.append(_file_record(key, destination, destination, bundle_root=bundle_root))
+                copied_files.append(
+                    _file_record(key, destination, destination, bundle_root=bundle_root)
+                )
 
-        for extra_index, source in enumerate(report_map.get("supporting_reports", []), start=1):
+        for extra_index, source in enumerate(
+            report_map.get("supporting_reports", []), start=1
+        ):
             if not source.exists():
                 continue
-            destination = reports_dir / f"supporting_report_{extra_index}{source.suffix or '.md'}"
-            _copy_record(source, destination, "supporting-report", exports, copied_files, bundle_root=bundle_root)
+            destination = (
+                reports_dir / f"supporting_report_{extra_index}{source.suffix or '.md'}"
+            )
+            _copy_record(
+                source,
+                destination,
+                "supporting-report",
+                exports,
+                copied_files,
+                bundle_root=bundle_root,
+            )
 
         validation_dest = reports_dir / "validation_report.md"
         validation_json_dest = reports_dir / "validation_report.json"
-        validation_dest.write_text(render_validation_markdown(validation_report), encoding="utf-8")
+        validation_dest.write_text(
+            render_validation_markdown(validation_report), encoding="utf-8"
+        )
         write_json(validation_json_dest, validation_report)
-        exports.append(ExportedArtifact(validation_dest, validation_dest, "validation-report"))
-        copied_files.append(_file_record("validation-report", validation_dest, validation_dest, bundle_root=bundle_root))
-        exports.append(ExportedArtifact(validation_json_dest, validation_json_dest, "validation-report-json"))
+        exports.append(
+            ExportedArtifact(validation_dest, validation_dest, "validation-report")
+        )
         copied_files.append(
-            _file_record("validation-report-json", validation_json_dest, validation_json_dest, bundle_root=bundle_root)
+            _file_record(
+                "validation-report",
+                validation_dest,
+                validation_dest,
+                bundle_root=bundle_root,
+            )
+        )
+        exports.append(
+            ExportedArtifact(
+                validation_json_dest, validation_json_dest, "validation-report-json"
+            )
+        )
+        copied_files.append(
+            _file_record(
+                "validation-report-json",
+                validation_json_dest,
+                validation_json_dest,
+                bundle_root=bundle_root,
+            )
         )
 
         worktable_changes_dest = source_dir / "worktable_changes.md"
@@ -625,18 +781,36 @@ def export_ready_to_import(
             source_xscr=source_xscr,
             source_scripts=source_scripts or [],
         ):
-            exports.append(ExportedArtifact(worktable_changes_dest, worktable_changes_dest, "worktable-changes"))
+            exports.append(
+                ExportedArtifact(
+                    worktable_changes_dest, worktable_changes_dest, "worktable-changes"
+                )
+            )
             copied_files.append(
-                _file_record("worktable-changes", worktable_changes_dest, worktable_changes_dest, bundle_root=bundle_root)
+                _file_record(
+                    "worktable-changes",
+                    worktable_changes_dest,
+                    worktable_changes_dest,
+                    bundle_root=bundle_root,
+                )
             )
         else:
             worktable_changes_dest.write_text(
                 _render_worktable_changes_unavailable(protocol_ir_dest),
                 encoding="utf-8",
             )
-            exports.append(ExportedArtifact(worktable_changes_dest, worktable_changes_dest, "worktable-changes"))
+            exports.append(
+                ExportedArtifact(
+                    worktable_changes_dest, worktable_changes_dest, "worktable-changes"
+                )
+            )
             copied_files.append(
-                _file_record("worktable-changes", worktable_changes_dest, worktable_changes_dest, bundle_root=bundle_root)
+                _file_record(
+                    "worktable-changes",
+                    worktable_changes_dest,
+                    worktable_changes_dest,
+                    bundle_root=bundle_root,
+                )
             )
 
         worktable_patch_dest = source_dir / "worktable.patch.json"
@@ -656,36 +830,75 @@ def export_ready_to_import(
             source_xscr=source_xscr,
             source_scripts=source_scripts or [],
         ):
-            exports.append(ExportedArtifact(worktable_patch_dest, worktable_patch_dest, "worktable-patch"))
+            exports.append(
+                ExportedArtifact(
+                    worktable_patch_dest, worktable_patch_dest, "worktable-patch"
+                )
+            )
             copied_files.append(
-                _file_record("worktable-patch", worktable_patch_dest, worktable_patch_dest, bundle_root=bundle_root)
+                _file_record(
+                    "worktable-patch",
+                    worktable_patch_dest,
+                    worktable_patch_dest,
+                    bundle_root=bundle_root,
+                )
             )
         else:
             worktable_patch_dest.write_text(
                 _render_worktable_patch_unavailable(protocol_ir_dest),
                 encoding="utf-8",
             )
-            exports.append(ExportedArtifact(worktable_patch_dest, worktable_patch_dest, "worktable-patch"))
+            exports.append(
+                ExportedArtifact(
+                    worktable_patch_dest, worktable_patch_dest, "worktable-patch"
+                )
+            )
             copied_files.append(
-                _file_record("worktable-patch", worktable_patch_dest, worktable_patch_dest, bundle_root=bundle_root)
+                _file_record(
+                    "worktable-patch",
+                    worktable_patch_dest,
+                    worktable_patch_dest,
+                    bundle_root=bundle_root,
+                )
             )
 
         request_spec_dest = source_dir / "request.spec.yaml"
         if request_spec is not None and request_spec.exists():
-            _copy_record(request_spec, request_spec_dest, "request-spec", exports, copied_files, bundle_root=bundle_root)
+            _copy_record(
+                request_spec,
+                request_spec_dest,
+                "request-spec",
+                exports,
+                copied_files,
+                bundle_root=bundle_root,
+            )
         else:
             request_spec_dest.write_text(
                 _minimal_harness_request_spec_yaml(script_name),
                 encoding="utf-8",
             )
-            exports.append(ExportedArtifact(request_spec_dest, request_spec_dest, "request-spec"))
+            exports.append(
+                ExportedArtifact(request_spec_dest, request_spec_dest, "request-spec")
+            )
             copied_files.append(
-                _file_record("request-spec", request_spec_dest, request_spec_dest, bundle_root=bundle_root)
+                _file_record(
+                    "request-spec",
+                    request_spec_dest,
+                    request_spec_dest,
+                    bundle_root=bundle_root,
+                )
             )
 
         validation_diff_dest = source_dir / "validation_diff.md"
         if validation_diff is not None and validation_diff.exists():
-            _copy_record(validation_diff, validation_diff_dest, "validation-diff", exports, copied_files, bundle_root=bundle_root)
+            _copy_record(
+                validation_diff,
+                validation_diff_dest,
+                "validation-diff",
+                exports,
+                copied_files,
+                bundle_root=bundle_root,
+            )
 
         validation_diff_json_dest = source_dir / "validation_diff.json"
         if validation_diff_json is not None and validation_diff_json.exists():
@@ -701,11 +914,19 @@ def export_ready_to_import(
         hardware_evidence_present = _has_hardware_evidence(hardware_report)
         hardware_connectors_present = _has_packaged_hardware_connectors(hardware_report)
         full_zeia_export = (validation_context or {}).get("full_zeia_export") or {}
-        approved_partial = bool((validation_context or {}).get("partial_zeia_export_approved"))
-        workflow_status = "ready_to_import" if validation_report.get("ready") else "validated_not_ready"
+        approved_partial = bool(
+            (validation_context or {}).get("partial_zeia_export_approved")
+        )
+        workflow_status = (
+            "ready_to_import"
+            if validation_report.get("ready")
+            else "validated_not_ready"
+        )
         lifecycle = lifecycle_metadata(
             bundle_role="ready" if validation_report.get("ready") else "debug",
-            source_export_kind=source_export_kind(full_zeia_export, approved_partial=approved_partial),
+            source_export_kind=source_export_kind(
+                full_zeia_export, approved_partial=approved_partial
+            ),
             verification_state=verification_state_from_readiness(
                 ready_to_import=bool(validation_report.get("ready")),
                 readiness=readiness,
@@ -754,7 +975,11 @@ def export_ready_to_import(
                         "Import this ZEIA when you want FluentControl's archive importer to add the "
                         "generated script object while resolving existing context dependencies from the target system."
                     ),
-                    "packaging_method": project_import_records[0].get("packaging_method") if project_import_records else None,
+                    "packaging_method": (
+                        project_import_records[0].get("packaging_method")
+                        if project_import_records
+                        else None
+                    ),
                 }
                 if project_import_records
                 else None
@@ -796,12 +1021,34 @@ def export_ready_to_import(
                 "direct_import_scripts": "direct-imports/scripts/",
                 "full_script_folder": "direct-imports/scripts/full-script/",
                 "generated_script": "direct-imports/scripts/full-script/generated_script.xscr",
-                "subroutines": "direct-imports/scripts/subroutines/" if subroutine_records else None,
-                "generated_worklist": "direct-imports/worklists/generated_worklist.gwl" if worklist_present else None,
-                "hardware_connectors": "direct-imports/hardware-connectors/" if hardware_connectors_present else None,
-                "project_imports": "direct-imports/projects/" if project_import_records else None,
-                "full_project_folder": "direct-imports/projects/full-project/" if project_import_records else None,
-                "generated_project": "direct-imports/projects/full-project/generated_project.zeia" if project_import_records else None,
+                "subroutines": (
+                    "direct-imports/scripts/subroutines/"
+                    if subroutine_records
+                    else None
+                ),
+                "generated_worklist": (
+                    "direct-imports/worklists/generated_worklist.gwl"
+                    if worklist_present
+                    else None
+                ),
+                "hardware_connectors": (
+                    "direct-imports/hardware-connectors/"
+                    if hardware_connectors_present
+                    else None
+                ),
+                "project_imports": (
+                    "direct-imports/projects/" if project_import_records else None
+                ),
+                "full_project_folder": (
+                    "direct-imports/projects/full-project/"
+                    if project_import_records
+                    else None
+                ),
+                "generated_project": (
+                    "direct-imports/projects/full-project/generated_project.zeia"
+                    if project_import_records
+                    else None
+                ),
                 "source": "source/",
                 "protocol_ir": "source/protocol.ir.json",
                 "expression_provenance": (
@@ -811,28 +1058,66 @@ def export_ready_to_import(
                 ),
                 "protocol_draft": "source/protocol_draft.py",
                 "original_sources": "source/original-sources/",
-                "subroutine_manifest": "source/subroutines/SUBROUTINES.md" if subroutine_records else None,
-                "hardware": "source/hardware/" if hardware_evidence_present else None,
-                "hardware_manifest": "source/hardware/hardware_manifest.json" if hardware_evidence_present else None,
-                "labware_catalog": "source/labware_catalog.json" if labware_catalog_dest else None,
-                "connector_coverage": "source/connector_coverage.json" if connector_coverage_dest else None,
-                "connector_graph": "source/connector_graph.json" if connector_graph_dest else None,
-                "liquid_classes": "source/liquid_classes.json" if liquid_classes_dest else None,
-                "driver_macros": "source/driver_macros.json" if driver_macros_dest else None,
-                "script_folder_bindings": (
-                    "source/script_folder_bindings.json" if script_folder_bindings_dest else None
+                "subroutine_manifest": (
+                    "source/subroutines/SUBROUTINES.md" if subroutine_records else None
                 ),
-                "hardware_pins_checklist": "source/HARDWARE_PINS.md" if hardware_evidence_present else None,
+                "hardware": "source/hardware/" if hardware_evidence_present else None,
+                "hardware_manifest": (
+                    "source/hardware/hardware_manifest.json"
+                    if hardware_evidence_present
+                    else None
+                ),
+                "labware_catalog": (
+                    "source/labware_catalog.json" if labware_catalog_dest else None
+                ),
+                "connector_coverage": (
+                    "source/connector_coverage.json"
+                    if connector_coverage_dest
+                    else None
+                ),
+                "connector_graph": (
+                    "source/connector_graph.json" if connector_graph_dest else None
+                ),
+                "liquid_classes": (
+                    "source/liquid_classes.json" if liquid_classes_dest else None
+                ),
+                "driver_macros": (
+                    "source/driver_macros.json" if driver_macros_dest else None
+                ),
+                "script_folder_bindings": (
+                    "source/script_folder_bindings.json"
+                    if script_folder_bindings_dest
+                    else None
+                ),
+                "hardware_pins_checklist": (
+                    "source/HARDWARE_PINS.md" if hardware_evidence_present else None
+                ),
                 "method_touchtools_readiness": "source/METHOD_TOUCHTOOLS_READINESS.md",
                 "method_touchtools_readiness_json": "source/reports/method_touchtools_readiness.json",
-                "project_import_report": "source/reports/project_import_report.md" if project_import_records else None,
-                "project_import_report_json": "source/reports/project_import_report.json" if project_import_records else None,
+                "project_import_report": (
+                    "source/reports/project_import_report.md"
+                    if project_import_records
+                    else None
+                ),
+                "project_import_report_json": (
+                    "source/reports/project_import_report.json"
+                    if project_import_records
+                    else None
+                ),
                 "reports": "source/reports/",
                 "worktable_changes": "source/worktable_changes.md",
                 "worktable_patch": "source/worktable.patch.json",
-                "request_spec": "source/request.spec.yaml" if request_spec is not None else None,
-                "validation_diff": "source/validation_diff.md" if validation_diff is not None else None,
-                "validation_diff_json": "source/validation_diff.json" if validation_diff_json is not None else None,
+                "request_spec": (
+                    "source/request.spec.yaml" if request_spec is not None else None
+                ),
+                "validation_diff": (
+                    "source/validation_diff.md" if validation_diff is not None else None
+                ),
+                "validation_diff_json": (
+                    "source/validation_diff.json"
+                    if validation_diff_json is not None
+                    else None
+                ),
                 "validation_report": "source/reports/validation_report.md",
                 "validation_report_json": "source/reports/validation_report.json",
                 "metadata": "source/metadata.json",
@@ -855,17 +1140,31 @@ def export_ready_to_import(
             request_spec_present=request_spec is not None,
         ):
             exports.append(ExportedArtifact(guide_dest, guide_dest, "recreate-guide"))
-            copied_files.append(_file_record("recreate-guide", guide_dest, guide_dest, bundle_root=bundle_root))
+            copied_files.append(
+                _file_record(
+                    "recreate-guide", guide_dest, guide_dest, bundle_root=bundle_root
+                )
+            )
         else:
             _write_recreate_unavailable(protocol_ir_dest, guide_dest)
             exports.append(ExportedArtifact(guide_dest, guide_dest, "recreate-guide"))
-            copied_files.append(_file_record("recreate-guide", guide_dest, guide_dest, bundle_root=bundle_root))
+            copied_files.append(
+                _file_record(
+                    "recreate-guide", guide_dest, guide_dest, bundle_root=bundle_root
+                )
+            )
 
-        copied_files.append(_file_record("metadata", metadata_dest, metadata_dest, bundle_root=bundle_root))
+        copied_files.append(
+            _file_record(
+                "metadata", metadata_dest, metadata_dest, bundle_root=bundle_root
+            )
+        )
         metadata["files"] = copied_files
         ensure_parent(metadata_dest)
         try:
-            metadata_dest.write_text(json.dumps(metadata, indent=2, sort_keys=True), encoding="utf-8")
+            metadata_dest.write_text(
+                json.dumps(metadata, indent=2, sort_keys=True), encoding="utf-8"
+            )
         except Exception as exc:
             _raise_bundle_transaction_error(
                 "metadata_generation",
@@ -892,7 +1191,9 @@ def export_ready_to_import(
             verification_state=verification_state,
             readiness_status=verification_state,
         )
-        raise PipelineError(f"{exc}; failed package moved to {failed_bundle_path}") from exc
+        raise PipelineError(
+            f"{exc}; failed package moved to {failed_bundle_path}"
+        ) from exc
     except Exception as exc:
         failed_bundle_path = _quarantine_bundle_transaction_failure(
             script_dir,
@@ -905,7 +1206,9 @@ def export_ready_to_import(
             failure_point="bundle_assembly",
             error=exc,
         )
-        raise PipelineError(f"Could not assemble staged ready bundle: {exc}; failed package moved to {failed_bundle_path}") from exc
+        raise PipelineError(
+            f"Could not assemble staged ready bundle: {exc}; failed package moved to {failed_bundle_path}"
+        ) from exc
 
     stage = ReadyBundleStage(
         staging_root=staging_run_root,
@@ -950,7 +1253,9 @@ def export_ready_to_import(
             verification_state="failed_validation",
             readiness_status="failed_validation",
         )
-        raise PipelineError(f"{failure}; failed package moved to {failed_bundle_path}") from failure
+        raise PipelineError(
+            f"{failure}; failed package moved to {failed_bundle_path}"
+        ) from failure
     try:
         return publish_ready_to_import_zeia(stage)
     except Exception as exc:
@@ -965,7 +1270,9 @@ def export_ready_to_import(
             failure_point="final_publication",
             error=exc,
         )
-        raise PipelineError(f"{exc}; failed package moved to {failed_bundle_path}") from exc
+        raise PipelineError(
+            f"{exc}; failed package moved to {failed_bundle_path}"
+        ) from exc
 
 
 def _write_bundle_transaction_failure_metadata(
@@ -990,8 +1297,14 @@ def _write_bundle_transaction_failure_metadata(
         if isinstance(loaded, dict):
             metadata = loaded
 
-    lifecycle = metadata.get("lifecycle") if isinstance(metadata.get("lifecycle"), dict) else {}
-    created_from = lifecycle.get("created_from") if isinstance(lifecycle.get("created_from"), dict) else {}
+    lifecycle = (
+        metadata.get("lifecycle") if isinstance(metadata.get("lifecycle"), dict) else {}
+    )
+    created_from = (
+        lifecycle.get("created_from")
+        if isinstance(lifecycle.get("created_from"), dict)
+        else {}
+    )
     if not created_from:
         created_from = created_from_record(
             context_name=context_name,
@@ -1002,12 +1315,20 @@ def _write_bundle_transaction_failure_metadata(
         or metadata.get("source_export_kind")
         or "unknown"
     )
-    exported_at = metadata.get("exported_at") or datetime.now(timezone.utc).isoformat(timespec="seconds")
-    readiness = metadata.get("readiness") if isinstance(metadata.get("readiness"), dict) else {}
+    exported_at = metadata.get("exported_at") or datetime.now(timezone.utc).isoformat(
+        timespec="seconds"
+    )
+    readiness = (
+        metadata.get("readiness") if isinstance(metadata.get("readiness"), dict) else {}
+    )
     layout = metadata.get("layout") if isinstance(metadata.get("layout"), dict) else {}
     layout.setdefault("source", "source/")
     layout["metadata"] = "source/metadata.json"
-    files = metadata.get("files") if isinstance(metadata.get("files"), list) else list(copied_files)
+    files = (
+        metadata.get("files")
+        if isinstance(metadata.get("files"), list)
+        else list(copied_files)
+    )
     failure_record = {
         "stage": failure_point,
         "error_type": error.__class__.__name__,
@@ -1029,9 +1350,14 @@ def _write_bundle_transaction_failure_metadata(
     )
     metadata.update(
         {
-            "bundle_schema_version": metadata.get("bundle_schema_version") or BUNDLE_SCHEMA_VERSION,
+            "bundle_schema_version": metadata.get("bundle_schema_version")
+            or BUNDLE_SCHEMA_VERSION,
             "script_name": metadata.get("script_name") or bundle_name,
-            "context_name": metadata.get("context_name") if metadata.get("context_name") is not None else context_name,
+            "context_name": (
+                metadata.get("context_name")
+                if metadata.get("context_name") is not None
+                else context_name
+            ),
             "exported_at": exported_at,
             "bundle_role": "debug",
             "ready_to_import": False,
@@ -1114,7 +1440,9 @@ def _publish_bundle_replacement(
         ) from exc
 
 
-def _replace_path_with_retry(source: Path, destination: Path, *, attempts: int = 12) -> None:
+def _replace_path_with_retry(
+    source: Path, destination: Path, *, attempts: int = 12
+) -> None:
     """Atomically replace a path, tolerating transient Windows file locks."""
 
     last_error: OSError | None = None
@@ -1158,7 +1486,9 @@ def publish_ready_to_import_zeia(stage: ReadyBundleStage) -> list[ExportedArtifa
         and artifact.destination.exists()
     ]
     if not zeia_artifacts:
-        raise PipelineError("Only generated ZEIA archives may be published to ready-to-import.")
+        raise PipelineError(
+            "Only generated ZEIA archives may be published to ready-to-import."
+        )
 
     ready_root = READY_TO_IMPORT_DIR
     ready_root.mkdir(parents=True, exist_ok=True)
@@ -1166,7 +1496,9 @@ def publish_ready_to_import_zeia(stage: ReadyBundleStage) -> list[ExportedArtifa
     published_ok = False
     try:
         for index, artifact in enumerate(zeia_artifacts, start=1):
-            protocol_base = _ready_protocol_folder_base_name(stage.protocol_name or stage.bundle_name, index)
+            protocol_base = _ready_protocol_folder_base_name(
+                stage.protocol_name or stage.bundle_name, index
+            )
             publish_plan = plan_ready_to_import_publish(ready_root, protocol_base)
             protocol_folder = publish_plan.bundle_name
             destination_dir = publish_plan.bundle_dir
@@ -1187,7 +1519,9 @@ def publish_ready_to_import_zeia(stage: ReadyBundleStage) -> list[ExportedArtifa
                     destination_dir,
                     backup_dir=backup_dir,
                 )
-                _validate_published_protocol_folder(destination_dir, protocol_folder, require_final_reports=False)
+                _validate_published_protocol_folder(
+                    destination_dir, protocol_folder, require_final_reports=False
+                )
             except Exception:
                 if staged_dir.exists():
                     shutil.rmtree(staged_dir, ignore_errors=True)
@@ -1195,7 +1529,11 @@ def publish_ready_to_import_zeia(stage: ReadyBundleStage) -> list[ExportedArtifa
             _remove_legacy_loose_zeia(ready_root, protocol_folder)
             if protocol_base != protocol_folder:
                 _remove_legacy_loose_zeia(ready_root, protocol_base)
-            published.append(ExportedArtifact(artifact.destination, destination, "fluent-project-archive"))
+            published.append(
+                ExportedArtifact(
+                    artifact.destination, destination, "fluent-project-archive"
+                )
+            )
         published_ok = True
         return published
     finally:
@@ -1215,7 +1553,11 @@ def _assemble_protocol_delivery_folder(
     _copy(zeia_artifact.destination, published_zeia)
 
     required_files = [
-        (stage.script_dir / "RECREATE_SCRIPT.md", staged_dir / "RECREATE_SCRIPT.md", "recreate instructions"),
+        (
+            stage.script_dir / "RECREATE_SCRIPT.md",
+            staged_dir / "RECREATE_SCRIPT.md",
+            "recreate instructions",
+        ),
         (
             stage.script_dir / "source" / "request.spec.yaml",
             staged_dir / "source" / "request.spec.yaml",
@@ -1232,7 +1574,9 @@ def _assemble_protocol_delivery_folder(
             "generated Python",
         ),
     ]
-    missing = [label for source, _destination, label in required_files if not source.exists()]
+    missing = [
+        label for source, _destination, label in required_files if not source.exists()
+    ]
     reports_source = stage.script_dir / "source" / "reports"
     if not reports_source.exists():
         missing.append("reports directory")
@@ -1247,11 +1591,24 @@ def _assemble_protocol_delivery_folder(
         _copy(source, destination)
 
     _copy_v2_source_tree(stage.script_dir / "source", staged_dir / "source")
-    _copy_delivery_optional(stage.metadata_path, staged_dir / "source" / "metadata.json")
-    _copy_delivery_optional(stage.script_dir / "RECREATE_SCRIPT.md", staged_dir / "source" / "RECREATE_SCRIPT.md")
-    _copy_delivery_optional(stage.script_dir / "RECIPE_GROUP_NOTES.md", staged_dir / "RECIPE_GROUP_NOTES.md")
-    _copy_delivery_optional(stage.script_dir / "RECIPE_GROUP_NOTES.md", staged_dir / "source" / "RECIPE_GROUP_NOTES.md")
-    _copy_delivery_optional(stage.script_dir / "source" / "RECIPE_GROUP_NOTES.md", staged_dir / "RECIPE_GROUP_NOTES.md")
+    _copy_delivery_optional(
+        stage.metadata_path, staged_dir / "source" / "metadata.json"
+    )
+    _copy_delivery_optional(
+        stage.script_dir / "RECREATE_SCRIPT.md",
+        staged_dir / "source" / "RECREATE_SCRIPT.md",
+    )
+    _copy_delivery_optional(
+        stage.script_dir / "RECIPE_GROUP_NOTES.md", staged_dir / "RECIPE_GROUP_NOTES.md"
+    )
+    _copy_delivery_optional(
+        stage.script_dir / "RECIPE_GROUP_NOTES.md",
+        staged_dir / "source" / "RECIPE_GROUP_NOTES.md",
+    )
+    _copy_delivery_optional(
+        stage.script_dir / "source" / "RECIPE_GROUP_NOTES.md",
+        staged_dir / "RECIPE_GROUP_NOTES.md",
+    )
     _copy_delivery_optional(
         stage.script_dir / "source" / "RECIPE_GROUP_NOTES.md",
         staged_dir / "source" / "RECIPE_GROUP_NOTES.md",
@@ -1272,7 +1629,9 @@ def _assemble_protocol_delivery_folder(
         protocol_folder=protocol_folder,
         external_file_deployments=external_file_deployments,
     )
-    _validate_published_protocol_folder(staged_dir, protocol_folder, require_final_reports=False)
+    _validate_published_protocol_folder(
+        staged_dir, protocol_folder, require_final_reports=False
+    )
 
 
 def _copy_v2_source_tree(source_dir: Path, destination_dir: Path) -> None:
@@ -1331,9 +1690,13 @@ def _stage_external_file_deployments(
             return []
         directories = {
             key: directory
-            for key, directory in parse_fs_mapping_directories(archive.read(mapping_name))
+            for key, directory in parse_fs_mapping_directories(
+                archive.read(mapping_name)
+            )
         }
-        for info in sorted(archive.infolist(), key=lambda item: item.filename.casefold()):
+        for info in sorted(
+            archive.infolist(), key=lambda item: item.filename.casefold()
+        ):
             normalized = info.filename.replace("\\", "/")
             parts = PurePosixPath(normalized).parts
             if info.is_dir() or len(parts) < 3 or parts[0].casefold() != "fs":
@@ -1344,10 +1707,14 @@ def _stage_external_file_deployments(
                 continue
             target_root = directories.get(fs_key)
             if not target_root:
-                raise PipelineError(f"ZEIA filesystem payload has no directory mapping: {normalized}")
+                raise PipelineError(
+                    f"ZEIA filesystem payload has no directory mapping: {normalized}"
+                )
             relative_parts = parts[2:]
             if any(part in {"", ".", ".."} for part in relative_parts):
-                raise PipelineError(f"ZEIA filesystem payload has an unsafe archive path: {normalized}")
+                raise PipelineError(
+                    f"ZEIA filesystem payload has an unsafe archive path: {normalized}"
+                )
             target_path = str(PureWindowsPath(target_root, *relative_parts))
             if _is_touchtools_media_target(target_path):
                 continue
@@ -1385,7 +1752,9 @@ def _is_touchtools_media_target(target_path: str) -> bool:
 
 
 def _copy_v2_setup_script(destination: Path) -> None:
-    template = Path(__file__).resolve().parents[1] / "tools" / "run_tecan_bundle_setup.bat"
+    template = (
+        Path(__file__).resolve().parents[1] / "tools" / "run_tecan_bundle_setup.bat"
+    )
     if not template.is_file():
         raise PipelineError(f"V2 bundle setup template is missing: {template}")
     _copy(template, destination)
@@ -1478,7 +1847,9 @@ def attach_generation_reports_to_protocol_folders(
         return []
 
     attached: list[ExportedArtifact] = []
-    for protocol_dir in _bundle_dirs_from_artifacts(artifact_paths, ready_root=ready_root):
+    for protocol_dir in _bundle_dirs_from_artifacts(
+        artifact_paths, ready_root=ready_root
+    ):
         attached.extend(
             attach_generation_reports_to_protocol_folder(
                 protocol_dir,
@@ -1529,19 +1900,30 @@ def attach_generation_reports_to_protocol_folder(
             relative_path = Path(relative)
             destination = (
                 staged_dir / relative_path
-                if relative_path.as_posix() in {"RECREATE_SCRIPT.md", "RECIPE_GROUP_NOTES.md"}
+                if relative_path.as_posix()
+                in {"RECREATE_SCRIPT.md", "RECIPE_GROUP_NOTES.md"}
                 else staged_dir / "source" / relative_path
             )
             _copy(source, destination)
-            artifacts.append(ExportedArtifact(source, destination, _delivery_artifact_kind(relative)))
+            artifacts.append(
+                ExportedArtifact(source, destination, _delivery_artifact_kind(relative))
+            )
         _refresh_delivery_manifest(staged_dir)
-        _validate_published_protocol_folder(staged_dir, protocol_dir.name, require_final_reports=True)
-        _publish_protocol_folder_replacement(staged_dir, protocol_dir, backup_dir=backup_dir)
-        return _retarget_exported_artifacts(artifacts, from_root=staged_dir, to_root=protocol_dir)
+        _validate_published_protocol_folder(
+            staged_dir, protocol_dir.name, require_final_reports=True
+        )
+        _publish_protocol_folder_replacement(
+            staged_dir, protocol_dir, backup_dir=backup_dir
+        )
+        return _retarget_exported_artifacts(
+            artifacts, from_root=staged_dir, to_root=protocol_dir
+        )
     except Exception as exc:
         if staged_dir.exists():
             shutil.rmtree(staged_dir, ignore_errors=True)
-        raise PipelineError(f"Could not attach generation reports to {protocol_dir}: {exc}") from exc
+        raise PipelineError(
+            f"Could not attach generation reports to {protocol_dir}: {exc}"
+        ) from exc
 
 
 def _delivery_artifact_kind(relative: str) -> str:
@@ -1578,7 +1960,10 @@ def _refresh_delivery_manifest(staged_dir: Path) -> None:
             }
         ],
     )
-    manifest.setdefault("internal_artifacts", [{"kind": "compiled_xscr_intermediate", "published": False}])
+    manifest.setdefault(
+        "internal_artifacts",
+        [{"kind": "compiled_xscr_intermediate", "published": False}],
+    )
     companions = manifest.setdefault("companion_artifacts", [])
     existing = {item.get("path") for item in companions if isinstance(item, dict)}
     for kind, relative in (
@@ -1695,7 +2080,9 @@ def attach_generation_reports_to_ready_bundles(
         return []
 
     attached: list[ExportedArtifact] = []
-    for bundle_dir in _bundle_dirs_from_artifacts(artifact_paths, ready_root=ready_root):
+    for bundle_dir in _bundle_dirs_from_artifacts(
+        artifact_paths, ready_root=ready_root
+    ):
         attached.extend(
             attach_generation_reports_to_bundle(
                 bundle_dir,
@@ -1733,7 +2120,9 @@ def attach_generation_reports_to_bundle(
             ExportedArtifact(generation_manifest, manifest_dest, "generation-manifest"),
             ExportedArtifact(workflow_report, workflow_dest, "workflow-report"),
         ]
-        _record_attached_generation_reports(staged_bundle, bundle_artifacts, bundle_root=staged_bundle)
+        _record_attached_generation_reports(
+            staged_bundle, bundle_artifacts, bundle_root=staged_bundle
+        )
         _publish_bundle_replacement(
             staged_bundle,
             bundle_dir,
@@ -1760,12 +2149,16 @@ def attach_generation_reports_to_bundle(
                 failure_point="generation_manifest_creation",
                 error=exc,
             )
-        raise PipelineError(f"Could not attach generation reports to {bundle_dir}: {exc}") from exc
+        raise PipelineError(
+            f"Could not attach generation reports to {bundle_dir}: {exc}"
+        ) from exc
     finally:
         _cleanup_empty_directory(staging_root)
 
 
-def _bundle_dirs_from_artifacts(artifact_paths: list[str | Path], *, ready_root: Path) -> list[Path]:
+def _bundle_dirs_from_artifacts(
+    artifact_paths: list[str | Path], *, ready_root: Path
+) -> list[Path]:
     bundle_dirs: list[Path] = []
     seen: set[Path] = set()
     ready_root = ready_root.resolve()
@@ -1805,7 +2198,12 @@ def _record_attached_generation_reports(
 
     files = metadata.setdefault("files", [])
     for artifact in artifacts:
-        record = _file_record(artifact.kind, artifact.source, artifact.destination, bundle_root=bundle_root)
+        record = _file_record(
+            artifact.kind,
+            artifact.source,
+            artifact.destination,
+            bundle_root=bundle_root,
+        )
         files[:] = [
             existing
             for existing in files
@@ -1822,7 +2220,11 @@ def _record_attached_generation_reports(
             ),
             verification_state=verification_state_from_readiness(
                 ready_to_import=bool(manifest.get("ready_to_import")),
-                readiness=manifest.get("readiness") if isinstance(manifest.get("readiness"), dict) else None,
+                readiness=(
+                    manifest.get("readiness")
+                    if isinstance(manifest.get("readiness"), dict)
+                    else None
+                ),
                 workflow_status=manifest.get("workflow_status"),
             ),
             created_from=created_from_record(
@@ -1842,7 +2244,9 @@ def _record_attached_generation_reports(
                 "lifecycle": lifecycle,
             }
         )
-    metadata_path.write_text(json.dumps(metadata, indent=2, sort_keys=True), encoding="utf-8")
+    metadata_path.write_text(
+        json.dumps(metadata, indent=2, sort_keys=True), encoding="utf-8"
+    )
 
 
 def _read_attached_generation_manifest(bundle_dir: Path) -> dict[str, Any]:
@@ -1868,7 +2272,9 @@ def audit_ready_bundle(
     metadata_path = source_dir / "metadata.json"
     manifest_path = source_dir / "generation_manifest.json"
     workflow_path = source_dir / "GENERATION_WORKFLOW.md"
-    expected_bundle_dir = expected_bundle_dir.resolve() if expected_bundle_dir else bundle_dir
+    expected_bundle_dir = (
+        expected_bundle_dir.resolve() if expected_bundle_dir else bundle_dir
+    )
 
     audit: dict[str, Any] = {
         "kind": "ready_bundle_audit",
@@ -1879,7 +2285,9 @@ def audit_ready_bundle(
         "blocking": [],
         "needs_review": [],
         "metadata_path": str(metadata_path) if metadata_path.exists() else None,
-        "generation_manifest_path": str(manifest_path) if manifest_path.exists() else None,
+        "generation_manifest_path": (
+            str(manifest_path) if manifest_path.exists() else None
+        ),
         "workflow_report_path": str(workflow_path) if workflow_path.exists() else None,
         "inventory_count": 0,
         "missing_inventory": [],
@@ -1995,7 +2403,9 @@ def audit_ready_bundle(
                 for value in ready_artifacts:
                     if isinstance(value, (str, Path)) and str(value).strip():
                         try:
-                            manifest_artifacts.add(Path(str(value)).expanduser().resolve())
+                            manifest_artifacts.add(
+                                Path(str(value)).expanduser().resolve()
+                            )
                         except OSError:
                             continue
                 missing_artifacts = sorted(
@@ -2051,7 +2461,9 @@ def _copy_record(
 ) -> None:
     _copy(source, destination)
     exports.append(ExportedArtifact(source, destination, kind))
-    copied_files.append(_file_record(kind, source, destination, bundle_root=bundle_root))
+    copied_files.append(
+        _file_record(kind, source, destination, bundle_root=bundle_root)
+    )
 
 
 def _reset_strict_bundle(script_dir: Path) -> None:
@@ -2073,7 +2485,15 @@ def _reset_strict_bundle(script_dir: Path) -> None:
         target = script_dir / relative
         if target.exists() and target.is_file():
             target.unlink()
-    for relative in ("direct-imports", "source", "reports", "original_sources", "original-sources", "subroutines", "hardware"):
+    for relative in (
+        "direct-imports",
+        "source",
+        "reports",
+        "original_sources",
+        "original-sources",
+        "subroutines",
+        "hardware",
+    ):
         target = script_dir / relative
         if target.exists() and target.is_dir():
             shutil.rmtree(target)
@@ -2125,7 +2545,9 @@ def next_ready_bundle_name(root: Path, base_name: str) -> str:
     return _next_versioned_bundle_name(root, base_name)
 
 
-def plan_ready_to_import_publish(root: Path, base_name: str, *, run_id: str | None = None) -> ReadyBundlePublishPlan:
+def plan_ready_to_import_publish(
+    root: Path, base_name: str, *, run_id: str | None = None
+) -> ReadyBundlePublishPlan:
     """Reserve versioned ready-to-import paths for a single publish attempt."""
     ready_root = root.resolve()
     bundle_name = next_ready_bundle_name(ready_root, base_name)
@@ -2163,7 +2585,9 @@ def _next_versioned_bundle_name(root: Path, base_name: str) -> str:
             if match is None:
                 continue
             highest_version = max(highest_version, int(match.group(1) or 1))
-    next_version = max(highest_version + 1 if highest_version else 1, requested_version or 1)
+    next_version = max(
+        highest_version + 1 if highest_version else 1, requested_version or 1
+    )
     return f"{family_base}_v{next_version}"
 
 
@@ -2188,7 +2612,9 @@ def _retarget_exported_artifacts(
     for artifact in artifacts:
         updated.append(
             ExportedArtifact(
-                source=_retarget_path(artifact.source, from_root=from_root, to_root=to_root),
+                source=_retarget_path(
+                    artifact.source, from_root=from_root, to_root=to_root
+                ),
                 destination=_retarget_path(
                     artifact.destination, from_root=from_root, to_root=to_root
                 ),
@@ -2219,7 +2645,9 @@ def _finalize_bundle_metadata(
     metadata["bundle_role"] = bundle_role
     metadata["ready_to_import"] = ready_to_import
     metadata["verification_state"] = verification_state
-    lifecycle = metadata.get("lifecycle") if isinstance(metadata.get("lifecycle"), dict) else {}
+    lifecycle = (
+        metadata.get("lifecycle") if isinstance(metadata.get("lifecycle"), dict) else {}
+    )
     metadata["lifecycle"] = {
         **lifecycle,
         "bundle_role": bundle_role,
@@ -2232,8 +2660,12 @@ def _finalize_bundle_metadata(
                 continue
             source = record.get("source")
             if isinstance(source, str):
-                record["source"] = str(_retarget_path(source, from_root=from_root, to_root=to_root))
-    metadata_path.write_text(json.dumps(metadata, indent=2, sort_keys=True), encoding="utf-8")
+                record["source"] = str(
+                    _retarget_path(source, from_root=from_root, to_root=to_root)
+                )
+    metadata_path.write_text(
+        json.dumps(metadata, indent=2, sort_keys=True), encoding="utf-8"
+    )
 
 
 def _move_bundle_root(source_root: Path, destination_root: Path) -> None:
@@ -2259,7 +2691,9 @@ def _cleanup_empty_directory(path: Path) -> None:
         pass
 
 
-def _file_record(kind: str, source: Path, destination: Path, *, bundle_root: Path) -> dict[str, str]:
+def _file_record(
+    kind: str, source: Path, destination: Path, *, bundle_root: Path
+) -> dict[str, str]:
     return {
         "kind": kind,
         "source": str(source),
@@ -2314,7 +2748,9 @@ def _prepare_generated_touchtools_media(
 
     reports_dir.mkdir(parents=True, exist_ok=True)
     write_json(reports_dir / "media_path_map.json", path_map)
-    (reports_dir / "media_path_map.md").write_text(render_media_path_map_markdown(path_map), encoding="utf-8")
+    (reports_dir / "media_path_map.md").write_text(
+        render_media_path_map_markdown(path_map), encoding="utf-8"
+    )
     write_json(
         reports_dir / "generated_touchtools_media.json",
         {
@@ -2360,7 +2796,9 @@ def _prior_ready_bundles_for_protocol(ir: dict[str, Any] | None) -> list[Path]:
         folder_stem = normalize_protocol_stem(folder_base)
         if folder_stem not in stems:
             continue
-        matches.append((version if version is not None else 0, bundle.name.casefold(), bundle))
+        matches.append(
+            (version if version is not None else 0, bundle.name.casefold(), bundle)
+        )
     matches.sort(reverse=True)
     return [path for _, _, path in matches]
 
@@ -2431,11 +2869,24 @@ def _materialize_step_label_media_into_media_dir(
             continue
         suffix = source.suffix.lower()
         targets: list[str] = []
-        if suffix in {".gif", ".mp4", ".webm", ".mov"} and assignment.get("video_output"):
+        if suffix in {".gif", ".mp4", ".webm", ".mov"} and assignment.get(
+            "video_output"
+        ):
             targets.append(str(assignment["video_output"]))
-        if suffix in {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"} and assignment.get("image_output"):
+        if suffix in {
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".bmp",
+            ".tif",
+            ".tiff",
+        } and assignment.get("image_output"):
             targets.append(str(assignment["image_output"]))
-        if suffix in {".png", ".jpg", ".jpeg"} and assignment.get("video_output") and not targets:
+        if (
+            suffix in {".png", ".jpg", ".jpeg"}
+            and assignment.get("video_output")
+            and not targets
+        ):
             targets.append(str(assignment["video_output"]))
         for target_name in targets:
             _copy_assignment(
@@ -2457,8 +2908,12 @@ def _materialize_step_label_media_into_media_dir(
         match = re.match(r"step_0*(\d+)$", step_id, flags=re.IGNORECASE)
         if not match:
             continue
-        params = step.get("parameters") if isinstance(step.get("parameters"), dict) else {}
-        placeholders = params.get("media_placeholders") if isinstance(params, dict) else None
+        params = (
+            step.get("parameters") if isinstance(step.get("parameters"), dict) else {}
+        )
+        placeholders = (
+            params.get("media_placeholders") if isinstance(params, dict) else None
+        )
         if not isinstance(placeholders, list) or not placeholders:
             continue
         slots = {
@@ -2484,13 +2939,21 @@ def _materialize_step_label_media_into_media_dir(
             _copy_assignment(
                 path,
                 slots["video"],
-                {"prompt_number": number, "step_id": slots["step_id"], "mapping_basis": "ir_step_id"},
+                {
+                    "prompt_number": number,
+                    "step_id": slots["step_id"],
+                    "mapping_basis": "ir_step_id",
+                },
             )
         if ext in {"png", "jpg", "jpeg", "bmp", "tif", "tiff"} and slots.get("image"):
             _copy_assignment(
                 path,
                 slots["image"],
-                {"prompt_number": number, "step_id": slots["step_id"], "mapping_basis": "ir_step_id"},
+                {
+                    "prompt_number": number,
+                    "step_id": slots["step_id"],
+                    "mapping_basis": "ir_step_id",
+                },
             )
     return applied
 
@@ -2531,7 +2994,11 @@ def _embed_generated_media_files(
 
 
 def _normalize_windows_key(value: Any) -> str:
-    return str(PureWindowsPath(str(value or "").strip().replace("/", "\\"))).rstrip("\\").casefold()
+    return (
+        str(PureWindowsPath(str(value or "").strip().replace("/", "\\")))
+        .rstrip("\\")
+        .casefold()
+    )
 
 
 def _remove_generated_media_unresolved_paths(
@@ -2585,7 +3052,11 @@ def _write_project_import_archives(
         if path.exists() and path.suffix.lower() == ".zeia" and zipfile.is_zipfile(path)
     ]
     for index, source_project in enumerate(readable_projects, start=1):
-        filename = "generated_project.zeia" if index == 1 else f"generated_project_{index}.zeia"
+        filename = (
+            "generated_project.zeia"
+            if index == 1
+            else f"generated_project_{index}.zeia"
+        )
         destination = destination_dir / filename
         ordered_filesystem_sources = [
             source_project,
@@ -2605,15 +3076,26 @@ def _write_project_import_archives(
             target_script_folder=target_script_folder,
             filesystem_source_archives=ordered_filesystem_sources,
         )
-        exports.append(ExportedArtifact(source_project, destination, "generated-project-archive"))
-        copied_files.append(_file_record("generated-project-archive", source_project, destination, bundle_root=bundle_root))
+        exports.append(
+            ExportedArtifact(source_project, destination, "generated-project-archive")
+        )
+        copied_files.append(
+            _file_record(
+                "generated-project-archive",
+                source_project,
+                destination,
+                bundle_root=bundle_root,
+            )
+        )
         records.append(record)
     return records
 
 
 def _force_full_zeia_copy() -> bool:
     """Opt-in full source ZEIA copy. Default packaging is script-scoped (Fluent or portable)."""
-    return str(os.environ.get("TECAN_PACKAGE_FULL_ZEIA_COPY") or "").strip().casefold() in {
+    return str(
+        os.environ.get("TECAN_PACKAGE_FULL_ZEIA_COPY") or ""
+    ).strip().casefold() in {
         "1",
         "true",
         "yes",
@@ -2716,11 +3198,16 @@ def _write_generated_project_archive_script_scoped(
 ) -> dict[str, Any]:
     subroutine_artifacts = _dedupe_subroutine_artifacts(subroutine_artifacts)
     use_fluent_writer = _fluent_archive_writer_available()
-    packaging_method = "fluent_archive_writer" if use_fluent_writer else "portable_archive_writer"
+    packaging_method = (
+        "fluent_archive_writer" if use_fluent_writer else "portable_archive_writer"
+    )
 
     ensure_parent(destination)
     with zipfile.ZipFile(source_project, "r") as source_zip:
-        archive_data = {info.filename: source_zip.read(info.filename) for info in source_zip.infolist()}
+        archive_data = {
+            info.filename: source_zip.read(info.filename)
+            for info in source_zip.infolist()
+        }
     dependency_archive_data = _dependency_archive_data(
         archive_data,
         filesystem_source_archives or [],
@@ -2728,7 +3215,9 @@ def _write_generated_project_archive_script_scoped(
 
     script_records = _archive_script_records(archive_data)
     if not script_records:
-        raise PipelineError(f"source ZEIA has no script entries to derive metadata from: {source_project}")
+        raise PipelineError(
+            f"source ZEIA has no script entries to derive metadata from: {source_project}"
+        )
 
     generated_name = _script_object_name_from_path(compiled_xscr) or compiled_xscr.stem
     main_record = _select_project_main_script(
@@ -2739,7 +3228,9 @@ def _write_generated_project_archive_script_scoped(
         generated_name=generated_name,
     )
     if main_record is None:
-        raise PipelineError(f"could not identify the main script metadata in source ZEIA: {source_project}")
+        raise PipelineError(
+            f"could not identify the main script metadata in source ZEIA: {source_project}"
+        )
 
     source_folder = str(main_record.get("folder") or "")
     generated_target_folder = _normalize_script_folder(target_script_folder)
@@ -2760,7 +3251,9 @@ def _write_generated_project_archive_script_scoped(
     )
 
     target_folder = (
-        _script_folder_from_payload(generated_payload) or generated_target_folder or source_folder
+        _script_folder_from_payload(generated_payload)
+        or generated_target_folder
+        or source_folder
     )
     main_collision = collision_preflight(
         local_scripts_inventory,
@@ -2774,7 +3267,8 @@ def _write_generated_project_archive_script_scoped(
     )
     replace_existing = (
         bool(main_record.get("guid"))
-        and str(main_record.get("object_name") or "").casefold() == generated_name.casefold()
+        and str(main_record.get("object_name") or "").casefold()
+        == generated_name.casefold()
     )
     used_guids = _available_archive_guids(archive_data)
     # Prefer the installed FluentControl GUID for the same name+folder. Otherwise
@@ -2821,7 +3315,9 @@ def _write_generated_project_archive_script_scoped(
                 "guid": script_guid,
                 "relative_path": relative_path,
                 "object_name": generated_name,
-                "object_path": _script_folder_from_payload(generated_payload) or generated_target_folder or source_folder,
+                "object_path": _script_folder_from_payload(generated_payload)
+                or generated_target_folder
+                or source_folder,
                 "type": "Script",
                 "version": 1,
                 "type_version": _script_type_version_from_payload(generated_payload),
@@ -2856,15 +3352,31 @@ def _write_generated_project_archive_script_scoped(
             path = Path(str(item.get("path") or ""))
             if not path.exists():
                 continue
-            guid = str(item.get("guid") or _guid_from_archive_entry(str(item.get("entry") or ""))).strip()
+            guid = str(
+                item.get("guid")
+                or _guid_from_archive_entry(str(item.get("entry") or ""))
+            ).strip()
             if not guid:
                 continue
             guid_key = guid.casefold()
-            if guid_key in packaged_script_guids or guid_key in excluded_subroutine_guids:
+            if (
+                guid_key in packaged_script_guids
+                or guid_key in excluded_subroutine_guids
+            ):
                 continue
-            object_name = str(item.get("object_name") or _script_object_name_from_path(path) or path.stem)
-            folder = str(_script_folder_from_path(path) or _folder_from_subroutine_ref(item) or "")
-            relative = _datastore_relative_entry(str(item.get("entry") or f"DataStore\\UserSpecific\\{guid}.xscr"))
+            object_name = str(
+                item.get("object_name")
+                or _script_object_name_from_path(path)
+                or path.stem
+            )
+            folder = str(
+                _script_folder_from_path(path)
+                or _folder_from_subroutine_ref(item)
+                or ""
+            )
+            relative = _datastore_relative_entry(
+                str(item.get("entry") or f"DataStore\\UserSpecific\\{guid}.xscr")
+            )
             if not relative.replace("\\", "/").casefold().endswith(".xscr"):
                 relative = f"UserSpecific\\{guid}.xscr"
             staged_dependency = datastore_root / Path(relative.replace("\\", "/"))
@@ -2924,7 +3436,11 @@ def _write_generated_project_archive_script_scoped(
         )
         for record in subroutine_dependency_records:
             guid_key = str(record.get("guid") or "").casefold()
-            if not guid_key or guid_key in packaged_script_guids or guid_key in excluded_subroutine_guids:
+            if (
+                not guid_key
+                or guid_key in packaged_script_guids
+                or guid_key in excluded_subroutine_guids
+            ):
                 continue
             source_entry = str(record.get("source_entry") or "")
             relative = str(record.get("relative_path") or "")
@@ -2938,7 +3454,9 @@ def _write_generated_project_archive_script_scoped(
             )
             dependency_records.append(record)
             packaged_script_guids.add(guid_key)
-        metadata_path.write_text(json.dumps(metadata_records, indent=2), encoding="utf-8")
+        metadata_path.write_text(
+            json.dumps(metadata_records, indent=2), encoding="utf-8"
+        )
         if use_fluent_writer:
             writer_report = _run_fluent_archive_writer(
                 script_path=staged_script,
@@ -2963,7 +3481,9 @@ def _write_generated_project_archive_script_scoped(
     archive_payload = generated_payload
     actual_final_entry = final_entry
     with zipfile.ZipFile(destination, "r") as zf:
-        actual_final_entry = _find_archive_entry(zf.namelist(), final_entry) or final_entry
+        actual_final_entry = (
+            _find_archive_entry(zf.namelist(), final_entry) or final_entry
+        )
         if actual_final_entry in zf.namelist():
             archive_payload = zf.read(actual_final_entry)
     postprocessed_payload = _postprocess_archive_writer_script_payload(archive_payload)
@@ -2997,13 +3517,20 @@ def _write_generated_project_archive_script_scoped(
         media_dir=media_dir,
         media_path_map=media_path_map,
     )
-    _remove_generated_media_unresolved_paths(filesystem_packaging, generated_media_packaging)
+    _remove_generated_media_unresolved_paths(
+        filesystem_packaging, generated_media_packaging
+    )
 
-    checksum_audit = audit_archive_checksums({actual_final_entry: archive_payload}, mutated_entries={actual_final_entry})
+    checksum_audit = audit_archive_checksums(
+        {actual_final_entry: archive_payload}, mutated_entries={actual_final_entry}
+    )
     checksum_audit["recomputed_count"] = len(recomputed_entries)
     checksum_audit["recomputed_entries"] = sorted(set(recomputed_entries))
 
-    owned_entries = {actual_final_entry, *(str(item.get("entry") or "") for item in added_subroutines_for_audit)}
+    owned_entries = {
+        actual_final_entry,
+        *(str(item.get("entry") or "") for item in added_subroutines_for_audit),
+    }
     archive_audit = verify_generated_project_archive(
         destination,
         bundle_root=bundle_root,
@@ -3026,7 +3553,9 @@ def _write_generated_project_archive_script_scoped(
 
     warnings: list[str] = []
     for item in reference_findings:
-        where = f" in script `{item['source_label']}`" if item.get("source_label") else ""
+        where = (
+            f" in script `{item['source_label']}`" if item.get("source_label") else ""
+        )
         type_label = item.get("type_id") or "model"
         warnings.append(
             f"MISSING DEPENDENCY: {type_label} `{item['object_name']}` ({item['guid']}) "
@@ -3065,7 +3594,9 @@ def _write_generated_project_archive_script_scoped(
             "<Checksum>. FluentControl validates checksums on load and will reject these entries."
         )
     if str(main_collision.get("status") or "") == "collision":
-        collision_guids = ", ".join(str(item) for item in (main_collision.get("guids") or []))
+        collision_guids = ", ".join(
+            str(item) for item in (main_collision.get("guids") or [])
+        )
         warnings.append(
             "LOCAL SCRIPT GUID COLLISION: "
             f"`{target_folder}\\{generated_name}` maps to multiple FluentControl GUIDs "
@@ -3116,10 +3647,15 @@ def _write_generated_project_archive_script_scoped(
             "guid_source": (
                 "local_fluentcontrol_datastore"
                 if local_target_guid
-                else ("source_zeia_main_script" if replace_existing else "generated_unique")
+                else (
+                    "source_zeia_main_script"
+                    if replace_existing
+                    else "generated_unique"
+                )
             ),
             "local_target_guid": local_target_guid or "",
-            "local_inventory_collision": str(main_collision.get("status") or "") == "collision",
+            "local_inventory_collision": str(main_collision.get("status") or "")
+            == "collision",
             "local_inventory_guids": list(main_collision.get("guids") or []),
             "local_inventory_status": str(main_collision.get("status") or ""),
             "metadata_source": "source ZEIA script record plus generated XSCR references",
@@ -3131,9 +3667,14 @@ def _write_generated_project_archive_script_scoped(
         "dependencies_packaged": packaged_dependencies,
         "dependencies_not_packaged": import_unsupported_dependencies,
         "subroutine_dependencies": [
-            item for item in packaged_dependencies if str(item.get("type") or "").casefold() == "script"
+            item
+            for item in packaged_dependencies
+            if str(item.get("type") or "").casefold() == "script"
         ],
-        "archive_metadata_entries_changed": ["DataStore\\nodedescription.xml", "meta\\content.xml"],
+        "archive_metadata_entries_changed": [
+            "DataStore\\nodedescription.xml",
+            "meta\\content.xml",
+        ],
         "filesystem_packaging": filesystem_packaging,
         "generated_media_packaging": generated_media_packaging,
         "unresolved_references": reference_findings,
@@ -3196,7 +3737,9 @@ def _write_generated_project_archive_legacy_zip(
 
     script_records = _archive_script_records(archive_data)
     if not script_records:
-        raise PipelineError(f"source ZEIA has no script entries to replace: {source_project}")
+        raise PipelineError(
+            f"source ZEIA has no script entries to replace: {source_project}"
+        )
 
     generated_name = _script_object_name_from_path(compiled_xscr) or compiled_xscr.stem
     main_record = _select_project_main_script(
@@ -3207,7 +3750,9 @@ def _write_generated_project_archive_legacy_zip(
         generated_name=generated_name,
     )
     if main_record is None:
-        raise PipelineError(f"could not identify the main script entry in source ZEIA: {source_project}")
+        raise PipelineError(
+            f"could not identify the main script entry in source ZEIA: {source_project}"
+        )
 
     replacements: dict[str, bytes] = {}
     additions: dict[str, bytes] = {}
@@ -3224,11 +3769,17 @@ def _write_generated_project_archive_legacy_zip(
         fallback_folder=source_folder,
         target_folder=generated_target_folder,
     )
-    generated_folder = _script_folder_from_payload(generated_payload) or generated_target_folder or source_folder
+    generated_folder = (
+        _script_folder_from_payload(generated_payload)
+        or generated_target_folder
+        or source_folder
+    )
     generated_payload, reference_findings = _strip_unavailable_optional_references(
         generated_payload, dependency_archive_data, source_label=generated_name
     )
-    with tempfile.TemporaryDirectory(prefix="tecan_orphan_media_refs_legacy_") as orphan_tmp:
+    with tempfile.TemporaryDirectory(
+        prefix="tecan_orphan_media_refs_legacy_"
+    ) as orphan_tmp:
         orphan_xscr = Path(orphan_tmp) / "script.xscr"
         orphan_xscr.write_bytes(generated_payload)
         if strip_orphan_touchtools_media_file_references(orphan_xscr):
@@ -3241,8 +3792,12 @@ def _write_generated_project_archive_legacy_zip(
         path = Path(str(item.get("path") or ""))
         if not path.exists():
             continue
-        object_name = str(item.get("object_name") or _script_object_name_from_path(path) or path.stem)
-        folder = str(_script_folder_from_path(path) or _folder_from_subroutine_ref(item) or "")
+        object_name = str(
+            item.get("object_name") or _script_object_name_from_path(path) or path.stem
+        )
+        folder = str(
+            _script_folder_from_path(path) or _folder_from_subroutine_ref(item) or ""
+        )
         if item.get("ambiguous"):
             alternatives = ", ".join(
                 str(alt.get("object_name") or alt.get("entry") or "?")
@@ -3278,10 +3833,19 @@ def _write_generated_project_archive_legacy_zip(
             entry = f"Scripts/{_safe_label(object_name)}.xscr"
         entry = _unique_archive_entry(entry, archive_data, additions)
         additions[entry] = payload
-        added_subroutines.append({"object_name": object_name, "entry": entry, "source": str(path), "guid": guid})
+        added_subroutines.append(
+            {
+                "object_name": object_name,
+                "entry": entry,
+                "source": str(path),
+                "guid": guid,
+            }
+        )
 
     for item in reference_findings:
-        where = f" in script `{item['source_label']}`" if item.get("source_label") else ""
+        where = (
+            f" in script `{item['source_label']}`" if item.get("source_label") else ""
+        )
         if item.get("action") == "removed":
             warnings.append(
                 f"Removed unresolved {item['type_id']} reference `{item['object_name']}` "
@@ -3306,10 +3870,16 @@ def _write_generated_project_archive_legacy_zip(
 
     if datastore_archive:
         if added_subroutines:
-            node_name = _find_archive_entry(archive_data, "DataStore/nodedescription.xml")
+            node_name = _find_archive_entry(
+                archive_data, "DataStore/nodedescription.xml"
+            )
             if node_name:
-                current_node_bytes = replacements.get(node_name, archive_data[node_name])
-                base_version = _next_nodedescription_version(_decode_xml_bytes(current_node_bytes))
+                current_node_bytes = replacements.get(
+                    node_name, archive_data[node_name]
+                )
+                base_version = _next_nodedescription_version(
+                    _decode_xml_bytes(current_node_bytes)
+                )
                 replacements[node_name] = _append_nodedescription_script_nodes(
                     current_node_bytes,
                     added_subroutines,
@@ -3317,7 +3887,9 @@ def _write_generated_project_archive_legacy_zip(
                 )
                 changed_metadata_entries.append(node_name)
             else:
-                warnings.append("Could not add datastore node descriptions for new subroutines; nodedescription.xml was not found.")
+                warnings.append(
+                    "Could not add datastore node descriptions for new subroutines; nodedescription.xml was not found."
+                )
 
             content_name = _find_archive_entry(archive_data, "meta/content.xml")
             if content_name:
@@ -3327,7 +3899,9 @@ def _write_generated_project_archive_legacy_zip(
                 )
                 changed_metadata_entries.append(content_name)
             else:
-                warnings.append("Could not add datastore content entries for new subroutines; meta/content.xml was not found.")
+                warnings.append(
+                    "Could not add datastore content entries for new subroutines; meta/content.xml was not found."
+                )
 
         node_name = _find_archive_entry(archive_data, "DataStore/nodedescription.xml")
         if node_name and main_record.get("guid"):
@@ -3377,9 +3951,13 @@ def _write_generated_project_archive_legacy_zip(
         media_dir=media_dir,
         media_path_map=media_path_map,
     )
-    _remove_generated_media_unresolved_paths(filesystem_packaging, generated_media_packaging)
+    _remove_generated_media_unresolved_paths(
+        filesystem_packaging, generated_media_packaging
+    )
 
-    checksum_audit = audit_archive_checksums(final_entries, mutated_entries=mutated_entries)
+    checksum_audit = audit_archive_checksums(
+        final_entries, mutated_entries=mutated_entries
+    )
     checksum_audit["recomputed_count"] = len(recomputed_entries)
     checksum_audit["recomputed_entries"] = sorted(recomputed_entries)
 
@@ -3415,14 +3993,17 @@ def _write_generated_project_archive_legacy_zip(
         },
         "subroutines_replaced": replaced_subroutines,
         "subroutines_added": added_subroutines,
-        "subroutine_dependencies": subroutine_dependency_records_from_artifacts(subroutine_artifacts),
+        "subroutine_dependencies": subroutine_dependency_records_from_artifacts(
+            subroutine_artifacts
+        ),
         "archive_metadata_entries_changed": sorted(set(changed_metadata_entries)),
         "filesystem_packaging": filesystem_packaging,
         "generated_media_packaging": generated_media_packaging,
         "unresolved_references": reference_findings,
         "base_reuse": {
             "base_entry_count": len(infos),
-            "script_entries_replaced": len(replacements) - len(set(changed_metadata_entries)),
+            "script_entries_replaced": len(replacements)
+            - len(set(changed_metadata_entries)),
             "script_entries_added": len(additions),
             "models_created": 0,
             "note": (
@@ -3445,7 +4026,9 @@ def _write_generated_project_archive_legacy_zip(
             + " The packaged generated_project.zeia will fail to load in FluentControl."
         )
     for finding in subroutine_audit.get("blocking") or []:
-        warnings.append("ADDED SUBROUTINE METADATA DEFECT: " + _format_subroutine_finding(finding))
+        warnings.append(
+            "ADDED SUBROUTINE METADATA DEFECT: " + _format_subroutine_finding(finding)
+        )
     if subroutine_audit.get("added"):
         warnings.append(
             f"{len(subroutine_audit['added'])} subroutine(s) were ADDED to the base ZEIA (not "
@@ -3481,10 +4064,16 @@ def _owned_archive_entry_keys(entries: Iterable[str] | None) -> set[str] | None:
     """Normalize packaging-owned archive entry paths; ``None`` means no ownership filter."""
     if entries is None:
         return None
-    return {_normalize_archive_entry(str(entry)) for entry in entries if str(entry or "").strip()}
+    return {
+        _normalize_archive_entry(str(entry))
+        for entry in entries
+        if str(entry or "").strip()
+    }
 
 
-def _finding_targets_owned_entry(finding: Mapping[str, Any], owned: set[str] | None) -> bool:
+def _finding_targets_owned_entry(
+    finding: Mapping[str, Any], owned: set[str] | None
+) -> bool:
     if owned is None:
         return True
     entry = finding.get("entry")
@@ -3496,7 +4085,9 @@ def _finding_targets_owned_entry(finding: Mapping[str, Any], owned: set[str] | N
 
 def _is_inherited_base_export_finding_kind(kind: str) -> bool:
     value = str(kind or "")
-    return value in _INHERITED_BASE_EXPORT_FINDING_KINDS or value.startswith("filesystem_")
+    return value in _INHERITED_BASE_EXPORT_FINDING_KINDS or value.startswith(
+        "filesystem_"
+    )
 
 
 def _demote_inherited_base_export_findings(
@@ -3518,11 +4109,13 @@ def _demote_inherited_base_export_findings(
     kept: list[dict[str, Any]] = []
     for item in blocking:
         kind = str(item.get("kind") or "")
-        if _is_inherited_base_export_finding_kind(kind) and not _finding_targets_owned_entry(
-            item, owned_entries
-        ):
+        if _is_inherited_base_export_finding_kind(
+            kind
+        ) and not _finding_targets_owned_entry(item, owned_entries):
             detail = str(item.get("detail") or "").rstrip()
-            suffix = "Inherited from the base ZEIA export; not owned by this generation."
+            suffix = (
+                "Inherited from the base ZEIA export; not owned by this generation."
+            )
             needs_review.append(
                 {
                     **item,
@@ -3563,12 +4156,16 @@ def verify_generated_project_archive(
     """
     owned_entry_keys = _owned_archive_entry_keys(owned_entries)
     audit: dict[str, Any] = {
-        "archive": _bundle_relative_path(archive_path, bundle_root=bundle_root or READY_TO_IMPORT_DIR),
+        "archive": _bundle_relative_path(
+            archive_path, bundle_root=bundle_root or READY_TO_IMPORT_DIR
+        ),
         "zip_ok": False,
         "entry_count": 0,
         "blocking": [],
         "needs_review": [],
-        "owned_entries": sorted(owned_entry_keys) if owned_entry_keys is not None else None,
+        "owned_entries": (
+            sorted(owned_entry_keys) if owned_entry_keys is not None else None
+        ),
         "expression_inventory": {
             "valid": True,
             "script_count": 0,
@@ -3581,10 +4178,14 @@ def verify_generated_project_archive(
     needs_review: list[dict[str, Any]] = audit["needs_review"]
 
     if not archive_path.exists():
-        blocking.append({"kind": "missing_archive", "detail": "the archive was not written"})
+        blocking.append(
+            {"kind": "missing_archive", "detail": "the archive was not written"}
+        )
         return audit
     if not zipfile.is_zipfile(archive_path):
-        blocking.append({"kind": "not_a_zip", "detail": "the file is not a valid ZIP archive"})
+        blocking.append(
+            {"kind": "not_a_zip", "detail": "the file is not a valid ZIP archive"}
+        )
         return audit
 
     try:
@@ -3592,9 +4193,15 @@ def verify_generated_project_archive(
             corrupt = zf.testzip()
             if corrupt is not None:
                 blocking.append(
-                    {"kind": "corrupt_entry", "entry": corrupt, "detail": "failed CRC integrity check"}
+                    {
+                        "kind": "corrupt_entry",
+                        "entry": corrupt,
+                        "detail": "failed CRC integrity check",
+                    }
                 )
-            archive_data = {info.filename: zf.read(info.filename) for info in zf.infolist()}
+            archive_data = {
+                info.filename: zf.read(info.filename) for info in zf.infolist()
+            }
     except (zipfile.BadZipFile, OSError) as exc:
         blocking.append({"kind": "unreadable_zip", "detail": str(exc)})
         return audit
@@ -3630,21 +4237,25 @@ def verify_generated_project_archive(
         )
         expression_script_inventories.append(expression_inventory)
         for failure in expression_inventory.get("failures") or []:
-            blocking.append({
-                "kind": "invalid_expression",
-                "entry": entry,
-                "script": failure.get("script"),
-                "line": failure.get("line"),
-                "command": failure.get("command"),
-                "field": failure.get("field"),
-                "variable": failure.get("variable"),
-                "raw_expression": failure.get("raw_expression"),
-                "reason": failure.get("reason"),
-                "offset": failure.get("offset"),
-                "semantic_issues": failure.get("semantic_issues"),
-                "detail": "FluentControl expression failed typed expression validation.",
-            })
-        liquid_class_usage = bool(re.search(r"<LiquidClassName(?:BySelection)?>(?!\s*</)", text))
+            blocking.append(
+                {
+                    "kind": "invalid_expression",
+                    "entry": entry,
+                    "script": failure.get("script"),
+                    "line": failure.get("line"),
+                    "command": failure.get("command"),
+                    "field": failure.get("field"),
+                    "variable": failure.get("variable"),
+                    "raw_expression": failure.get("raw_expression"),
+                    "reason": failure.get("reason"),
+                    "offset": failure.get("offset"),
+                    "semantic_issues": failure.get("semantic_issues"),
+                    "detail": "FluentControl expression failed typed expression validation.",
+                }
+            )
+        liquid_class_usage = bool(
+            re.search(r"<LiquidClassName(?:BySelection)?>(?!\s*</)", text)
+        )
         checksum_state = entry_checksum_state(data)
         if checksum_state == "invalid":
             blocking.append(
@@ -3681,7 +4292,9 @@ def verify_generated_project_archive(
                     not object_name
                     or bool(
                         re.search(
-                            r"<LiquidClassName[^>]*>\s*" + re.escape(object_name) + r"\s*</LiquidClassName",
+                            r"<LiquidClassName[^>]*>\s*"
+                            + re.escape(object_name)
+                            + r"\s*</LiquidClassName",
                             text,
                             re.IGNORECASE,
                         )
@@ -3702,7 +4315,9 @@ def verify_generated_project_archive(
                 }
             )
 
-    _audit_datastore_metadata(archive_data, blocking=blocking, needs_review=needs_review)
+    _audit_datastore_metadata(
+        archive_data, blocking=blocking, needs_review=needs_review
+    )
     expression_failures = [
         failure
         for inventory in expression_script_inventories
@@ -3711,7 +4326,9 @@ def verify_generated_project_archive(
     audit["expression_inventory"] = {
         "valid": not expression_failures,
         "script_count": len(expression_script_inventories),
-        "record_count": sum(int(item.get("record_count") or 0) for item in expression_script_inventories),
+        "record_count": sum(
+            int(item.get("record_count") or 0) for item in expression_script_inventories
+        ),
         "failure_count": len(expression_failures),
         "scripts": expression_script_inventories,
         "failures": expression_failures[:50],
@@ -3737,7 +4354,9 @@ def _audit_datastore_metadata(
     declared: set[str] = set()
     if content_name:
         content_text = _decode_xml_bytes(archive_data[content_name])
-        block = re.search(r"<DatastoreEntries>(.*?)</DatastoreEntries>", content_text, flags=re.DOTALL)
+        block = re.search(
+            r"<DatastoreEntries>(.*?)</DatastoreEntries>", content_text, flags=re.DOTALL
+        )
         scope = block.group(1) if block else ""
         for raw in re.findall(r"<Entry>(.*?)</Entry>", scope):
             value = raw.strip()
@@ -3846,7 +4465,9 @@ def _format_archive_finding(finding: dict[str, Any]) -> str:
     return f"{detail}." if entry is None else f"`{entry}`: {detail}."
 
 
-_GUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+_GUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
 
 
 def verify_added_subroutine_metadata(
@@ -3890,10 +4511,13 @@ def verify_added_subroutine_metadata(
         try:
             with zipfile.ZipFile(archive_path, "r") as zf:
                 archive_entries = set(zf.namelist())
-                normalized_archive_entries = {_normalize_archive_entry(name) for name in archive_entries}
+                normalized_archive_entries = {
+                    _normalize_archive_entry(name) for name in archive_entries
+                }
                 if datastore_archive:
                     node_name = _find_archive_entry(
-                        {name: b"" for name in archive_entries}, "DataStore/nodedescription.xml"
+                        {name: b"" for name in archive_entries},
+                        "DataStore/nodedescription.xml",
                     )
                     if node_name:
                         node_text = _decode_xml_bytes(zf.read(node_name))
@@ -3964,7 +4588,11 @@ def _merge_project_audits(records: list[dict[str, Any]]) -> dict[str, dict[str, 
     replaced_count = 0
     for record in records:
         archive_audit = record.get("archive_audit") or {}
-        name = archive_audit.get("archive") or record.get("relative_path") or "generated_project.zeia"
+        name = (
+            archive_audit.get("archive")
+            or record.get("relative_path")
+            or "generated_project.zeia"
+        )
         for item in archive_audit.get("blocking") or []:
             archive_blocking.append({**item, "archive": name})
         for item in archive_audit.get("needs_review") or []:
@@ -3983,7 +4611,8 @@ def _merge_project_audits(records: list[dict[str, Any]]) -> dict[str, dict[str, 
             dependency_records = [
                 item
                 for item in record.get("dependencies_packaged") or []
-                if isinstance(item, dict) and str(item.get("type") or "").casefold() == "script"
+                if isinstance(item, dict)
+                and str(item.get("type") or "").casefold() == "script"
             ]
         for item in dependency_records or []:
             if isinstance(item, dict):
@@ -4037,14 +4666,23 @@ def _write_project_import_report_artifacts(
 ) -> None:
     json_dest = reports_dir / "project_import_report.json"
     ensure_parent(json_dest)
-    json_dest.write_text(json.dumps({"project_imports": records}, indent=2, sort_keys=True), encoding="utf-8")
+    json_dest.write_text(
+        json.dumps({"project_imports": records}, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
     exports.append(ExportedArtifact(json_dest, json_dest, "project-import-report-json"))
-    copied_files.append(_file_record("project-import-report-json", json_dest, json_dest, bundle_root=bundle_root))
+    copied_files.append(
+        _file_record(
+            "project-import-report-json", json_dest, json_dest, bundle_root=bundle_root
+        )
+    )
 
     md_dest = reports_dir / "project_import_report.md"
     md_dest.write_text(_render_project_import_report(records), encoding="utf-8")
     exports.append(ExportedArtifact(md_dest, md_dest, "project-import-report"))
-    copied_files.append(_file_record("project-import-report", md_dest, md_dest, bundle_root=bundle_root))
+    copied_files.append(
+        _file_record("project-import-report", md_dest, md_dest, bundle_root=bundle_root)
+    )
 
 
 def _checksum_note(audit: dict[str, Any]) -> str:
@@ -4110,11 +4748,15 @@ def _render_project_import_report(records: list[dict[str, Any]]) -> str:
         if record.get("subroutines_replaced"):
             lines.append("- Replaced subroutines:")
             for item in record["subroutines_replaced"]:
-                lines.append(f"  - `{item.get('object_name')}` -> `{item.get('entry')}`")
+                lines.append(
+                    f"  - `{item.get('object_name')}` -> `{item.get('entry')}`"
+                )
         if record.get("subroutines_added"):
             lines.append("- Added subroutines:")
             for item in record["subroutines_added"]:
-                lines.append(f"  - `{item.get('object_name')}` -> `{item.get('entry')}`")
+                lines.append(
+                    f"  - `{item.get('object_name')}` -> `{item.get('entry')}`"
+                )
         if record.get("subroutine_dependencies"):
             lines.append("- Subroutine dependencies:")
             for item in record["subroutine_dependencies"]:
@@ -4139,7 +4781,11 @@ def _render_project_import_report(records: list[dict[str, Any]]) -> str:
                 "and ignores it during import."
             )
             for item in record["dependencies_not_packaged"]:
-                key = f", DataStoreKey `{item.get('datastore_key')}`" if item.get("datastore_key") else ""
+                key = (
+                    f", DataStoreKey `{item.get('datastore_key')}`"
+                    if item.get("datastore_key")
+                    else ""
+                )
                 lines.append(
                     f"  - `{item.get('object_name')}` ({item.get('type')} {item.get('guid')}{key}); "
                     "must already exist in the target FluentControl system/library"
@@ -4154,8 +4800,16 @@ def _render_project_import_report(records: list[dict[str, Any]]) -> str:
                     "no model was created):"
                 )
                 for item in missing:
-                    used = "used by script" if item.get("used_in_script") else "usage unconfirmed"
-                    where = f", script `{item['source_label']}`" if item.get("source_label") else ""
+                    used = (
+                        "used by script"
+                        if item.get("used_in_script")
+                        else "usage unconfirmed"
+                    )
+                    where = (
+                        f", script `{item['source_label']}`"
+                        if item.get("source_label")
+                        else ""
+                    )
                     lines.append(
                         f"  - `{item.get('object_name')}` ({item.get('type_id')} "
                         f"{item.get('guid')}{where}) - {used}; must already exist in the target "
@@ -4164,7 +4818,11 @@ def _render_project_import_report(records: list[dict[str, Any]]) -> str:
             if removed:
                 lines.append("- Removed unresolved references (unused in script body):")
                 for item in removed:
-                    where = f", script `{item['source_label']}`" if item.get("source_label") else ""
+                    where = (
+                        f", script `{item['source_label']}`"
+                        if item.get("source_label")
+                        else ""
+                    )
                     lines.append(
                         f"  - `{item.get('object_name')}` ({item.get('type_id')} "
                         f"{item.get('guid')}{where})"
@@ -4187,24 +4845,34 @@ def _render_project_import_report(records: list[dict[str, Any]]) -> str:
             )
             invalid_entries = audit.get("invalid_entries") or []
             if invalid_entries:
-                lines.append("  - Entries with invalid checksums (FluentControl will reject on load):")
+                lines.append(
+                    "  - Entries with invalid checksums (FluentControl will reject on load):"
+                )
                 for entry in invalid_entries:
                     lines.append(f"    - `{entry}`")
             blank_entries = audit.get("blank_entries") or []
             if blank_entries:
-                lines.append("  - Entries with blank checksums (FluentControl will reject/recalc on load):")
+                lines.append(
+                    "  - Entries with blank checksums (FluentControl will reject/recalc on load):"
+                )
                 for entry in blank_entries:
                     lines.append(f"    - `{entry}`")
             absent_entries = audit.get("absent_entries") or []
             if absent_entries:
-                lines.append("  - Entries missing checksums (FluentControl will reject on load):")
+                lines.append(
+                    "  - Entries missing checksums (FluentControl will reject on load):"
+                )
                 for entry in absent_entries:
                     lines.append(f"    - `{entry}`")
         archive_audit = record.get("archive_audit") or {}
         if archive_audit:
             arch_blocking = archive_audit.get("blocking") or []
             arch_needs_review = archive_audit.get("needs_review") or []
-            status = "broken" if arch_blocking else ("needs-review" if arch_needs_review else "import-ready")
+            status = (
+                "broken"
+                if arch_blocking
+                else ("needs-review" if arch_needs_review else "import-ready")
+            )
             lines.append(
                 f"- Import artifact check: `{status}` "
                 f"(zip OK: `{bool(archive_audit.get('zip_ok'))}`, "
@@ -4216,8 +4884,13 @@ def _render_project_import_report(records: list[dict[str, Any]]) -> str:
                 for item in arch_blocking:
                     lines.append(f"    - {_format_archive_finding(item)}")
             if arch_needs_review:
-                lines.append("  - Needs review (loads, but confirm the dependency exists in the target):")
-                if any(item.get("kind") == "unresolved_reference" for item in arch_needs_review):
+                lines.append(
+                    "  - Needs review (loads, but confirm the dependency exists in the target):"
+                )
+                if any(
+                    item.get("kind") == "unresolved_reference"
+                    for item in arch_needs_review
+                ):
                     lines.append(
                         "    - FluentControl may show a missing referenced files dialog during "
                         "import; install/import those dependencies first or confirm the warning "
@@ -4280,10 +4953,17 @@ def _dependency_archive_data(
 ) -> dict[str, bytes]:
     archives = [primary_archive_data]
     for archive_path in _dedupe_paths(supplemental_archives):
-        if not archive_path.exists() or archive_path.suffix.lower() != ".zeia" or not zipfile.is_zipfile(archive_path):
+        if (
+            not archive_path.exists()
+            or archive_path.suffix.lower() != ".zeia"
+            or not zipfile.is_zipfile(archive_path)
+        ):
             continue
         with zipfile.ZipFile(archive_path, "r") as source_zip:
-            supplemental = {info.filename: source_zip.read(info.filename) for info in source_zip.infolist()}
+            supplemental = {
+                info.filename: source_zip.read(info.filename)
+                for info in source_zip.infolist()
+            }
         if supplemental and supplemental is not primary_archive_data:
             archives.append(supplemental)
     if len(archives) == 1:
@@ -4300,7 +4980,10 @@ def _dependency_archive_data(
 
     merged_node = _merged_nodedescription(archives)
     if merged_node:
-        node_entry = _find_archive_entry(combined, "DataStore/nodedescription.xml") or "DataStore/nodedescription.xml"
+        node_entry = (
+            _find_archive_entry(combined, "DataStore/nodedescription.xml")
+            or "DataStore/nodedescription.xml"
+        )
         combined[node_entry] = merged_node
     return combined
 
@@ -4384,7 +5067,9 @@ def _archive_writer_dependency_records(
             continue
         if _fluent_import_unsupported_dependency(record):
             if skipped_import_unsupported is not None:
-                skipped_import_unsupported.append(_dependency_not_packaged_record(record))
+                skipped_import_unsupported.append(
+                    _dependency_not_packaged_record(record)
+                )
             continue
         source_entry = str(record.get("source_entry") or "")
         if source_entry:
@@ -4397,7 +5082,9 @@ def _archive_writer_dependency_records(
             record["refs"] = []
             out.append(record)
             if source_entry.replace("\\", "/").casefold().endswith(".xscr"):
-                for ref in _script_reference_guids_from_payload(archive_data[source_entry]):
+                for ref in _script_reference_guids_from_payload(
+                    archive_data[source_entry]
+                ):
                     if ref.casefold() not in seen and ref.casefold() not in excluded:
                         queued.append(ref)
     return out
@@ -4409,7 +5096,11 @@ def _fluent_import_unsupported_dependency(record: dict[str, Any]) -> bool:
         return True
     if record_type in FLUENT_IMPORT_UNSUPPORTED_DATASTORE_TYPES:
         return True
-    relative = str(record.get("relative_path") or record.get("source_entry") or "").replace("/", "\\").casefold()
+    relative = (
+        str(record.get("relative_path") or record.get("source_entry") or "")
+        .replace("/", "\\")
+        .casefold()
+    )
     return any(
         token in relative
         for token in (
@@ -4426,7 +5117,11 @@ def _dependency_not_packaged_record(record: dict[str, Any]) -> dict[str, str]:
         "guid": str(record.get("guid") or ""),
         "object_name": str(record.get("object_name") or ""),
         "type": _friendly_import_unsupported_type(record),
-        "datastore_key": record_type if record_type in FLUENT_IMPORT_UNSUPPORTED_DATASTORE_KEYS else "",
+        "datastore_key": (
+            record_type
+            if record_type in FLUENT_IMPORT_UNSUPPORTED_DATASTORE_KEYS
+            else ""
+        ),
         "relative_path": str(record.get("relative_path") or ""),
         "reason": "fluent_import_unsupported_datastore_key",
     }
@@ -4436,7 +5131,11 @@ def _friendly_import_unsupported_type(record: dict[str, Any]) -> str:
     record_type = str(record.get("type") or "").strip()
     if record_type and record_type not in FLUENT_IMPORT_UNSUPPORTED_DATASTORE_KEYS:
         return record_type
-    relative = str(record.get("relative_path") or record.get("source_entry") or "").replace("/", "\\").casefold()
+    relative = (
+        str(record.get("relative_path") or record.get("source_entry") or "")
+        .replace("/", "\\")
+        .casefold()
+    )
     if "systemspecific\\liquidclasses\\" in relative:
         return "LiquidClass"
     if "systemspecific\\worktable\\components\\" in relative:
@@ -4446,7 +5145,9 @@ def _friendly_import_unsupported_type(record: dict[str, Any]) -> str:
     return record_type or "datastore object"
 
 
-def _archive_nodedescription_records(archive_data: dict[str, bytes]) -> dict[str, dict[str, Any]]:
+def _archive_nodedescription_records(
+    archive_data: dict[str, bytes],
+) -> dict[str, dict[str, Any]]:
     node_entry = _find_archive_entry(archive_data, "DataStore/nodedescription.xml")
     if node_entry is None:
         return {}
@@ -4472,14 +5173,18 @@ def _archive_nodedescription_records(archive_data: dict[str, bytes]) -> dict[str
         records[guid.casefold()] = {
             "guid": guid,
             "source_entry": source_entry,
-            "relative_path": _datastore_relative_entry(source_entry) if source_entry else "",
+            "relative_path": (
+                _datastore_relative_entry(source_entry) if source_entry else ""
+            ),
             "object_name": _first_xml_text_from_text(block, "N"),
             "object_path": _first_xml_text_from_text(block, "P"),
             "type": type_by_short.get(type_short, type_short),
             "version": int(_first_xml_text_from_text(block, "V") or "1"),
             "type_version": _first_xml_text_from_text(block, "TV"),
-            "is_root": 'isRootNode="True"' in attrs_text or "isRootNode='True'" in attrs_text,
-            "was_manufacturer": 'wasMf="True"' in attrs_text or "wasMf='True'" in attrs_text,
+            "is_root": 'isRootNode="True"' in attrs_text
+            or "isRootNode='True'" in attrs_text,
+            "was_manufacturer": 'wasMf="True"' in attrs_text
+            or "wasMf='True'" in attrs_text,
             "refs": _unique_preserving_order(
                 re.findall(r"<Ref>(.*?)</Ref>", block, re.DOTALL)
             ),
@@ -4504,7 +5209,9 @@ def _datastore_entries_by_guid(archive_data: dict[str, bytes]) -> dict[str, str]
     return entries
 
 
-def _find_datastore_entry_for_guid(archive_data: dict[str, bytes], guid: str) -> str | None:
+def _find_datastore_entry_for_guid(
+    archive_data: dict[str, bytes], guid: str
+) -> str | None:
     return _datastore_entries_by_guid(archive_data).get(guid.casefold())
 
 
@@ -4528,7 +5235,13 @@ def _select_project_main_script(
     source_scripts: list[Path],
     generated_name: str,
 ) -> dict[str, Any] | None:
-    parent_paths = {Path(path).resolve() for path in [*source_scripts, *([source_xscr] if source_xscr is not None else [])]}
+    parent_paths = {
+        Path(path).resolve()
+        for path in [
+            *source_scripts,
+            *([source_xscr] if source_xscr is not None else []),
+        ]
+    }
     if source_manifest and parent_paths:
         for script in source_manifest.get("scripts") or []:
             if not isinstance(script, dict):
@@ -4556,10 +5269,14 @@ def _select_project_main_script(
         and str(item.get("folder") or "").casefold() != "subroutines"
     ]
     candidates = non_subroutines or script_records
-    return max(candidates, key=lambda item: int(item.get("command_count") or 0), default=None)
+    return max(
+        candidates, key=lambda item: int(item.get("command_count") or 0), default=None
+    )
 
 
-def _find_archive_script_by_entry(script_records: list[dict[str, Any]], entry: str) -> dict[str, Any] | None:
+def _find_archive_script_by_entry(
+    script_records: list[dict[str, Any]], entry: str
+) -> dict[str, Any] | None:
     normalized = _normalize_archive_entry(entry)
     if not normalized:
         return None
@@ -4569,7 +5286,9 @@ def _find_archive_script_by_entry(script_records: list[dict[str, Any]], entry: s
     return None
 
 
-def _find_archive_script_by_object_name(script_records: list[dict[str, Any]], object_name: str) -> dict[str, Any] | None:
+def _find_archive_script_by_object_name(
+    script_records: list[dict[str, Any]], object_name: str
+) -> dict[str, Any] | None:
     needle = object_name.casefold()
     if not needle:
         return None
@@ -4589,7 +5308,9 @@ def _prepare_project_script_payload(
     normalized_target = _normalize_script_folder(target_folder)
     folder = normalized_target or _normalize_script_folder(fallback_folder)
     if folder:
-        data = _ensure_object_subfolder_path(data, folder, replace=bool(normalized_target))
+        data = _ensure_object_subfolder_path(
+            data, folder, replace=bool(normalized_target)
+        )
     return data
 
 
@@ -4597,16 +5318,26 @@ def _normalize_script_folder(value: Any) -> str:
     return str(value or "").strip().strip("\\/")
 
 
-def _ensure_object_subfolder_path(data: bytes, folder: str, *, replace: bool = False) -> bytes:
+def _ensure_object_subfolder_path(
+    data: bytes, folder: str, *, replace: bool = False
+) -> bytes:
     if not folder:
         return data
     text = _decode_xml_bytes(data)
-    existing_tag = re.search(r"<ObjectSubfolderPath>.*?</ObjectSubfolderPath>", text, flags=re.DOTALL)
+    existing_tag = re.search(
+        r"<ObjectSubfolderPath>.*?</ObjectSubfolderPath>", text, flags=re.DOTALL
+    )
     if existing_tag and not replace:
         return data
     tag = f"<ObjectSubfolderPath>{_xml_escape_text(folder)}</ObjectSubfolderPath>"
     if existing_tag:
-        updated = re.sub(r"<ObjectSubfolderPath>.*?</ObjectSubfolderPath>", tag, text, count=1, flags=re.DOTALL)
+        updated = re.sub(
+            r"<ObjectSubfolderPath>.*?</ObjectSubfolderPath>",
+            tag,
+            text,
+            count=1,
+            flags=re.DOTALL,
+        )
     else:
         updated = text.replace("</ObjectName>", f"</ObjectName>\n    {tag}", 1)
     return _encode_xml_text_like(data, _blank_checksum(updated))
@@ -4635,14 +5366,18 @@ def _strip_unavailable_optional_references(
     text = _decode_xml_bytes(data)
     available_guids = _available_archive_guids(archive_data)
     findings: list[dict[str, Any]] = []
-    liquid_class_usage = bool(re.search(r"<LiquidClassName(?:BySelection)?>(?!\s*</)", text))
+    liquid_class_usage = bool(
+        re.search(r"<LiquidClassName(?:BySelection)?>(?!\s*</)", text)
+    )
 
     def _name_used(name: str) -> bool:
         if not name:
             return False
         return bool(
             re.search(
-                r"<LiquidClassName[^>]*>\s*" + re.escape(name) + r"\s*</LiquidClassName",
+                r"<LiquidClassName[^>]*>\s*"
+                + re.escape(name)
+                + r"\s*</LiquidClassName",
                 text,
                 re.IGNORECASE,
             )
@@ -4667,7 +5402,9 @@ def _strip_unavailable_optional_references(
             findings.append(finding)
             return ""
         finding["action"] = "retained_unresolved"
-        finding["used_in_script"] = _name_used(object_name) if type_id == "LiquidClass" else True
+        finding["used_in_script"] = (
+            _name_used(object_name) if type_id == "LiquidClass" else True
+        )
         findings.append(finding)
         return block
 
@@ -4683,9 +5420,16 @@ def _available_archive_guids(archive_data: dict[str, bytes]) -> set[str]:
         guid = _guid_from_archive_entry(entry)
         if guid:
             guids.add(guid.casefold())
-        if entry.replace("\\", "/").casefold().endswith("datastore/nodedescription.xml"):
+        if (
+            entry.replace("\\", "/")
+            .casefold()
+            .endswith("datastore/nodedescription.xml")
+        ):
             text = _decode_xml_bytes(data)
-            guids.update(value.casefold() for value in re.findall(r"<Id>([0-9a-fA-F-]{36})</Id>", text))
+            guids.update(
+                value.casefold()
+                for value in re.findall(r"<Id>([0-9a-fA-F-]{36})</Id>", text)
+            )
     return guids
 
 
@@ -4700,13 +5444,16 @@ def _append_nodedescription_script_nodes(
     for item in scripts:
         source_path = Path(item["source"])
         refs = _script_reference_guids(source_path)
-        ref_lines = "".join(f"\t\t\t<Ref>{_xml_escape_text(ref)}</Ref>\r\n" for ref in refs)
+        ref_lines = "".join(
+            f"\t\t\t<Ref>{_xml_escape_text(ref)}</Ref>\r\n" for ref in refs
+        )
         file_refs = _script_file_references(source_path)
         file_ref_lines = "".join(
-            f"\t\t\t<FileRef>{_xml_escape_text(file_ref)}</FileRef>\r\n" for file_ref in file_refs
+            f"\t\t\t<FileRef>{_xml_escape_text(file_ref)}</FileRef>\r\n"
+            for file_ref in file_refs
         )
         nodes.append(
-            "\t\t<S isRootNode=\"True\">\r\n"
+            '\t\t<S isRootNode="True">\r\n'
             f"\t\t\t<Id>{_xml_escape_text(item['guid'])}</Id>\r\n"
             f"\t\t\t<N>{_xml_escape_text(item['object_name'])}</N>\r\n"
             "\t\t\t<P></P>\r\n"
@@ -4743,13 +5490,21 @@ def _append_content_datastore_entries(data: bytes, entries: list[str]) -> bytes:
         datastore_entry = _datastore_relative_entry(entry)
         if not datastore_entry or f"<Entry>{datastore_entry}</Entry>" in text:
             continue
-        additions.append(f"\t\t\t<Entry>{_xml_escape_text(datastore_entry)}</Entry>\r\n")
+        additions.append(
+            f"\t\t\t<Entry>{_xml_escape_text(datastore_entry)}</Entry>\r\n"
+        )
     if not additions:
         return data
     if "\t\t\t<Entry>nodedescription.xml</Entry>" in text:
-        updated = text.replace("\t\t\t<Entry>nodedescription.xml</Entry>", "".join(additions) + "\t\t\t<Entry>nodedescription.xml</Entry>", 1)
+        updated = text.replace(
+            "\t\t\t<Entry>nodedescription.xml</Entry>",
+            "".join(additions) + "\t\t\t<Entry>nodedescription.xml</Entry>",
+            1,
+        )
     else:
-        updated = text.replace("\t\t</DatastoreEntries>", "".join(additions) + "\t\t</DatastoreEntries>", 1)
+        updated = text.replace(
+            "\t\t</DatastoreEntries>", "".join(additions) + "\t\t</DatastoreEntries>", 1
+        )
     return _encode_xml_text_like(data, _blank_checksum(updated))
 
 
@@ -4765,9 +5520,13 @@ def _update_nodedescription_script_identity(
         block = match.group(0)
         if not re.search(rf"<Id>{re.escape(script_guid)}</Id>", block):
             continue
-        updated_block = _replace_or_insert_simple_tag(block, "N", object_name, after_tag="Id")
+        updated_block = _replace_or_insert_simple_tag(
+            block, "N", object_name, after_tag="Id"
+        )
         if folder:
-            updated_block = _replace_or_insert_simple_tag(updated_block, "P", folder, after_tag="N")
+            updated_block = _replace_or_insert_simple_tag(
+                updated_block, "P", folder, after_tag="N"
+            )
         if updated_block == block:
             return None
         updated = text[: match.start()] + updated_block + text[match.end() :]
@@ -4775,7 +5534,9 @@ def _update_nodedescription_script_identity(
     return None
 
 
-def _replace_or_insert_simple_tag(block: str, tag: str, value: str, *, after_tag: str) -> str:
+def _replace_or_insert_simple_tag(
+    block: str, tag: str, value: str, *, after_tag: str
+) -> str:
     escaped = _xml_escape_text(value)
     if re.search(rf"<{tag}>.*?</{tag}>", block, flags=re.DOTALL):
         replacement = f"<{tag}>{escaped}</{tag}>"
@@ -4786,10 +5547,14 @@ def _replace_or_insert_simple_tag(block: str, tag: str, value: str, *, after_tag
             count=1,
             flags=re.DOTALL,
         )
-    return block.replace(f"</{after_tag}>", f"</{after_tag}>\r\n\t\t\t<{tag}>{escaped}</{tag}>", 1)
+    return block.replace(
+        f"</{after_tag}>", f"</{after_tag}>\r\n\t\t\t<{tag}>{escaped}</{tag}>", 1
+    )
 
 
-def _write_zip_info(out_zip: zipfile.ZipFile, info: zipfile.ZipInfo, data: bytes) -> None:
+def _write_zip_info(
+    out_zip: zipfile.ZipFile, info: zipfile.ZipInfo, data: bytes
+) -> None:
     out_zip.writestr(info, data)
 
 
@@ -4816,13 +5581,30 @@ def _restore_windows_datastore_zip_names(archive_path: Path) -> None:
                 local_header_offset = info.header_offset
                 if data[local_header_offset : local_header_offset + 4] == b"PK\x03\x04":
                     name_len = int.from_bytes(
-                        data[local_header_offset + 26 : local_header_offset + 28], "little"
+                        data[local_header_offset + 26 : local_header_offset + 28],
+                        "little",
                     )
-                    filename = bytes(data[local_header_offset + 30 : local_header_offset + 30 + name_len])
+                    filename = bytes(
+                        data[
+                            local_header_offset
+                            + 30 : local_header_offset
+                            + 30
+                            + name_len
+                        ]
+                    )
                     rewritten = _windows_datastore_zip_filename(filename)
 
-                    if rewritten is not None and rewritten != filename and len(rewritten) == len(filename):
-                        data[local_header_offset + 30 : local_header_offset + 30 + name_len] = rewritten
+                    if (
+                        rewritten is not None
+                        and rewritten != filename
+                        and len(rewritten) == len(filename)
+                    ):
+                        data[
+                            local_header_offset
+                            + 30 : local_header_offset
+                            + 30
+                            + name_len
+                        ] = rewritten
                         changed = True
 
             cd_offset = zf.start_dir
@@ -4833,14 +5615,24 @@ def _restore_windows_datastore_zip_names(archive_path: Path) -> None:
                 if data[cd_offset : cd_offset + 4] != b"PK\x01\x02":
                     break
 
-                filename_len = int.from_bytes(data[cd_offset + 28 : cd_offset + 30], "little")
-                extra_len = int.from_bytes(data[cd_offset + 30 : cd_offset + 32], "little")
-                comment_len = int.from_bytes(data[cd_offset + 32 : cd_offset + 34], "little")
+                filename_len = int.from_bytes(
+                    data[cd_offset + 28 : cd_offset + 30], "little"
+                )
+                extra_len = int.from_bytes(
+                    data[cd_offset + 30 : cd_offset + 32], "little"
+                )
+                comment_len = int.from_bytes(
+                    data[cd_offset + 32 : cd_offset + 34], "little"
+                )
 
                 filename = bytes(data[cd_offset + 46 : cd_offset + 46 + filename_len])
                 rewritten = _windows_datastore_zip_filename(filename)
 
-                if rewritten is not None and rewritten != filename and len(rewritten) == len(filename):
+                if (
+                    rewritten is not None
+                    and rewritten != filename
+                    and len(rewritten) == len(filename)
+                ):
                     data[cd_offset + 46 : cd_offset + 46 + filename_len] = rewritten
                     changed = True
 
@@ -4870,7 +5662,10 @@ def _find_archive_entry(archive_data: dict[str, bytes], expected: str) -> str | 
 
 
 def _archive_has_datastore_metadata(archive_data: dict[str, bytes]) -> bool:
-    return _find_archive_entry(archive_data, "DataStore/nodedescription.xml") is not None and _find_archive_entry(archive_data, "meta/content.xml") is not None
+    return (
+        _find_archive_entry(archive_data, "DataStore/nodedescription.xml") is not None
+        and _find_archive_entry(archive_data, "meta/content.xml") is not None
+    )
 
 
 def _datastore_relative_entry(entry: str) -> str:
@@ -4881,7 +5676,9 @@ def _datastore_relative_entry(entry: str) -> str:
     return normalized
 
 
-def _unique_archive_entry(entry: str, archive_data: dict[str, bytes], additions: dict[str, bytes]) -> str:
+def _unique_archive_entry(
+    entry: str, archive_data: dict[str, bytes], additions: dict[str, bytes]
+) -> str:
     existing = {_normalize_archive_entry(name) for name in archive_data}
     existing.update(_normalize_archive_entry(name) for name in additions)
     if _normalize_archive_entry(entry) not in existing:
@@ -4891,14 +5688,23 @@ def _unique_archive_entry(entry: str, archive_data: dict[str, bytes], additions:
     suffix = path.suffix
     parent = str(path.parent).replace("/", "\\")
     for index in range(2, 1000):
-        candidate = f"{parent}\\{stem}_{index}{suffix}" if parent != "." else f"{stem}_{index}{suffix}"
+        candidate = (
+            f"{parent}\\{stem}_{index}{suffix}"
+            if parent != "."
+            else f"{stem}_{index}{suffix}"
+        )
         if _normalize_archive_entry(candidate) not in existing:
             return candidate
     raise PipelineError(f"could not create a unique archive entry for {entry}")
 
 
 def _stable_project_guid(source_project: Path, object_name: str, path: Path) -> str:
-    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"{source_project.resolve()}::{object_name}::{path.resolve()}"))
+    return str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            f"{source_project.resolve()}::{object_name}::{path.resolve()}",
+        )
+    )
 
 
 def _fluentcontrol_userspecific_dirs() -> list[Path]:
@@ -4961,7 +5767,10 @@ def _unique_project_guid(
 
 def _guid_from_archive_entry(entry: str) -> str:
     stem = Path(entry.replace("\\", "/")).stem
-    if re.fullmatch(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", stem):
+    if re.fullmatch(
+        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+        stem,
+    ):
         return stem
     return ""
 
@@ -4979,7 +5788,9 @@ def _script_object_name_from_path(path: Path) -> str:
 def _script_folder_from_path(path: Path) -> str:
     if not path.exists():
         return ""
-    return _first_xml_text_from_text(_decode_xml_bytes(path.read_bytes()), "ObjectSubfolderPath")
+    return _first_xml_text_from_text(
+        _decode_xml_bytes(path.read_bytes()), "ObjectSubfolderPath"
+    )
 
 
 def _script_reference_guids(path: Path) -> list[str]:
@@ -5005,7 +5816,9 @@ def _script_file_references(path: Path) -> list[str]:
         return []
     text = _decode_xml_bytes(path.read_bytes())
     files: list[str] = []
-    for block in re.findall(r"<FileReference>.*?</FileReference>", text, flags=re.DOTALL):
+    for block in re.findall(
+        r"<FileReference>.*?</FileReference>", text, flags=re.DOTALL
+    ):
         value = _first_xml_text_from_text(block, "File")
         if value and value not in files:
             files.append(value)
@@ -5021,7 +5834,9 @@ def _folder_from_subroutine_ref(item: dict[str, Any]) -> str:
 
 
 def _first_xml_text_from_text(text: str, name: str) -> str:
-    match = re.search(rf"<{re.escape(name)}>(.*?)</{re.escape(name)}>", text, flags=re.DOTALL)
+    match = re.search(
+        rf"<{re.escape(name)}>(.*?)</{re.escape(name)}>", text, flags=re.DOTALL
+    )
     if not match:
         return ""
     return re.sub(r"\s+", " ", match.group(1)).strip()
@@ -5056,7 +5871,7 @@ def _ensure_blank_checksum_element(text: str) -> str:
     if re.search(r"<Checksum\s*/>", text):
         return re.sub(r"<Checksum\s*/>", "<Checksum></Checksum>", text, count=1)
     return re.sub(
-        r'(\s*</(?:[A-Za-z_][\w.-]*:)?VxData>\s*)$',
+        r"(\s*</(?:[A-Za-z_][\w.-]*:)?VxData>\s*)$",
         "\n  <Checksum></Checksum>\\1",
         text,
         count=1,
@@ -5073,10 +5888,14 @@ def _find_archive_entry(entries: list[str], wanted: str) -> str | None:
 
 def _replace_zip_entry(archive_path: Path, target_entry: str, data: bytes) -> None:
     tmp_path = archive_path.with_suffix(archive_path.suffix + ".tmp")
-    with zipfile.ZipFile(archive_path, "r") as source, zipfile.ZipFile(tmp_path, "w") as dest:
+    with zipfile.ZipFile(archive_path, "r") as source, zipfile.ZipFile(
+        tmp_path, "w"
+    ) as dest:
         replaced = False
         for info in source.infolist():
-            payload = data if info.filename == target_entry else source.read(info.filename)
+            payload = (
+                data if info.filename == target_entry else source.read(info.filename)
+            )
             dest.writestr(info, payload)
             replaced = replaced or info.filename == target_entry
         if not replaced:
@@ -5107,7 +5926,9 @@ def _script_reference_guids_from_payload(data: bytes) -> list[str]:
 def _script_file_refs(data: bytes) -> list[str]:
     return [
         value.strip()
-        for value in re.findall(r"<File>(.*?)</File>", _decode_xml_bytes(data), re.DOTALL)
+        for value in re.findall(
+            r"<File>(.*?)</File>", _decode_xml_bytes(data), re.DOTALL
+        )
         if value.strip()
     ]
 
@@ -5167,7 +5988,10 @@ def _build_portable_nodedescription_xml(
     type_shorts: dict[str, str],
 ) -> bytes:
     map_lines = []
-    for type_name, short in sorted(type_shorts.items(), key=lambda item: int(item[1]) if item[1].isdigit() else item[1]):
+    for type_name, short in sorted(
+        type_shorts.items(),
+        key=lambda item: int(item[1]) if item[1].isdigit() else item[1],
+    ):
         map_lines.append(
             "\t\t\t<Map>\r\n"
             f"\t\t\t\t<Type>{_xml_escape_text(type_name)}</Type>\r\n"
@@ -5283,9 +6107,13 @@ def _run_portable_archive_writer(
     try:
         records = json.loads(metadata_json.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise PipelineError(f"portable archive writer could not read metadata JSON: {exc}") from exc
+        raise PipelineError(
+            f"portable archive writer could not read metadata JSON: {exc}"
+        ) from exc
     if not isinstance(records, list) or not records:
-        raise PipelineError("portable archive writer requires a non-empty metadata record list")
+        raise PipelineError(
+            "portable archive writer requires a non-empty metadata record list"
+        )
 
     ensure_parent(archive_path)
     if archive_path.exists():
@@ -5296,23 +6124,33 @@ def _run_portable_archive_writer(
     datastore_entry_names: list[str] = []
     for record in records:
         if not isinstance(record, dict):
-            raise PipelineError("portable archive writer metadata records must be objects")
+            raise PipelineError(
+                "portable archive writer metadata records must be objects"
+            )
         relative = str(record.get("relative_path") or "").replace("/", "\\").strip()
         if not relative:
-            raise PipelineError("portable archive writer metadata record is missing relative_path")
+            raise PipelineError(
+                "portable archive writer metadata record is missing relative_path"
+            )
         staged = datastore_root / Path(relative.replace("\\", "/"))
         if not staged.is_file():
-            raise PipelineError(f"portable archive writer missing staged datastore file: {relative}")
+            raise PipelineError(
+                f"portable archive writer missing staged datastore file: {relative}"
+            )
         archive_entries[f"DataStore\\{relative}"] = staged.read_bytes()
         datastore_entry_names.append(relative)
 
-    archive_entries["DataStore\\nodedescription.xml"] = _build_portable_nodedescription_xml(
-        records, type_shorts
+    archive_entries["DataStore\\nodedescription.xml"] = (
+        _build_portable_nodedescription_xml(records, type_shorts)
     )
-    archive_entries["meta\\content.xml"] = _build_portable_content_xml(datastore_entry_names)
+    archive_entries["meta\\content.xml"] = _build_portable_content_xml(
+        datastore_entry_names
+    )
     archive_entries["meta\\sysinfo.xml"] = _build_portable_sysinfo_xml()
 
-    with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as out_zip:
+    with zipfile.ZipFile(
+        archive_path, "w", compression=zipfile.ZIP_DEFLATED
+    ) as out_zip:
         for name, payload in archive_entries.items():
             out_zip.writestr(name, payload)
     _restore_windows_datastore_zip_names(archive_path)
@@ -5331,7 +6169,11 @@ def _run_portable_archive_writer(
 
 
 def _powershell_executable() -> str | None:
-    return shutil.which("powershell.exe") or shutil.which("powershell") or shutil.which("pwsh")
+    return (
+        shutil.which("powershell.exe")
+        or shutil.which("powershell")
+        or shutil.which("pwsh")
+    )
 
 
 def _run_fluent_archive_writer(
@@ -5345,7 +6187,9 @@ def _run_fluent_archive_writer(
     if shell is None:
         raise _ArchiveWriterUnavailable("PowerShell is not available")
     try:
-        timeout_seconds = max(1, int(os.environ.get("TECAN_ARCHIVE_WRITER_TIMEOUT_SECONDS") or "300"))
+        timeout_seconds = max(
+            1, int(os.environ.get("TECAN_ARCHIVE_WRITER_TIMEOUT_SECONDS") or "300")
+        )
     except ValueError:
         timeout_seconds = 300
     writer_script = metadata_json.parent / "write_script_only_archive.ps1"
@@ -5381,7 +6225,11 @@ def _run_fluent_archive_writer(
     if completed.returncode != 0:
         raise PipelineError(
             "FluentControl archive writer failed: "
-            + (completed.stderr.strip() or completed.stdout.strip() or f"exit {completed.returncode}")
+            + (
+                completed.stderr.strip()
+                or completed.stdout.strip()
+                or f"exit {completed.returncode}"
+            )
         )
     output = completed.stdout.strip()
     try:
@@ -5393,7 +6241,7 @@ def _run_fluent_archive_writer(
     return report
 
 
-_ARCHIVE_WRITER_PS1 = r'''
+_ARCHIVE_WRITER_PS1 = r"""
 param(
     [Parameter(Mandatory = $true)]
     [string]$ScriptPath,
@@ -5484,7 +6332,7 @@ $result = $writer.WriteArchive()
     warningMessages = $result.WarningMessages
     errorMessages = $result.ErrorMessages
 } | ConvertTo-Json -Depth 6
-'''
+"""
 
 
 def _encode_xml_text_like(original: bytes, text: str) -> bytes:
@@ -5494,16 +6342,17 @@ def _encode_xml_text_like(original: bytes, text: str) -> bytes:
 
 
 def _blank_checksum(text: str) -> str:
-    return re.sub(r"<Checksum>.*?</Checksum>", "<Checksum></Checksum>", text, count=1, flags=re.DOTALL)
+    return re.sub(
+        r"<Checksum>.*?</Checksum>",
+        "<Checksum></Checksum>",
+        text,
+        count=1,
+        flags=re.DOTALL,
+    )
 
 
 def _xml_escape_text(value: str) -> str:
-    return (
-        str(value)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    return str(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def _resolved_subroutine_artifacts(
@@ -5516,7 +6365,11 @@ def _resolved_subroutine_artifacts(
     parent_paths = {Path(path).resolve() for path in parent_scripts if path is not None}
     if not parent_paths:
         return []
-    scripts = [script for script in source_manifest.get("scripts") or [] if isinstance(script, dict)]
+    scripts = [
+        script
+        for script in source_manifest.get("scripts") or []
+        if isinstance(script, dict)
+    ]
     parent_records = [
         script
         for script in scripts
@@ -5527,11 +6380,16 @@ def _resolved_subroutine_artifacts(
         parent_records = [
             script
             for script in scripts
-            if Path(str(script.get("entry") or script.get("extracted_path") or "")).name.casefold() in parent_names
+            if Path(
+                str(script.get("entry") or script.get("extracted_path") or "")
+            ).name.casefold()
+            in parent_names
         ]
     out = []
     seen: set[Path] = set()
-    parent_resolved_paths = {_manifest_script_path(source_manifest, script) for script in parent_records}
+    parent_resolved_paths = {
+        _manifest_script_path(source_manifest, script) for script in parent_records
+    }
     queue = list(parent_records)
     scanned: set[Path] = set()
     while queue:
@@ -5542,7 +6400,9 @@ def _resolved_subroutine_artifacts(
         scanned.add(parent_path)
         deps = parent.get("dependencies") or {}
         for ref in deps.get("subroutine_refs") or []:
-            match, alternatives = _find_subroutine_record(source_manifest, scripts, str(ref), parent)
+            match, alternatives = _find_subroutine_record(
+                source_manifest, scripts, str(ref), parent
+            )
             if not match:
                 continue
             path = _manifest_script_path(source_manifest, match)
@@ -5554,10 +6414,14 @@ def _resolved_subroutine_artifacts(
                 {
                     "ref": str(ref),
                     "object_name": str(match.get("object_name") or ""),
-                    "folder": str(match.get("folder") or match.get("object_subfolder_path") or ""),
+                    "folder": str(
+                        match.get("folder") or match.get("object_subfolder_path") or ""
+                    ),
                     "guid": str(match.get("guid") or match.get("script_guid") or ""),
                     "entry": str(match.get("entry") or ""),
-                    "version": str(match.get("script_version") or match.get("version") or ""),
+                    "version": str(
+                        match.get("script_version") or match.get("version") or ""
+                    ),
                     "source_context": str(match.get("source_context") or ""),
                     "path": path,
                     "ambiguous": bool(alternatives),
@@ -5567,7 +6431,9 @@ def _resolved_subroutine_artifacts(
     return out
 
 
-def _dedupe_subroutine_artifacts(artifacts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _dedupe_subroutine_artifacts(
+    artifacts: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     deduped: list[dict[str, Any]] = []
     seen_paths: set[Path] = set()
     seen_identities: set[str] = set()
@@ -5594,9 +6460,15 @@ def _subroutine_artifact_identity(item: dict[str, Any]) -> str:
     if qualified:
         return norm_subroutine_key(qualified)
     object_name = str(item.get("object_name") or item.get("name") or "").strip()
-    folder = str(item.get("folder") or item.get("object_subfolder_path") or "").strip().strip("\\/")
+    folder = (
+        str(item.get("folder") or item.get("object_subfolder_path") or "")
+        .strip()
+        .strip("\\/")
+    )
     if object_name:
-        return norm_subroutine_key(f"{folder}\\{object_name}" if folder else object_name)
+        return norm_subroutine_key(
+            f"{folder}\\{object_name}" if folder else object_name
+        )
     ref = str(item.get("ref") or "").strip()
     if ref:
         return norm_subroutine_key(ref)
@@ -5607,7 +6479,9 @@ def _subroutine_artifact_identity(item: dict[str, Any]) -> str:
     return norm_subroutine_key(Path(path).stem) if path else ""
 
 
-def _manifest_script_path(source_manifest: dict[str, Any], script: dict[str, Any]) -> Path:
+def _manifest_script_path(
+    source_manifest: dict[str, Any], script: dict[str, Any]
+) -> Path:
     return _manifest_item_path(source_manifest, script)
 
 
@@ -5662,7 +6536,10 @@ def _subroutine_match_strength(script: dict[str, Any], forms: dict[str, str]) ->
 
 
 def _subroutine_artifact_name(item: dict[str, Any], index: int) -> str:
-    label = item.get("object_name") or Path(str(item.get("entry") or item["path"].stem)).stem
+    label = (
+        item.get("object_name")
+        or Path(str(item.get("entry") or item["path"].stem)).stem
+    )
     return f"subroutine_{index}_{_safe_label(str(label))}.xscr"
 
 
@@ -5699,7 +6576,11 @@ def _render_subroutine_manifest(records: list[dict[str, Any]]) -> str:
         if record.get("ambiguous"):
             alternatives = ", ".join(
                 f"`{alt.get('object_name') or alt.get('entry') or '?'}`"
-                + (f" ({alt.get('source_context')})" if alt.get("source_context") else "")
+                + (
+                    f" ({alt.get('source_context')})"
+                    if alt.get("source_context")
+                    else ""
+                )
                 for alt in record.get("alternatives") or []
             )
             lines.append("   - Ambiguous: `True`")
@@ -5741,7 +6622,12 @@ def _resolved_hardware_artifacts(
     script_summaries: list[dict[str, Any]] = []
     for script in script_records:
         deps = script.get("dependencies") or {}
-        script_pins = _sorted_strs([*(deps.get("pin_refs") or []), *(deps.get("worktable_pin_locations") or [])])
+        script_pins = _sorted_strs(
+            [
+                *(deps.get("pin_refs") or []),
+                *(deps.get("worktable_pin_locations") or []),
+            ]
+        )
         script_assets = _sorted_strs(deps.get("custom_asset_refs") or [])
         script_barcodes = _sorted_strs(deps.get("barcode_refs") or [])
         script_touchtools = _sorted_strs(deps.get("touchtools_titles") or [])
@@ -5763,16 +6649,17 @@ def _resolved_hardware_artifacts(
                 }
             )
 
-    objects = [obj for obj in source_manifest.get("objects") or [] if isinstance(obj, dict)]
+    objects = [
+        obj for obj in source_manifest.get("objects") or [] if isinstance(obj, dict)
+    ]
     connector_objects = [
         obj
         for obj in objects
-        if str(obj.get("kind") or "").casefold() == "connector" and (obj.get("pin_refs") or obj.get("object_name"))
+        if str(obj.get("kind") or "").casefold() == "connector"
+        and (obj.get("pin_refs") or obj.get("object_name"))
     ]
     asset_objects = [
-        obj
-        for obj in objects
-        if str(obj.get("kind") or "").casefold() == "asset"
+        obj for obj in objects if str(obj.get("kind") or "").casefold() == "asset"
     ]
 
     connector_artifacts: dict[str, dict[str, Any]] = {}
@@ -5795,7 +6682,9 @@ def _resolved_hardware_artifacts(
 
     asset_artifacts: dict[str, dict[str, Any]] = {}
     asset_records: list[dict[str, Any]] = []
-    asset_names = sorted({name for ref in asset_refs for name in _asset_names_from_ref(ref)})
+    asset_names = sorted(
+        {name for ref in asset_refs for name in _asset_names_from_ref(ref)}
+    )
     for name in asset_names:
         matches = [obj for obj in asset_objects if _object_matches_asset(obj, name)]
         asset_refs_for_name = _asset_raw_refs_for_name(asset_refs, name)
@@ -5808,7 +6697,9 @@ def _resolved_hardware_artifacts(
             {
                 "asset_name": name,
                 "raw_refs": asset_refs_for_name,
-                "status": "asset_packaged" if packaged_refs else "referenced_but_not_packaged",
+                "status": (
+                    "asset_packaged" if packaged_refs else "referenced_but_not_packaged"
+                ),
                 "asset_artifacts": packaged_refs,
                 "manual_verification_required": not bool(packaged_refs),
             }
@@ -5816,7 +6707,11 @@ def _resolved_hardware_artifacts(
 
     report.update(
         {
-            "status": "static_evidence_packaged" if (pin_records or asset_records) else "no_hardware_refs",
+            "status": (
+                "static_evidence_packaged"
+                if (pin_records or asset_records)
+                else "no_hardware_refs"
+            ),
             "scripts": script_summaries,
             "pins": pin_records,
             "assets": asset_records,
@@ -5833,7 +6728,12 @@ def _resolved_hardware_artifacts(
 def _has_hardware_evidence(report: dict[str, Any] | None) -> bool:
     if not report:
         return False
-    return bool(report.get("pins") or report.get("assets") or report.get("connector_artifacts") or report.get("asset_artifacts"))
+    return bool(
+        report.get("pins")
+        or report.get("assets")
+        or report.get("connector_artifacts")
+        or report.get("asset_artifacts")
+    )
 
 
 def _write_labware_catalog_artifact(
@@ -5852,7 +6752,11 @@ def _write_labware_catalog_artifact(
     from .labware_catalog_export import LABWARE_CATALOG_FILENAME, write_labware_catalog
 
     manifest = source_manifest if isinstance(source_manifest, dict) else {}
-    geometry = manifest.get("worktable_geometry") if isinstance(manifest.get("worktable_geometry"), dict) else None
+    geometry = (
+        manifest.get("worktable_geometry")
+        if isinstance(manifest.get("worktable_geometry"), dict)
+        else None
+    )
     context_root = None
     for key in ("root", "context_root", "extracted_dir"):
         raw = manifest.get(key)
@@ -5869,7 +6773,9 @@ def _write_labware_catalog_artifact(
     if written is None:
         return None
     exports.append(ExportedArtifact(written, written, "labware-catalog"))
-    copied_files.append(_file_record("labware-catalog", written, written, bundle_root=bundle_root))
+    copied_files.append(
+        _file_record("labware-catalog", written, written, bundle_root=bundle_root)
+    )
     return written
 
 
@@ -5882,17 +6788,28 @@ def _write_connector_coverage_artifact(
     copied_files: list[dict[str, str]],
 ) -> Path | None:
     """Persist ZEIA-derived connector coverage (name profiles → resolved GUIDs/counts)."""
-    from .connector_coverage_export import CONNECTOR_COVERAGE_FILENAME, write_connector_coverage
+    from .connector_coverage_export import (
+        CONNECTOR_COVERAGE_FILENAME,
+        write_connector_coverage,
+    )
 
-    geometry = (source_manifest or {}).get("worktable_geometry") if isinstance(source_manifest, dict) else None
+    geometry = (
+        (source_manifest or {}).get("worktable_geometry")
+        if isinstance(source_manifest, dict)
+        else None
+    )
     if not isinstance(geometry, dict) or not geometry.get("components"):
         return None
     destination = source_dir / CONNECTOR_COVERAGE_FILENAME
-    written = write_connector_coverage(destination, geometry, source="worktable_geometry")
+    written = write_connector_coverage(
+        destination, geometry, source="worktable_geometry"
+    )
     if written is None:
         return None
     exports.append(ExportedArtifact(written, written, "connector-coverage"))
-    copied_files.append(_file_record("connector-coverage", written, written, bundle_root=bundle_root))
+    copied_files.append(
+        _file_record("connector-coverage", written, written, bundle_root=bundle_root)
+    )
     return written
 
 
@@ -5913,7 +6830,11 @@ def _write_connector_graph_artifact(
     from .connector_graph_export import CONNECTOR_GRAPH_FILENAME, write_connector_graph
 
     manifest = source_manifest if isinstance(source_manifest, dict) else {}
-    geometry = manifest.get("worktable_geometry") if isinstance(manifest.get("worktable_geometry"), dict) else None
+    geometry = (
+        manifest.get("worktable_geometry")
+        if isinstance(manifest.get("worktable_geometry"), dict)
+        else None
+    )
     context_root = None
     for key in ("root", "context_root", "extracted_dir"):
         raw = manifest.get(key)
@@ -5930,7 +6851,9 @@ def _write_connector_graph_artifact(
     if written is None:
         return None
     exports.append(ExportedArtifact(written, written, "connector-graph"))
-    copied_files.append(_file_record("connector-graph", written, written, bundle_root=bundle_root))
+    copied_files.append(
+        _file_record("connector-graph", written, written, bundle_root=bundle_root)
+    )
     return written
 
 
@@ -5943,7 +6866,10 @@ def _write_liquid_classes_artifact(
     copied_files: list[dict[str, str]],
 ) -> Path | None:
     """Persist ZEIA-derived liquid class catalog (``*.xlqc``) into the bundle source tree."""
-    from .liquid_classes_export import LIQUID_CLASSES_FILENAME, write_liquid_classes_catalog
+    from .liquid_classes_export import (
+        LIQUID_CLASSES_FILENAME,
+        write_liquid_classes_catalog,
+    )
 
     manifest = source_manifest if isinstance(source_manifest, dict) else {}
     context_root = None
@@ -5962,7 +6888,9 @@ def _write_liquid_classes_artifact(
     if written is None:
         return None
     exports.append(ExportedArtifact(written, written, "liquid-classes"))
-    copied_files.append(_file_record("liquid-classes", written, written, bundle_root=bundle_root))
+    copied_files.append(
+        _file_record("liquid-classes", written, written, bundle_root=bundle_root)
+    )
     return written
 
 
@@ -5975,7 +6903,10 @@ def _write_driver_macros_artifact(
     copied_files: list[dict[str, str]],
 ) -> Path | None:
     """Persist ZEIA-mined Legacy/Application driver macro inventory (soft-empty OK)."""
-    from .driver_macros_export import DRIVER_MACROS_FILENAME, write_driver_macros_catalog
+    from .driver_macros_export import (
+        DRIVER_MACROS_FILENAME,
+        write_driver_macros_catalog,
+    )
 
     manifest = source_manifest if isinstance(source_manifest, dict) else {}
     context_root = None
@@ -5994,7 +6925,9 @@ def _write_driver_macros_artifact(
     if written is None:
         return None
     exports.append(ExportedArtifact(written, written, "driver-macros"))
-    copied_files.append(_file_record("driver-macros", written, written, bundle_root=bundle_root))
+    copied_files.append(
+        _file_record("driver-macros", written, written, bundle_root=bundle_root)
+    )
     return written
 
 
@@ -6019,7 +6952,9 @@ def _write_script_folder_bindings_artifact(
         return None
     exports.append(ExportedArtifact(written, written, "script-folder-bindings"))
     copied_files.append(
-        _file_record("script-folder-bindings", written, written, bundle_root=bundle_root)
+        _file_record(
+            "script-folder-bindings", written, written, bundle_root=bundle_root
+        )
     )
     return written
 
@@ -6027,7 +6962,10 @@ def _write_script_folder_bindings_artifact(
 def _has_packaged_hardware_connectors(report: dict[str, Any] | None) -> bool:
     if not report:
         return False
-    return any(bool(record.get("packaged")) for record in report.get("connector_artifacts") or [])
+    return any(
+        bool(record.get("packaged"))
+        for record in report.get("connector_artifacts") or []
+    )
 
 
 def _write_hardware_artifacts(
@@ -6050,11 +6988,24 @@ def _write_hardware_artifacts(
             record["packaged"] = False
             record["missing_source"] = True
             continue
-        destination = direct_connectors_dir / _hardware_connector_artifact_name(record, index)
-        _copy_record(source, destination, "hardware-connector", exports, copied_files, bundle_root=bundle_root)
+        destination = direct_connectors_dir / _hardware_connector_artifact_name(
+            record, index
+        )
+        _copy_record(
+            source,
+            destination,
+            "hardware-connector",
+            exports,
+            copied_files,
+            bundle_root=bundle_root,
+        )
         record["packaged"] = True
-        record["bundle_path"] = _bundle_relative_path(destination, bundle_root=bundle_root)
-        connector_bundle_paths[str(record.get("key") or record.get("source_path") or "")] = record["bundle_path"]
+        record["bundle_path"] = _bundle_relative_path(
+            destination, bundle_root=bundle_root
+        )
+        connector_bundle_paths[
+            str(record.get("key") or record.get("source_path") or "")
+        ] = record["bundle_path"]
 
     assets_dir = hardware_dir / "assets"
     for index, record in enumerate(report.get("asset_artifacts") or [], start=1):
@@ -6064,10 +7015,21 @@ def _write_hardware_artifacts(
             record["missing_source"] = True
             continue
         destination = assets_dir / _hardware_asset_artifact_name(record, index)
-        _copy_record(source, destination, "hardware-asset", exports, copied_files, bundle_root=bundle_root)
+        _copy_record(
+            source,
+            destination,
+            "hardware-asset",
+            exports,
+            copied_files,
+            bundle_root=bundle_root,
+        )
         record["packaged"] = True
-        record["bundle_path"] = _bundle_relative_path(destination, bundle_root=bundle_root)
-        asset_bundle_paths[str(record.get("key") or record.get("source_path") or "")] = record["bundle_path"]
+        record["bundle_path"] = _bundle_relative_path(
+            destination, bundle_root=bundle_root
+        )
+        asset_bundle_paths[
+            str(record.get("key") or record.get("source_path") or "")
+        ] = record["bundle_path"]
 
     for pin in report.get("pins") or []:
         for connector in pin.get("connector_artifacts") or []:
@@ -6084,23 +7046,48 @@ def _write_hardware_artifacts(
     report["summary"] = _hardware_summary(report)
 
     manifest_dest = hardware_dir / "hardware_manifest.json"
-    manifest_dest.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+    manifest_dest.write_text(
+        json.dumps(report, indent=2, sort_keys=True), encoding="utf-8"
+    )
     exports.append(ExportedArtifact(manifest_dest, manifest_dest, "hardware-manifest"))
-    copied_files.append(_file_record("hardware-manifest", manifest_dest, manifest_dest, bundle_root=bundle_root))
+    copied_files.append(
+        _file_record(
+            "hardware-manifest", manifest_dest, manifest_dest, bundle_root=bundle_root
+        )
+    )
 
     checklist_dest = script_dir / "HARDWARE_PINS.md"
     checklist_dest.write_text(_render_hardware_pins_checklist(report), encoding="utf-8")
-    exports.append(ExportedArtifact(checklist_dest, checklist_dest, "hardware-pins-checklist"))
-    copied_files.append(_file_record("hardware-pins-checklist", checklist_dest, checklist_dest, bundle_root=bundle_root))
+    exports.append(
+        ExportedArtifact(checklist_dest, checklist_dest, "hardware-pins-checklist")
+    )
+    copied_files.append(
+        _file_record(
+            "hardware-pins-checklist",
+            checklist_dest,
+            checklist_dest,
+            bundle_root=bundle_root,
+        )
+    )
     return report
 
 
-def _manifest_scripts_for_paths(source_manifest: dict[str, Any], script_paths: list[Path]) -> list[dict[str, Any]]:
+def _manifest_scripts_for_paths(
+    source_manifest: dict[str, Any], script_paths: list[Path]
+) -> list[dict[str, Any]]:
     wanted_paths = {Path(path).resolve() for path in script_paths if path is not None}
     if not wanted_paths:
         return []
-    scripts = [script for script in source_manifest.get("scripts") or [] if isinstance(script, dict)]
-    matches = [script for script in scripts if _manifest_script_path(source_manifest, script) in wanted_paths]
+    scripts = [
+        script
+        for script in source_manifest.get("scripts") or []
+        if isinstance(script, dict)
+    ]
+    matches = [
+        script
+        for script in scripts
+        if _manifest_script_path(source_manifest, script) in wanted_paths
+    ]
     if matches:
         return _dedupe_manifest_records(matches)
 
@@ -6108,19 +7095,30 @@ def _manifest_scripts_for_paths(source_manifest: dict[str, Any], script_paths: l
     name_matches = [
         script
         for script in scripts
-        if Path(str(script.get("entry") or script.get("extracted_path") or "").replace("\\", "/")).name.casefold()
+        if Path(
+            str(script.get("entry") or script.get("extracted_path") or "").replace(
+                "\\", "/"
+            )
+        ).name.casefold()
         in wanted_names
     ]
     return _dedupe_manifest_records(name_matches)
 
 
 def _manifest_item_path(source_manifest: dict[str, Any], item: dict[str, Any]) -> Path:
-    raw = item.get("resolved_path") or item.get("extracted_path") or item.get("entry") or ""
+    raw = (
+        item.get("resolved_path")
+        or item.get("extracted_path")
+        or item.get("entry")
+        or ""
+    )
     normalized = str(raw).replace("\\", "/")
     path = Path(normalized).expanduser()
     if path.is_absolute():
         return path.resolve()
-    root = Path(str(item.get("context_root") or source_manifest.get("root") or "")).expanduser()
+    root = Path(
+        str(item.get("context_root") or source_manifest.get("root") or "")
+    ).expanduser()
     if root:
         return (root / path).resolve()
     return path.resolve()
@@ -6130,7 +7128,12 @@ def _dedupe_manifest_records(records: list[dict[str, Any]]) -> list[dict[str, An
     out = []
     seen: set[str] = set()
     for record in records:
-        key = str(record.get("resolved_path") or record.get("extracted_path") or record.get("entry") or id(record))
+        key = str(
+            record.get("resolved_path")
+            or record.get("extracted_path")
+            or record.get("entry")
+            or id(record)
+        )
         if key in seen:
             continue
         seen.add(key)
@@ -6158,11 +7161,17 @@ def _pin_refs_match(required: str, candidate: str) -> bool:
     candidate_norm = _pin_norm(candidate)
     if not required_norm or not candidate_norm:
         return False
-    if required_norm == candidate_norm or required_norm in candidate_norm or candidate_norm in required_norm:
+    if (
+        required_norm == candidate_norm
+        or required_norm in candidate_norm
+        or candidate_norm in required_norm
+    ):
         return True
     required_suffix = _pin_suffix(required)
     candidate_suffix = _pin_suffix(candidate)
-    return bool(required_suffix and candidate_suffix and required_suffix == candidate_suffix)
+    return bool(
+        required_suffix and candidate_suffix and required_suffix == candidate_suffix
+    )
 
 
 def _pin_norm(value: str) -> str:
@@ -6193,13 +7202,21 @@ def _asset_names_from_ref(ref: object) -> list[str]:
     path = Path(normalized)
     if path.suffix.casefold() in ASSET_SUFFIXES:
         names.add(path.name)
-    for match in re.findall(r"[A-Za-z0-9_. -]+\.(?:bmp|gif|jpe?g|png|tiff?)", normalized, flags=re.IGNORECASE):
+    for match in re.findall(
+        r"[A-Za-z0-9_. -]+\.(?:bmp|gif|jpe?g|png|tiff?)",
+        normalized,
+        flags=re.IGNORECASE,
+    ):
         names.add(Path(match).name)
     return sorted(names)
 
 
 def _asset_raw_refs_for_name(raw_refs: set[str], name: str) -> list[str]:
-    return sorted(ref for ref in raw_refs if name.casefold() in {item.casefold() for item in _asset_names_from_ref(ref)})
+    return sorted(
+        ref
+        for ref in raw_refs
+        if name.casefold() in {item.casefold() for item in _asset_names_from_ref(ref)}
+    )
 
 
 def _object_matches_asset(obj: dict[str, Any], name: str) -> bool:
@@ -6218,7 +7235,9 @@ def _object_matches_asset(obj: dict[str, Any], name: str) -> bool:
     return False
 
 
-def _hardware_object_record(source_manifest: dict[str, Any], obj: dict[str, Any], kind: str) -> dict[str, Any]:
+def _hardware_object_record(
+    source_manifest: dict[str, Any], obj: dict[str, Any], kind: str
+) -> dict[str, Any]:
     source_path = _manifest_item_path(source_manifest, obj)
     return {
         "key": str(source_path),
@@ -6246,14 +7265,20 @@ def _artifact_reference(record: dict[str, Any]) -> dict[str, str]:
 def _hardware_connector_artifact_name(record: dict[str, Any], index: int) -> str:
     source = Path(str(record.get("source_path") or ""))
     suffix = source.suffix or ".xcon"
-    label = _hardware_file_label(source.stem or record.get("object_name") or "connector")
+    label = _hardware_file_label(
+        source.stem or record.get("object_name") or "connector"
+    )
     return f"connector_{index}_{label}{suffix}"
 
 
 def _hardware_asset_artifact_name(record: dict[str, Any], index: int) -> str:
     source = Path(str(record.get("source_path") or ""))
-    suffix = source.suffix or Path(str(record.get("object_name") or "")).suffix or ".asset"
-    label = _hardware_file_label(source.stem or Path(str(record.get("object_name") or "asset")).stem)
+    suffix = (
+        source.suffix or Path(str(record.get("object_name") or "")).suffix or ".asset"
+    )
+    label = _hardware_file_label(
+        source.stem or Path(str(record.get("object_name") or "asset")).stem
+    )
     return f"asset_{index}_{label}{suffix}"
 
 
@@ -6272,18 +7297,27 @@ def _hardware_summary(report: dict[str, Any]) -> dict[str, Any]:
     return {
         "script_count": len(report.get("scripts") or []),
         "required_pin_count": len(pins),
-        "pins_with_connector_evidence": sum(1 for pin in pins if pin.get("connector_artifacts")),
+        "pins_with_connector_evidence": sum(
+            1 for pin in pins if pin.get("connector_artifacts")
+        ),
         "runtime_or_unresolved_pin_count": sum(
             1
             for pin in pins
-            if pin.get("status") in {"runtime_pin_verification_required", "no_static_connector_evidence"}
+            if pin.get("status")
+            in {"runtime_pin_verification_required", "no_static_connector_evidence"}
         ),
         "asset_ref_count": len(assets),
-        "packaged_asset_ref_count": sum(1 for asset in assets if asset.get("asset_artifacts")),
+        "packaged_asset_ref_count": sum(
+            1 for asset in assets if asset.get("asset_artifacts")
+        ),
         "connector_artifact_count": len(connectors),
-        "packaged_connector_artifact_count": sum(1 for item in connectors if item.get("packaged")),
+        "packaged_connector_artifact_count": sum(
+            1 for item in connectors if item.get("packaged")
+        ),
         "asset_artifact_count": len(asset_artifacts),
-        "packaged_asset_artifact_count": sum(1 for item in asset_artifacts if item.get("packaged")),
+        "packaged_asset_artifact_count": sum(
+            1 for item in asset_artifacts if item.get("packaged")
+        ),
         "barcode_ref_count": len(report.get("barcode_refs") or []),
         "touchtools_title_count": len(report.get("touchtools_titles") or []),
     }
@@ -6314,7 +7348,12 @@ def _render_hardware_pins_checklist(report: dict[str, Any]) -> str:
         lines.extend(["## Pin Checks", ""])
         for item in pins:
             bundle_paths = [
-                str(ref.get("bundle_path") or ref.get("entry") or ref.get("object_name") or "")
+                str(
+                    ref.get("bundle_path")
+                    or ref.get("entry")
+                    or ref.get("object_name")
+                    or ""
+                )
                 for ref in item.get("connector_artifacts") or []
             ]
             bundle_paths = [value for value in bundle_paths if value]
@@ -6323,10 +7362,14 @@ def _render_hardware_pins_checklist(report: dict[str, Any]) -> str:
             if bundle_paths:
                 lines.append(f"  - Connector evidence: `{', '.join(bundle_paths[:8])}`")
                 if len(bundle_paths) > 8:
-                    lines.append(f"  - Additional connector evidence: `{len(bundle_paths) - 8}` more in `hardware/connectors/`")
+                    lines.append(
+                        f"  - Additional connector evidence: `{len(bundle_paths) - 8}` more in `hardware/connectors/`"
+                    )
             else:
                 lines.append("  - Connector evidence: `none packaged`")
-            lines.append("  - Manual check: confirm this pin/site in FluentControl's worktable or hardware configuration.")
+            lines.append(
+                "  - Manual check: confirm this pin/site in FluentControl's worktable or hardware configuration."
+            )
         lines.append("")
 
     assets = report.get("assets") or []
@@ -6334,7 +7377,12 @@ def _render_hardware_pins_checklist(report: dict[str, Any]) -> str:
         lines.extend(["## Custom Detail Assets", ""])
         for item in assets:
             bundle_paths = [
-                str(ref.get("bundle_path") or ref.get("entry") or ref.get("object_name") or "")
+                str(
+                    ref.get("bundle_path")
+                    or ref.get("entry")
+                    or ref.get("object_name")
+                    or ""
+                )
                 for ref in item.get("asset_artifacts") or []
             ]
             bundle_paths = [value for value in bundle_paths if value]
@@ -6346,7 +7394,9 @@ def _render_hardware_pins_checklist(report: dict[str, Any]) -> str:
                 lines.append("  - Packaged asset: `none found in ZEIA extraction`")
             raw_refs = item.get("raw_refs") or []
             if raw_refs:
-                lines.append(f"  - Referenced as: `{', '.join(str(ref) for ref in raw_refs[:4])}`")
+                lines.append(
+                    f"  - Referenced as: `{', '.join(str(ref) for ref in raw_refs[:4])}`"
+                )
         lines.append("")
 
     barcode_refs = report.get("barcode_refs") or []
@@ -6355,7 +7405,9 @@ def _render_hardware_pins_checklist(report: dict[str, Any]) -> str:
         for ref in barcode_refs[:20]:
             lines.append(f"- `{ref}`")
         if len(barcode_refs) > 20:
-            lines.append(f"- `{len(barcode_refs) - 20}` additional barcode refs are listed in `hardware/hardware_manifest.json`.")
+            lines.append(
+                f"- `{len(barcode_refs) - 20}` additional barcode refs are listed in `hardware/hardware_manifest.json`."
+            )
         lines.append("")
 
     touchtools_titles = report.get("touchtools_titles") or []
@@ -6364,7 +7416,9 @@ def _render_hardware_pins_checklist(report: dict[str, Any]) -> str:
         for title in touchtools_titles[:20]:
             lines.append(f"- `{title}`")
         if len(touchtools_titles) > 20:
-            lines.append(f"- `{len(touchtools_titles) - 20}` additional titles are listed in `hardware/hardware_manifest.json`.")
+            lines.append(
+                f"- `{len(touchtools_titles) - 20}` additional titles are listed in `hardware/hardware_manifest.json`."
+            )
         lines.append("")
 
     lines.extend(
@@ -6424,9 +7478,11 @@ def _method_touchtools_readiness_report(
     status = (
         "method_preparation_required"
         if method_required
-        else "touchtools_method_check_required"
-        if touchtools_visibility_required
-        else "direct_script_review"
+        else (
+            "touchtools_method_check_required"
+            if touchtools_visibility_required
+            else "direct_script_review"
+        )
     )
 
     report = {
@@ -6484,13 +7540,33 @@ def _write_method_touchtools_artifacts(
     json_dest = reports_dir / "method_touchtools_readiness.json"
     ensure_parent(json_dest)
     json_dest.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
-    exports.append(ExportedArtifact(json_dest, json_dest, "method-touchtools-readiness-json"))
-    copied_files.append(_file_record("method-touchtools-readiness-json", json_dest, json_dest, bundle_root=bundle_root))
+    exports.append(
+        ExportedArtifact(json_dest, json_dest, "method-touchtools-readiness-json")
+    )
+    copied_files.append(
+        _file_record(
+            "method-touchtools-readiness-json",
+            json_dest,
+            json_dest,
+            bundle_root=bundle_root,
+        )
+    )
 
     report_dest = script_dir / "METHOD_TOUCHTOOLS_READINESS.md"
-    report_dest.write_text(_render_method_touchtools_readiness(report), encoding="utf-8")
-    exports.append(ExportedArtifact(report_dest, report_dest, "method-touchtools-readiness"))
-    copied_files.append(_file_record("method-touchtools-readiness", report_dest, report_dest, bundle_root=bundle_root))
+    report_dest.write_text(
+        _render_method_touchtools_readiness(report), encoding="utf-8"
+    )
+    exports.append(
+        ExportedArtifact(report_dest, report_dest, "method-touchtools-readiness")
+    )
+    copied_files.append(
+        _file_record(
+            "method-touchtools-readiness",
+            report_dest,
+            report_dest,
+            bundle_root=bundle_root,
+        )
+    )
 
 
 def _source_script_readiness_evidence(
@@ -6499,12 +7575,22 @@ def _source_script_readiness_evidence(
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
-    manifest_records = _manifest_scripts_for_paths(source_manifest, script_paths) if source_manifest else []
+    manifest_records = (
+        _manifest_scripts_for_paths(source_manifest, script_paths)
+        if source_manifest
+        else []
+    )
     for record in manifest_records:
         path = _manifest_script_path(source_manifest or {}, record)
-        key = str(path.resolve()) if path.exists() else str(record.get("entry") or id(record))
+        key = (
+            str(path.resolve())
+            if path.exists()
+            else str(record.get("entry") or id(record))
+        )
         seen.add(key)
-        out.append(_manifest_script_readiness_evidence(source_manifest or {}, record, path))
+        out.append(
+            _manifest_script_readiness_evidence(source_manifest or {}, record, path)
+        )
 
     for path in script_paths:
         if path is None:
@@ -6523,14 +7609,18 @@ def _manifest_script_readiness_evidence(
     record: dict[str, Any],
     path: Path,
 ) -> dict[str, Any]:
-    parsed = _xscr_readiness_evidence(path, role="source_script") if path.exists() else {}
+    parsed = (
+        _xscr_readiness_evidence(path, role="source_script") if path.exists() else {}
+    )
     dependencies = record.get("dependencies") or {}
     return {
         "role": "source_script",
         "path": str(path),
         "entry": str(record.get("entry") or ""),
         "source_context": str(record.get("source_context") or ""),
-        "object_name": str(record.get("object_name") or parsed.get("object_name") or ""),
+        "object_name": str(
+            record.get("object_name") or parsed.get("object_name") or ""
+        ),
         "artifact_type": "script",
         "touchtools_titles": _sorted_strs(
             [
@@ -6568,7 +7658,11 @@ def _xscr_readiness_evidence(path: Path, *, role: str) -> dict[str, Any]:
         return evidence
     evidence["object_name"] = _first_text(root, "ObjectName") or path.stem
     evidence["touchtools_titles"] = _sorted_strs(
-        [el.text for el in root.iter() if _local_name(el.tag) == "RUPScreenTitle" and el.text]
+        [
+            el.text
+            for el in root.iter()
+            if _local_name(el.tag) == "RUPScreenTitle" and el.text
+        ]
     )
     evidence["startup_variables"] = _xscr_startup_variables(root)
     evidence["operator_prompts"] = _xscr_operator_prompts(root)
@@ -6603,7 +7697,9 @@ def _xscr_startup_variables(root: ET.Element) -> list[dict[str, Any]]:
             "read_only": _direct_bool(el, "ReadOnly"),
             "default_values": _direct_values(el, "Values"),
         }
-        record["manual_review_required"] = bool(record["query_on_startup"] or record["prompt"])
+        record["manual_review_required"] = bool(
+            record["query_on_startup"] or record["prompt"]
+        )
         key = (str(record["name"]), str(record["scope"]), str(record["type"]))
         if key in seen:
             continue
@@ -6616,7 +7712,11 @@ def _xscr_operator_prompts(root: ET.Element) -> list[dict[str, Any]]:
     prompts = []
     for el in root.iter():
         statement_name = _local_name(el.tag)
-        if statement_name not in {"RUPVariableStatement", "RUPWorktableStatement", "RUPStandardStatement"}:
+        if statement_name not in {
+            "RUPVariableStatement",
+            "RUPWorktableStatement",
+            "RUPStandardStatement",
+        }:
             continue
         variables = _xscr_rup_variable_items(el)
         prompt = {
@@ -6725,21 +7825,33 @@ def _method_touchtools_manual_checks(
 ) -> list[str]:
     checks = []
     if method_required:
-        checks.append("Prepare or create a FluentControl method containing the generated script before TouchTools use.")
+        checks.append(
+            "Prepare or create a FluentControl method containing the generated script before TouchTools use."
+        )
     if touchtools_visibility_required:
-        checks.append("In the method TouchTools settings, enable `Is visible in Touch Tools` before expecting it in Method Starter.")
+        checks.append(
+            "In the method TouchTools settings, enable `Is visible in Touch Tools` before expecting it in Method Starter."
+        )
     if startup_variable_count:
-        checks.append("Review startup variable defaults and prompt text before saving the method.")
+        checks.append(
+            "Review startup variable defaults and prompt text before saving the method."
+        )
     if operator_prompt_count:
-        checks.append("Run the method/script in FluentControl simulation to verify each operator prompt appears in the intended order.")
-    checks.append("Confirm user-role method permissions and method approval/release status on the target FluentControl system.")
+        checks.append(
+            "Run the method/script in FluentControl simulation to verify each operator prompt appears in the intended order."
+        )
+    checks.append(
+        "Confirm user-role method permissions and method approval/release status on the target FluentControl system."
+    )
     return checks
 
 
 def _readiness_startup_variables(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     variables = []
     for record in records:
-        source_label = record.get("object_name") or Path(str(record.get("path") or "")).name
+        source_label = (
+            record.get("object_name") or Path(str(record.get("path") or "")).name
+        )
         for variable in record.get("startup_variables") or []:
             if not isinstance(variable, dict):
                 continue
@@ -6820,7 +7932,9 @@ def _render_method_touchtools_readiness(report: dict[str, Any]) -> str:
         lines.extend(["## Startup Variables To Review", ""])
         for variable in variables[:40]:
             defaults = variable.get("default_values") or []
-            default_text = ", ".join(str(value) for value in defaults[:5]) if defaults else ""
+            default_text = (
+                ", ".join(str(value) for value in defaults[:5]) if defaults else ""
+            )
             details = [
                 f"type `{variable.get('type') or 'unknown'}`",
                 f"scope `{variable.get('scope') or 'unknown'}`",
@@ -6834,10 +7948,19 @@ def _render_method_touchtools_readiness(report: dict[str, Any]) -> str:
             if variable.get("source"):
                 lines.append(f"  - Source: `{variable.get('source')}`")
         if len(variables) > 40:
-            lines.append(f"- `{len(variables) - 40}` additional variables are listed in `reports/method_touchtools_readiness.json`.")
+            lines.append(
+                f"- `{len(variables) - 40}` additional variables are listed in `reports/method_touchtools_readiness.json`."
+            )
         lines.append("")
     else:
-        lines.extend(["## Startup Variables To Review", "", "No query-on-startup variables or variable prompt strings were detected.", ""])
+        lines.extend(
+            [
+                "## Startup Variables To Review",
+                "",
+                "No query-on-startup variables or variable prompt strings were detected.",
+                "",
+            ]
+        )
 
     prompts = report.get("operator_prompts") or []
     if prompts:
@@ -6855,7 +7978,9 @@ def _render_method_touchtools_readiness(report: dict[str, Any]) -> str:
             ]
             for variable in variables[:6]:
                 label = variable.get("name") or variable.get("display_text")
-                display = variable.get("display_text") or variable.get("display_type") or ""
+                display = (
+                    variable.get("display_text") or variable.get("display_type") or ""
+                )
                 allowed = variable.get("allowed_values") or ""
                 suffix = f" - {display}" if display else ""
                 lines.append(f"  - Variable `{label}`{suffix}")
@@ -6864,10 +7989,19 @@ def _render_method_touchtools_readiness(report: dict[str, Any]) -> str:
             if len(variables) > 6:
                 lines.append(f"  - Additional prompt variables: `{len(variables) - 6}`")
         if len(prompts) > 40:
-            lines.append(f"- `{len(prompts) - 40}` additional prompts are listed in `reports/method_touchtools_readiness.json`.")
+            lines.append(
+                f"- `{len(prompts) - 40}` additional prompts are listed in `reports/method_touchtools_readiness.json`."
+            )
         lines.append("")
     else:
-        lines.extend(["## Operator Prompt Screens", "", "No TouchTools/RUP operator prompt screens were detected.", ""])
+        lines.extend(
+            [
+                "## Operator Prompt Screens",
+                "",
+                "No TouchTools/RUP operator prompt screens were detected.",
+                "",
+            ]
+        )
 
     titles = report.get("touchtools_titles") or []
     if titles:
@@ -6875,7 +8009,9 @@ def _render_method_touchtools_readiness(report: dict[str, Any]) -> str:
         for title in titles[:40]:
             lines.append(f"- `{title}`")
         if len(titles) > 40:
-            lines.append(f"- `{len(titles) - 40}` additional titles are listed in `reports/method_touchtools_readiness.json`.")
+            lines.append(
+                f"- `{len(titles) - 40}` additional titles are listed in `reports/method_touchtools_readiness.json`."
+            )
         lines.append("")
 
     checks = report.get("manual_checks") or []
@@ -6885,7 +8021,9 @@ def _render_method_touchtools_readiness(report: dict[str, Any]) -> str:
             lines.append(f"{index}. {check}")
         lines.append("")
 
-    lines.append("Machine-readable evidence is in `reports/method_touchtools_readiness.json`.")
+    lines.append(
+        "Machine-readable evidence is in `reports/method_touchtools_readiness.json`."
+    )
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -6897,7 +8035,9 @@ def _write_protocol_ir_from_draft(draft_path: Path, destination: Path) -> None:
     try:
         ir = protocol_ir_from_python(draft_path)
     except Exception as exc:
-        _write_unavailable_json(destination, f"failed to derive canonical IR from draft: {exc}")
+        _write_unavailable_json(
+            destination, f"failed to derive canonical IR from draft: {exc}"
+        )
         return
     write_protocol_ir(ir, destination)
 
@@ -6909,7 +8049,9 @@ def _write_unavailable_json(destination: Path, reason: str) -> None:
             {
                 "ir_version": "unavailable",
                 "reason": reason,
-                "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "generated_at": datetime.now(timezone.utc).isoformat(
+                    timespec="seconds"
+                ),
             },
             indent=2,
             sort_keys=True,
@@ -6940,7 +8082,9 @@ def _write_recreate_from_ir(
     if worklist_present:
         generated_files["gwl"] = "direct-imports/worklists/generated_worklist.gwl"
     if project_archive_present:
-        generated_files["zeia"] = "direct-imports/projects/full-project/generated_project.zeia"
+        generated_files["zeia"] = (
+            "direct-imports/projects/full-project/generated_project.zeia"
+        )
     destination.write_text(
         render_recreate_markdown(
             ir,
@@ -7022,7 +8166,9 @@ def _worktable_diff_from_ir(
         return None
 
     source_irs = []
-    for source in _dedupe_paths([*source_scripts, *([source_xscr] if source_xscr is not None else [])]):
+    for source in _dedupe_paths(
+        [*source_scripts, *([source_xscr] if source_xscr is not None else [])]
+    ):
         if not source.exists() or source.suffix.lower() != ".xscr":
             continue
         try:
@@ -7049,34 +8195,37 @@ def _render_worktable_changes_unavailable(protocol_ir_path: Path) -> str:
 
 
 def _render_worktable_patch_unavailable(protocol_ir_path: Path) -> str:
-    return json.dumps(
-        {
-            "kind": "worktable_patch",
-            "schema_version": "tecan.worktable_patch.v1",
-            "status": "unavailable",
-            "source_of_truth": protocol_ir_path.name,
-            "summary": {
-                "operation_count": 0,
-                "severity_counts": {"blocking": 1, "needs_review": 0, "safe": 0},
-                "overall_severity": "blocking",
-                "has_blocking": True,
-                "has_needs_review": False,
-                "warning_count": 1,
-                "manual_step_count": 0,
+    return (
+        json.dumps(
+            {
+                "kind": "worktable_patch",
+                "schema_version": "tecan.worktable_patch.v1",
+                "status": "unavailable",
+                "source_of_truth": protocol_ir_path.name,
+                "summary": {
+                    "operation_count": 0,
+                    "severity_counts": {"blocking": 1, "needs_review": 0, "safe": 0},
+                    "overall_severity": "blocking",
+                    "has_blocking": True,
+                    "has_needs_review": False,
+                    "warning_count": 1,
+                    "manual_step_count": 0,
+                },
+                "operations": [],
+                "warnings": [
+                    {
+                        "id": "warning.1",
+                        "severity": "blocking",
+                        "message": "Worktable patch was not generated because the canonical protocol IR could not be loaded.",
+                    }
+                ],
+                "manual_setup_steps": [],
             },
-            "operations": [],
-            "warnings": [
-                {
-                    "id": "warning.1",
-                    "severity": "blocking",
-                    "message": "Worktable patch was not generated because the canonical protocol IR could not be loaded.",
-                }
-            ],
-            "manual_setup_steps": [],
-        },
-        indent=2,
-        sort_keys=True,
-    ) + "\n"
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )
 
 
 def _dedupe_paths(paths: list[Path]) -> list[Path]:
@@ -7110,7 +8259,9 @@ def _original_source_name(path: Path, kind: str, index: int) -> str:
     return f"source_file_{index}{suffix}"
 
 
-def _strict_report_map(report_files: dict[str, Path], reports: list[Path]) -> dict[str, Any]:
+def _strict_report_map(
+    report_files: dict[str, Path], reports: list[Path]
+) -> dict[str, Any]:
     mapped: dict[str, Any] = {}
     supporting = []
     for key, path in report_files.items():
@@ -7179,17 +8330,26 @@ def _render_worktable_changes(details: dict[str, object]) -> str:
                 lines.append(f"- {label}: `{value}`")
         lines.append("")
     else:
-        lines.extend(["No worktable metadata was detected in the exported artifacts.", ""])
+        lines.extend(
+            ["No worktable metadata was detected in the exported artifacts.", ""]
+        )
 
     selected_items = details.get("selected_items")
-    labware_items = [
-        item for item in selected_items
-        if isinstance(item, dict) and str(item.get("kind") or "") == "labware"
-    ] if isinstance(selected_items, list) else []
+    labware_items = (
+        [
+            item
+            for item in selected_items
+            if isinstance(item, dict) and str(item.get("kind") or "") == "labware"
+        ]
+        if isinstance(selected_items, list)
+        else []
+    )
     if labware_items:
         lines.extend(["## Labware Placements", ""])
         for item in labware_items:
-            lines.append(f"- `{item.get('label') or item.get('name') or item.get('catalog')}`")
+            lines.append(
+                f"- `{item.get('label') or item.get('name') or item.get('catalog')}`"
+            )
             for label, key in (
                 ("Catalog / FluentControl type", "catalog"),
                 ("Python class", "python_class"),
@@ -7227,13 +8387,17 @@ def _render_recreate_guide(metadata: dict[str, object]) -> str:
     files = metadata.get("files") or []
     compiled = str(metadata.get("compiled_xscr") or "")
     draft = _first_file(files, "protocol-draft") or _first_file(files, "source-draft")
-    original = _first_file(files, "source-script") or _first_file(files, "original-script")
+    original = _first_file(files, "source-script") or _first_file(
+        files, "original-script"
+    )
     reports = [
-        item for item in files
+        item
+        for item in files
         if isinstance(item, dict)
         and (
             str(item.get("kind") or "").endswith("_report")
-            or item.get("kind") in {"project_report", "simulation_report", "repair_plan", "compile_report"}
+            or item.get("kind")
+            in {"project_report", "simulation_report", "repair_plan", "compile_report"}
         )
     ]
     context = metadata.get("context_name") or "none"
@@ -7389,16 +8553,24 @@ def _extract_draft_manual_details(draft_path: Path | None) -> dict[str, object]:
 
     for statement in build.body:
         target_name = _assignment_target_name(statement)
-        value = statement.value if isinstance(statement, (ast.Assign, ast.Expr)) else statement
+        value = (
+            statement.value
+            if isinstance(statement, (ast.Assign, ast.Expr))
+            else statement
+        )
         call = value if isinstance(value, ast.Call) else None
 
-        if isinstance(statement, ast.Assign) and isinstance(statement.value, ast.Attribute):
+        if isinstance(statement, ast.Assign) and isinstance(
+            statement.value, ast.Attribute
+        ):
             if statement.value.attr.lower() in {"mca96", "liha", "fca"} and target_name:
                 selected_items.append(
                     {
                         "kind": "device",
                         "name": _friendly_device_name(statement.value.attr),
-                        "source_path": _source_path(draft_path.name, current_group, source, statement.value),
+                        "source_path": _source_path(
+                            draft_path.name, current_group, source, statement.value
+                        ),
                     }
                 )
             continue
@@ -7411,19 +8583,29 @@ def _extract_draft_manual_details(draft_path: Path | None) -> dict[str, object]:
             continue
 
         if _call_name(call) == "Reagent" and target_name:
-            reagent_name = _value_label(call.args[0], reagents_by_var, labware_by_var) if call.args else target_name
+            reagent_name = (
+                _value_label(call.args[0], reagents_by_var, labware_by_var)
+                if call.args
+                else target_name
+            )
             reagents_by_var[target_name] = reagent_name
             selected_items.append(
                 {
                     "kind": "reagent",
                     "name": reagent_name,
-                    "source_path": _source_path(draft_path.name, current_group, source, call),
+                    "source_path": _source_path(
+                        draft_path.name, current_group, source, call
+                    ),
                 }
             )
             continue
 
         if _is_method_call(call, "group"):
-            current_group = _value_label(call.args[0], reagents_by_var, labware_by_var) if call.args else current_group
+            current_group = (
+                _value_label(call.args[0], reagents_by_var, labware_by_var)
+                if call.args
+                else current_group
+            )
             continue
 
         if _is_method_call(call, "place"):
@@ -7432,17 +8614,30 @@ def _extract_draft_manual_details(draft_path: Path | None) -> dict[str, object]:
                 selected_items.append(item)
                 if target_name:
                     labware_by_var[target_name] = item
-                commands.append(_draft_add_labware_command(item, draft_path.name, current_group, source, call))
+                commands.append(
+                    _draft_add_labware_command(
+                        item, draft_path.name, current_group, source, call
+                    )
+                )
             continue
 
         if _is_fill_all_call(call):
             _apply_fill_all(call, labware_by_var, reagents_by_var)
             continue
 
-        command = _draft_runtime_command(call, draft_path.name, current_group, source, reagents_by_var, labware_by_var)
+        command = _draft_runtime_command(
+            call,
+            draft_path.name,
+            current_group,
+            source,
+            reagents_by_var,
+            labware_by_var,
+        )
         if command:
             commands.append(command)
-            for item in _draft_command_selected_items(call, draft_path.name, current_group, source):
+            for item in _draft_command_selected_items(
+                call, draft_path.name, current_group, source
+            ):
                 selected_items.append(item)
 
     return {
@@ -7497,7 +8692,9 @@ def _extract_xscr_manual_details(xscr_path: Path | None) -> dict[str, object]:
         if not object_type.endswith("ScriptGroupDataV1"):
             continue
         group_data = _direct_child(group_object, "ScriptGroupDataV1")
-        group_name = _direct_text(group_data, "Name") if group_data is not None else None
+        group_name = (
+            _direct_text(group_data, "Name") if group_data is not None else None
+        )
         statements = _first_descendant(group_object, "Statements")
         if statements is None:
             continue
@@ -7541,7 +8738,12 @@ def _render_manual_recreation(details: dict[str, object]) -> list[str]:
         for item in selected_items:
             if not isinstance(item, dict):
                 continue
-            name = item.get("label") or item.get("name") or item.get("catalog") or item.get("kind")
+            name = (
+                item.get("label")
+                or item.get("name")
+                or item.get("catalog")
+                or item.get("kind")
+            )
             lines.append(f"- `{name}`")
             for field_label, key in (
                 ("Item kind", "kind"),
@@ -7568,7 +8770,9 @@ def _render_manual_recreation(details: dict[str, object]) -> list[str]:
             lines.append(f"{index}. {name}")
             lines.append(f"   - Command name: `{name}`")
             if _has_value(command.get("command_id")):
-                lines.append(f"   - FluentControl command ID: `{command.get('command_id')}`")
+                lines.append(
+                    f"   - FluentControl command ID: `{command.get('command_id')}`"
+                )
             specs = command.get("specifications")
             if isinstance(specs, list) and specs:
                 lines.append("   - Specifications:")
@@ -7615,23 +8819,37 @@ def _merge_selected_items(*values: object) -> list[dict[str, object]]:
     return [merged[key] for key in order]
 
 
-def _merge_commands(xscr_commands: object, draft_commands: object) -> list[dict[str, object]]:
+def _merge_commands(
+    xscr_commands: object, draft_commands: object
+) -> list[dict[str, object]]:
     if isinstance(xscr_commands, list) and xscr_commands:
-        commands = [dict(command) for command in xscr_commands if isinstance(command, dict)]
+        commands = [
+            dict(command) for command in xscr_commands if isinstance(command, dict)
+        ]
         if isinstance(draft_commands, list):
-            draft_dicts = [command for command in draft_commands if isinstance(command, dict)]
+            draft_dicts = [
+                command for command in draft_commands if isinstance(command, dict)
+            ]
             for command, draft_command in zip(commands, draft_dicts):
                 if _has_value(draft_command.get("source_path")):
                     command["source_path"] = draft_command["source_path"]
         return commands
     if isinstance(draft_commands, list):
-        return [dict(command) for command in draft_commands if isinstance(command, dict)]
+        return [
+            dict(command) for command in draft_commands if isinstance(command, dict)
+        ]
     return []
 
 
 def _selected_item_key(item: dict[str, object]) -> tuple[str, str]:
     kind = str(item.get("kind") or "")
-    name = str(item.get("label") or item.get("name") or item.get("catalog") or item.get("path") or "")
+    name = str(
+        item.get("label")
+        or item.get("name")
+        or item.get("catalog")
+        or item.get("path")
+        or ""
+    )
     return kind, name
 
 
@@ -7726,10 +8944,16 @@ def _apply_fill_all(
     target = call.func.value
     if not isinstance(target, ast.Name) or target.id not in labware_by_var:
         return
-    reagent = _value_label(call.args[0], reagents_by_var, labware_by_var) if call.args else None
+    reagent = (
+        _value_label(call.args[0], reagents_by_var, labware_by_var)
+        if call.args
+        else None
+    )
     volume = _literal_text(call.args[1]) if len(call.args) > 1 else None
     if _has_value(reagent) and _has_value(volume):
-        labware_by_var[target.id]["initial_contents"] = f"{reagent}, {volume} uL in all wells"
+        labware_by_var[target.id][
+            "initial_contents"
+        ] = f"{reagent}, {volume} uL in all wells"
 
 
 def _draft_runtime_command(
@@ -7835,7 +9059,9 @@ def _literal_text(node: ast.AST) -> object:
     return None
 
 
-def _source_path(draft_name: str, current_group: str, source: str, node: ast.AST) -> str:
+def _source_path(
+    draft_name: str, current_group: str, source: str, node: ast.AST
+) -> str:
     segment = ast.get_source_segment(source, node) or ""
     segment = " ".join(segment.split())
     if len(segment) > 120:
@@ -7852,7 +9078,9 @@ def _friendly_device_name(value: str) -> str:
     return names.get(value.lower(), value)
 
 
-def _xscr_command_details(command_object: ET.Element, group_name: str) -> dict[str, object] | None:
+def _xscr_command_details(
+    command_object: ET.Element, group_name: str
+) -> dict[str, object] | None:
     command_id = _command_id(command_object)
     if not command_id:
         return None
@@ -7871,7 +9099,9 @@ def _xscr_command_details(command_object: ET.Element, group_name: str) -> dict[s
     }
 
 
-def _selected_item_from_xscr_command(command: dict[str, object]) -> dict[str, object] | None:
+def _selected_item_from_xscr_command(
+    command: dict[str, object],
+) -> dict[str, object] | None:
     if command.get("command_id") != "AddLabwareDataV1":
         return None
     item: dict[str, object] = {"kind": "labware", "path": command.get("path")}
@@ -7892,7 +9122,9 @@ def _selected_item_from_xscr_command(command: dict[str, object]) -> dict[str, ob
 def _xscr_command_specs(command_object: ET.Element, command_id: str) -> list[str]:
     specs: list[str] = []
     if command_id == "AddLabwareDataV1":
-        _append_spec(specs, "Labware label", _first_text(command_object, "LabwareLable"))
+        _append_spec(
+            specs, "Labware label", _first_text(command_object, "LabwareLable")
+        )
         _append_spec(specs, "Labware type", _first_text(command_object, "LabwareType"))
         location = _first_text(command_object, "Location")
         position = _first_text(command_object, "Position")
@@ -7906,17 +9138,23 @@ def _xscr_command_specs(command_object: ET.Element, command_id: str) -> list[str
         return specs
 
     _append_spec(specs, "Labware", _first_text(command_object, "LabwareName"))
-    _append_spec(specs, "Volume", _with_unit(_first_text(command_object, "Volume"), "uL"))
+    _append_spec(
+        specs, "Volume", _with_unit(_first_text(command_object, "Volume"), "uL")
+    )
     _append_spec(
         specs,
         "Liquid class",
-        _first_nonempty_text(command_object, ["LiquidClassNameBySelection", "LiquidClassName"]),
+        _first_nonempty_text(
+            command_object, ["LiquidClassNameBySelection", "LiquidClassName"]
+        ),
     )
     _append_spec(specs, "Device alias", _first_text(command_object, "DeviceAlias"))
     _append_spec(specs, "Device ID", _first_text(command_object, "AvailableID"))
     _append_spec(specs, "Blowout airgap", _first_text(command_object, "BlowoutAirgap"))
     _append_spec(specs, "Head position", _first_text(command_object, "HeadPositions"))
-    _append_spec(specs, "Partial columns", _first_text(command_object, "PartialColumns"))
+    _append_spec(
+        specs, "Partial columns", _first_text(command_object, "PartialColumns")
+    )
     _append_spec(specs, "Partial rows", _first_text(command_object, "PartialRows"))
     _append_spec(specs, "Well offset", _first_text(command_object, "WellOffset"))
     _append_spec(specs, "Tip range", _tip_range(command_object))
@@ -7924,7 +9162,9 @@ def _xscr_command_specs(command_object: ET.Element, command_id: str) -> list[str
     _append_spec(specs, "Adapter", _adapter_summary(command_object))
     _append_spec(specs, "Back position", _first_text(command_object, "Backs"))
     _append_spec(specs, "Remove rack", _first_text(command_object, "RemoveRack"))
-    _append_spec(specs, "Adapter after drop", _first_text(command_object, "AdapterAfterDrop"))
+    _append_spec(
+        specs, "Adapter after drop", _first_text(command_object, "AdapterAfterDrop")
+    )
     return specs
 
 
@@ -8061,7 +9301,7 @@ _XSCR_COMMAND_NAMES = {
 def _simulate_command(draft: str, context: object) -> str:
     context_part = f" --context {context}" if context and context != "none" else ""
     return (
-        f".\\.venv\\Scripts\\python.exe -m fluent_pipeline.cli simulate \"<path-to-this-folder>\\{draft}\""
+        f'.\\.venv\\Scripts\\python.exe -m fluent_pipeline.cli simulate "<path-to-this-folder>\\{draft}"'
         f"{context_part} --report temp_files\\recreated_simulation.md --json-out temp_files\\recreated_simulation.json"
     )
 
@@ -8069,7 +9309,7 @@ def _simulate_command(draft: str, context: object) -> str:
 def _compile_command(draft: str, compiled: str, context: object) -> str:
     context_part = f" --context {context}" if context and context != "none" else ""
     return (
-        f".\\.venv\\Scripts\\python.exe -m fluent_pipeline.cli compile \"<path-to-this-folder>\\{draft}\""
+        f'.\\.venv\\Scripts\\python.exe -m fluent_pipeline.cli compile "<path-to-this-folder>\\{draft}"'
         f"{context_part} -o temp_files\\{compiled}"
     )
 
@@ -8078,5 +9318,5 @@ def _roundtrip_command(original: str, context: object) -> str:
     context_part = f" --context {context}" if context and context != "none" else ""
     return (
         f".\\.venv\\Scripts\\python.exe -m fluent_pipeline.cli roundtrip "
-        f"\"<path-to-this-folder>\\{original}\"{context_part}"
+        f'"<path-to-this-folder>\\{original}"{context_part}'
     )
