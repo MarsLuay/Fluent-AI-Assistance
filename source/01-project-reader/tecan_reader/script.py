@@ -7,19 +7,20 @@ from pathlib import Path
 from typing import Any
 
 from tecan_common.xml_compat import ET
-
-from .common import (
+from tecan_common.xml_helpers import (
     child_text,
-    command_family,
-    command_short_name,
     first_text,
     local_name,
-    parse_xml_text,
-    read_text,
     texts_by_name,
     unique_texts,
 )
 
+from .common import (
+    command_family,
+    command_short_name,
+    parse_xml_text,
+    read_text,
+)
 
 INTERESTING_FIELDS = {
     "Name",
@@ -265,7 +266,9 @@ def _dependencies(root: ET.Element) -> dict[str, list[str]]:
         "external_or_worklist_refs": external,
         "subroutine_refs": sorted(set(grouped.get("SubRoutine", []))),
         "barcode_refs": sorted(set(grouped.get("Barcode", []))),
-        "custom_asset_refs": sorted(set(_asset_refs(grouped.get("CustomDetailImageFilePath", [])))),
+        "custom_asset_refs": sorted(
+            set(_asset_refs(grouped.get("CustomDetailImageFilePath", [])))
+        ),
         "pin_refs": sorted(set(grouped.get("PinNumber", []))),
         "worktable_pin_locations": sorted(
             value
@@ -284,18 +287,26 @@ def _warnings(commands: list[dict[str, Any]]) -> list[str]:
     warnings: list[str] = []
     raw_types = [command["raw_type"].lower() for command in commands]
     if any("subroutine" in t for t in raw_types):
-        warnings.append("Contains subroutine calls; inspect referenced scripts before editing.")
+        warnings.append(
+            "Contains subroutine calls; inspect referenced scripts before editing."
+        )
     if any("executevbscript" in t or "executeapplication" in t for t in raw_types):
         warnings.append("Contains external application or VB script calls.")
     if any("worklist" in t for t in raw_types):
         warnings.append("Contains worklist import/load/execute commands.")
     if any("touchtools" in t or ".rup." in t for t in raw_types):
         warnings.append("Contains TouchTools/RUP UI workflow commands.")
-    if any("pin" in str(value).lower() for command in commands for value in command.get("fields", {}).values()):
+    if any(
+        "pin" in str(value).lower()
+        for command in commands
+        for value in command.get("fields", {}).values()
+    ):
         warnings.append("Contains pin-controlled or pin-located hardware references.")
     unknown = [command for command in commands if command["family"] == "Other"]
     if unknown:
-        warnings.append(f"Contains {len(unknown)} commands outside the current family classifier.")
+        warnings.append(
+            f"Contains {len(unknown)} commands outside the current family classifier."
+        )
     return warnings
 
 
