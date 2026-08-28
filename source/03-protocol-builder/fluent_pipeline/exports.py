@@ -4825,36 +4825,26 @@ def _restore_windows_datastore_zip_names(archive_path: Path) -> None:
                         data[local_header_offset + 30 : local_header_offset + 30 + name_len] = rewritten
                         changed = True
 
-            cd_offset = getattr(zf, "start_dir", None)
-            if cd_offset is None:
-                max_comment_size = 65535
-                search_start = max(0, len(data) - max_comment_size - 22)
-                search_data = data[search_start:]
-                end_cd_idx = search_data.rfind(b"PK\x05\x06")
-                if end_cd_idx >= 0:
-                    end_cd_offset = search_start + end_cd_idx
-                    cd_offset = int.from_bytes(data[end_cd_offset + 16 : end_cd_offset + 20], "little")
+            cd_offset = zf.start_dir
+            for _ in zf.infolist():
+                if cd_offset >= len(data):
+                    break
 
-            if cd_offset is not None:
-                for _ in zf.infolist():
-                    if cd_offset >= len(data):
-                        break
+                if data[cd_offset : cd_offset + 4] != b"PK\x01\x02":
+                    break
 
-                    if data[cd_offset : cd_offset + 4] != b"PK\x01\x02":
-                        break
+                filename_len = int.from_bytes(data[cd_offset + 28 : cd_offset + 30], "little")
+                extra_len = int.from_bytes(data[cd_offset + 30 : cd_offset + 32], "little")
+                comment_len = int.from_bytes(data[cd_offset + 32 : cd_offset + 34], "little")
 
-                    filename_len = int.from_bytes(data[cd_offset + 28 : cd_offset + 30], "little")
-                    extra_len = int.from_bytes(data[cd_offset + 30 : cd_offset + 32], "little")
-                    comment_len = int.from_bytes(data[cd_offset + 32 : cd_offset + 34], "little")
+                filename = bytes(data[cd_offset + 46 : cd_offset + 46 + filename_len])
+                rewritten = _windows_datastore_zip_filename(filename)
 
-                    filename = bytes(data[cd_offset + 46 : cd_offset + 46 + filename_len])
-                    rewritten = _windows_datastore_zip_filename(filename)
+                if rewritten is not None and rewritten != filename and len(rewritten) == len(filename):
+                    data[cd_offset + 46 : cd_offset + 46 + filename_len] = rewritten
+                    changed = True
 
-                    if rewritten is not None and rewritten != filename and len(rewritten) == len(filename):
-                        data[cd_offset + 46 : cd_offset + 46 + filename_len] = rewritten
-                        changed = True
-
-                    cd_offset += 46 + filename_len + extra_len + comment_len
+                cd_offset += 46 + filename_len + extra_len + comment_len
 
     except zipfile.BadZipFile:
         pass
