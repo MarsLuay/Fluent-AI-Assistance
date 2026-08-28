@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import re
 import shutil
@@ -2058,15 +2059,20 @@ def _texts_by_name(root: ET.Element, names: set[str]) -> dict[str, list[str]]:
     return out
 
 
+@functools.lru_cache(maxsize=1024)
+def _get_open_pattern(name: str):
+    return re.compile(
+        rf"<(?:[A-Za-z_][\w.-]*:)?{re.escape(name)}(?:\s[^>]*)?>",
+        flags=re.IGNORECASE,
+    )
+
+
 def _regex_texts_by_name(text: str, names: set[str]) -> dict[str, list[str]]:
     out = {name: [] for name in names}
     if not text:
         return out
     for name in names:
-        open_pattern = re.compile(
-            rf"<(?:[A-Za-z_][\w.-]*:)?{re.escape(name)}(?:\s[^>]*)?>",
-            flags=re.IGNORECASE,
-        )
+        open_pattern = _get_open_pattern(name)
         closing = f"</{name.casefold()}>"
         seen: set[str] = set()
         lowered = text.casefold()
