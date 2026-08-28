@@ -3372,6 +3372,36 @@ class ProjectAuditMergeTests(unittest.TestCase):
 
 
 class ArchiveWindowsNameRestorationTests(unittest.TestCase):
+    def test_eocd_without_start_dir(self):
+        """
+        Verify that `_restore_windows_datastore_zip_names` works correctly
+        even when `start_dir` is removed (simulating Python 3.13+ compatibility).
+        """
+        from fluent_pipeline.exports import _restore_windows_datastore_zip_names
+
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "test.zip"
+            with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_STORED) as zf:
+                zf.writestr("DataStore/file1.txt", b"hello world")
+
+            # Monkeypatch zipfile.ZipFile to remove start_dir to simulate Python 3.13
+            orig_init = zipfile.ZipFile.__init__
+
+            def patched_init(self, *args, **kwargs):
+                orig_init(self, *args, **kwargs)
+                if hasattr(self, "start_dir"):
+                    delattr(self, "start_dir")
+
+            zipfile.ZipFile.__init__ = patched_init
+            try:
+                _restore_windows_datastore_zip_names(p)
+            finally:
+                zipfile.ZipFile.__init__ = orig_init
+
+            with zipfile.ZipFile(p, "r") as zf:
+                names = zf.namelist()
+                self.assertIn("DataStore\\file1.txt", names)
+
     def test_rewrite_zip_filename_records_false_signature_payload(self):
         """
         Verify that `_restore_windows_datastore_zip_names` does not corrupt the ZIP
