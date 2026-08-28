@@ -4815,18 +4815,16 @@ def _restore_windows_datastore_zip_names(archive_path: Path) -> None:
             infolist = zf.infolist()
             cd_offset = zf.start_dir
 
-        # Process local headers and central directory entries based on parsed info
         for info in infolist:
-            # Local header
             local_header_offset = info.header_offset
             if data[local_header_offset : local_header_offset + 4] == b"PK\x03\x04":
                 name_len = int.from_bytes(
                     data[local_header_offset + 26 : local_header_offset + 28], "little"
                 )
                 filename = bytes(data[local_header_offset + 30 : local_header_offset + 30 + name_len])
-                # Verify that the filename matches the length and that we're editing the right name
-                if filename == info.orig_filename.encode('utf-8'):
+                if filename == info.orig_filename.encode("utf-8"):
                     rewritten = _windows_datastore_zip_filename(filename)
+
                     if rewritten is not None and rewritten != filename and len(rewritten) == len(filename):
                         data[local_header_offset + 30 : local_header_offset + 30 + name_len] = rewritten
                         changed = True
@@ -4843,7 +4841,7 @@ def _restore_windows_datastore_zip_names(archive_path: Path) -> None:
             comment_len = int.from_bytes(data[cd_offset + 32 : cd_offset + 34], "little")
 
             filename = bytes(data[cd_offset + 46 : cd_offset + 46 + filename_len])
-            if filename == info.orig_filename.encode('utf-8'):
+            if filename == info.orig_filename.encode("utf-8"):
                 rewritten = _windows_datastore_zip_filename(filename)
 
                 if rewritten is not None and rewritten != filename and len(rewritten) == len(filename):
