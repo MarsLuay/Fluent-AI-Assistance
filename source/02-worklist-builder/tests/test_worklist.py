@@ -1,12 +1,14 @@
-from __future__ import annotations
-
 import tempfile
 import unittest
 from pathlib import Path
 
 from tecan_worklist.gwl import parse_gwl, parse_gwl_lines
-from tecan_worklist.transfer import build_worklist, load_transfers, validate_transfers, well_to_position
-
+from tecan_worklist.transfer import (
+    build_worklist,
+    load_transfers,
+    validate_transfers,
+    well_to_position,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -63,22 +65,28 @@ class WorklistGeneratorTests(unittest.TestCase):
 
     def test_row_to_transfer_invalid_position(self) -> None:
         from tecan_worklist.transfer import _row_to_transfer
+
         row = {
             "source_position": "invalid",
             "dest_position": "A1",
             "volume_ul": "10",
         }
-        with self.assertRaisesRegex(ValueError, "CSV row 2: Invalid well/position value: 'invalid'"):
+        with self.assertRaisesRegex(
+            ValueError, "CSV row 2: Invalid well/position value: 'invalid'"
+        ):
             _row_to_transfer(row, row_number=2, well_rows=8)
 
     def test_row_to_transfer_invalid_volume(self) -> None:
         from tecan_worklist.transfer import _row_to_transfer
+
         row = {
             "source_position": "A1",
             "dest_position": "A2",
             "volume_ul": "not_a_number",
         }
-        with self.assertRaisesRegex(ValueError, "CSV row 3: volume_ul must be numeric."):
+        with self.assertRaisesRegex(
+            ValueError, "CSV row 3: volume_ul must be numeric."
+        ):
             _row_to_transfer(row, row_number=3, well_rows=8)
 
 
