@@ -2,20 +2,28 @@
 
 from __future__ import annotations
 
+import functools
 import re
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
-from .media_convert import write_placeholder_video_slot
+from .media_convert import write_placeholder_video_slot  # noqa: F401
 from .policies.prompt_text import (  # noqa: F401
     MEDIA_PLACEHOLDER_BEGIN,
     MEDIA_PLACEHOLDER_END,
+)
+from .policies.prompt_text import (
     normalize_operator_prompt_text as _normalize_operator_prompt_text,
+)
+from .policies.prompt_text import (
     prompt_has_media_boilerplate as _prompt_has_media_boilerplate,
 )
 
 CANONICAL_SETUP_GROUP_NAME = "Setup"
-RUP_VARIABLE_SELECTOR_INSTRUCTIONS = 'For each test, leave it on "yes" to run it or set it to "no" to skip it.'
+RUP_VARIABLE_SELECTOR_INSTRUCTIONS = (
+    'For each test, leave it on "yes" to run it or set it to "no" to skip it.'
+)
 RUP_VARIABLE_REVIEW_INSTRUCTIONS = "Review values, then press OK."
 RUP_VARIABLE_MAX_INSTRUCTIONS_CHARS = 90
 
@@ -51,7 +59,10 @@ CATALOG_DEFAULT_CLASS_NAMES = frozenset(
 MEDIA_DIR_NAME = "media"
 MEDIA_SLOT_EXTENSIONS = {"image": ".png", "video": ".gif"}
 PLACEHOLDER_IMAGE_TEMPLATE_PATH = (
-    Path(__file__).resolve().parent.parent / "templates" / "media" / "placeholder_image.png"
+    Path(__file__).resolve().parent.parent
+    / "templates"
+    / "media"
+    / "placeholder_image.png"
 )
 PLACEHOLDER_IMAGE_LABEL = "Replace with image"
 _MINIMAL_PLACEHOLDER_PNG = bytes.fromhex(
@@ -114,11 +125,16 @@ def is_setup_group_name(name: Any) -> bool:
     return lowered.endswith(" setup") or lowered.startswith("setup ")
 
 
-def canonical_setup_group_name_for_steps(steps: list[dict[str, Any]] | None = None) -> str:
+def canonical_setup_group_name_for_steps(
+    steps: list[dict[str, Any]] | None = None,
+) -> str:
     """Use one stable setup group name for generated FluentControl scripts."""
     if steps:
         for step in steps:
-            if isinstance(step, dict) and str(step.get("group") or "").strip().casefold() == "operator setup":
+            if (
+                isinstance(step, dict)
+                and str(step.get("group") or "").strip().casefold() == "operator setup"
+            ):
                 return str(step.get("group") or CANONICAL_SETUP_GROUP_NAME)
     return CANONICAL_SETUP_GROUP_NAME
 
@@ -139,7 +155,9 @@ def normalize_setup_groups(ir: dict[str, Any]) -> dict[str, Any]:
     steps = ir.get("steps")
     if not isinstance(steps, list):
         return ir
-    setup_group = canonical_setup_group_name_for_steps([step for step in steps if isinstance(step, dict)])
+    setup_group = canonical_setup_group_name_for_steps(
+        [step for step in steps if isinstance(step, dict)]
+    )
     for step in steps:
         if not isinstance(step, dict):
             continue
@@ -154,13 +172,18 @@ def normalize_group_hierarchy(ir: dict[str, Any]) -> dict[str, Any]:
     return ir
 
 
-def normalize_runtime_variable_prompt_instructions(ir: dict[str, Any]) -> dict[str, Any]:
+def normalize_runtime_variable_prompt_instructions(
+    ir: dict[str, Any],
+) -> dict[str, Any]:
     """Normalize runtime variable prompt instructions to concise operator text."""
     steps = ir.get("steps")
     if not isinstance(steps, list):
         return ir
     for step in steps:
-        if not isinstance(step, dict) or step.get("operation") != "runtime_variable_prompt":
+        if (
+            not isinstance(step, dict)
+            or step.get("operation") != "runtime_variable_prompt"
+        ):
             continue
         params = step.get("parameters")
         if not isinstance(params, dict):
@@ -209,8 +232,12 @@ def _verification_media_focus(step: dict[str, Any]) -> str:
     params = step.get("parameters") if isinstance(step.get("parameters"), dict) else {}
     prompt = str(params.get("prompt") or "").casefold()
 
-    fingers_focus = "RGA fingers parallel and straight vs. diagonal, crossed, or wobbling"
-    seating_focus = "correct seating/placement vs. tilt, wiggling, loose seat, or collision risk"
+    fingers_focus = (
+        "RGA fingers parallel and straight vs. diagonal, crossed, or wobbling"
+    )
+    seating_focus = (
+        "correct seating/placement vs. tilt, wiggling, loose seat, or collision risk"
+    )
     id_focus = "tube ID pop-up/read and vial-gripper fingers closing evenly"
     cap_focus = "cap removed into the holder and reseated straight and tight"
     camera_focus = "second-camera scan and uncap/recap into the yellow cap holder"
@@ -226,8 +253,16 @@ def _verification_media_focus(step: dict[str, Any]) -> str:
         or has_word("connected")
         or has_word("connect")
     )
-    mentions_scan = has_word("scan") or has_word("camera") or has_word("read") or has_word("id")
-    mentions_cap = has_word("cap") or has_word("caps") or has_word("uncap") or has_word("recap") or has_word("uncapped")
+    mentions_scan = (
+        has_word("scan") or has_word("camera") or has_word("read") or has_word("id")
+    )
+    mentions_cap = (
+        has_word("cap")
+        or has_word("caps")
+        or has_word("uncap")
+        or has_word("recap")
+        or has_word("uncapped")
+    )
 
     if "arm" in group:
         return fingers_focus
@@ -268,7 +303,10 @@ def normalize_operator_prompt_text(text: str) -> str:
 
 def prompt_looks_like_external_initialization_check(text: str) -> bool:
     prompt = normalize_operator_prompt_text(text)
-    return bool(_EXTERNAL_INIT_ACTION_RE.search(prompt) and _EXTERNAL_INIT_TARGET_RE.search(prompt))
+    return bool(
+        _EXTERNAL_INIT_ACTION_RE.search(prompt)
+        and _EXTERNAL_INIT_TARGET_RE.search(prompt)
+    )
 
 
 def resolve_verification_prompt_rup_kind(
@@ -289,7 +327,9 @@ def resolve_verification_prompt_rup_kind(
 
 
 def prompt_step_is_deck_presence_check(params: dict[str, Any]) -> bool:
-    return bool(params.get("deck_presence_check")) and bool(prompt_step_worktable_binding(params))
+    return bool(params.get("deck_presence_check")) and bool(
+        prompt_step_worktable_binding(params)
+    )
 
 
 def annotate_verification_prompts_with_media(
@@ -312,14 +352,18 @@ def annotate_verification_prompts_with_media(
             params = {}
             step["parameters"] = params
         if params.get("plain_prompt"):
-            params["prompt"] = normalize_operator_prompt_text(str(params.get("prompt") or ""))
+            params["prompt"] = normalize_operator_prompt_text(
+                str(params.get("prompt") or "")
+            )
             step["command_id"] = "UserPromptStatement"
             step["name"] = step.get("name") or "Prompt User"
             continue
 
         step_id = str(step.get("id") or f"step_{step.get('index') or 0:03d}")
         focus = _verification_media_focus(step)
-        step_rup_kind = resolve_verification_prompt_rup_kind(params, default_rup_kind=mode)
+        step_rup_kind = resolve_verification_prompt_rup_kind(
+            params, default_rup_kind=mode
+        )
         placeholders: list[dict[str, Any]] = []
         for kind in ("image", "video"):
             slot = f"{step_id}_{kind}"
@@ -336,7 +380,9 @@ def annotate_verification_prompts_with_media(
         params["media_placeholders"] = placeholders
         params["media_annotated"] = True
         params["rup_kind"] = step_rup_kind
-        params["prompt"] = normalize_operator_prompt_text(str(params.get("prompt") or ""))
+        params["prompt"] = normalize_operator_prompt_text(
+            str(params.get("prompt") or "")
+        )
         if step_rup_kind == "worktable":
             step["command_id"] = "RUPWorktableStatement"
             step["name"] = step.get("name") or "RUP Worktable"
@@ -350,7 +396,8 @@ def annotate_verification_prompts_with_media(
     if annotated_any:
         assumptions = ir.setdefault("safety_assumptions", [])
         if not any(
-            isinstance(item, dict) and item.get("id") == "verification_prompts_expect_media"
+            isinstance(item, dict)
+            and item.get("id") == "verification_prompts_expect_media"
             for item in assumptions
         ):
             assumptions.append(
@@ -379,7 +426,10 @@ def force_worktable_prompt_images(ir: dict[str, Any]) -> dict[str, Any]:
 
     rewritten_steps: list[Any] = []
     for step in steps:
-        if not isinstance(step, dict) or str(step.get("operation") or "") != "prompt_user":
+        if (
+            not isinstance(step, dict)
+            or str(step.get("operation") or "") != "prompt_user"
+        ):
             rewritten_steps.append(step)
             continue
         params = step.get("parameters")
@@ -402,7 +452,9 @@ def force_worktable_prompt_images(ir: dict[str, Any]) -> dict[str, Any]:
         ).strip()
         if sound_file and not bool(params.get("worktable_audio_prelude_inserted")):
             prelude_params = {
-                "prompt": normalize_operator_prompt_text(str(params.get("prompt") or "Audio cue")),
+                "prompt": normalize_operator_prompt_text(
+                    str(params.get("prompt") or "Audio cue")
+                ),
                 "timeout": 1,
                 "auto_close": True,
                 "sound_file": sound_file,
@@ -462,7 +514,10 @@ def route_unbound_worktable_prompts_to_standard(
         return ir
 
     for step in ir.get("steps") or []:
-        if not isinstance(step, dict) or str(step.get("operation") or "") != "prompt_user":
+        if (
+            not isinstance(step, dict)
+            or str(step.get("operation") or "") != "prompt_user"
+        ):
             continue
         if str(step.get("command_id") or "") != "RUPWorktableStatement":
             continue
@@ -494,7 +549,10 @@ def route_unbound_worktable_prompts_to_standard(
 
 def sync_verification_prompt_target_labware(ir: dict[str, Any]) -> dict[str, Any]:
     for step in ir.get("steps") or []:
-        if not isinstance(step, dict) or str(step.get("operation") or "") != "prompt_user":
+        if (
+            not isinstance(step, dict)
+            or str(step.get("operation") or "") != "prompt_user"
+        ):
             continue
         params = step.get("parameters")
         if not isinstance(params, dict):
@@ -510,9 +568,14 @@ def sync_verification_prompt_target_labware(ir: dict[str, Any]) -> dict[str, Any
     return ir
 
 
-def sanitize_worktable_prompt_variable_labware_bindings(ir: dict[str, Any]) -> dict[str, Any]:
+def sanitize_worktable_prompt_variable_labware_bindings(
+    ir: dict[str, Any],
+) -> dict[str, Any]:
     for step in ir.get("steps") or []:
-        if not isinstance(step, dict) or str(step.get("operation") or "") != "prompt_user":
+        if (
+            not isinstance(step, dict)
+            or str(step.get("operation") or "") != "prompt_user"
+        ):
             continue
         params = step.get("parameters")
         if not isinstance(params, dict):
@@ -520,10 +583,17 @@ def sanitize_worktable_prompt_variable_labware_bindings(ir: dict[str, Any]) -> d
         binding = params.get("worktable_labware")
         if not isinstance(binding, dict):
             continue
-        labware = str(binding.get("labware") or binding.get("selected_labware_name") or "").strip()
+        labware = str(
+            binding.get("labware") or binding.get("selected_labware_name") or ""
+        ).strip()
         if not labware or not _labware_name_has_variable_index(labware):
             continue
-        for key in ("labware", "selected_labware_name", "labware_type", "selected_labware_type"):
+        for key in (
+            "labware",
+            "selected_labware_name",
+            "labware_type",
+            "selected_labware_type",
+        ):
             binding.pop(key, None)
         if str(step.get("target_labware") or "").strip() == labware:
             step.pop("target_labware", None)
@@ -543,7 +613,10 @@ def apply_default_verification_worktable_bindings(
         return ir
 
     for step in ir.get("steps") or []:
-        if not isinstance(step, dict) or str(step.get("operation") or "") != "prompt_user":
+        if (
+            not isinstance(step, dict)
+            or str(step.get("operation") or "") != "prompt_user"
+        ):
             continue
         params = step.get("parameters")
         if not isinstance(params, dict):
@@ -559,9 +632,14 @@ def apply_default_verification_worktable_bindings(
 def collect_media_placeholders(ir: dict[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for step in ir.get("steps") or []:
-        if not isinstance(step, dict) or str(step.get("operation") or "") != "prompt_user":
+        if (
+            not isinstance(step, dict)
+            or str(step.get("operation") or "") != "prompt_user"
+        ):
             continue
-        params = step.get("parameters") if isinstance(step.get("parameters"), dict) else {}
+        params = (
+            step.get("parameters") if isinstance(step.get("parameters"), dict) else {}
+        )
         placeholders = params.get("media_placeholders")
         if not isinstance(placeholders, list) or not placeholders:
             continue
@@ -573,7 +651,9 @@ def collect_media_placeholders(ir: dict[str, Any]) -> list[dict[str, Any]]:
                 "name": step.get("name"),
                 "command_id": step.get("command_id"),
                 "rup_kind": params.get("rup_kind"),
-                "prompt": normalize_operator_prompt_text(str(params.get("prompt") or "")),
+                "prompt": normalize_operator_prompt_text(
+                    str(params.get("prompt") or "")
+                ),
                 "media": placeholders,
             }
         )
@@ -583,9 +663,14 @@ def collect_media_placeholders(ir: dict[str, Any]) -> list[dict[str, Any]]:
 def prompt_image_media_slots(ir: dict[str, Any]) -> list[dict[str, Any]]:
     slots: list[dict[str, Any]] = []
     for step in ir.get("steps") or []:
-        if not isinstance(step, dict) or str(step.get("operation") or "") != "prompt_user":
+        if (
+            not isinstance(step, dict)
+            or str(step.get("operation") or "") != "prompt_user"
+        ):
             continue
-        params = step.get("parameters") if isinstance(step.get("parameters"), dict) else {}
+        params = (
+            step.get("parameters") if isinstance(step.get("parameters"), dict) else {}
+        )
         image_path = prompt_step_image_path(params)
         if not image_path:
             continue
@@ -593,7 +678,8 @@ def prompt_image_media_slots(ir: dict[str, Any]) -> list[dict[str, Any]]:
             (
                 media
                 for media in (params.get("media_placeholders") or [])
-                if isinstance(media, dict) and str(media.get("kind") or "").lower() == "image"
+                if isinstance(media, dict)
+                and str(media.get("kind") or "").lower() == "image"
             ),
             None,
         )
@@ -653,7 +739,8 @@ def _prompt_step_media_path_by_preference(
             (
                 item
                 for item in placeholders
-                if isinstance(item, dict) and str(item.get("kind") or "").lower() == wanted_kind
+                if isinstance(item, dict)
+                and str(item.get("kind") or "").lower() == wanted_kind
             ),
             None,
         )
@@ -672,8 +759,12 @@ def prompt_step_worktable_binding(params: dict[str, Any]) -> dict[str, Any] | No
     binding = params.get("worktable_labware")
     if not isinstance(binding, dict):
         return None
-    labware = str(binding.get("labware") or binding.get("selected_labware_name") or "").strip()
-    labware_type = str(binding.get("labware_type") or binding.get("selected_labware_type") or "").strip()
+    labware = str(
+        binding.get("labware") or binding.get("selected_labware_name") or ""
+    ).strip()
+    labware_type = str(
+        binding.get("labware_type") or binding.get("selected_labware_type") or ""
+    ).strip()
     grid = binding.get("grid")
     site = binding.get("site")
     if not labware and grid is None and site is None:
@@ -712,7 +803,9 @@ def _media_slot_specs_from_rows(rows: list[dict[str, Any]]) -> list[dict[str, An
             specs.append(
                 {
                     "filename": media_slot_filename(slot, kind),
-                    "path": str(media.get("path") or media_slot_relative_path(slot, kind)),
+                    "path": str(
+                        media.get("path") or media_slot_relative_path(slot, kind)
+                    ),
                     "slot": slot,
                     "kind": kind,
                     "step_id": row.get("step_id"),
@@ -820,15 +913,25 @@ def _prompt_display_media_slots(
         rup_kinds = {_media_spec_rup_kind(item) for item in grouped}
         rup_kinds.discard("")
         if rup_kinds == {"worktable"}:
-            worktable_selected = next((item for item in grouped if item.get("worktable_display")), None)
+            worktable_selected = next(
+                (item for item in grouped if item.get("worktable_display")), None
+            )
             if worktable_selected is None:
                 worktable_selected = next(
-                    (item for item in grouped if str(item.get("kind") or "").lower() == "image"),
+                    (
+                        item
+                        for item in grouped
+                        if str(item.get("kind") or "").lower() == "image"
+                    ),
                     None,
                 )
             if worktable_selected is None:
                 worktable_selected = next(
-                    (item for item in grouped if str(item.get("kind") or "").lower() == "video"),
+                    (
+                        item
+                        for item in grouped
+                        if str(item.get("kind") or "").lower() == "video"
+                    ),
                     None,
                 )
             if worktable_selected is not None:
@@ -836,12 +939,20 @@ def _prompt_display_media_slots(
             continue
         if rup_kinds == {"standard"}:
             standard_selected = next(
-                (item for item in grouped if str(item.get("kind") or "").lower() == "video"),
+                (
+                    item
+                    for item in grouped
+                    if str(item.get("kind") or "").lower() == "video"
+                ),
                 None,
             )
             if standard_selected is None:
                 standard_selected = next(
-                    (item for item in grouped if str(item.get("kind") or "").lower() == "image"),
+                    (
+                        item
+                        for item in grouped
+                        if str(item.get("kind") or "").lower() == "image"
+                    ),
                     None,
                 )
             if standard_selected is not None:
@@ -849,23 +960,39 @@ def _prompt_display_media_slots(
             continue
 
         standard_selected = next(
-            (item for item in grouped if str(item.get("kind") or "").lower() == "video"),
+            (
+                item
+                for item in grouped
+                if str(item.get("kind") or "").lower() == "video"
+            ),
             None,
         )
         if standard_selected is None:
             standard_selected = next(
-                (item for item in grouped if str(item.get("kind") or "").lower() == "image"),
+                (
+                    item
+                    for item in grouped
+                    if str(item.get("kind") or "").lower() == "image"
+                ),
                 None,
             )
         if standard_selected is not None:
             selected_image_path_slots.add(str(standard_selected.get("slot") or ""))
         worktable_selected = next(
-            (item for item in grouped if str(item.get("kind") or "").lower() == "image"),
+            (
+                item
+                for item in grouped
+                if str(item.get("kind") or "").lower() == "image"
+            ),
             None,
         )
         if worktable_selected is None:
             worktable_selected = next(
-                (item for item in grouped if str(item.get("kind") or "").lower() == "video"),
+                (
+                    item
+                    for item in grouped
+                    if str(item.get("kind") or "").lower() == "video"
+                ),
                 None,
             )
         if worktable_selected is not None:
@@ -877,7 +1004,9 @@ def worktable_pipeline_video_slots(specs: list[dict[str, Any]]) -> set[str]:
     filtered = [spec for spec in specs or [] if isinstance(spec, dict)]
     if not filtered:
         return set()
-    _, worktable_detail_slots = _prompt_display_media_slots(_group_media_slot_specs_by_step(filtered))
+    _, worktable_detail_slots = _prompt_display_media_slots(
+        _group_media_slot_specs_by_step(filtered)
+    )
     return {
         str(spec.get("slot") or "").strip()
         for spec in filtered
@@ -890,9 +1019,13 @@ def required_media_slot_specs(specs: list[dict[str, Any]]) -> list[dict[str, Any
     filtered = [spec for spec in specs or [] if isinstance(spec, dict)]
     if not filtered:
         return []
-    selected, worktable = _prompt_display_media_slots(_group_media_slot_specs_by_step(filtered))
+    selected, worktable = _prompt_display_media_slots(
+        _group_media_slot_specs_by_step(filtered)
+    )
     required = selected | worktable
-    return [spec for spec in filtered if str(spec.get("slot") or "").strip() in required]
+    return [
+        spec for spec in filtered if str(spec.get("slot") or "").strip() in required
+    ]
 
 
 def build_media_path_map_from_specs(
@@ -906,7 +1039,9 @@ def build_media_path_map_from_specs(
     sub = str(subfolder).strip() if subfolder else None
     specs = [spec for spec in specs or [] if isinstance(spec, dict)]
     specs_by_step = _group_media_slot_specs_by_step(specs)
-    selected_image_path_slots, worktable_detail_slots = _prompt_display_media_slots(specs_by_step)
+    selected_image_path_slots, worktable_detail_slots = _prompt_display_media_slots(
+        specs_by_step
+    )
     entries: list[dict[str, Any]] = []
     for spec in specs:
         kind = str(spec.get("kind") or "media").lower()
@@ -927,7 +1062,9 @@ def build_media_path_map_from_specs(
                 "drives_worktable_detail_path": drives_worktable_detail_path,
                 "drives_selected_sound_path": drives_selected_sound_path,
                 "attachment_only": not (
-                    drives_worktable_detail_path or drives_selected_image_path or drives_selected_sound_path
+                    drives_worktable_detail_path
+                    or drives_selected_image_path
+                    or drives_selected_sound_path
                 ),
                 "step_id": spec.get("step_id"),
                 "group": spec.get("group"),
@@ -939,7 +1076,9 @@ def build_media_path_map_from_specs(
                 "worktable_safe": bool(spec.get("worktable_safe")),
             }
         )
-    entries.sort(key=lambda entry: (str(entry.get("slot") or ""), str(entry.get("kind") or "")))
+    entries.sort(
+        key=lambda entry: (str(entry.get("slot") or ""), str(entry.get("kind") or ""))
+    )
     return {
         "protocol": protocol_name,
         "touchtools_dir": base,
@@ -1018,8 +1157,14 @@ def resolve_touchtools_media_subfolder(ir: dict[str, Any]) -> str:
     name = str(protocol.get("name") or "").strip()
     if not name:
         source = ir.get("source", {}) if isinstance(ir.get("source"), dict) else {}
-        naming = source.get("script_naming", {}) if isinstance(source.get("script_naming"), dict) else {}
-        name = str(naming.get("final_name") or naming.get("requested_name") or "").strip()
+        naming = (
+            source.get("script_naming", {})
+            if isinstance(source.get("script_naming"), dict)
+            else {}
+        )
+        name = str(
+            naming.get("final_name") or naming.get("requested_name") or ""
+        ).strip()
     return touchtools_media_subfolder(name or "script")
 
 
@@ -1058,7 +1203,14 @@ def render_media_path_map_markdown(path_map: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def apply_media_path_map_to_xscr(xscr_path: Path, path_map: dict[str, Any]) -> list[dict[str, str]]:
+@functools.lru_cache(maxsize=1024)
+def _get_media_path_pattern(tag: str, escaped_path: str) -> re.Pattern[str]:
+    return re.compile(rf"(<{tag}>){escaped_path}(</{tag}>)")
+
+
+def apply_media_path_map_to_xscr(
+    xscr_path: Path, path_map: dict[str, Any]
+) -> list[dict[str, str]]:
     """Rewrite bundle-relative prompt media paths to deployed TouchTools absolutes."""
     if not xscr_path.exists():
         return []
@@ -1073,8 +1225,9 @@ def apply_media_path_map_to_xscr(xscr_path: Path, path_map: dict[str, Any]) -> l
         absolute_path = str(entry.get("absolute_path") or "").strip()
         if not bundle_path or not absolute_path or bundle_path not in updated:
             continue
+        escaped_bundle_path = re.escape(bundle_path)
         for tag in ("CustomDetailImageFilePath", "SelectedImagePath", "File"):
-            pattern = re.compile(rf"(<{tag}>){re.escape(bundle_path)}(</{tag}>)")
+            pattern = _get_media_path_pattern(tag, escaped_bundle_path)
             if not pattern.search(updated):
                 continue
 
@@ -1085,11 +1238,13 @@ def apply_media_path_map_to_xscr(xscr_path: Path, path_map: dict[str, Any]) -> l
             fixups.append({"from": bundle_path, "to": absolute_path, "tag": tag})
         if entry.get("drives_selected_sound_path") or entry.get("kind") == "audio":
             for tag in ("SelectedSoundPath", "SoundFile"):
-                pattern = re.compile(rf"(<{tag}>){re.escape(bundle_path)}(</{tag}>)")
+                pattern = _get_media_path_pattern(tag, escaped_bundle_path)
                 if not pattern.search(updated):
                     continue
 
-                def _replace_sound(match: re.Match[str], *, target: str = absolute_path) -> str:
+                def _replace_sound(
+                    match: re.Match[str], *, target: str = absolute_path
+                ) -> str:
                     return f"{match.group(1)}{target}{match.group(2)}"
 
                 updated = pattern.sub(_replace_sound, updated)
@@ -1136,8 +1291,9 @@ def rewrite_flat_touchtools_media_paths_in_xscr(
         target_path = deployed_media_path(base, name, subfolder=sub)
         if flat_path == target_path or flat_path not in updated:
             continue
+        escaped_flat_path = re.escape(flat_path)
         for tag in TOUCHTOOLS_MEDIA_PATH_TAGS:
-            pattern = re.compile(rf"(<{tag}>){re.escape(flat_path)}(</{tag}>)")
+            pattern = _get_media_path_pattern(tag, escaped_flat_path)
             if not pattern.search(updated):
                 continue
 
@@ -1188,7 +1344,9 @@ def apply_deployed_touchtools_media_paths(
     if not collect_media_placeholders(ir) and not sound_path_specs_from_ir(ir):
         return {}, []
     base = str(touchtools_dir or resolve_touchtools_images_dir()).strip()
-    resolved_subfolder = subfolder if subfolder is not None else resolve_touchtools_media_subfolder(ir)
+    resolved_subfolder = (
+        subfolder if subfolder is not None else resolve_touchtools_media_subfolder(ir)
+    )
     path_map = build_media_path_map(ir, base, subfolder=resolved_subfolder)
     fixups = apply_touchtools_media_path_map_to_xscr(xscr_path, path_map)
     return path_map, fixups
