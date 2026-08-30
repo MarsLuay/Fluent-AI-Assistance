@@ -4825,7 +4825,18 @@ def _restore_windows_datastore_zip_names(archive_path: Path) -> None:
                         data[local_header_offset + 30 : local_header_offset + 30 + name_len] = rewritten
                         changed = True
 
-            cd_offset = zf.start_dir
+            eocd_offset = -1
+            search_stop = max(-1, len(data) - (65535 + 22) - 1)
+            for i in range(len(data) - 22, search_stop, -1):
+                if data[i : i + 4] == b"PK\x05\x06":
+                    eocd_offset = i
+                    break
+
+            if eocd_offset != -1:
+                cd_offset = int.from_bytes(data[eocd_offset + 16 : eocd_offset + 20], "little")
+            else:
+                cd_offset = getattr(zf, "start_dir", len(data))
+
             for _ in zf.infolist():
                 if cd_offset >= len(data):
                     break
