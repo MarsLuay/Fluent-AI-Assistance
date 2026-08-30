@@ -8,10 +8,8 @@ from typing import Any, Iterable
 import re
 
 from tecan_common import xml_compat as ET
-from tecan_common.xml_helpers import child_text, first_text, local_name, texts_by_name, unique_texts
 
 from .command_registry import registry_command_family
-
 
 TECAN_EXTENSIONS = {
     ".zeia",
@@ -83,9 +81,21 @@ def command_family(type_name: str) -> str:
         return "Worktable"
     if "variable" in t:
         return "Variables"
-    if "loopgroup" in t or "conditionalgroup" in t or "alternategroup" in t or "scriptgroup" in t:
+    if (
+        "loopgroup" in t
+        or "conditionalgroup" in t
+        or "alternategroup" in t
+        or "scriptgroup" in t
+    ):
         return "Control flow"
-    if "commentstatement" in t or "userprompt" in t or "delay" in t or "waitstatement" in t or "timer" in t or "leavestatement" in t:
+    if (
+        "commentstatement" in t
+        or "userprompt" in t
+        or "delay" in t
+        or "waitstatement" in t
+        or "timer" in t
+        or "leavestatement" in t
+    ):
         return "User/script flow"
     if "subroutine" in t:
         return "Subroutine"

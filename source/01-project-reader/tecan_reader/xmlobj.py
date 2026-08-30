@@ -6,16 +6,25 @@ from pathlib import Path
 from typing import Any
 import re
 
-from .common import first_text, parse_xml_text, read_text, texts_by_name
+from tecan_common.xml_helpers import first_text, texts_by_name
+
+from .common import parse_xml_text, read_text
 
 
-def inspect_xml_object(path: str | Path, *, source_name: str | None = None) -> dict[str, Any]:
+def inspect_xml_object(
+    path: str | Path, *, source_name: str | None = None
+) -> dict[str, Any]:
     text = read_text(path)
-    root = parse_xml_text(text)
-    return inspect_xml_object_text(text, source_name=source_name or str(path), suffix=Path(source_name or path).suffix)
+    return inspect_xml_object_text(
+        text,
+        source_name=source_name or str(path),
+        suffix=Path(source_name or path).suffix,
+    )
 
 
-def inspect_xml_object_text(text: str, *, source_name: str, suffix: str = "") -> dict[str, Any]:
+def inspect_xml_object_text(
+    text: str, *, source_name: str, suffix: str = ""
+) -> dict[str, Any]:
     root = parse_xml_text(text)
     grouped = texts_by_name(
         root,
@@ -54,7 +63,9 @@ def inspect_xml_object_text(text: str, *, source_name: str, suffix: str = "") ->
         "guids": [*grouped.get("Guid", []), *grouped.get("GUID", [])][:10],
         "pin_refs": pin_refs,
         "asset_refs": asset_refs,
-        "custom_part": bool(pin_refs or asset_refs or "custom" in object_name.casefold()),
+        "custom_part": bool(
+            pin_refs or asset_refs or "custom" in object_name.casefold()
+        ),
     }
 
 
@@ -72,13 +83,20 @@ def _kind_from_suffix(suffix: str) -> str:
 
 
 def _pin_refs(text: str) -> list[str]:
-    refs = set(re.findall(r"\b(?:GIO\d+_Pin\d+|Worktable_[A-Za-z0-9_]*Pin[A-Za-z0-9_]*|WorktablePin_[A-Za-z0-9_]+)\b", text))
+    refs = set(
+        re.findall(
+            r"\b(?:GIO\d+_Pin\d+|Worktable_[A-Za-z0-9_]*Pin[A-Za-z0-9_]*|WorktablePin_[A-Za-z0-9_]+)\b",
+            text,
+        )
+    )
     return sorted(refs)
 
 
 def _asset_refs(text: str) -> list[str]:
     refs = set()
-    for match in re.findall(r"[^<>\"]+\.(?:bmp|gif|jpe?g|png|tiff?)", text, flags=re.IGNORECASE):
+    for match in re.findall(
+        r"[^<>\"]+\.(?:bmp|gif|jpe?g|png|tiff?)", text, flags=re.IGNORECASE
+    ):
         value = match.strip()
         if value:
             refs.add(Path(value.replace("\\", "/")).name)
