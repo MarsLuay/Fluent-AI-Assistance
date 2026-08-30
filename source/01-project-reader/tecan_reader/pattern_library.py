@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
 import json
 import re
 import sqlite3
+from pathlib import Path
+from typing import Any
 
 from .command_registry import registry_manual_step, registry_pattern_type
 from .common import to_jsonable
 from .project_index import DEFAULT_INDEX_PATH
-
 
 PATTERN_SCHEMA_VERSION = "1"
 
@@ -130,21 +129,13 @@ def summarize_script_patterns(
     conn, should_close, database = _connection_arg(db_path_or_conn)
     try:
         _initialize_pattern_tables(conn)
-        type_counts = {
-            row["pattern_type"]: row["count"]
-            for row in conn.execute(
-                """
+        type_counts = {row["pattern_type"]: row["count"] for row in conn.execute("""
                 SELECT pattern_type, COUNT(*) AS count
                 FROM script_patterns
                 GROUP BY pattern_type
                 ORDER BY count DESC, pattern_type
-                """
-            )
-        }
-        top_sources = [
-            dict(row)
-            for row in conn.execute(
-                """
+                """)}
+        top_sources = [dict(row) for row in conn.execute("""
                 SELECT s.object_name AS source_script, z.path AS zeia_file,
                        COUNT(*) AS pattern_count
                 FROM script_patterns p
@@ -153,9 +144,7 @@ def summarize_script_patterns(
                 GROUP BY s.object_name, z.path
                 ORDER BY pattern_count DESC, source_script
                 LIMIT 25
-                """
-            )
-        ]
+                """)]
         return {
             "kind": "script_pattern_summary",
             "database": database,
@@ -297,8 +286,7 @@ def _connection_arg(
 
 
 def _initialize_pattern_tables(conn: sqlite3.Connection) -> None:
-    conn.executescript(
-        """
+    conn.executescript("""
         CREATE TABLE IF NOT EXISTS script_patterns (
             id INTEGER PRIMARY KEY,
             zeia_file_id INTEGER NOT NULL REFERENCES zeia_files(id) ON DELETE CASCADE,
@@ -333,8 +321,7 @@ def _initialize_pattern_tables(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_script_patterns_source ON script_patterns(source_script);
         CREATE INDEX IF NOT EXISTS idx_script_patterns_signature ON script_patterns(command_signature);
         CREATE INDEX IF NOT EXISTS idx_script_pattern_steps_name ON script_pattern_steps(command_name);
-        """
-    )
+        """)
     conn.execute(
         "INSERT OR REPLACE INTO metadata(key, value) VALUES('pattern_schema_version', ?)",
         (PATTERN_SCHEMA_VERSION,),
@@ -342,8 +329,7 @@ def _initialize_pattern_tables(conn: sqlite3.Connection) -> None:
 
 
 def _load_indexed_scripts(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    rows = conn.execute(
-        """
+    rows = conn.execute("""
         SELECT c.id AS command_id, c.zeia_file_id, c.script_id, c.command_index,
                c.command_type, c.raw_type, c.family, c.line, c.name,
                c.fields_json, s.object_name AS source_script,
@@ -352,8 +338,7 @@ def _load_indexed_scripts(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         JOIN scripts s ON s.id = c.script_id
         JOIN zeia_files z ON z.id = c.zeia_file_id
         ORDER BY z.path, s.object_name, c.script_id, c.command_index
-        """
-    )
+        """)
     grouped: dict[int, dict[str, Any]] = {}
     for row in rows:
         script_id = int(row["script_id"])
@@ -608,8 +593,7 @@ def _search_pattern_rows(
 ) -> list[dict[str, Any]]:
     pattern = f"%{query.lower()}%"
     params: list[Any] = [pattern, pattern, pattern, pattern, pattern, pattern, pattern]
-    clauses = [
-        """
+    clauses = ["""
         (
             lower(p.pattern_type) LIKE ?
             OR lower(p.name) LIKE ?
@@ -628,8 +612,7 @@ def _search_pattern_rows(
                   )
             )
         )
-        """
-    ]
+        """]
     params.extend([pattern, pattern])
     if pattern_type:
         clauses.append("p.pattern_type = ?")
@@ -745,6 +728,14 @@ def _metadata_value(conn: sqlite3.Connection, key: str) -> str:
 def _count(conn: sqlite3.Connection, table: str) -> int:
     if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", table):
         raise ValueError(f"Invalid table name: {table}")
+
+    # Securely validate against a schema-derived allowlist
+    allowed_tables = {
+        r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    if table not in allowed_tables:
+        raise ValueError(f"Table name not found in schema: {table}")
+
     escaped_table = '"' + table.replace('"', '""') + '"'
     row = conn.execute(f"SELECT COUNT(*) AS count FROM {escaped_table}").fetchone()
     return int(row["count"] or 0)
