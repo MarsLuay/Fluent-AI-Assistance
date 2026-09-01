@@ -3404,6 +3404,43 @@ class ArchiveWindowsNameRestorationTests(unittest.TestCase):
             # zipfile.namelist() normalizes backslashes to forward slashes.
             self.assertIn(b"DataStore\\file1.txt", data)
 
+    def test_rewrite_zip_filename_records_false_eocd_signature(self):
+        """
+        Verify that `_restore_windows_datastore_zip_names` correctly rejects spoofed EOCD
+        signatures when they do not align with the end of the file, such as when embedded
+        within ZIP payloads.
+        """
+        from fluent_pipeline.exports import _restore_windows_datastore_zip_names
+
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "test.zip"
+            with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_STORED) as zf:
+                # Payload containing a spoofed EOCD block with an invalid comment length
+                # We want it to be ignored by our backward EOCD search logic
+                payload = bytearray(b"hello PK\x05\x06")
+                payload.extend(b"\x00" * 12)
+                payload.extend((9999).to_bytes(4, "little")) # fake cd_offset
+                payload.extend((123).to_bytes(2, "little")) # fake comment_len that is invalid
+
+                payload.extend(b"\x00" * 14)
+                payload.extend(b"DataStore/false_file1.txt")
+                payload.extend(b"\x00" * 1200)
+
+                zf.writestr("DataStore/file1.txt", payload)
+                zf.writestr("meta/file2.txt", b"world")
+
+            with zipfile.ZipFile(p, "r") as zf:
+                self.assertIsNone(zf.testzip())
+
+            _restore_windows_datastore_zip_names(p)
+
+            with zipfile.ZipFile(p, "r") as zf:
+                self.assertIsNone(zf.testzip())
+
+            data = p.read_bytes()
+            self.assertIn(b"meta\\file2.txt", data)
+            self.assertIn(b"DataStore\\file1.txt", data)
+
     def test_rewrite_zip_filename_records_false_signature_payload(self):
         """
         Verify that `_restore_windows_datastore_zip_names` does not corrupt the ZIP

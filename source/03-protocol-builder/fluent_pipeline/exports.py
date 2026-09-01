@@ -4829,8 +4829,10 @@ def _restore_windows_datastore_zip_names(archive_path: Path) -> None:
             search_stop = max(-1, len(data) - (65535 + 22) - 1)
             for i in range(len(data) - 22, search_stop, -1):
                 if data[i : i + 4] == b"PK\x05\x06":
-                    eocd_offset = i
-                    break
+                    comment_len = int.from_bytes(data[i + 20 : i + 22], "little")
+                    if i + 22 + comment_len == len(data):
+                        eocd_offset = i
+                        break
 
             if eocd_offset != -1:
                 cd_offset = int.from_bytes(data[eocd_offset + 16 : eocd_offset + 20], "little")
