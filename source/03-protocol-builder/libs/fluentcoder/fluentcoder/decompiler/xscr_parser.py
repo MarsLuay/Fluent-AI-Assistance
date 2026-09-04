@@ -21,7 +21,7 @@ from __future__ import annotations
 import re
 from .. import xml_compat as ET
 from pathlib import Path
-from typing import Iterator, Optional, Union
+from typing import Callable, Iterator, Optional, Union
 
 from ..catalog.xcmp import _find, _local, _text
 from ..expressions import is_expression_field, parse_or_preserve_source_expression
@@ -266,23 +266,317 @@ def _parse_statements(stmts: ET.Element) -> list[Step]:
     return out
 
 
+
+def _parse_add_labware(command_id: str, obj: ET.Element) -> Step:
+    return AddLabwareStep(
+        labware_type=_extract_field(obj, "LabwareType") or "",
+        label=_extract_field(obj, "LabwareLable") or "",
+        location=_extract_field(obj, "Location") or "Site",
+        position=_parse_registered_expression(
+            command_id,
+            "Position",
+            _extract_field(obj, "Position") or "1",
+        ),
+    )
+
+def _parse_remove_labware(command_id: str, obj: ET.Element) -> Step:
+    return RemoveLabwareStep(labware_name=_extract_field(obj, "LabwareName") or "")
+
+def _parse_get_head_adapter(command_id: str, obj: ET.Element) -> Step:
+    return GetHeadAdapterStep(
+        labware_name=_extract_field(obj, "LabwareName") or "EVA1",
+        device_alias=_extract_field(obj, "DeviceAlias"),
+        available_id=_extract_available_id(obj),
+    )
+
+def _parse_drop_head_adapter(command_id: str, obj: ET.Element) -> Step:
+    return DropHeadAdapterStep(
+        labware_name=_extract_field(obj, "LabwareName"),
+        device_alias=_extract_field(obj, "DeviceAlias"),
+        available_id=_extract_available_id(obj),
+    )
+
+def _parse_pick_up_tips(command_id: str, obj: ET.Element) -> Step:
+    return PickUpTipsStep(
+        labware_name=_extract_field(obj, "LabwareName") or "",
+        partial_columns=_parse_int(_extract_field(obj, "PartialColumns"), default=24),
+        partial_rows=_parse_int(_extract_field(obj, "PartialRows"), default=16),
+        device_alias=_extract_field(obj, "DeviceAlias"),
+        available_id=_extract_available_id(obj),
+    )
+
+def _parse_set_tips_back(command_id: str, obj: ET.Element) -> Step:
+    return SetTipsBackStep(
+        labware_name=_extract_field(obj, "LabwareName"),
+        device_alias=_extract_field(obj, "DeviceAlias"),
+        available_id=_extract_available_id(obj),
+    )
+
+def _parse_aspirate(command_id: str, obj: ET.Element) -> Step:
+    return AspirateStep(
+        labware_name=_extract_field(obj, "LabwareName") or "",
+        volume=_parse_registered_expression(
+            command_id,
+            "Volume",
+            _extract_field(obj, "Volume") or "0",
+        ),
+        liquid_class=_extract_field(obj, "LiquidClassName"),
+    )
+
+def _parse_dispense(command_id: str, obj: ET.Element) -> Step:
+    return DispenseStep(
+        labware_name=_extract_field(obj, "LabwareName") or "",
+        volume=_parse_registered_expression(
+            command_id,
+            "Volume",
+            _extract_field(obj, "Volume") or "0",
+        ),
+        liquid_class=_extract_field(obj, "LiquidClassName"),
+    )
+
+def _parse_cga_get_fingers(command_id: str, obj: ET.Element) -> Step:
+    return CgaGetFingersStep(
+        labware_name=_extract_field(obj, "LabwareName"),
+        device_alias=_extract_field(obj, "DeviceAlias"),
+        available_id=_extract_available_id(obj),
+    )
+
+def _parse_cga_drop_fingers(command_id: str, obj: ET.Element) -> Step:
+    return CgaDropFingersStep(
+        labware_name=_extract_field(obj, "LabwareName"),
+        device_alias=_extract_field(obj, "DeviceAlias"),
+        available_id=_extract_available_id(obj),
+        use_source_as_back_position=_extract_field(obj, "Backs") or "BackToPosition",
+    )
+
+def _parse_set_variable(command_id: str, obj: ET.Element) -> Step:
+    return SetVariableStep(
+        variable_name=_extract_field(obj, "VariableName") or _extract_field(obj, "Name") or "",
+        value=_parse_registered_expression(
+            command_id,
+            "Value",
+            _extract_field(obj, "Value") or "",
+        ),
+    )
+
+def _parse_comment(command_id: str, obj: ET.Element) -> Step:
+    return CommentStep(comment=_extract_field(obj, "Text") or _extract_field(obj, "Comment") or "")
+
+def _parse_wait(command_id: str, obj: ET.Element) -> Step:
+    seconds_text = _extract_field(obj, "Seconds") or _extract_field(obj, "Duration")
+    return WaitStep(
+        duration_seconds=_parse_registered_expression(
+            command_id,
+            "Duration",
+            seconds_text or "0",
+        )
+    )
+
+def _parse_delay(command_id: str, obj: ET.Element) -> Step:
+    return DelayStep(
+        delay=_parse_registered_expression(
+            command_id,
+            "Delay",
+            _extract_field(obj, "Delay") or "0",
+        )
+    )
+
+def _parse_start_timer(command_id: str, obj: ET.Element) -> Step:
+    return StartTimerStep(timer=_parse_int(_extract_field(obj, "Timer"), default=1))
+
+def _parse_wait_for_timer(command_id: str, obj: ET.Element) -> Step:
+    return WaitForTimerStep(
+        timer=_parse_int(_extract_field(obj, "Timer"), default=1),
+        duration_seconds=_parse_registered_expression(
+            command_id,
+            "Duration",
+            _extract_field(obj, "Duration") or "0",
+        ),
+    )
+
+def _parse_export_variable(command_id: str, obj: ET.Element) -> Step:
+    return ExportVariableStep(
+        variables=_list_values(obj, "Variables"),
+        export_file=_strip_wrapping_quotes(_extract_field(obj, "ExportFile") or ""),
+        write_header=_parse_bool(_extract_field(obj, "WriteHeader")),
+        replace_existing_file=_parse_bool(_extract_field(obj, "ReplaceExistingFile")),
+        export_strings_with_quotes=_parse_bool(_extract_field(obj, "ExportStringsWithQuotes")),
+        delimiter_code=_parse_int(_extract_field(obj, "DelimiterCode"), default=59),
+    )
+
+def _parse_import_variable(command_id: str, obj: ET.Element) -> Step:
+    return ImportVariableStep(
+        variables=_list_values(obj, "Variables"),
+        import_file=_strip_wrapping_quotes(_extract_field(obj, "ImportFile") or ""),
+        read_line=_parse_bool(_extract_field(obj, "ReadLine")),
+        line=_parse_int(_extract_field(obj, "Line"), default=1),
+        start_in_column=_parse_bool(_extract_field(obj, "StartInColumn")),
+        column=_parse_int(_extract_field(obj, "Column"), default=1),
+        has_header=_parse_bool(_extract_field(obj, "HasHeader")),
+        delimiter_code=_parse_int(_extract_field(obj, "DelimiterCode"), default=59),
+    )
+
+def _parse_query_variable(command_id: str, obj: ET.Element) -> Step:
+    return QueryVariableStep(
+        variable_name=_extract_field(obj, "VariableName") or _extract_field(obj, "Name") or "",
+        query_prompt=_extract_field(obj, "QueryPrompt") or "",
+        limit_range=_parse_bool(_extract_field(obj, "LimitRange")),
+    )
+
+def _parse_execute_application(command_id: str, obj: ET.Element) -> Step:
+    return ExecuteApplicationStep(
+        application=_extract_field(obj, "Application") or "",
+        arguments=_extract_field(obj, "Arguments") or "",
+        wait=_parse_bool(_extract_field(obj, "Wait"), default=True),
+        store_return=_parse_bool(_extract_field(obj, "StoreReturn")),
+        variable=_extract_field(obj, "Variable") or "",
+    )
+
+def _parse_set_location(command_id: str, obj: ET.Element) -> Step:
+    return SetLocationStep(
+        labware=_extract_field(obj, "Labware") or "",
+        location=_extract_field(obj, "Location") or "Site",
+        site=_parse_registered_expression(
+            command_id,
+            "Site",
+            _extract_field(obj, "Site") or "1",
+        ),
+        rotation=_parse_int(_extract_field(obj, "Rotation"), default=0),
+    )
+
+def _parse_liha_drop_tips(command_id: str, obj: ET.Element) -> Step:
+    return LihaDropTipsStep(
+        labware_name=_extract_field(obj, "LabwareName") or None,
+    )
+
+def _parse_liha_empty_tips(command_id: str, obj: ET.Element) -> Step:
+    return LihaEmptyTipsStep(
+        labware_name=_extract_field(obj, "LabwareName") or "",
+        volume=_parse_registered_expression(
+            command_id,
+            "Volume",
+            _extract_field(obj, "Volume") or "0",
+        ),
+        liquid_class=_extract_field(obj, "LiquidClassName"),
+    )
+
+def _parse_mca384_get_tips(command_id: str, obj: ET.Element) -> Step:
+    return Mca384GetTipsStep(labware_name=_extract_field(obj, "LabwareName") or None)
+
+def _parse_mca384_drop_tips(command_id: str, obj: ET.Element) -> Step:
+    return Mca384DropTipsStep(labware_name=_extract_field(obj, "LabwareName") or None)
+
+def _parse_mca384_move_arm(command_id: str, obj: ET.Element) -> Step:
+    return Mca384MoveArmStep(
+        movement_type=_extract_field(obj, "MovementType") or "GlobalZTravel",
+        labware_name=_extract_field(obj, "LabwareName") or None,
+    )
+
+def _parse_mca384_mix(command_id: str, obj: ET.Element) -> Step:
+    return Mca384MixStep(
+        labware_name=_extract_field(obj, "LabwareName") or "",
+        volume=_parse_registered_expression(
+            command_id,
+            "Volume",
+            _extract_field(obj, "Volume") or "0",
+        ),
+        cycles=_parse_registered_expression(
+            command_id,
+            "Cycles",
+            _extract_field(obj, "Cycles") or "10",
+        ),
+        liquid_class=_extract_field(obj, "LiquidClassName"),
+    )
+
+def _parse_mca384_empty_tips(command_id: str, obj: ET.Element) -> Step:
+    return Mca384EmptyTipsStep(
+        labware_name=_extract_field(obj, "LabwareName") or "",
+        volume=_parse_registered_expression(
+            command_id,
+            "Volume",
+            _extract_field(obj, "Volume") or "0",
+        ),
+        liquid_class=_extract_field(obj, "LiquidClassName") or None,
+    )
+
+def _parse_subroutine(command_id: str, obj: ET.Element) -> Step:
+    return SubRoutineStep(
+        subroutine=_strip_wrapping_quotes(_extract_field(obj, "SubRoutine") or ""),
+        execution_mode=_extract_field(obj, "ExecutionMode") or "Synchronous",
+        variable_mappings_start=_parse_variable_mappings(obj, "VariableMappingsStart"),
+        variable_mappings_end=_parse_variable_mappings(obj, "VariableMappingsEnd"),
+    )
+
+
+
+
+
+_SUFFIX_PARSERS: dict[str, Callable[[ET.Element, str], Optional[Step]]] = {
+    "LoopGroup": lambda obj, suffix: _parse_loop(obj),
+    "ConditionalGroup": lambda obj, suffix: _parse_conditional(obj),
+    "AlternateGroup": lambda obj, suffix: _raw_step("AlternateGroup", obj.attrib.get("Type") or "", obj),
+    "ScriptGroupData": lambda obj, suffix: ScriptGroupStep(name=_extract_field(obj, "Name") or "Steps", steps=_parse_body(obj)),
+    "MoveAxisCommandScriptStatement": lambda obj, suffix: _parse_move_axis_command(obj),
+    "StartMoveCommandScriptStatement": lambda obj, suffix: _parse_start_move_command(obj),
+    "WaitForAsyncResponseScriptStatement": lambda obj, suffix: _parse_wait_for_async_response(obj),
+    "EndScriptStatement": lambda obj, suffix: _parse_end_script(obj),
+    "RUPWorktableStatement": lambda obj, suffix: _parse_user_prompt(obj, suffix=suffix),
+    "ExecuteVbScriptStatement": lambda obj, suffix: _parse_execute_vb_script(obj),
+    "TeGioSetPWMOutputStatement": lambda obj, suffix: _parse_tegio_set_pwm_output(obj),
+    "LeaveStatement": lambda obj, suffix: _parse_leave(obj),
+}
+
+_STEP_PARSERS: dict[StepType, Callable[[str, ET.Element], Step]] = {
+    StepType.ADD_LABWARE: _parse_add_labware,
+    StepType.REMOVE_LABWARE: _parse_remove_labware,
+    StepType.GET_HEAD_ADAPTER: _parse_get_head_adapter,
+    StepType.DROP_HEAD_ADAPTER: _parse_drop_head_adapter,
+    StepType.PICK_UP_TIPS: _parse_pick_up_tips,
+    StepType.SET_TIPS_BACK: _parse_set_tips_back,
+    StepType.ASPIRATE: _parse_aspirate,
+    StepType.DISPENSE: _parse_dispense,
+    StepType.RGA_TRANSFER_LABWARE: lambda cmd_id, obj: _parse_rga_transfer(obj),
+    StepType.CGA_GET_FINGERS: _parse_cga_get_fingers,
+    StepType.CGA_DROP_FINGERS: _parse_cga_drop_fingers,
+    StepType.SET_VARIABLE: _parse_set_variable,
+    StepType.COMMENT: _parse_comment,
+    StepType.WAIT: _parse_wait,
+    StepType.DELAY: _parse_delay,
+    StepType.USER_PROMPT: lambda cmd_id, obj: _parse_user_prompt(obj, suffix=obj.attrib.get("Type", "").rsplit(".", 1)[-1]),
+    StepType.START_TIMER: _parse_start_timer,
+    StepType.WAIT_FOR_TIMER: _parse_wait_for_timer,
+    StepType.EXPORT_VARIABLE: _parse_export_variable,
+    StepType.IMPORT_VARIABLE: _parse_import_variable,
+    StepType.QUERY_VARIABLE: _parse_query_variable,
+    StepType.INITIALIZE_DEVICE: lambda cmd_id, obj: _parse_initialize_device(obj, raw_command_id=_CMD_ID_RE.sub("", obj.attrib.get("Type", "").rsplit(".", 1)[-1])),
+    StepType.EXECUTE_APPLICATION: _parse_execute_application,
+    StepType.SET_LOCATION: _parse_set_location,
+    StepType.LIHA_GET_TIPS: lambda cmd_id, obj: LihaGetTipsStep(labware_name=_extract_field(obj, "LabwareName") or None) if not (_CMD_ID_RE.sub("", obj.attrib.get("Type", "").rsplit(".", 1)[-1]) == "LihaPickUp" or _liha_get_tips_requires_raw(obj)) else _raw_step(cmd_id, obj.attrib.get("Type") or "", obj),
+    StepType.LIHA_DROP_TIPS: _parse_liha_drop_tips,
+    StepType.LIHA_ASPIRATE: lambda cmd_id, obj: _parse_liha_pipette(obj, step_type=StepType.LIHA_ASPIRATE),
+    StepType.LIHA_DISPENSE: lambda cmd_id, obj: _parse_liha_pipette(obj, step_type=StepType.LIHA_DISPENSE),
+    StepType.LIHA_MIX: lambda cmd_id, obj: _parse_liha_pipette(obj, step_type=StepType.LIHA_MIX),
+    StepType.LIHA_DETECT_LIQUID: lambda cmd_id, obj: _parse_liha_detect_liquid(obj),
+    StepType.LIHA_EMPTY_TIPS: _parse_liha_empty_tips,
+    StepType.MCA384_GET_TIPS: _parse_mca384_get_tips,
+    StepType.MCA384_DROP_TIPS: _parse_mca384_drop_tips,
+    StepType.MCA384_MOVE_ARM: _parse_mca384_move_arm,
+    StepType.MCA384_MIX: _parse_mca384_mix,
+    StepType.MCA384_EMPTY_TIPS: _parse_mca384_empty_tips,
+    StepType.SUBROUTINE: _parse_subroutine,
+}
+
+
+
 def _parse_step_object(obj: ET.Element) -> Optional[Step]:
     type_attr = obj.attrib.get("Type") or ""
     suffix = type_attr.rsplit(".", 1)[-1]
 
-    if "LoopGroup" in suffix:
-        return _parse_loop(obj)
-    if "ConditionalGroup" in suffix:
-        return _parse_conditional(obj)
-    if "AlternateGroup" in suffix:
-        return _raw_step("AlternateGroup", type_attr, obj)
-    if "ScriptGroupData" in suffix:
-        return ScriptGroupStep(
-            name=_extract_field(obj, "Name") or "Steps",
-            steps=_parse_body(obj),
-        )
+    for suffix_key, parser_func in _SUFFIX_PARSERS.items():
+        if suffix_key in suffix:
+            return parser_func(obj, suffix)
 
-    raw_command_id = _CMD_ID_RE.sub("", suffix)
+
     command_id = _normalise_command_id(suffix)
 
     if "ApplicationDriverMacro" in suffix or command_id == "ApplicationDriverMacro":
@@ -294,258 +588,12 @@ def _parse_step_object(obj: ET.Element) -> Optional[Step]:
     if "GenerateReportStatement" in suffix or command_id == "GenerateReportStatement":
         return _parse_generate_report(obj)
 
-    if "MoveAxisCommandScriptStatement" in suffix:
-        return _parse_move_axis_command(obj)
-    if "StartMoveCommandScriptStatement" in suffix:
-        return _parse_start_move_command(obj)
-    if "WaitForAsyncResponseScriptStatement" in suffix:
-        return _parse_wait_for_async_response(obj)
-    if "EndScriptStatement" in suffix:
-        return _parse_end_script(obj)
-    if "RUPWorktableStatement" in suffix:
-        return _parse_user_prompt(obj, suffix=suffix)
-    if "ExecuteVbScriptStatement" in suffix:
-        return _parse_execute_vb_script(obj)
-    if "TeGioSetPWMOutputStatement" in suffix:
-        return _parse_tegio_set_pwm_output(obj)
-    if "LeaveStatement" in suffix:
-        return _parse_leave(obj)
-
     if command_id in RAW_PRESERVE_COMMAND_IDS:
         return _raw_step(command_id, type_attr, obj)
-    step_type = COMMAND_ID_TO_STEP_TYPE.get(command_id)
 
-    if step_type == StepType.ADD_LABWARE:
-        return AddLabwareStep(
-            labware_type=_extract_field(obj, "LabwareType") or "",
-            label=_extract_field(obj, "LabwareLable") or "",
-            location=_extract_field(obj, "Location") or "Site",
-            position=_parse_registered_expression(
-                command_id,
-                "Position",
-                _extract_field(obj, "Position") or "1",
-            ),
-        )
-    if step_type == StepType.REMOVE_LABWARE:
-        return RemoveLabwareStep(labware_name=_extract_field(obj, "LabwareName") or "")
-    if step_type == StepType.GET_HEAD_ADAPTER:
-        return GetHeadAdapterStep(
-            labware_name=_extract_field(obj, "LabwareName") or "EVA1",
-            device_alias=_extract_field(obj, "DeviceAlias"),
-            available_id=_extract_available_id(obj),
-        )
-    if step_type == StepType.DROP_HEAD_ADAPTER:
-        return DropHeadAdapterStep(
-            labware_name=_extract_field(obj, "LabwareName"),
-            device_alias=_extract_field(obj, "DeviceAlias"),
-            available_id=_extract_available_id(obj),
-        )
-    if step_type == StepType.PICK_UP_TIPS:
-        return PickUpTipsStep(
-            labware_name=_extract_field(obj, "LabwareName") or "",
-            partial_columns=_parse_int(_extract_field(obj, "PartialColumns"), default=24),
-            partial_rows=_parse_int(_extract_field(obj, "PartialRows"), default=16),
-            device_alias=_extract_field(obj, "DeviceAlias"),
-            available_id=_extract_available_id(obj),
-        )
-    if step_type == StepType.SET_TIPS_BACK:
-        return SetTipsBackStep(
-            labware_name=_extract_field(obj, "LabwareName"),
-            device_alias=_extract_field(obj, "DeviceAlias"),
-            available_id=_extract_available_id(obj),
-        )
-    if step_type == StepType.ASPIRATE:
-        return AspirateStep(
-            labware_name=_extract_field(obj, "LabwareName") or "",
-            volume=_parse_registered_expression(
-                command_id,
-                "Volume",
-                _extract_field(obj, "Volume") or "0",
-            ),
-            liquid_class=_extract_field(obj, "LiquidClassName"),
-        )
-    if step_type == StepType.DISPENSE:
-        return DispenseStep(
-            labware_name=_extract_field(obj, "LabwareName") or "",
-            volume=_parse_registered_expression(
-                command_id,
-                "Volume",
-                _extract_field(obj, "Volume") or "0",
-            ),
-            liquid_class=_extract_field(obj, "LiquidClassName"),
-        )
-    if step_type == StepType.RGA_TRANSFER_LABWARE:
-        return _parse_rga_transfer(obj)
-    if step_type == StepType.CGA_GET_FINGERS:
-        return CgaGetFingersStep(
-            labware_name=_extract_field(obj, "LabwareName"),
-            device_alias=_extract_field(obj, "DeviceAlias"),
-            available_id=_extract_available_id(obj),
-        )
-    if step_type == StepType.CGA_DROP_FINGERS:
-        return CgaDropFingersStep(
-            labware_name=_extract_field(obj, "LabwareName"),
-            device_alias=_extract_field(obj, "DeviceAlias"),
-            available_id=_extract_available_id(obj),
-            use_source_as_back_position=_extract_field(obj, "Backs") or "BackToPosition",
-        )
-    if step_type == StepType.SET_VARIABLE:
-        return SetVariableStep(
-            variable_name=_extract_field(obj, "VariableName") or _extract_field(obj, "Name") or "",
-            value=_parse_registered_expression(
-                command_id,
-                "Value",
-                _extract_field(obj, "Value") or "",
-            ),
-        )
-    if step_type == StepType.COMMENT:
-        return CommentStep(comment=_extract_field(obj, "Text") or _extract_field(obj, "Comment") or "")
-    if step_type == StepType.WAIT:
-        seconds_text = _extract_field(obj, "Seconds") or _extract_field(obj, "Duration")
-        return WaitStep(
-            duration_seconds=_parse_registered_expression(
-                command_id,
-                "Duration",
-                seconds_text or "0",
-            )
-        )
-    if step_type == StepType.DELAY:
-        return DelayStep(
-            delay=_parse_registered_expression(
-                command_id,
-                "Delay",
-                _extract_field(obj, "Delay") or "0",
-            )
-        )
-    if step_type == StepType.USER_PROMPT:
-        return _parse_user_prompt(obj, suffix=suffix)
-    if step_type == StepType.START_TIMER:
-        return StartTimerStep(timer=_parse_int(_extract_field(obj, "Timer"), default=1))
-    if step_type == StepType.WAIT_FOR_TIMER:
-        return WaitForTimerStep(
-            timer=_parse_int(_extract_field(obj, "Timer"), default=1),
-            duration_seconds=_parse_registered_expression(
-                command_id,
-                "Duration",
-                _extract_field(obj, "Duration") or "0",
-            ),
-        )
-    if step_type == StepType.EXPORT_VARIABLE:
-        return ExportVariableStep(
-            variables=_list_values(obj, "Variables"),
-            export_file=_strip_wrapping_quotes(_extract_field(obj, "ExportFile") or ""),
-            write_header=_parse_bool(_extract_field(obj, "WriteHeader")),
-            replace_existing_file=_parse_bool(_extract_field(obj, "ReplaceExistingFile")),
-            export_strings_with_quotes=_parse_bool(_extract_field(obj, "ExportStringsWithQuotes")),
-            delimiter_code=_parse_int(_extract_field(obj, "DelimiterCode"), default=59),
-        )
-    if step_type == StepType.IMPORT_VARIABLE:
-        return ImportVariableStep(
-            variables=_list_values(obj, "Variables"),
-            import_file=_strip_wrapping_quotes(_extract_field(obj, "ImportFile") or ""),
-            read_line=_parse_bool(_extract_field(obj, "ReadLine")),
-            line=_parse_int(_extract_field(obj, "Line"), default=1),
-            start_in_column=_parse_bool(_extract_field(obj, "StartInColumn")),
-            column=_parse_int(_extract_field(obj, "Column"), default=1),
-            has_header=_parse_bool(_extract_field(obj, "HasHeader")),
-            delimiter_code=_parse_int(_extract_field(obj, "DelimiterCode"), default=59),
-        )
-    if step_type == StepType.QUERY_VARIABLE:
-        return QueryVariableStep(
-            variable_name=_extract_field(obj, "VariableName") or _extract_field(obj, "Name") or "",
-            query_prompt=_extract_field(obj, "QueryPrompt") or "",
-            limit_range=_parse_bool(_extract_field(obj, "LimitRange")),
-        )
-    if step_type == StepType.INITIALIZE_DEVICE:
-        return _parse_initialize_device(obj, raw_command_id=raw_command_id)
-    if step_type == StepType.EXECUTE_APPLICATION:
-        return ExecuteApplicationStep(
-            application=_extract_field(obj, "Application") or "",
-            arguments=_extract_field(obj, "Arguments") or "",
-            wait=_parse_bool(_extract_field(obj, "Wait"), default=True),
-            store_return=_parse_bool(_extract_field(obj, "StoreReturn")),
-            variable=_extract_field(obj, "Variable") or "",
-        )
-    if step_type == StepType.SET_LOCATION:
-        return SetLocationStep(
-            labware=_extract_field(obj, "Labware") or "",
-            location=_extract_field(obj, "Location") or "Site",
-            site=_parse_registered_expression(
-                command_id,
-                "Site",
-                _extract_field(obj, "Site") or "1",
-            ),
-            rotation=_parse_int(_extract_field(obj, "Rotation"), default=0),
-        )
-    if step_type == StepType.LIHA_GET_TIPS:
-        if raw_command_id == "LihaPickUp" or _liha_get_tips_requires_raw(obj):
-            return _raw_step(command_id, type_attr, obj)
-        return LihaGetTipsStep(
-            labware_name=_extract_field(obj, "LabwareName") or None,
-        )
-    if step_type == StepType.LIHA_DROP_TIPS:
-        return LihaDropTipsStep(
-            labware_name=_extract_field(obj, "LabwareName") or None,
-        )
-    if step_type == StepType.LIHA_ASPIRATE:
-        return _parse_liha_pipette(obj, step_type=StepType.LIHA_ASPIRATE)
-    if step_type == StepType.LIHA_DISPENSE:
-        return _parse_liha_pipette(obj, step_type=StepType.LIHA_DISPENSE)
-    if step_type == StepType.LIHA_MIX:
-        return _parse_liha_pipette(obj, step_type=StepType.LIHA_MIX)
-    if step_type == StepType.LIHA_DETECT_LIQUID:
-        return _parse_liha_detect_liquid(obj)
-    if step_type == StepType.LIHA_EMPTY_TIPS:
-        return LihaEmptyTipsStep(
-            labware_name=_extract_field(obj, "LabwareName") or "",
-            volume=_parse_registered_expression(
-                command_id,
-                "Volume",
-                _extract_field(obj, "Volume") or "0",
-            ),
-            liquid_class=_extract_field(obj, "LiquidClassName"),
-        )
-    if step_type == StepType.MCA384_GET_TIPS:
-        return Mca384GetTipsStep(labware_name=_extract_field(obj, "LabwareName") or None)
-    if step_type == StepType.MCA384_DROP_TIPS:
-        return Mca384DropTipsStep(labware_name=_extract_field(obj, "LabwareName") or None)
-    if step_type == StepType.MCA384_MOVE_ARM:
-        return Mca384MoveArmStep(
-            movement_type=_extract_field(obj, "MovementType") or "GlobalZTravel",
-            labware_name=_extract_field(obj, "LabwareName") or None,
-        )
-    if step_type == StepType.MCA384_MIX:
-        return Mca384MixStep(
-            labware_name=_extract_field(obj, "LabwareName") or "",
-            volume=_parse_registered_expression(
-                command_id,
-                "Volume",
-                _extract_field(obj, "Volume") or "0",
-            ),
-            cycles=_parse_registered_expression(
-                command_id,
-                "Cycles",
-                _extract_field(obj, "Cycles") or "10",
-            ),
-            liquid_class=_extract_field(obj, "LiquidClassName"),
-        )
-    if step_type == StepType.MCA384_EMPTY_TIPS:
-        return Mca384EmptyTipsStep(
-            labware_name=_extract_field(obj, "LabwareName") or "",
-            volume=_parse_registered_expression(
-                command_id,
-                "Volume",
-                _extract_field(obj, "Volume") or "0",
-            ),
-            liquid_class=_extract_field(obj, "LiquidClassName") or None,
-        )
-    if step_type == StepType.SUBROUTINE:
-        return SubRoutineStep(
-            subroutine=_strip_wrapping_quotes(_extract_field(obj, "SubRoutine") or ""),
-            execution_mode=_extract_field(obj, "ExecutionMode") or "Synchronous",
-            variable_mappings_start=_parse_variable_mappings(obj, "VariableMappingsStart"),
-            variable_mappings_end=_parse_variable_mappings(obj, "VariableMappingsEnd"),
-        )
+    step_type = COMMAND_ID_TO_STEP_TYPE.get(command_id)
+    if step_type in _STEP_PARSERS:
+        return _STEP_PARSERS[step_type](command_id, obj)
 
     return _raw_step(command_id or suffix, type_attr, obj)
 
