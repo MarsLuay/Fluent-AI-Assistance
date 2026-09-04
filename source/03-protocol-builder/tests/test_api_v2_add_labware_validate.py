@@ -8,6 +8,7 @@ from fluent_pipeline.api_v2.commands import AddLabware, add_labware_from_ir_step
 from fluent_pipeline.api_v2.types import ApiV2ValidationError
 from fluent_pipeline.api_v2_add_labware_validate import (
     AddLabwareFields,
+    validate_add_labware_before_execute,
     validate_add_labware_fields,
     validate_add_labware_ir_steps,
     validate_add_labware_offline,
@@ -154,6 +155,78 @@ class AddLabwareValidateTests(unittest.TestCase):
         cmd = add_labware_from_ir_step(step)
         self.assertIsInstance(cmd, AddLabware)
         cmd.validate()
+
+    def test_before_execute_skips_non_add_labware(self):
+        cmd = _CommandStub(payload_xml="")
+        cmd.type_name = "SomeOtherCommand"
+        result = validate_add_labware_before_execute(cmd)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.source, "skipped_non_add_labware")
+
+    def test_before_execute_offline_failure(self):
+        bad_payload = """<Object Type="Tecan.Core.Scripting.Worktable.Data.AddLabwareDataV1">
+          <AddLabwareDataV1>
+            <LabwareType>96 Well Flat</LabwareType>
+            <LabwareLable>Plate1</LabwareLable>
+            <Location></Location>
+            <Position>1</Position>
+          </AddLabwareDataV1>
+        </Object>"""
+        cmd = _CommandStub(payload_xml=bad_payload)
+        called_native = False
+
+        def mock_native():
+            nonlocal called_native
+            called_native = True
+
+        result = validate_add_labware_before_execute(cmd, native_validate=mock_native)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.source, "offline_typed_validate")
+        self.assertEqual(result.field, "location")
+        self.assertFalse(called_native)
+
+    def test_before_execute_native_passes(self):
+        cmd = _CommandStub(payload_xml=_GOOD_PAYLOAD)
+        called_native = False
+
+        def mock_native():
+            nonlocal called_native
+            called_native = True
+
+        result = validate_add_labware_before_execute(cmd, native_validate=mock_native)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.source, "native")
+        self.assertTrue(called_native)
+
+    def test_before_execute_native_fails(self):
+        cmd = _CommandStub(payload_xml=_GOOD_PAYLOAD)
+
+        def mock_native():
+            raise ValueError("Instrument offline")
+
+        result = validate_add_labware_before_execute(cmd, native_validate=mock_native)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.reason, "native_validate_failed")
+        self.assertEqual(result.message, "Instrument offline")
+        self.assertEqual(result.source, "native")
+
+    def test_before_execute_native_fails_empty_error(self):
+        cmd = _CommandStub(payload_xml=_GOOD_PAYLOAD)
+
+        def mock_native():
+            raise ValueError("")
+
+        result = validate_add_labware_before_execute(cmd, native_validate=mock_native)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.reason, "native_validate_failed")
+        self.assertEqual(result.message, "AddLabware.Validate() failed.")
+        self.assertEqual(result.source, "native")
+
+    def test_before_execute_no_native(self):
+        cmd = _CommandStub(payload_xml=_GOOD_PAYLOAD)
+        result = validate_add_labware_before_execute(cmd)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.source, "offline_typed_validate")
 
 
 if __name__ == "__main__":
