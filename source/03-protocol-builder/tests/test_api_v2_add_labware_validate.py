@@ -141,6 +141,91 @@ class AddLabwareValidateTests(unittest.TestCase):
         self.assertEqual(len(failures), 1)
         self.assertEqual(failures[0].reason, "duplicate_labware_label")
 
+    def test_validate_add_labware_ir_steps_coverage(self):
+        ir = {
+            "variables": [{"name": "GLOBAL_VAR"}, "not-a-dict", {}],
+            "steps": [
+                "not-a-dict",
+                {
+                    "operation": "some_other_op",
+                },
+                {
+                    "id": "step_001",
+                    "operation": "add_labware",
+                    "parameters": {
+                        "catalog": "[VAR_FROM_STEP]",
+                        "label": "[GLOBAL_VAR]",
+                        "location": "NestPlatform",
+                        "position": 1,
+                        "declared_variables": ["VAR_FROM_STEP"],
+                    },
+                },
+                {
+                    "id": "step_002",
+                    "operation": "add_labware",
+                    "parameters": {
+                        "catalog": "[UNDECLARED_CAT]",
+                        "label": "Plate2",
+                        "location": "NestPlatform",
+                        "position": 2,
+                    },
+                },
+                {
+                    "id": "step_003",
+                    "operation": "add_labware",
+                    "parameters": {
+                        "catalog": "96 Well Flat",
+                        "label": "[UNDECLARED_LBL]",
+                        "location": "NestPlatform",
+                        "position": 3,
+                    },
+                },
+                {
+                    "id": "step_004",
+                    "operation": "add_labware",
+                    "parameters": {
+                        "catalog": "96 Well Flat",
+                        "label": "Plate1",
+                        "location": "NestPlatform",
+                        "position": 4,
+                    },
+                },
+                {
+                    "id": "step_005",
+                    "operation": "add_labware",
+                    "parameters": {
+                        "catalog": "96 Well Flat",
+                        "label": "Plate1",
+                        "location": "NestPlatform",
+                        "position": 5,
+                    },
+                },
+                {
+                    "id": "step_006",
+                    "operation": "add_labware",
+                    "parameters": {
+                        "catalog": "96 Well Flat",
+                        "label": "Plate6",
+                        "location": "NestPlatform",
+                        "position": 4,
+                    },
+                },
+            ]
+        }
+
+        failures = validate_add_labware_ir_steps(ir, declared_variables={"PRE_DECLARED"})
+        self.assertEqual(len(failures), 3)
+
+        # Test missing label in bracket (results in "undeclared_variable")
+        self.assertEqual(failures[0].reason, "undeclared_variable")
+        self.assertIn("UNDECLARED_LBL", failures[0].message)
+
+        self.assertEqual(failures[1].reason, "duplicate_labware_label")
+        self.assertEqual(failures[1].field, "labware_label")
+
+        self.assertEqual(failures[2].reason, "occupied_slot")
+        self.assertEqual(failures[2].field, "site")
+
     def test_add_labware_from_ir_step(self):
         step = {
             "operation": "add_labware",
