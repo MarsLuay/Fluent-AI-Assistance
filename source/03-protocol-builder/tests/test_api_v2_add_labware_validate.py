@@ -108,6 +108,115 @@ class AddLabwareValidateTests(unittest.TestCase):
         with self.assertRaises(ApiV2ValidationError):
             cmd.validate()
 
+
+    def test_missing_labware_type_fails(self):
+        fields = AddLabwareFields(
+            labware_type="",
+            labware_label="Plate1",
+            location="NestPlatform",
+            site=1,
+        )
+        result = validate_add_labware_fields(fields)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.field, "labware_type")
+
+    def test_missing_labware_label_fails(self):
+        fields = AddLabwareFields(
+            labware_type="96 Well Flat",
+            labware_label="",
+            location="NestPlatform",
+            site=1,
+        )
+        result = validate_add_labware_fields(fields)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.field, "labware_label")
+
+    def test_invalid_rotation_fails(self):
+        fields = AddLabwareFields(
+            labware_type="96 Well Flat",
+            labware_label="Plate1",
+            location="NestPlatform",
+            site=1,
+            rotation=400,
+        )
+        result = validate_add_labware_fields(fields)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.field, "rotation")
+
+    def test_undeclared_bracket_variable_in_label_fails(self):
+        fields = AddLabwareFields(
+            labware_type="96 Well Flat",
+            labware_label="Plate_[id]",
+            location="NestPlatform",
+            site=1,
+        )
+        result = validate_add_labware_fields(fields, check_bracket_variables=True, declared_variables=set())
+        self.assertFalse(result.ok)
+        self.assertEqual(result.reason, "undeclared_variable")
+
+    def test_declared_bracket_variable_in_label_passes(self):
+        fields = AddLabwareFields(
+            labware_type="96 Well Flat",
+            labware_label="Plate_[id]",
+            location="NestPlatform",
+            site=1,
+        )
+        result = validate_add_labware_fields(fields, check_bracket_variables=True, declared_variables={"id"})
+        self.assertTrue(result.ok)
+
+    def test_fc_var_labware_type_invalid_name(self):
+        fields = AddLabwareFields(
+            labware_type="fc_var:",
+            labware_label="Plate1",
+            location="NestPlatform",
+            site=1,
+        )
+        result = validate_add_labware_fields(fields)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.field, "labware_type")
+
+    def test_fc_var_labware_type_valid_name(self):
+        fields = AddLabwareFields(
+            labware_type="fc_var:MyLabwareType",
+            labware_label="Plate1",
+            location="NestPlatform",
+            site=1,
+        )
+        result = validate_add_labware_fields(fields)
+        self.assertTrue(result.ok)
+
+    def test_undeclared_bracket_variable_in_labware_type_fails(self):
+        fields = AddLabwareFields(
+            labware_type="[type_var]",
+            labware_label="Plate1",
+            location="NestPlatform",
+            site=1,
+        )
+        result = validate_add_labware_fields(fields, check_bracket_variables=True, declared_variables=set())
+        self.assertFalse(result.ok)
+        self.assertEqual(result.field, "labware_type")
+
+    def test_declared_bracket_variable_in_labware_type_passes(self):
+        fields = AddLabwareFields(
+            labware_type="[type_var]",
+            labware_label="Plate1",
+            location="NestPlatform",
+            site=1,
+        )
+        result = validate_add_labware_fields(fields, check_bracket_variables=True, declared_variables={"type_var"})
+        self.assertTrue(result.ok)
+
+    def test_placeholder_labware_label_fails(self):
+        fields = AddLabwareFields(
+            labware_type="96 Well Flat",
+            labware_label="TODO",
+            location="NestPlatform",
+            site=1,
+        )
+        result = validate_add_labware_fields(fields)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.field, "labware_label")
+
     def test_offline_stepped_command(self):
         result = validate_add_labware_offline(_CommandStub(payload_xml=_GOOD_PAYLOAD))
         self.assertTrue(result.ok)
