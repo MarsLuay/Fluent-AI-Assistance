@@ -15,7 +15,7 @@ from .expressions import (
 )
 from .reagent import Reagent
 from .ir.schema import VariableMapping
-from .worktable import Worktable
+from .worktable import Worktable, ImportVariableOptions
 from .gripper import Gripper
 from .heads import FCAHead, LiHa, MCA96Head, MCA384Head, Tip
 from .labware import (
@@ -46,7 +46,7 @@ __all__ = [
     "render_expression",
     "Reagent",
     "VariableMapping",
-    "Worktable", "Gripper",
+    "Worktable", "ImportVariableOptions", "Gripper",
     "MCA96Head", "MCA384Head", "LiHa", "FCAHead", "Tip",
     "Labware", "ExternalLabware", "Layer", "Well",
     "Plate", "Plate96", "Plate96Deep", "Plate384",

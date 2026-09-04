@@ -589,7 +589,7 @@ def _emit_steps(
             continue
 
         if isinstance(step, ImportVariableStep):
-            out.append(indent + _emit_import_variables(step))
+            out.append(indent + _emit_import_variables(step, classes_used))
             i += 1
             continue
 
@@ -898,20 +898,26 @@ def _emit_export_variables(step: ExportVariableStep) -> str:
     return f"wt.export_variables({', '.join(parts)})"
 
 
-def _emit_import_variables(step: ImportVariableStep) -> str:
+def _emit_import_variables(step: ImportVariableStep, classes_used: set[str]) -> str:
     parts = [repr(step.variables), repr(step.import_file)]
+    opt_parts = []
     if step.read_line:
-        parts.append(f"read_line={step.read_line!r}")
+        opt_parts.append(f"read_line={step.read_line!r}")
     if step.line != 1:
-        parts.append(f"line={step.line!r}")
+        opt_parts.append(f"line={step.line!r}")
     if step.start_in_column:
-        parts.append(f"start_in_column={step.start_in_column!r}")
+        opt_parts.append(f"start_in_column={step.start_in_column!r}")
     if step.column != 1:
-        parts.append(f"column={step.column!r}")
+        opt_parts.append(f"column={step.column!r}")
     if step.has_header:
-        parts.append(f"has_header={step.has_header!r}")
+        opt_parts.append(f"has_header={step.has_header!r}")
     if step.delimiter_code != 59:
-        parts.append(f"delimiter_code={step.delimiter_code!r}")
+        opt_parts.append(f"delimiter_code={step.delimiter_code!r}")
+
+    if opt_parts:
+        classes_used.add("ImportVariableOptions")
+        parts.append(f"options=ImportVariableOptions({', '.join(opt_parts)})")
+
     return f"wt.import_variables({', '.join(parts)})"
 
 

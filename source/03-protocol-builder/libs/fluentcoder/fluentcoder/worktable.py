@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Collection, Iterator, Optional, Union
 
@@ -32,6 +33,17 @@ from .labware.base import Labware
 if TYPE_CHECKING:
     from .simulator.snapshots import Snapshot
     from .simulator.report import SimulationReport
+
+
+@dataclass(frozen=True)
+class ImportVariableOptions:
+    """Options for the import_variables worktable method."""
+    read_line: bool = False
+    line: int = 1
+    start_in_column: bool = False
+    column: int = 1
+    has_header: bool = False
+    delimiter_code: int = 59
 
 
 class Worktable:
@@ -527,23 +539,18 @@ class Worktable:
         self,
         variables: list[str],
         import_file: str,
-        *,
-        read_line: bool = False,
-        line: int = 1,
-        start_in_column: bool = False,
-        column: int = 1,
-        has_header: bool = False,
-        delimiter_code: int = 59,
+        options: Optional[ImportVariableOptions] = None,
     ) -> None:
+        opts = options or ImportVariableOptions()
         self._emit(ImportVariableStep(
             variables=variables,
             import_file=import_file,
-            read_line=read_line,
-            line=line,
-            start_in_column=start_in_column,
-            column=column,
-            has_header=has_header,
-            delimiter_code=delimiter_code,
+            read_line=opts.read_line,
+            line=opts.line,
+            start_in_column=opts.start_in_column,
+            column=opts.column,
+            has_header=opts.has_header,
+            delimiter_code=opts.delimiter_code,
         ))
 
     def query_variable(
