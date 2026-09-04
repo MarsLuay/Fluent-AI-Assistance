@@ -8,6 +8,7 @@ from fluent_pipeline.api_v2.commands import AddLabware, add_labware_from_ir_step
 from fluent_pipeline.api_v2.types import ApiV2ValidationError
 from fluent_pipeline.api_v2_add_labware_validate import (
     AddLabwareFields,
+    record_successful_add_labware,
     validate_add_labware_fields,
     validate_add_labware_ir_steps,
     validate_add_labware_offline,
@@ -154,6 +155,38 @@ class AddLabwareValidateTests(unittest.TestCase):
         cmd = add_labware_from_ir_step(step)
         self.assertIsInstance(cmd, AddLabware)
         cmd.validate()
+
+    def test_record_successful_add_labware(self):
+        fields = AddLabwareFields(
+            labware_type="96 Well Flat",
+            labware_label="Plate1",
+            location="NestPlatform",
+            site=1,
+            rotation=0,
+            has_lid=False
+        )
+        prior_labels = set()
+        prior_slots = set()
+        record_successful_add_labware(fields, prior_labels=prior_labels, prior_slots=prior_slots)
+
+        self.assertIn("plate1", prior_labels)
+        self.assertIn(("nestplatform", "1"), prior_slots)
+
+    def test_record_successful_add_labware_empty(self):
+        fields = AddLabwareFields(
+            labware_type="Unknown",
+            labware_label="",
+            location="",
+            site="",
+            rotation=0,
+            has_lid=False
+        )
+        prior_labels = set()
+        prior_slots = set()
+        record_successful_add_labware(fields, prior_labels=prior_labels, prior_slots=prior_slots)
+
+        self.assertEqual(len(prior_labels), 0)
+        self.assertEqual(len(prior_slots), 0)
 
 
 if __name__ == "__main__":
