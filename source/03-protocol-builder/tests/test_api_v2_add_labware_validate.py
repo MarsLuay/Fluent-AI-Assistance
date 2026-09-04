@@ -8,6 +8,7 @@ from fluent_pipeline.api_v2.commands import AddLabware, add_labware_from_ir_step
 from fluent_pipeline.api_v2.types import ApiV2ValidationError
 from fluent_pipeline.api_v2_add_labware_validate import (
     AddLabwareFields,
+    AddLabwareValidateResult,
     validate_add_labware_fields,
     validate_add_labware_ir_steps,
     validate_add_labware_offline,
@@ -154,6 +155,61 @@ class AddLabwareValidateTests(unittest.TestCase):
         cmd = add_labware_from_ir_step(step)
         self.assertIsInstance(cmd, AddLabware)
         cmd.validate()
+
+    def test_add_labware_fields_as_dict(self):
+        fields = AddLabwareFields(
+            labware_type="96 Well Flat",
+            labware_label="Plate1",
+            location="NestPlatform",
+            site=1,
+            rotation=90,
+            has_lid=True,
+        )
+        self.assertEqual(
+            fields.as_dict(),
+            {
+                "labware_type": "96 Well Flat",
+                "labware_label": "Plate1",
+                "location": "NestPlatform",
+                "site": 1,
+                "rotation": 90,
+                "has_lid": True,
+            },
+        )
+
+    def test_add_labware_validate_result_as_dict(self):
+        result_ok = AddLabwareValidateResult(ok=True)
+        self.assertEqual(
+            result_ok.as_dict(),
+            {
+                "ok": True,
+                "source": "offline",
+                "api_v2_method": "AddLabware.Validate()",
+                "api_v2_issue": "api-v2-008",
+            },
+        )
+
+        result_error = AddLabwareValidateResult(
+            ok=False,
+            message="Error message",
+            reason="invalid_field",
+            field="labware_type",
+            fields={"labware_type": "Invalid"},
+            source="native",
+        )
+        self.assertEqual(
+            result_error.as_dict(),
+            {
+                "ok": False,
+                "source": "native",
+                "api_v2_method": "AddLabware.Validate()",
+                "api_v2_issue": "api-v2-008",
+                "message": "Error message",
+                "reason": "invalid_field",
+                "field": "labware_type",
+                "fields": {"labware_type": "Invalid"},
+            },
+        )
 
 
 if __name__ == "__main__":
