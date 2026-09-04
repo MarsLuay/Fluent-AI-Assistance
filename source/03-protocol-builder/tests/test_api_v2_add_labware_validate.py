@@ -46,6 +46,15 @@ class AddLabwareValidateTests(unittest.TestCase):
         self.assertTrue(result.ok)
         self.assertEqual(result.api_v2_issue, "api-v2-008")
 
+    def test_label_key_normalization(self):
+        fields = AddLabwareFields(
+            labware_type="96 Well Flat",
+            labware_label="  MyPlate  ",
+            location="NestPlatform",
+            site=1,
+        )
+        self.assertEqual(fields.label_key(), "myplate")
+
     def test_missing_location_fails(self):
         fields = AddLabwareFields(
             labware_type="96 Well Flat",
