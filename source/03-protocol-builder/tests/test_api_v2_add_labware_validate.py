@@ -8,6 +8,7 @@ from fluent_pipeline.api_v2.commands import AddLabware, add_labware_from_ir_step
 from fluent_pipeline.api_v2.types import ApiV2ValidationError
 from fluent_pipeline.api_v2_add_labware_validate import (
     AddLabwareFields,
+    is_add_labware_command,
     validate_add_labware_fields,
     validate_add_labware_ir_steps,
     validate_add_labware_offline,
@@ -154,6 +155,20 @@ class AddLabwareValidateTests(unittest.TestCase):
         cmd = add_labware_from_ir_step(step)
         self.assertIsInstance(cmd, AddLabware)
         cmd.validate()
+
+    def test_is_add_labware_command(self):
+        cmd = _CommandStub(payload_xml="")
+        cmd.type_name = "AddLabwareDataV1"
+        self.assertTrue(is_add_labware_command(cmd))
+
+        cmd.type_name = "TransferDataV1"
+        self.assertFalse(is_add_labware_command(cmd))
+
+        cmd.type_name = ""
+        self.assertFalse(is_add_labware_command(cmd))
+
+        cmd.type_name = None
+        self.assertFalse(is_add_labware_command(cmd))
 
 
 if __name__ == "__main__":
