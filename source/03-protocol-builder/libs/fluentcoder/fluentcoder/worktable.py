@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from contextlib import contextmanager
 from pathlib import Path
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Collection, Iterator, Optional, Union
 
 from .expressions import Expression, coerce_source_expression, expression_python_value, render_expression
@@ -32,6 +33,14 @@ from .labware.base import Labware
 if TYPE_CHECKING:
     from .simulator.snapshots import Snapshot
     from .simulator.report import SimulationReport
+
+
+@dataclass
+class ExecuteApplicationConfig:
+    arguments: str = ""
+    wait: bool = True
+    store_return: bool = False
+    variable: str = ""
 
 
 class Worktable:
@@ -562,18 +571,16 @@ class Worktable:
     def execute_application(
         self,
         application: str,
-        *,
-        arguments: str = "",
-        wait: bool = True,
-        store_return: bool = False,
-        variable: str = "",
+        config: Optional[ExecuteApplicationConfig] = None,
     ) -> None:
+        if config is None:
+            config = ExecuteApplicationConfig()
         self._emit(ExecuteApplicationStep(
             application=application,
-            arguments=arguments,
-            wait=wait,
-            store_return=store_return,
-            variable=variable,
+            arguments=config.arguments,
+            wait=config.wait,
+            store_return=config.store_return,
+            variable=config.variable,
         ))
 
     def initialize_device(

@@ -42,15 +42,14 @@ from ..ir.schema import (
     CommentStep, ConditionalStep, DispenseStep, DropHeadAdapterStep,
     ExecuteApplicationStep, ExportVariableStep, GenericStep, GetHeadAdapterStep,
     EndScriptStep, MoveAxisCommandStep, StartMoveCommandStep, WaitForAsyncResponseStep,
-    Group, ImportVariableStep, InitializeDeviceStep, LihaAspirateStep, LihaDispenseStep,
+    ImportVariableStep, InitializeDeviceStep, LihaAspirateStep, LihaDispenseStep,
     LihaDetectLiquidStep, GenerateReportStep, LihaMixStep,
     LihaDropTipsStep, LihaEmptyTipsStep, LihaGetTipsStep,
     LoopStep, Mca384DropTipsStep, Mca384EmptyTipsStep, Mca384GetTipsStep,
     Mca384MixStep, Mca384MoveArmStep, PickUpTipsStep, Protocol,
     QueryVariableStep, RemoveLabwareStep, RgaTransferLabwareStep,
     ScriptGroupStep, SetLocationStep, SetTipsBackStep, SetVariableStep,
-    StartTimerStep, Step, SubRoutineStep, UserPromptStep, VariableMapping,
-    WaitForTimerStep, WaitStep, ExecuteVbScriptStep, TeGioSetPwmOutputStep, LeaveStep,
+    StartTimerStep, Step, SubRoutineStep, UserPromptStep, WaitForTimerStep, WaitStep, ExecuteVbScriptStep, TeGioSetPwmOutputStep, LeaveStep,
 )
 
 
@@ -602,7 +601,7 @@ def _emit_steps(
             continue
 
         if isinstance(step, ExecuteApplicationStep):
-            out.append(indent + _emit_execute_application(step))
+            out.append(indent + _emit_execute_application(step, classes_used))
             i += 1
             continue
 
@@ -936,16 +935,22 @@ def _emit_call_subroutine(step: SubRoutineStep, classes_used: set[str]) -> str:
     return f"wt.call_subroutine({', '.join(parts)})"
 
 
-def _emit_execute_application(step: ExecuteApplicationStep) -> str:
+def _emit_execute_application(step: ExecuteApplicationStep, classes_used: set[str]) -> str:
     parts = [repr(step.application)]
+    config_parts = []
     if step.arguments:
-        parts.append(f"arguments={step.arguments!r}")
+        config_parts.append(f"arguments={step.arguments!r}")
     if not step.wait:
-        parts.append(f"wait={step.wait!r}")
+        config_parts.append(f"wait={step.wait!r}")
     if step.store_return:
-        parts.append(f"store_return={step.store_return!r}")
+        config_parts.append(f"store_return={step.store_return!r}")
     if step.variable:
-        parts.append(f"variable={step.variable!r}")
+        config_parts.append(f"variable={step.variable!r}")
+
+    if config_parts:
+        classes_used.add("ExecuteApplicationConfig")
+        parts.append(f"config=ExecuteApplicationConfig({', '.join(config_parts)})")
+
     return f"wt.execute_application({', '.join(parts)})"
 
 
