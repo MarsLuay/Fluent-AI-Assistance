@@ -584,12 +584,12 @@ def _emit_steps(
             continue
 
         if isinstance(step, ExportVariableStep):
-            out.append(indent + _emit_export_variables(step))
+            out.append(indent + _emit_export_variables(step, classes_used))
             i += 1
             continue
 
         if isinstance(step, ImportVariableStep):
-            out.append(indent + _emit_import_variables(step))
+            out.append(indent + _emit_import_variables(step, classes_used))
             i += 1
             continue
 
@@ -885,33 +885,47 @@ def _emit_generate_report(step: GenerateReportStep) -> str:
     return f"wt.generate_report({inner})" if inner else "wt.generate_report()"
 
 
-def _emit_export_variables(step: ExportVariableStep) -> str:
+def _emit_export_variables(step: ExportVariableStep, classes_used: set[str]) -> str:
     parts = [repr(step.variables), repr(step.export_file)]
+
+    opts_parts = []
     if step.write_header:
-        parts.append(f"write_header={step.write_header!r}")
+        opts_parts.append(f"write_header={step.write_header!r}")
     if step.replace_existing_file:
-        parts.append(f"replace_existing_file={step.replace_existing_file!r}")
+        opts_parts.append(f"replace_existing_file={step.replace_existing_file!r}")
     if step.export_strings_with_quotes:
-        parts.append(f"export_strings_with_quotes={step.export_strings_with_quotes!r}")
+        opts_parts.append(f"export_strings_with_quotes={step.export_strings_with_quotes!r}")
     if step.delimiter_code != 59:
-        parts.append(f"delimiter_code={step.delimiter_code!r}")
+        opts_parts.append(f"delimiter_code={step.delimiter_code!r}")
+
+    if opts_parts:
+        classes_used.add("VariableExportOptions")
+        parts.append(f"options=VariableExportOptions({', '.join(opts_parts)})")
+
     return f"wt.export_variables({', '.join(parts)})"
 
 
-def _emit_import_variables(step: ImportVariableStep) -> str:
+def _emit_import_variables(step: ImportVariableStep, classes_used: set[str]) -> str:
     parts = [repr(step.variables), repr(step.import_file)]
+
+    opts_parts = []
     if step.read_line:
-        parts.append(f"read_line={step.read_line!r}")
+        opts_parts.append(f"read_line={step.read_line!r}")
     if step.line != 1:
-        parts.append(f"line={step.line!r}")
+        opts_parts.append(f"line={step.line!r}")
     if step.start_in_column:
-        parts.append(f"start_in_column={step.start_in_column!r}")
+        opts_parts.append(f"start_in_column={step.start_in_column!r}")
     if step.column != 1:
-        parts.append(f"column={step.column!r}")
+        opts_parts.append(f"column={step.column!r}")
     if step.has_header:
-        parts.append(f"has_header={step.has_header!r}")
+        opts_parts.append(f"has_header={step.has_header!r}")
     if step.delimiter_code != 59:
-        parts.append(f"delimiter_code={step.delimiter_code!r}")
+        opts_parts.append(f"delimiter_code={step.delimiter_code!r}")
+
+    if opts_parts:
+        classes_used.add("VariableImportOptions")
+        parts.append(f"options=VariableImportOptions({', '.join(opts_parts)})")
+
     return f"wt.import_variables({', '.join(parts)})"
 
 

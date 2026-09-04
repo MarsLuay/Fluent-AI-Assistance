@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import re
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Collection, Iterator, Optional, Union
+
 
 from .expressions import Expression, coerce_source_expression, expression_python_value, render_expression
 from .fc_variables import (
@@ -32,6 +34,26 @@ from .labware.base import Labware
 if TYPE_CHECKING:
     from .simulator.snapshots import Snapshot
     from .simulator.report import SimulationReport
+
+
+@dataclass(frozen=True)
+class VariableExportOptions:
+    """Options for exporting variables."""
+    write_header: bool = False
+    replace_existing_file: bool = False
+    export_strings_with_quotes: bool = False
+    delimiter_code: int = 59
+
+
+@dataclass(frozen=True)
+class VariableImportOptions:
+    """Options for importing variables."""
+    read_line: bool = False
+    line: int = 1
+    start_in_column: bool = False
+    column: int = 1
+    has_header: bool = False
+    delimiter_code: int = 59
 
 
 class Worktable:
@@ -509,18 +531,15 @@ class Worktable:
         variables: list[str],
         export_file: str,
         *,
-        write_header: bool = False,
-        replace_existing_file: bool = False,
-        export_strings_with_quotes: bool = False,
-        delimiter_code: int = 59,
+        options: VariableExportOptions = VariableExportOptions(),
     ) -> None:
         self._emit(ExportVariableStep(
             variables=variables,
             export_file=export_file,
-            write_header=write_header,
-            replace_existing_file=replace_existing_file,
-            export_strings_with_quotes=export_strings_with_quotes,
-            delimiter_code=delimiter_code,
+            write_header=options.write_header,
+            replace_existing_file=options.replace_existing_file,
+            export_strings_with_quotes=options.export_strings_with_quotes,
+            delimiter_code=options.delimiter_code,
         ))
 
     def import_variables(
@@ -528,22 +547,17 @@ class Worktable:
         variables: list[str],
         import_file: str,
         *,
-        read_line: bool = False,
-        line: int = 1,
-        start_in_column: bool = False,
-        column: int = 1,
-        has_header: bool = False,
-        delimiter_code: int = 59,
+        options: VariableImportOptions = VariableImportOptions(),
     ) -> None:
         self._emit(ImportVariableStep(
             variables=variables,
             import_file=import_file,
-            read_line=read_line,
-            line=line,
-            start_in_column=start_in_column,
-            column=column,
-            has_header=has_header,
-            delimiter_code=delimiter_code,
+            read_line=options.read_line,
+            line=options.line,
+            start_in_column=options.start_in_column,
+            column=options.column,
+            has_header=options.has_header,
+            delimiter_code=options.delimiter_code,
         ))
 
     def query_variable(
