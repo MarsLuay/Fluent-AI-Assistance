@@ -683,11 +683,12 @@ def _emit_add_labware(
             fc_token_vars[fc_name] = token_var
             lines.append(f"{token_var} = wt.declare_fc_variable({fc_name!r})")
         catalog_expr = fc_token_vars[fc_name]
+        classes_used.add("PlaceOptions")
         lines.append(
             f"{var_name} = wt.place("
             f"{cls_name}({step.label!r}, catalog={catalog_expr}), "
             f"{step.location!r}, {_emit_expression_arg(step.position, classes_used)}, "
-            "allow_occupied=True, allow_invalid_slot=True)"
+            "options=PlaceOptions(allow_occupied=True, allow_invalid_slot=True))"
         )
         return lines, True
 
@@ -698,6 +699,7 @@ def _emit_add_labware(
         # offline review when the catalog index is empty or incomplete.
         cls_name, category = _fallback_class_for_unresolved_catalog(step.labware_type)
         classes_used.add(cls_name)
+        classes_used.add("PlaceOptions")
         var_name = _allocate_var_name(step.label, label_to_var)
         placed_labware.append((var_name, category))
         message = (
@@ -712,11 +714,12 @@ def _emit_add_labware(
                 f"{var_name} = wt.place("
                 f"{cls_name}({step.label!r}, catalog={step.labware_type!r}), "
                 f"{step.location!r}, {_emit_expression_arg(step.position, classes_used)}, "
-                "allow_occupied=True, allow_invalid_slot=True)",
+                "options=PlaceOptions(allow_occupied=True, allow_invalid_slot=True))",
             ],
             True,
         )
     classes_used.add(cls_name)
+    classes_used.add("PlaceOptions")
     var_name = _allocate_var_name(step.label, label_to_var)
     placed_labware.append((var_name, category))
     return (
@@ -724,7 +727,7 @@ def _emit_add_labware(
             f"{var_name} = wt.place("
             f"{cls_name}({step.label!r}, catalog={step.labware_type!r}), "
             f"{step.location!r}, {_emit_expression_arg(step.position, classes_used)}, "
-            "allow_occupied=True, allow_invalid_slot=True)"
+            "options=PlaceOptions(allow_occupied=True, allow_invalid_slot=True))"
         ],
         True,
     )

@@ -11,7 +11,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-from fluentcoder import FixedDeck, Plate96, Worktable, InvalidSlotError  # noqa: E402
+from fluentcoder import FixedDeck, Plate96, Worktable, InvalidSlotError, PlaceOptions  # noqa: E402
 from fluentcoder.catalog.catalog import (  # noqa: E402
     WorkspaceEntry,
     index_exists,
@@ -185,7 +185,7 @@ def test_placing_trough_carrier_registers_child_trough_slots() -> None:
         FixedDeck("Trough_Carrier", catalog="6_Trough_Carrier_Reservoir"),
         "Nest7mm_Pos",
         6,
-        allow_occupied=True,
+        options=PlaceOptions(allow_occupied=True),
     )
 
     assert ("TroughMP_1", 1) in wt.valid_slots

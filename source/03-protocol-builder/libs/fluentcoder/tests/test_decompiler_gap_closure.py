@@ -6,7 +6,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-from fluentcoder import FCA1000Box, Plate96, Reagent, Worktable
+from fluentcoder import FCA1000Box, Plate96, PlaceOptions, Reagent, Worktable
 from fluentcoder.catalog.catalog import index_exists, list_by_category
 from fluentcoder.decompiler import emit_python, parse_xscr
 from fluentcoder.decompiler.xscr_parser import _parse_condition_string
@@ -308,7 +308,7 @@ def test_decompiled_add_labware_preserves_unmapped_workspace_location(
 
     generated = emit_python(protocol)
     assert "96Deepwell2ml_CoverSite_2" in generated
-    assert "allow_invalid_slot=True" in generated
+    assert "options=PlaceOptions(allow_occupied=True, allow_invalid_slot=True)" in generated
 
     wt = Worktable(name="source slot")
     wt.valid_slots = {("Nest", 1)}
@@ -317,7 +317,7 @@ def test_decompiled_add_labware_preserves_unmapped_workspace_location(
         Plate96("FilterDWP[001]", catalog="96 Well Flat"),
         "96Deepwell2ml_CoverSite_2",
         1,
-        allow_invalid_slot=True,
+        options=PlaceOptions(allow_invalid_slot=True),
     )
     assert plate.slot == ("96Deepwell2ml_CoverSite_2", 1)
     assert wt.to_protocol().groups[0].steps[0].location == "96Deepwell2ml_CoverSite_2"
@@ -349,7 +349,7 @@ def test_decompiled_add_labware_preserves_location_when_catalog_missing(
     )
     generated = emit_python(protocol)
     assert "96Deepwell2ml_CoverSite_2" in generated
-    assert "allow_invalid_slot=True" in generated
+    assert "options=PlaceOptions(allow_occupied=True, allow_invalid_slot=True)" in generated
     assert "Plate96" in generated
 
 

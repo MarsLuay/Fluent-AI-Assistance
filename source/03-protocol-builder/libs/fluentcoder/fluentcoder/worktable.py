@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Collection, Iterator, Optional, Union
 
@@ -32,6 +33,12 @@ from .labware.base import Labware
 if TYPE_CHECKING:
     from .simulator.snapshots import Snapshot
     from .simulator.report import SimulationReport
+
+
+@dataclass
+class PlaceOptions:
+    allow_occupied: bool = False
+    allow_invalid_slot: bool = False
 
 
 class Worktable:
@@ -818,8 +825,7 @@ class Worktable:
         location: str,
         position: Union[int, str, Expression],
         *,
-        allow_occupied: bool = False,
-        allow_invalid_slot: bool = False,
+        options: Optional[PlaceOptions] = None,
     ) -> Labware:
         """Place labware on the worktable at (location, position).
 
@@ -828,6 +834,7 @@ class Worktable:
         double-placement surfaces immediately. If the worktable was built via
         `from_workspace`, only slots in `self.valid_slots` are accepted.
         """
+        options = options or PlaceOptions()
         cover_slot = self._cover_site_slot(location, position)
         slot_position = self._slot_position_key(position)
         slot = cover_slot or (location, slot_position)
@@ -836,7 +843,7 @@ class Worktable:
             self.valid_slots is not None
             and not dynamic_position
             and slot not in self.valid_slots
-            and not allow_invalid_slot
+            and not options.allow_invalid_slot
         ):
             from .simulator.invariants import InvalidSlotError
             raise InvalidSlotError(
@@ -847,7 +854,7 @@ class Worktable:
             not dynamic_position
             and slot in self.slot_map
             and self.slot_map[slot]
-            and not (allow_occupied or cover_slot is not None)
+            and not (options.allow_occupied or cover_slot is not None)
         ):
             occupied_by = self.slot_map[slot][-1]
             raise ValueError(

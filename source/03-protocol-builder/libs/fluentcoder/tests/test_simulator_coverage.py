@@ -7,7 +7,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-from fluentcoder import FCA1000Box, InvalidSlotError, MagnetRack, Plate96, Reagent, SimulationError, Worktable  # noqa: E402
+from fluentcoder import FCA1000Box, InvalidSlotError, MagnetRack, Plate96, PlaceOptions, Reagent, SimulationError, Worktable  # noqa: E402
 from fluentcoder.expressions import parse_expression  # noqa: E402
 from fluentcoder.simulator.walk import Simulator  # noqa: E402
 
@@ -66,7 +66,7 @@ def test_simulator_resolves_cover_site_functions_from_simulated_labware() -> Non
         Plate96("ElutionRack", catalog="96 Well Flat"),
         'GetCoverSiteName("ParkAdapter")',
         parse_expression('GetCoverSiteIndex("ParkAdapter")'),
-        allow_occupied=True,
+        options=PlaceOptions(allow_occupied=True),
     )
 
     wt.simulate()
