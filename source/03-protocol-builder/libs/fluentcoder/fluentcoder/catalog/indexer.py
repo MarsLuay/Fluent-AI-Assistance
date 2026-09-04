@@ -273,6 +273,14 @@ def build_index(
         if liquid_classes_dir.exists():
             from .xlqc import load_xlqc
 
+            known_liquid_classes = {
+                row["guid"]
+                for row in conn.execute(
+                    "SELECT guid FROM liquid_classes WHERE install_key = ?",
+                    (install_key,),
+                ).fetchall()
+            }
+
             for path in sorted(liquid_classes_dir.glob("*.xlqc"), key=lambda p: p.as_posix()):
                 rel = _relative_install_path(path, install)
                 seen_paths.add(rel)
@@ -283,10 +291,7 @@ def build_index(
                     and cached["source_fingerprint"] == content_fp
                     and cached["entity_table"] == "liquid_classes"
                 ):
-                    if conn.execute(
-                        "SELECT 1 FROM liquid_classes WHERE install_key = ? AND guid = ?",
-                        (install_key, cached["entity_key"]),
-                    ).fetchone():
+                    if cached["entity_key"] in known_liquid_classes:
                         continue
 
                 try:
