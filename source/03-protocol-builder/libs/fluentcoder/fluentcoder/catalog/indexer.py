@@ -106,6 +106,13 @@ def build_index(
         existing_sources = _load_indexed_sources(conn, install_key)
         seen_paths: set[str] = set()
 
+        existing_components = {
+            str(row[0])
+            for row in conn.execute(
+                "SELECT guid FROM components WHERE install_key = ?", (install_key,)
+            ).fetchall()
+        }
+
         for path in sorted(components_dir.glob("*.xcmp"), key=lambda p: p.as_posix()):
             rel = _relative_install_path(path, install)
             seen_paths.add(rel)
@@ -116,11 +123,7 @@ def build_index(
                 and cached["source_fingerprint"] == content_fp
                 and cached["entity_table"] == "components"
             ):
-                row = conn.execute(
-                    "SELECT category FROM components WHERE install_key = ? AND guid = ?",
-                    (install_key, cached["entity_key"]),
-                ).fetchone()
-                if row is not None:
+                if cached["entity_key"] in existing_components:
                     continue
 
             try:
@@ -169,6 +172,12 @@ def build_index(
             )
 
         if workspaces_dir.exists():
+            existing_workspace_guids = {
+                str(row[0])
+                for row in conn.execute(
+                    "SELECT guid FROM workspaces WHERE install_key = ?", (install_key,)
+                ).fetchall()
+            }
             for path in sorted(workspaces_dir.glob("*.xwsp"), key=lambda p: p.as_posix()):
                 rel = _relative_install_path(path, install)
                 seen_paths.add(rel)
@@ -179,10 +188,7 @@ def build_index(
                     and cached["source_fingerprint"] == content_fp
                     and cached["entity_table"] == "workspaces"
                 ):
-                    if conn.execute(
-                        "SELECT 1 FROM workspaces WHERE install_key = ? AND guid = ?",
-                        (install_key, cached["entity_key"]),
-                    ).fetchone():
+                    if cached["entity_key"] in existing_workspace_guids:
                         continue
 
                 try:
@@ -218,6 +224,12 @@ def build_index(
                 )
 
         if sites_dir.exists():
+            existing_site_guids = {
+                str(row[0])
+                for row in conn.execute(
+                    "SELECT guid FROM sites WHERE install_key = ?", (install_key,)
+                ).fetchall()
+            }
             for path in sorted(sites_dir.glob("*.xsit"), key=lambda p: p.as_posix()):
                 rel = _relative_install_path(path, install)
                 seen_paths.add(rel)
@@ -229,10 +241,7 @@ def build_index(
                     and cached["source_fingerprint"] == content_fp
                     and cached["entity_table"] == "sites"
                 ):
-                    if conn.execute(
-                        "SELECT 1 FROM sites WHERE install_key = ? AND guid = ?",
-                        (install_key, cached["entity_key"]),
-                    ).fetchone():
+                    if cached["entity_key"] in existing_site_guids:
                         continue
 
                 conn.execute(
@@ -272,6 +281,13 @@ def build_index(
 
         if liquid_classes_dir.exists():
             from .xlqc import load_xlqc
+
+            existing_lqc_names = {
+                str(row[0])
+                for row in conn.execute(
+                    "SELECT name FROM liquid_classes WHERE install_key = ?", (install_key,)
+                ).fetchall()
+            }
 
             for path in sorted(liquid_classes_dir.glob("*.xlqc"), key=lambda p: p.as_posix()):
                 rel = _relative_install_path(path, install)
@@ -399,6 +415,7 @@ def _index_connector_file(
     path: Path,
     seen_paths: set[str],
     existing_sources: dict[str, dict[str, str]],
+    existing_connectors: set[str] | None = None,
 ) -> None:
     """Parse and upsert one ``.xcon`` connector file when changed or missing."""
     from .xcon import load_xcon
@@ -412,7 +429,9 @@ def _index_connector_file(
         and cached["source_fingerprint"] == content_fp
         and cached["entity_table"] == "connectors"
     ):
-        if conn.execute(
+        if existing_connectors is not None and cached["entity_key"] in existing_connectors:
+            return
+        elif existing_connectors is None and conn.execute(
             "SELECT 1 FROM connectors WHERE install_key = ? AND guid = ?",
             (install_key, cached["entity_key"]),
         ).fetchone():
@@ -456,6 +475,12 @@ def _index_site_referenced_connectors(
     existing_sources: dict[str, dict[str, str]],
 ) -> None:
     """Index only connectors referenced by indexed site definitions."""
+    existing_connectors = {
+        str(row[0])
+        for row in conn.execute(
+            "SELECT guid FROM connectors WHERE install_key = ?", (install_key,)
+        ).fetchall()
+    }
     connector_guids: set[str] = set()
     for path in sorted(sites_dir.glob("*.xsit"), key=lambda item: item.as_posix()):
         try:
@@ -475,6 +500,7 @@ def _index_site_referenced_connectors(
             path=path,
             seen_paths=seen_paths,
             existing_sources=existing_sources,
+            existing_connectors=existing_connectors,
         )
 
 
@@ -488,6 +514,12 @@ def _index_all_connectors(
     existing_sources: dict[str, dict[str, str]],
 ) -> None:
     """Walk every ``.xcon`` under the install connectors directory."""
+    existing_connectors = {
+        str(row[0])
+        for row in conn.execute(
+            "SELECT guid FROM connectors WHERE install_key = ?", (install_key,)
+        ).fetchall()
+    }
     for path in sorted(connectors_dir.glob("*.xcon"), key=lambda item: item.as_posix()):
         _index_connector_file(
             conn,
@@ -496,6 +528,7 @@ def _index_all_connectors(
             path=path,
             seen_paths=seen_paths,
             existing_sources=existing_sources,
+            existing_connectors=existing_connectors,
         )
 
 
