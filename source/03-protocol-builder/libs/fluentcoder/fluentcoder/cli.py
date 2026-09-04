@@ -366,11 +366,10 @@ def _cmd_decompile(args) -> int:
 
 
 def _cmd_corpus_report(args) -> int:
-    from .decompiler import run_corpus_report
+    from .decompiler import CorpusReportConfig, run_corpus_report
 
     try:
-        payload = run_corpus_report(
-            args.paths,
+        config = CorpusReportConfig(
             output_dir=args.output_dir,
             include_ready_to_import=args.include_ready_to_import,
             ready_to_import_root=args.ready_to_import_root,
@@ -380,6 +379,7 @@ def _cmd_corpus_report(args) -> int:
             subroutine_dirs=args.subroutine_dir,
             subroutine_xscr=args.subroutine_xscr,
         )
+        payload = run_corpus_report(args.paths, config=config)
     except ValueError as exc:
         print(f"Corpus report failed: {exc}", file=sys.stderr)
         return 1

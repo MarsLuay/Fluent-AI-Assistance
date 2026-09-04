@@ -380,40 +380,45 @@ def discover_subroutine_dirs(xscr_paths: Iterable[Path | str]) -> list[Path]:
     return sorted(discovered)
 
 
+@dataclass(frozen=True)
+class CorpusReportConfig:
+    """Configuration options for running a corpus report."""
+    output_dir: Path | str
+    include_ready_to_import: bool = False
+    ready_to_import_root: Path | str | None = None
+    top_n: int = 20
+    strict: bool = True
+    fail_on_opaque: bool = True
+    subroutine_dirs: list[Path] | None = None
+    subroutine_xscr: list[Path] | None = None
+
+
 def run_corpus_report(
     paths: Iterable[Path | str],
-    *,
-    output_dir: Path | str,
-    include_ready_to_import: bool = False,
-    ready_to_import_root: Path | str | None = None,
-    top_n: int = 20,
-    strict: bool = True,
-    fail_on_opaque: bool = True,
-    subroutine_dirs: list[Path] | None = None,
-    subroutine_xscr: list[Path] | None = None,
+    config: CorpusReportConfig,
 ) -> dict[str, Any]:
     """Decompile/simulate a corpus and emit unsupported-command mining artifacts."""
     xscr_paths = resolve_xscr_paths(
         paths,
-        include_ready_to_import=include_ready_to_import,
-        ready_to_import_root=ready_to_import_root,
+        include_ready_to_import=config.include_ready_to_import,
+        ready_to_import_root=config.ready_to_import_root,
     )
     if not xscr_paths:
         raise ValueError("No .xscr inputs resolved from the provided paths.")
 
-    output_root = Path(output_dir)
+    output_root = Path(config.output_dir)
     output_root.mkdir(parents=True, exist_ok=True)
-    effective_subroutine_dirs = list(subroutine_dirs or [])
+    effective_subroutine_dirs = list(config.subroutine_dirs or [])
     for directory in discover_subroutine_dirs(xscr_paths):
         if directory not in effective_subroutine_dirs:
             effective_subroutine_dirs.append(directory)
     results = run_decompiled_corpus(
         xscr_paths,
         output_dir=output_root / "generated",
-        strict=strict,
-        fail_on_opaque=fail_on_opaque,
+        strict=config.strict,
+        fail_on_opaque=config.fail_on_opaque,
         subroutine_dirs=effective_subroutine_dirs or None,
-        subroutine_xscr=subroutine_xscr,
+        subroutine_xscr=config.subroutine_xscr,
     )
     summary = summarize_corpus_results(results)
     unsupported_totals, unsupported_protocols = aggregate_unsupported_command_ids(results)
@@ -423,11 +428,11 @@ def run_corpus_report(
         generic_totals,
         unsupported_protocols=unsupported_protocols,
         generic_protocols=generic_protocols,
-        top_n=top_n,
+        top_n=config.top_n,
     )
     ready_root = (
-        Path(ready_to_import_root)
-        if ready_to_import_root is not None
+        Path(config.ready_to_import_root)
+        if config.ready_to_import_root is not None
         else default_ready_to_import_root()
     )
     report_markdown = render_corpus_report_markdown(
@@ -436,7 +441,7 @@ def run_corpus_report(
         unsupported_totals=unsupported_totals,
         generic_totals=generic_totals,
         parser_priorities=parser_priorities,
-        include_ready_to_import=include_ready_to_import,
+        include_ready_to_import=config.include_ready_to_import,
         ready_to_import_root=ready_root,
         unsupported_protocols=unsupported_protocols,
         generic_protocols=generic_protocols,

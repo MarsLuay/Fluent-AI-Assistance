@@ -11,6 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 from fluentcoder.catalog.catalog import index_exists  # noqa: E402
 from fluentcoder.catalog.indexer import build_index, install_path_default  # noqa: E402
 from fluentcoder.decompiler import (  # noqa: E402
+    CorpusReportConfig,
     aggregate_unsupported_command_ids,
     count_generic_step_types,
     default_ready_to_import_root,
@@ -116,10 +117,13 @@ def test_resolve_xscr_paths_expands_fixture_directory() -> None:
 
 @pytest.mark.usefixtures("synthetic_catalog")
 def test_run_corpus_report_ranks_unsupported_commands(tmp_path: Path) -> None:
-    payload = run_corpus_report(
-        [CORPUS_DIR],
+    config = CorpusReportConfig(
         output_dir=tmp_path / "report",
         top_n=5,
+    )
+    payload = run_corpus_report(
+        [CORPUS_DIR],
+        config=config,
     )
 
     assert len(payload["xscr_paths"]) >= 4
