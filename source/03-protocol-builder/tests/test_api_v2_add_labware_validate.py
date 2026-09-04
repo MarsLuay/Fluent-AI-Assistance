@@ -8,6 +8,7 @@ from fluent_pipeline.api_v2.commands import AddLabware, add_labware_from_ir_step
 from fluent_pipeline.api_v2.types import ApiV2ValidationError
 from fluent_pipeline.api_v2_add_labware_validate import (
     AddLabwareFields,
+    extract_add_labware_fields,
     validate_add_labware_fields,
     validate_add_labware_ir_steps,
     validate_add_labware_offline,
@@ -154,6 +155,85 @@ class AddLabwareValidateTests(unittest.TestCase):
         cmd = add_labware_from_ir_step(step)
         self.assertIsInstance(cmd, AddLabware)
         cmd.validate()
+
+
+class ExtractAddLabwareFieldsTests(unittest.TestCase):
+    def test_empty_payload(self):
+        cmd = _CommandStub(payload_xml="")
+        self.assertIsNone(extract_add_labware_fields(cmd))
+
+    def test_invalid_xml(self):
+        cmd = _CommandStub(payload_xml="<Not>Valid<XML")
+        self.assertIsNone(extract_add_labware_fields(cmd))
+
+    def test_missing_add_labware_data_node(self):
+        cmd = _CommandStub(payload_xml='<Object Type="Other"><OtherData/></Object>')
+        self.assertIsNone(extract_add_labware_fields(cmd))
+
+    def test_valid_payload_all_fields(self):
+        cmd = _CommandStub(payload_xml=_GOOD_PAYLOAD)
+        fields = extract_add_labware_fields(cmd)
+        self.assertIsNotNone(fields)
+        self.assertEqual(fields.labware_type, "96 Well Flat")
+        self.assertEqual(fields.labware_label, "Plate1")
+        self.assertEqual(fields.location, "NestPlatform")
+        self.assertEqual(fields.site, "1")
+        self.assertEqual(fields.rotation, "0")
+        self.assertFalse(fields.has_lid)
+
+    def test_default_values(self):
+        payload = """<Object Type="Tecan.Core.Scripting.Worktable.Data.AddLabwareDataV1">
+          <AddLabwareDataV1>
+            <LabwareType>384 Well</LabwareType>
+            <LabwareLabel>Plate2</LabwareLabel>
+            <Location>Site1</Location>
+          </AddLabwareDataV1>
+        </Object>"""
+        cmd = _CommandStub(payload_xml=payload)
+        fields = extract_add_labware_fields(cmd)
+        self.assertIsNotNone(fields)
+        self.assertEqual(fields.labware_type, "384 Well")
+        self.assertEqual(fields.labware_label, "Plate2")
+        self.assertEqual(fields.location, "Site1")
+        self.assertEqual(fields.site, "1")
+        self.assertEqual(fields.rotation, "0")
+        self.assertFalse(fields.has_lid)
+
+    def test_labware_label_spelling_variants(self):
+        # typo LabwareLable
+        payload1 = """<Object>
+          <AddLabwareDataV1>
+            <LabwareLable>TypoLabel</LabwareLable>
+          </AddLabwareDataV1>
+        </Object>"""
+        fields1 = extract_add_labware_fields(_CommandStub(payload_xml=payload1))
+        self.assertEqual(fields1.labware_label, "TypoLabel")
+
+        # correct LabwareLabel
+        payload2 = """<Object>
+          <AddLabwareDataV1>
+            <LabwareLabel>CorrectLabel</LabwareLabel>
+          </AddLabwareDataV1>
+        </Object>"""
+        fields2 = extract_add_labware_fields(_CommandStub(payload_xml=payload2))
+        self.assertEqual(fields2.labware_label, "CorrectLabel")
+
+    def test_has_lid_parsing(self):
+        payload = """<Object>
+          <AddLabwareDataV1>
+            <HasLid>True</HasLid>
+          </AddLabwareDataV1>
+        </Object>"""
+        fields = extract_add_labware_fields(_CommandStub(payload_xml=payload))
+        self.assertTrue(fields.has_lid)
+
+        payload_lower = """<Object>
+          <AddLabwareDataV1>
+            <HasLid>true</HasLid>
+          </AddLabwareDataV1>
+        </Object>"""
+        fields_lower = extract_add_labware_fields(_CommandStub(payload_xml=payload_lower))
+        self.assertTrue(fields_lower.has_lid)
 
 
 if __name__ == "__main__":
