@@ -14,6 +14,16 @@ from .codegen import emit_python
 from .xscr_parser import parse_xscr
 
 
+@dataclass
+class CorpusConfig:
+    output_dir: Path | str
+    strict: bool = True
+    fail_on_opaque: bool = True
+    subroutine_dirs: list[Path] | None = None
+    subroutine_xscr: list[Path] | None = None
+    subroutine_registry: Any | None = None
+
+
 @dataclass(frozen=True)
 class CorpusResult:
     name: str
@@ -43,23 +53,18 @@ class CorpusResult:
 def run_decompiled_corpus(
     paths: Iterable[Path | str],
     *,
-    output_dir: Path | str,
-    strict: bool = True,
-    fail_on_opaque: bool = True,
-    subroutine_dirs: list[Path] | None = None,
-    subroutine_xscr: list[Path] | None = None,
-    subroutine_registry=None,
+    config: CorpusConfig,
 ) -> list[CorpusResult]:
     """Decompile, execute, and simulate a fixed `.xscr` corpus."""
     from ..subroutines import build_subroutine_registry
 
-    output_root = Path(output_dir)
+    output_root = Path(config.output_dir)
     output_root.mkdir(parents=True, exist_ok=True)
-    registry = subroutine_registry
-    if registry is None and (subroutine_dirs or subroutine_xscr):
+    registry = config.subroutine_registry
+    if registry is None and (config.subroutine_dirs or config.subroutine_xscr):
         registry = build_subroutine_registry(
-            subroutine_dirs=subroutine_dirs,
-            subroutine_xscr=subroutine_xscr,
+            subroutine_dirs=config.subroutine_dirs,
+            subroutine_xscr=config.subroutine_xscr,
         )
 
     results: list[CorpusResult] = []
@@ -76,8 +81,8 @@ def run_decompiled_corpus(
             module = _load_module(generated_python, alias=f"corpus_{xscr_path.stem}")
             wt = module.build_worktable()
             wt.simulate(
-                strict=strict,
-                fail_on_opaque=fail_on_opaque,
+                strict=config.strict,
+                fail_on_opaque=config.fail_on_opaque,
                 subroutine_registry=registry,
             )
         except Exception as exc:
@@ -407,13 +412,17 @@ def run_corpus_report(
     for directory in discover_subroutine_dirs(xscr_paths):
         if directory not in effective_subroutine_dirs:
             effective_subroutine_dirs.append(directory)
-    results = run_decompiled_corpus(
-        xscr_paths,
+
+    config = CorpusConfig(
         output_dir=output_root / "generated",
         strict=strict,
         fail_on_opaque=fail_on_opaque,
         subroutine_dirs=effective_subroutine_dirs or None,
         subroutine_xscr=subroutine_xscr,
+    )
+    results = run_decompiled_corpus(
+        xscr_paths,
+        config=config,
     )
     summary = summarize_corpus_results(results)
     unsupported_totals, unsupported_protocols = aggregate_unsupported_command_ids(results)

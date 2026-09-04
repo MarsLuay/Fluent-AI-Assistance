@@ -19,6 +19,7 @@ from fluentcoder.decompiler import (  # noqa: E402
     run_decompiled_corpus,
     suggest_parser_priorities,
     summarize_corpus_results,
+    CorpusConfig,
 )
 
 
@@ -46,7 +47,8 @@ def test_decompiled_corpus_classifies_strict_outcomes(tmp_path: Path) -> None:
         CORPUS_DIR / "liquid_overdraw.xscr",
     ]
 
-    results = run_decompiled_corpus(corpus_paths, output_dir=tmp_path)
+    config = CorpusConfig(output_dir=tmp_path)
+    results = run_decompiled_corpus(corpus_paths, config=config)
     summary = summarize_corpus_results(results)
 
     by_name = {result["name"]: result for result in summary["protocols"]}
@@ -91,7 +93,8 @@ def test_decompiled_corpus_classifies_strict_outcomes(tmp_path: Path) -> None:
     reason="production corpus fixture not configured",
 )
 def test_production_corpus_reclassifies_to_next_catalog_issue(tmp_path: Path) -> None:
-    results = run_decompiled_corpus([PRODUCTION_XSCR], output_dir=tmp_path)
+    config = CorpusConfig(output_dir=tmp_path)
+    results = run_decompiled_corpus([PRODUCTION_XSCR], config=config)
     summary = summarize_corpus_results(results)
     assert summary["classification_counts"] == {"workspace_or_catalog": 1}
     assert summary["status_counts"] == {"failed": 1}
@@ -140,7 +143,8 @@ def test_aggregate_and_generic_mining_helpers(tmp_path: Path) -> None:
         CORPUS_DIR / "unsupported_runtime_step.xscr",
         CORPUS_DIR / "control_flow_steps.xscr",
     ]
-    results = run_decompiled_corpus(corpus_paths, output_dir=tmp_path)
+    config = CorpusConfig(output_dir=tmp_path)
+    results = run_decompiled_corpus(corpus_paths, config=config)
     unsupported_totals, unsupported_protocols = aggregate_unsupported_command_ids(results)
     generic_totals, generic_protocols = count_generic_step_types(corpus_paths)
     priorities = suggest_parser_priorities(
