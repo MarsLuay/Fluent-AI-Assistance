@@ -1100,8 +1100,9 @@ def _emit_move_axis_command(
     classes_used: set[str] | None = None,
 ) -> str:
     classes_used = classes_used if classes_used is not None else set()
+    classes_used.add("MoveAxisConfig")
     if step.raw_xml:
-        return f"wt.move_axis_command(raw_xml={step.raw_xml!r})"
+        return f"wt.move_axis_command(MoveAxisConfig(raw_xml={step.raw_xml!r}))"
     parts: list[str] = []
     if step.available_id is not None:
         parts.append(f"available_id={step.available_id!r}")
@@ -1117,7 +1118,7 @@ def _emit_move_axis_command(
         parts.append(f"acceleration={step.acceleration!r}")
     if step.deceleration is not None:
         parts.append(f"deceleration={step.deceleration!r}")
-    return f"wt.move_axis_command({', '.join(parts)})"
+    return f"wt.move_axis_command(MoveAxisConfig({', '.join(parts)}))"
 
 
 def _emit_start_move_command(step: StartMoveCommandStep) -> str:
