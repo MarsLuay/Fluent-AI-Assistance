@@ -68,7 +68,7 @@ class TestDiscoverZeiaPaths(unittest.TestCase):
             fake_home = Path(fake_home_str)
             mock_file = fake_home / "test.zeia"
             mock_file.touch()
-            with patch('pathlib.Path.home', return_value=fake_home), patch.dict(os.environ, {"HOME": fake_home_str}):
+            with patch('pathlib.Path.home', return_value=fake_home), patch.dict(os.environ, {"HOME": fake_home_str, "USERPROFILE": fake_home_str}):
                 paths = discover_zeia_paths(["~/test.zeia"])
                 self.assertEqual(paths, [mock_file.resolve()])
 
