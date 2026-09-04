@@ -14,6 +14,19 @@ from .codegen import emit_python
 from .xscr_parser import parse_xscr
 
 
+@dataclass
+class CorpusReportData:
+    xscr_paths: list[Path]
+    summary: dict[str, Any]
+    unsupported_totals: Counter[str]
+    generic_totals: Counter[str]
+    parser_priorities: list[dict[str, Any]]
+    include_ready_to_import: bool
+    ready_to_import_root: Path | None
+    unsupported_protocols: dict[str, set[str]] | None = None
+    generic_protocols: dict[str, set[str]] | None = None
+
+
 @dataclass(frozen=True)
 class CorpusResult:
     name: str
@@ -274,34 +287,23 @@ def suggest_parser_priorities(
     return ranked[:top_n]
 
 
-def render_corpus_report_markdown(
-    *,
-    xscr_paths: list[Path],
-    summary: dict[str, Any],
-    unsupported_totals: Counter[str],
-    generic_totals: Counter[str],
-    parser_priorities: list[dict[str, Any]],
-    include_ready_to_import: bool,
-    ready_to_import_root: Path | None,
-    unsupported_protocols: dict[str, set[str]] | None = None,
-    generic_protocols: dict[str, set[str]] | None = None,
-) -> str:
+def render_corpus_report_markdown(data: CorpusReportData) -> str:
     """Render a markdown mining report for unsupported decompiler/simulator gaps."""
-    unsupported_protocols = unsupported_protocols or {}
-    generic_protocols = generic_protocols or {}
+    unsupported_protocols = data.unsupported_protocols or {}
+    generic_protocols = data.generic_protocols or {}
     lines = [
         "# Decompiler Corpus Report",
         "",
         "## Summary",
-        f"- Protocols scanned: {len(xscr_paths)}",
-        f"- Ready-to-import included: {'yes' if include_ready_to_import else 'no'}",
+        f"- Protocols scanned: {len(data.xscr_paths)}",
+        f"- Ready-to-import included: {'yes' if data.include_ready_to_import else 'no'}",
     ]
-    if include_ready_to_import and ready_to_import_root is not None:
-        lines.append(f"- Ready-to-import root: `{ready_to_import_root}`")
+    if data.include_ready_to_import and data.ready_to_import_root is not None:
+        lines.append(f"- Ready-to-import root: `{data.ready_to_import_root}`")
     lines.extend(
         [
-            f"- Status counts: {summary['status_counts']}",
-            f"- Classification counts: {summary['classification_counts']}",
+            f"- Status counts: {data.summary['status_counts']}",
+            f"- Classification counts: {data.summary['classification_counts']}",
             "",
             "## Top Unsupported Command IDs",
             "",
@@ -311,9 +313,9 @@ def render_corpus_report_markdown(
             "| ---: | --- | ---: | ---: |",
         ]
     )
-    if unsupported_totals:
+    if data.unsupported_totals:
         for rank, (command_id, count) in enumerate(
-            unsupported_totals.most_common(20),
+            data.unsupported_totals.most_common(20),
             start=1,
         ):
             protocol_count = len(unsupported_protocols.get(command_id, set()))
@@ -332,8 +334,8 @@ def render_corpus_report_markdown(
             "| ---: | --- | ---: | ---: |",
         ]
     )
-    if generic_totals:
-        for rank, (step_type, count) in enumerate(generic_totals.most_common(20), start=1):
+    if data.generic_totals:
+        for rank, (step_type, count) in enumerate(data.generic_totals.most_common(20), start=1):
             protocol_count = len(generic_protocols.get(step_type, set()))
             lines.append(f"| {rank} | `{step_type}` | {count} | {protocol_count} |")
     else:
@@ -350,8 +352,8 @@ def render_corpus_report_markdown(
             "| ---: | --- | ---: | ---: | ---: | ---: |",
         ]
     )
-    if parser_priorities:
-        for rank, item in enumerate(parser_priorities, start=1):
+    if data.parser_priorities:
+        for rank, item in enumerate(data.parser_priorities, start=1):
             lines.append(
                 f"| {rank} | `{item['command_id']}` | {item['priority_score']} | "
                 f"{item['opaque_count']} | {item['generic_count']} | {item['protocol_count']} |"
@@ -360,7 +362,7 @@ def render_corpus_report_markdown(
         lines.append("| - | _none_ | 0 | 0 | 0 | 0 |")
 
     lines.extend(["", "## Inputs", ""])
-    for path in xscr_paths:
+    for path in data.xscr_paths:
         lines.append(f"- `{path}`")
     lines.append("")
     return "\n".join(lines)
@@ -430,7 +432,7 @@ def run_corpus_report(
         if ready_to_import_root is not None
         else default_ready_to_import_root()
     )
-    report_markdown = render_corpus_report_markdown(
+    report_data = CorpusReportData(
         xscr_paths=xscr_paths,
         summary=summary,
         unsupported_totals=unsupported_totals,
@@ -441,6 +443,7 @@ def run_corpus_report(
         unsupported_protocols=unsupported_protocols,
         generic_protocols=generic_protocols,
     )
+    report_markdown = render_corpus_report_markdown(report_data)
     report_path = output_root / "corpus_report.md"
     report_path.write_text(report_markdown, encoding="utf-8")
     return {

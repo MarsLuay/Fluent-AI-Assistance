@@ -1,0 +1,7 @@
+1. **Define Dataclass**: Edit `source/03-protocol-builder/libs/fluentcoder/fluentcoder/decompiler/corpus.py` to create the `CorpusReportData` dataclass that encapsulates the parameters for `render_corpus_report_markdown`.
+2. **Refactor function signature**: Edit `source/03-protocol-builder/libs/fluentcoder/fluentcoder/decompiler/corpus.py` to update the `render_corpus_report_markdown` function signature to take a single `CorpusReportData` argument. Update its usage in the function body.
+3. **Refactor call site**: Edit `source/03-protocol-builder/libs/fluentcoder/fluentcoder/decompiler/corpus.py` to update the call site (around line 433) to instantiate `CorpusReportData` and pass it to `render_corpus_report_markdown`.
+4. **Update exports**: Edit `source/03-protocol-builder/libs/fluentcoder/fluentcoder/decompiler/__init__.py` to export the new `CorpusReportData` dataclass.
+5. **Verify the change**: Run the test suite by first installing dependencies `pip install -e source/00-shared -e source/03-protocol-builder/libs/fluentcoder` and then running tests using `PYTHONPATH=source/00-shared:source/03-protocol-builder/libs/fluentcoder:source/03-protocol-builder python3 -m pytest source/03-protocol-builder/libs/fluentcoder/tests/`.
+6. **Pre-commit Steps**: Complete pre-commit steps to ensure proper testing, verification, review, and reflection are done.
+7. **Submit**: Submit the PR with code health improvement details.

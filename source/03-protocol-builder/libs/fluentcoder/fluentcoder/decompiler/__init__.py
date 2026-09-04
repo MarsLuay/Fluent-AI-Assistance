@@ -9,6 +9,7 @@ the same .xscr (codegen).
 from .xscr_parser import parse_xscr
 from .codegen import emit_python
 from .corpus import (
+    CorpusReportData,
     CorpusResult,
     aggregate_unsupported_command_ids,
     count_generic_step_types,
@@ -25,6 +26,7 @@ from .corpus import (
 __all__ = [
     "parse_xscr",
     "emit_python",
+    "CorpusReportData",
     "CorpusResult",
     "aggregate_unsupported_command_ids",
     "count_generic_step_types",
