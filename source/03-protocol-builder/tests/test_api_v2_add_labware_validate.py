@@ -112,6 +112,28 @@ class AddLabwareValidateTests(unittest.TestCase):
         result = validate_add_labware_offline(_CommandStub(payload_xml=_GOOD_PAYLOAD))
         self.assertTrue(result.ok)
 
+    def test_offline_non_add_labware(self):
+        class NonAddLabwareCommand:
+            type_name = "SomeOtherCommand"
+            index = 0
+            group = "Setup"
+            payload_xml = ""
+
+        result = validate_add_labware_offline(NonAddLabwareCommand())
+        self.assertTrue(result.ok)
+        self.assertEqual(result.source, "skipped_non_add_labware")
+
+    def test_offline_no_payload(self):
+        result = validate_add_labware_offline(_CommandStub(payload_xml=""))
+        self.assertTrue(result.ok)
+        self.assertEqual(result.source, "skipped_no_payload")
+        self.assertEqual(result.message, "No AddLabware payload available for offline validation.")
+
+    def test_offline_invalid_payload(self):
+        result = validate_add_labware_offline(_CommandStub(payload_xml="<Object>Invalid XML</Object"))
+        self.assertTrue(result.ok)
+        self.assertEqual(result.source, "skipped_no_payload")
+
     def test_ir_batch_detects_duplicate_label(self):
         ir = {
             "steps": [
