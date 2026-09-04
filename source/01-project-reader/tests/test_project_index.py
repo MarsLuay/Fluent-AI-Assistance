@@ -1,6 +1,8 @@
 import unittest
 import tempfile
+import os
 from pathlib import Path
+from unittest.mock import patch
 from tecan_reader.project_index import discover_zeia_paths
 
 class TestDiscoverZeiaPaths(unittest.TestCase):
@@ -60,3 +62,22 @@ class TestDiscoverZeiaPaths(unittest.TestCase):
         paths = discover_zeia_paths([self.file2, self.file1])
         expected = sorted([self.file1.resolve(), self.file2.resolve()], key=str)
         self.assertEqual(paths, expected)
+
+    def test_expanduser(self):
+        with tempfile.TemporaryDirectory() as fake_home_str:
+            fake_home = Path(fake_home_str)
+            mock_file = fake_home / "test.zeia"
+            mock_file.touch()
+            with patch('pathlib.Path.home', return_value=fake_home), patch.dict(os.environ, {"HOME": fake_home_str}):
+                paths = discover_zeia_paths(["~/test.zeia"])
+                self.assertEqual(paths, [mock_file.resolve()])
+
+    def test_case_insensitive_extension(self):
+        file_upper = self.dir1 / "TEST.ZEIA"
+        file_upper.touch()
+        paths = discover_zeia_paths([file_upper])
+        self.assertEqual(paths, [file_upper.resolve()])
+
+    def test_empty_paths_list(self):
+        with self.assertRaisesRegex(FileNotFoundError, "No .zeia files found"):
+            discover_zeia_paths([])
