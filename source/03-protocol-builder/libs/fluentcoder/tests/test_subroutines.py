@@ -1,6 +1,8 @@
 from __future__ import annotations
+from fluentcoder.simulator.options import SimulationOptions
 
-import sys
+
+
 from pathlib import Path
 
 import pytest
@@ -80,7 +82,7 @@ def test_simulator_subroutine_descent_inlines_body() -> None:
     wt.call_subroutine(r"TEST\SUB_Minimal_v1")
     wt.wait(1)
 
-    wt.simulate(subroutine_registry=registry)
+    wt.simulate(SimulationOptions(subroutine_registry=registry))
 
     report = wt.simulation_report
     assert report is not None
@@ -115,7 +117,7 @@ def test_simulator_subroutine_cycle_detection() -> None:
     wt.group("Steps")
     wt.call_subroutine(r"TEST\SUB_Recursive_v1")
 
-    wt.simulate(subroutine_registry=registry)
+    wt.simulate(SimulationOptions(subroutine_registry=registry))
 
     report = wt.simulation_report
     assert report is not None
@@ -139,7 +141,7 @@ def test_simulator_subroutine_variable_mappings_literal_start() -> None:
     )
     wt.wait(1)
 
-    wt.simulate(subroutine_registry=registry)
+    wt.simulate(SimulationOptions(subroutine_registry=registry))
 
     report = wt.simulation_report
     assert report is not None
@@ -166,7 +168,7 @@ def test_simulator_subroutine_variable_mappings_finger_selection() -> None:
     )
     wt.wait(1)
 
-    wt.simulate(subroutine_registry=registry)
+    wt.simulate(SimulationOptions(subroutine_registry=registry))
 
     report = wt.simulation_report
     assert report is not None

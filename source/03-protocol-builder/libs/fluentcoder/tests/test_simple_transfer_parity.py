@@ -9,7 +9,6 @@ the test runs fully offline with the synthetic catalog fixture.
 from __future__ import annotations
 
 import re
-import sys
 import tempfile
 from pathlib import Path
 

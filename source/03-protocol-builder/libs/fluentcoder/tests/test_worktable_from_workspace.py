@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 from fluentcoder import xml_compat as ET
 from pathlib import Path
 from types import SimpleNamespace
@@ -453,7 +452,6 @@ def test_protocol_carries_workspace_guid_and_name() -> None:
 
 
 def _find_workspace_with_min_sites(min_sites: int) -> str | None:
-    import sqlite3
 
     from fluentcoder.catalog.catalog import open_index
     from fluentcoder.catalog.paths import index_db_path_default

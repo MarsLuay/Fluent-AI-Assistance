@@ -1,13 +1,15 @@
 from __future__ import annotations
+from fluentcoder.simulator.options import SimulationOptions
 
-import sys
+
+
 from pathlib import Path
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-from fluentcoder import FCA1000Box, InvalidSlotError, MagnetRack, Plate96, Reagent, SimulationError, Worktable  # noqa: E402
+from fluentcoder import FCA1000Box, InvalidSlotError, Plate96, Reagent, SimulationError, Worktable  # noqa: E402
 from fluentcoder.expressions import parse_expression  # noqa: E402
 from fluentcoder.simulator.walk import Simulator  # noqa: E402
 
@@ -221,7 +223,7 @@ def test_unknown_generic_step_is_reported_and_can_fail() -> None:
     wt.generic_step("UnknownProductionCommand")
 
     with pytest.raises(SimulationError):
-        wt.simulate(fail_on_opaque=True)
+        wt.simulate(SimulationOptions(fail_on_opaque=True))
 
     report = wt.simulation_report
     assert report is not None
@@ -237,7 +239,7 @@ def test_min_coverage_can_fail() -> None:
     wt.generic_step("UnknownProductionCommand")
 
     with pytest.raises(SimulationError):
-        wt.simulate(min_coverage=0.75)
+        wt.simulate(SimulationOptions(min_coverage=0.75))
 
     assert wt.simulation_report is not None
     assert wt.simulation_report.modeled_coverage == pytest.approx(0.5)
@@ -440,7 +442,7 @@ def test_strict_simulation_requires_bound_workspace_and_preserves_report() -> No
     wt.place(Plate96("Source", catalog="96 Well Flat"), "Nest", 1)
 
     with pytest.raises(SimulationError, match="not bound to a specific FluentControl workspace"):
-        wt.simulate(strict=True)
+        wt.simulate(SimulationOptions(strict=True))
 
     report = wt.simulation_report
     assert report is not None
@@ -463,7 +465,7 @@ def test_strict_simulation_rejects_invalid_workspace_slot_with_partial_state() -
     wt.set_location(src, "Site", 2)
 
     with pytest.raises(SimulationError):
-        wt.simulate(strict=True)
+        wt.simulate(SimulationOptions(strict=True))
 
     report = wt.simulation_report
     assert report is not None
@@ -481,7 +483,7 @@ def test_failed_report_to_dict_includes_failure_and_effect_counts() -> None:
     wt.generic_step("UnknownProductionCommand")
 
     with pytest.raises(SimulationError):
-        wt.simulate(fail_on_opaque=True)
+        wt.simulate(SimulationOptions(fail_on_opaque=True))
 
     report = wt.simulation_report
     assert report is not None

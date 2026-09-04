@@ -8,7 +8,6 @@ must keep emitting the standard ``UserPromptStatement`` — no behavior change.
 
 from __future__ import annotations
 
-import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 

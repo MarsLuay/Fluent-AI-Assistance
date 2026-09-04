@@ -42,15 +42,14 @@ from ..ir.schema import (
     CommentStep, ConditionalStep, DispenseStep, DropHeadAdapterStep,
     ExecuteApplicationStep, ExportVariableStep, GenericStep, GetHeadAdapterStep,
     EndScriptStep, MoveAxisCommandStep, StartMoveCommandStep, WaitForAsyncResponseStep,
-    Group, ImportVariableStep, InitializeDeviceStep, LihaAspirateStep, LihaDispenseStep,
+    ImportVariableStep, InitializeDeviceStep, LihaAspirateStep, LihaDispenseStep,
     LihaDetectLiquidStep, GenerateReportStep, LihaMixStep,
     LihaDropTipsStep, LihaEmptyTipsStep, LihaGetTipsStep,
     LoopStep, Mca384DropTipsStep, Mca384EmptyTipsStep, Mca384GetTipsStep,
     Mca384MixStep, Mca384MoveArmStep, PickUpTipsStep, Protocol,
     QueryVariableStep, RemoveLabwareStep, RgaTransferLabwareStep,
     ScriptGroupStep, SetLocationStep, SetTipsBackStep, SetVariableStep,
-    StartTimerStep, Step, SubRoutineStep, UserPromptStep, VariableMapping,
-    WaitForTimerStep, WaitStep, ExecuteVbScriptStep, TeGioSetPwmOutputStep, LeaveStep,
+    StartTimerStep, Step, SubRoutineStep, UserPromptStep, WaitForTimerStep, WaitStep, ExecuteVbScriptStep, TeGioSetPwmOutputStep, LeaveStep,
 )
 
 

@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-from fluentcoder import Plate96, Trough100mL, MCA100Box, MagnetRack  # noqa: E402
+from fluentcoder import Plate96, Trough100mL, MCA100Box  # noqa: E402
 from fluentcoder.catalog.catalog import index_exists  # noqa: E402
 
 
@@ -61,7 +60,6 @@ def test_missing_catalog_when_index_present_raises() -> None:
 
 @pytest.mark.usefixtures("synthetic_catalog")
 def test_plate96_uses_registered_class_default_catalog() -> None:
-    from fluentcoder import Worktable
     from fluentcoder.defaults import set_catalog_defaults
 
     set_catalog_defaults({Plate96: "96 Well Flat"})

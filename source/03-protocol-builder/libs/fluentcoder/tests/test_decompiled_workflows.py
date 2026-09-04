@@ -1,5 +1,6 @@
 """Chunk 6: Decompiled and production-style workflow tests.
 
+
 Tests realism beyond clean authored protocols:
 - .xscr -> parse/decompile -> Python -> simulate
 - Inspect wt.simulation_report for modeled coverage and opaque command IDs
@@ -7,8 +8,9 @@ Tests realism beyond clean authored protocols:
 """
 
 from __future__ import annotations
+from fluentcoder.simulator.options import SimulationOptions
 
-import sys
+
 from pathlib import Path
 
 import pytest
@@ -37,7 +39,7 @@ def test_sample_simple_transfer_simulation() -> None:
     from examples.simple_transfer import build_worktable
 
     wt = build_worktable()
-    wt.simulate(strict=True)
+    wt.simulate(SimulationOptions(strict=True))
 
     report = wt.simulation_report
     assert report is not None
@@ -116,7 +118,7 @@ def test_sample_decompiled_liha_workflow(tmp_path: Path) -> None:
 
     # Execute and simulate
     wt = load_module(py).build_worktable()
-    wt.simulate(strict=True)
+    wt.simulate(SimulationOptions(strict=True))
 
     report = wt.simulation_report
     assert report is not None
@@ -193,7 +195,7 @@ def test_sample_mixed_with_opaque_coverage(tmp_path: Path) -> None:
     py = _emit_python_checked(tmp_path, "decompiled_mixed.py", proto)
 
     wt = load_module(py).build_worktable()
-    wt.simulate(strict=True)
+    wt.simulate(SimulationOptions(strict=True))
 
     report = wt.simulation_report
     assert report is not None
@@ -225,7 +227,7 @@ def test_sample_loop_conditional_simulation() -> None:
     from examples.loop_conditional import build_worktable
 
     wt = build_worktable()
-    wt.simulate(strict=True)
+    wt.simulate(SimulationOptions(strict=True))
 
     report = wt.simulation_report
     assert report is not None
@@ -252,7 +254,7 @@ def test_decompiled_workflow_summary(tmp_path: Path) -> None:
     # Sample A: simple_transfer (authored, fully modeled)
     from examples.simple_transfer import build_worktable as bt_simple
     wt_a = bt_simple()
-    wt_a.simulate(strict=True)
+    wt_a.simulate(SimulationOptions(strict=True))
     r_a = wt_a.simulation_report
     results.append({
         "name": "simple_transfer",
@@ -282,7 +284,7 @@ def test_decompiled_workflow_summary(tmp_path: Path) -> None:
 </Objects><Name>Steps</Name></ScriptGroup></Payload></VxData>""", encoding="utf-8")
     py_b = _emit_python_checked(tmp_path, "liha_decompiled.py", parse_xscr(src_b))
     wt_b = load_module(py_b).build_worktable()
-    wt_b.simulate(strict=True)
+    wt_b.simulate(SimulationOptions(strict=True))
     r_b = wt_b.simulation_report
     results.append({
         "name": "decompiled_liha",
@@ -308,7 +310,7 @@ def test_decompiled_workflow_summary(tmp_path: Path) -> None:
 </Objects><Name>Steps</Name></ScriptGroup></Payload></VxData>""", encoding="utf-8")
     py_c = _emit_python_checked(tmp_path, "mixed_decompiled.py", parse_xscr(src_c))
     wt_c = load_module(py_c).build_worktable()
-    wt_c.simulate(strict=True)
+    wt_c.simulate(SimulationOptions(strict=True))
     r_c = wt_c.simulation_report
     results.append({
         "name": "mixed_opaque",

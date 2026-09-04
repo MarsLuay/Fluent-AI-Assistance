@@ -6,7 +6,6 @@ asserts the expected component counts and key catalog entries are present.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pytest
@@ -15,7 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 from fluentcoder.catalog.indexer import build_index, install_path_default  # noqa: E402
 from fluentcoder.catalog.catalog import (  # noqa: E402
-    DEFAULT_INDEX_PATH, category_counts, install_info, resolve_by_name,
+    category_counts, install_info, resolve_by_name,
     resolve_workspace_by_guid, resolve_workspace_by_name,
 )
 from fluentcoder.catalog.xcmp import load_xwsp  # noqa: E402

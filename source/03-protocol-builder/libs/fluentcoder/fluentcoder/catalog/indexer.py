@@ -20,7 +20,7 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from .catalog import open_index
 from .paths import index_db_path_default, install_path_key

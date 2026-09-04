@@ -13,6 +13,9 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Collection, Iterator, Optional, Union
 
+if TYPE_CHECKING:
+    from .simulator.options import SimulationOptions
+
 from .expressions import Expression, coerce_source_expression, expression_python_value, render_expression
 from .fc_variables import (
     FCVariableToken, as_labware_type, is_valid_fc_variable_name,
@@ -963,13 +966,7 @@ class Worktable:
 
     def simulate(
         self,
-        *,
-        fail_on_opaque: bool = False,
-        min_coverage: Optional[float] = None,
-        strict: bool = False,
-        subroutine_registry=None,
-        record_snapshots: Union[bool, str] = True,
-        snapshot_mode: Optional[str] = None,
+        options: Optional["SimulationOptions"] = None,
     ) -> None:
         """Replay the IR through the Simulator, populating `self.snapshots`.
 
@@ -982,24 +979,27 @@ class Worktable:
         ``"final_only"``, or ``"delta"``).
         """
         from .simulator import Simulator
+        from .simulator.options import SimulationOptions
 
-        if snapshot_mode is not None:
-            effective_snapshot_mode = snapshot_mode
-        elif record_snapshots == "delta":
+        options = options or SimulationOptions()
+
+        if options.snapshot_mode is not None:
+            effective_snapshot_mode = options.snapshot_mode
+        elif options.record_snapshots == "delta":
             effective_snapshot_mode = "delta"
-        elif record_snapshots is False:
+        elif options.record_snapshots is False:
             effective_snapshot_mode = "final_only"
         else:
             effective_snapshot_mode = "full"
         sim = Simulator(
             self,
-            subroutine_registry=subroutine_registry,
+            subroutine_registry=options.subroutine_registry,
             snapshot_mode=effective_snapshot_mode,
         )
         sim.run(
-            fail_on_opaque=fail_on_opaque,
-            min_coverage=min_coverage,
-            strict=strict,
+            fail_on_opaque=options.fail_on_opaque,
+            min_coverage=options.min_coverage,
+            strict=options.strict,
         )
 
     # ── Internal helpers ────────────────────────────────────────────

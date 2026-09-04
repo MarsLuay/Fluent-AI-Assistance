@@ -1,5 +1,4 @@
 from tests.conftest import bind_offline_authoring
-import sys
 from pathlib import Path
 
 import pytest

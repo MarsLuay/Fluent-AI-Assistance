@@ -1,0 +1,10 @@
+<<<<<<< SEARCH
+from fluentcoder.decompiler import emit_python, parse_xscr  # noqa: E402
+from fluentcoder.simulator.subroutines import SubroutineRegistry  # noqa: E402
+from fluentcoder.worktable import Worktable  # noqa: E402
+=======
+from fluentcoder.decompiler import emit_python, parse_xscr  # noqa: E402
+from fluentcoder.simulator.options import SimulationOptions  # noqa: E402
+from fluentcoder.simulator.subroutines import SubroutineRegistry  # noqa: E402
+from fluentcoder.worktable import Worktable  # noqa: E402
+>>>>>>> REPLACE

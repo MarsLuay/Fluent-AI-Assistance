@@ -1,5 +1,6 @@
 """Phase B — round-trip parity tests for the decompiler.
 
+
 For each example .py:
     1. compile examples/<name>.py → orig.xscr
     2. decompile orig.xscr → decompiled.py
@@ -15,16 +16,16 @@ The normalisation strips:
 """
 
 from __future__ import annotations
+from fluentcoder.simulator.options import SimulationOptions
+
 
 import re
-import sys
 from pathlib import Path
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-from fluentcoder.catalog.catalog import index_exists  # noqa: E402
 from fluentcoder.cli import main as cli_main  # noqa: E402
 from fluentcoder.decompiler import emit_python, parse_xscr  # noqa: E402
 from fluentcoder.subroutines import SubroutineRegistry  # noqa: E402
@@ -108,7 +109,7 @@ def test_roundtrip_subroutine_call_simulates_with_registry(
     wt = load_module(decompiled_py, alias="subroutine_call_decompiled").build_worktable()
     registry = SubroutineRegistry()
     registry.register_directory(SUBROUTINE_DIR)
-    wt.simulate(subroutine_registry=registry)
+    wt.simulate(SimulationOptions(subroutine_registry=registry))
 
     report = wt.simulation_report
     assert report is not None

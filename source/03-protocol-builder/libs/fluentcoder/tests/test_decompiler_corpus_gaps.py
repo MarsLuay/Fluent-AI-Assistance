@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 import tempfile
 import zipfile
 from pathlib import Path
@@ -18,7 +17,6 @@ from fluentcoder.decompiler import (  # noqa: E402
 from fluentcoder.ir.schema import (  # noqa: E402
     ApplicationDriverMacroStep,
     GenerateReportStep,
-    GenericStep,
     LihaAspirateStep,
     LihaDetectLiquidStep,
     LihaDispenseStep,
