@@ -8,6 +8,7 @@ from fluent_pipeline.api_v2.commands import AddLabware, add_labware_from_ir_step
 from fluent_pipeline.api_v2.types import ApiV2ValidationError
 from fluent_pipeline.api_v2_add_labware_validate import (
     AddLabwareFields,
+    add_labware_fields_from_ir_step,
     validate_add_labware_fields,
     validate_add_labware_ir_steps,
     validate_add_labware_offline,
@@ -140,6 +141,60 @@ class AddLabwareValidateTests(unittest.TestCase):
         failures = validate_add_labware_ir_steps(ir)
         self.assertEqual(len(failures), 1)
         self.assertEqual(failures[0].reason, "duplicate_labware_label")
+
+    def test_add_labware_fields_from_ir_step_wrong_operation(self):
+        step = {"operation": "wrong_op"}
+        self.assertIsNone(add_labware_fields_from_ir_step(step))
+
+    def test_add_labware_fields_from_ir_step_missing_parameters(self):
+        step = {"operation": "add_labware", "parameters": "not_a_dict"}
+        self.assertIsNone(add_labware_fields_from_ir_step(step))
+
+        step_no_params = {"operation": "add_labware"}
+        fields = add_labware_fields_from_ir_step(step_no_params)
+        self.assertIsNotNone(fields)
+        self.assertEqual(fields.labware_type, "")
+        self.assertEqual(fields.labware_label, "")
+        self.assertEqual(fields.location, "")
+        self.assertEqual(fields.site, 1)
+
+    def test_add_labware_fields_from_ir_step_standard_params(self):
+        step = {
+            "operation": "add_labware",
+            "parameters": {
+                "catalog": "96 Well Flat",
+                "label": "Plate1",
+                "location": "NestPlatform",
+                "site": 1,
+                "rotation": 90,
+                "has_lid": True,
+            },
+        }
+        fields = add_labware_fields_from_ir_step(step)
+        self.assertIsNotNone(fields)
+        self.assertEqual(fields.labware_type, "96 Well Flat")
+        self.assertEqual(fields.labware_label, "Plate1")
+        self.assertEqual(fields.location, "NestPlatform")
+        self.assertEqual(fields.site, 1)
+        self.assertEqual(fields.rotation, 90)
+        self.assertTrue(fields.has_lid)
+
+    def test_add_labware_fields_from_ir_step_fallback_params(self):
+        step = {
+            "operation": "add_labware",
+            "target_labware": "Plate2",
+            "parameters": {
+                "labware_type": "384 Well Flat",
+                "position": 2,
+            },
+        }
+        fields = add_labware_fields_from_ir_step(step)
+        self.assertIsNotNone(fields)
+        self.assertEqual(fields.labware_type, "384 Well Flat")
+        self.assertEqual(fields.labware_label, "Plate2")
+        self.assertEqual(fields.site, 2)
+        self.assertEqual(fields.rotation, 0)
+        self.assertFalse(fields.has_lid)
 
     def test_add_labware_from_ir_step(self):
         step = {
