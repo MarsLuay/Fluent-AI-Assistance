@@ -33,7 +33,6 @@ def test_round_trip_780_empty() -> None:
 
     assert wt.workspace_name == "780_Empty"
     assert wt.valid_slots is not None
-    # Post xwsp parser fix: 780_Empty enumerates 56 slots, not 1.
     assert len(wt.valid_slots) == 56, (
         f"expected 780_Empty to enumerate 56 slots, got {len(wt.valid_slots)}"
     )
