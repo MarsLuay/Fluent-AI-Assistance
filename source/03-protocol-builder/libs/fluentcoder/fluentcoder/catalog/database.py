@@ -2073,6 +2073,26 @@ class TecanDatabase:
     def export_to_yaml(self, yaml_path: Path):
         """Export to commands.yaml format for compatibility."""
         import yaml
+        from collections import defaultdict
+
+        with self._connection() as conn:
+            obs_values_rows = conn.execute("SELECT parameter_id, value FROM observed_values").fetchall()
+            obs_values_by_param = defaultdict(list)
+            for row in obs_values_rows:
+                obs_values_by_param[row["parameter_id"]].append(row["value"])
+
+            params_rows = conn.execute("SELECT * FROM parameters").fetchall()
+            params_by_cmd = defaultdict(list)
+            for row in params_rows:
+                param_dict = {
+                    "name": row["name"],
+                    "type": row["type"],
+                    "required": bool(row["required"]),
+                }
+                obs_vals = obs_values_by_param.get(row["id"])
+                if obs_vals:
+                    param_dict["observed_values"] = obs_vals
+                params_by_cmd[row["command_id"]].append(param_dict)
 
         commands = []
         for cmd in self.get_all_commands():
@@ -2083,31 +2103,11 @@ class TecanDatabase:
                 "description": cmd["description"],
                 "template": cmd["template"],
             }
-
-            # Get parameters
-            with self._connection() as conn:
-                params = conn.execute(
-                    "SELECT * FROM parameters WHERE command_id = ?",
-                    (cmd["id"],)
-                ).fetchall()
-
+            params = params_by_cmd.get(cmd["id"])
+            if params:
+                cmd_dict["parameters"] = params
+            else:
                 cmd_dict["parameters"] = []
-                for param in params:
-                    param_dict = {
-                        "name": param["name"],
-                        "type": param["type"],
-                        "required": bool(param["required"]),
-                    }
-
-                    # Get observed values
-                    values = conn.execute(
-                        "SELECT value FROM observed_values WHERE parameter_id = ?",
-                        (param["id"],)
-                    ).fetchall()
-                    if values:
-                        param_dict["observed_values"] = [v["value"] for v in values]
-
-                    cmd_dict["parameters"].append(param_dict)
 
             commands.append(cmd_dict)
 
