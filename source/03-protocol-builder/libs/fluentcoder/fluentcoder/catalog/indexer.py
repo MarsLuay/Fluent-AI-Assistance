@@ -169,6 +169,12 @@ def build_index(
             )
 
         if workspaces_dir.exists():
+            indexed_ws_guids = {
+                row["guid"] for row in conn.execute(
+                    "SELECT guid FROM workspaces WHERE install_key = ?",
+                    (install_key,)
+                ).fetchall()
+            }
             for path in sorted(workspaces_dir.glob("*.xwsp"), key=lambda p: p.as_posix()):
                 rel = _relative_install_path(path, install)
                 seen_paths.add(rel)
@@ -179,10 +185,7 @@ def build_index(
                     and cached["source_fingerprint"] == content_fp
                     and cached["entity_table"] == "workspaces"
                 ):
-                    if conn.execute(
-                        "SELECT 1 FROM workspaces WHERE install_key = ? AND guid = ?",
-                        (install_key, cached["entity_key"]),
-                    ).fetchone():
+                    if cached["entity_key"] in indexed_ws_guids:
                         continue
 
                 try:
