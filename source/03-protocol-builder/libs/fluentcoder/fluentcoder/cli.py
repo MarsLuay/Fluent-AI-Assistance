@@ -20,7 +20,6 @@ import sys
 from pathlib import Path
 from typing import Any, Optional
 
-
 # Repo root: .../libs/fluentcoder/fluentcoder/cli.py → parents[5]
 _REPO_ROOT = Path(__file__).resolve().parents[5]
 _DEFAULT_TOOL_BUILD_DIR = (
@@ -31,14 +30,7 @@ _DEFAULT_TOOL_BUILD_DIR = (
 # ── Entry point ────────────────────────────────────────────────────
 
 
-def main(argv: Optional[list[str]] = None) -> int:
-    argv = list(argv if argv is not None else sys.argv[1:])
-    if len(argv) >= 2 and argv[0] == "decompile" and argv[1] != "corpus-report":
-        argv.insert(1, "file")
-
-    parser = argparse.ArgumentParser(prog="fluentcoder", description=__doc__.split("\n", 1)[0])
-    sub = parser.add_subparsers(dest="cmd", required=True)
-
+def _add_compile_parser(sub: argparse._SubParsersAction) -> None:
     p_compile = sub.add_parser("compile", help="render a protocol .py to .xscr")
     p_compile.add_argument("input", type=Path)
     p_compile.add_argument("--output", "-o", type=Path, default=None)
@@ -49,44 +41,59 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     p_compile.set_defaults(func=_cmd_compile)
 
-    p_simulate = sub.add_parser("simulate", help="run the simulator and print snapshot summary")
+
+def _add_simulate_parser(sub: argparse._SubParsersAction) -> None:
+    p_simulate = sub.add_parser(
+        "simulate", help="run the simulator and print snapshot summary"
+    )
     p_simulate.add_argument("input", type=Path)
     _add_simulate_policy_args(p_simulate)
     _add_subroutine_registry_args(p_simulate)
     _add_snapshot_args(p_simulate)
     p_simulate.set_defaults(func=_cmd_simulate)
 
-    p_decompile = sub.add_parser(
-        "decompile",
-        help="parse a .xscr and emit a fluentcoder Python protocol",
-    )
-    decompile_sub = p_decompile.add_subparsers(dest="decompile_cmd", required=True)
 
+def _add_decompile_file_parser(decompile_sub: argparse._SubParsersAction) -> None:
     p_decompile_file = decompile_sub.add_parser(
         "file",
         help="decompile one .xscr into a fluentcoder Python protocol",
     )
     p_decompile_file.add_argument("input", type=Path)
-    p_decompile_file.add_argument("--output", "-o", type=Path, default=None,
-                                    help="output .py path (defaults to <input>.py)")
-    p_decompile_file.add_argument("--strict", action="store_true",
-                                    help="exit 1 if any step decoded as GenericStep")
+    p_decompile_file.add_argument(
+        "--output",
+        "-o",
+        type=Path,
+        default=None,
+        help="output .py path (defaults to <input>.py)",
+    )
+    p_decompile_file.add_argument(
+        "--strict",
+        action="store_true",
+        help="exit 1 if any step decoded as GenericStep",
+    )
     p_decompile_file.add_argument(
         "--simulate",
         action="store_true",
         help="run the simulator on the emitted Python protocol",
     )
-    _add_simulate_policy_args(p_decompile_file, strict_flag="simulate-strict", strict_dest="simulate_strict")
+    _add_simulate_policy_args(
+        p_decompile_file, strict_flag="simulate-strict", strict_dest="simulate_strict"
+    )
     _add_subroutine_registry_args(p_decompile_file)
     _add_snapshot_args(p_decompile_file)
     p_decompile_file.set_defaults(func=_cmd_decompile)
 
+
+def _add_decompile_corpus_report_parser(
+    decompile_sub: argparse._SubParsersAction,
+) -> None:
     p_corpus_report = decompile_sub.add_parser(
         "corpus-report",
         help="decompile/simulate a corpus and rank unsupported commands",
     )
-    p_corpus_report.add_argument("paths", nargs="+", type=Path,
-                                 help="one or more .xscr files or directories")
+    p_corpus_report.add_argument(
+        "paths", nargs="+", type=Path, help="one or more .xscr files or directories"
+    )
     p_corpus_report.add_argument(
         "--output-dir",
         type=Path,
@@ -110,8 +117,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         default=20,
         help="number of parser-priority rows to include in the report",
     )
-    p_corpus_report.add_argument("--json", dest="as_json", action="store_true",
-                                 help="emit the mining summary as JSON")
+    p_corpus_report.add_argument(
+        "--json",
+        dest="as_json",
+        action="store_true",
+        help="emit the mining summary as JSON",
+    )
     p_corpus_report.add_argument(
         "--fail-on-opaque",
         action="store_true",
@@ -132,19 +143,44 @@ def main(argv: Optional[list[str]] = None) -> int:
     _add_subroutine_registry_args(p_corpus_report)
     p_corpus_report.set_defaults(func=_cmd_corpus_report)
 
+
+def _add_decompile_parser(sub: argparse._SubParsersAction) -> None:
+    p_decompile = sub.add_parser(
+        "decompile",
+        help="parse a .xscr and emit a fluentcoder Python protocol",
+    )
+    decompile_sub = p_decompile.add_subparsers(dest="decompile_cmd", required=True)
+    _add_decompile_file_parser(decompile_sub)
+    _add_decompile_corpus_report_parser(decompile_sub)
+
+
+def _add_catalog_parser(sub: argparse._SubParsersAction) -> None:
     p_cat = sub.add_parser("catalog", help="catalog index management")
     cat_sub = p_cat.add_subparsers(dest="cat_cmd", required=True)
 
     p_refresh = cat_sub.add_parser("refresh", help="rebuild the SQL catalog index")
-    p_refresh.add_argument("--install", type=Path, default=None,
-                           help="FluentControl install path (defaults to env or built-in)")
-    p_refresh.add_argument("--db", type=Path, default=None,
-                           help="output index path (defaults to package's install_index.db)")
-    p_refresh.add_argument("--all-connectors", action="store_true",
-                           help="index every Connectors/*.xcon (14k+ on full installs)")
+    p_refresh.add_argument(
+        "--install",
+        type=Path,
+        default=None,
+        help="FluentControl install path (defaults to env or built-in)",
+    )
+    p_refresh.add_argument(
+        "--db",
+        type=Path,
+        default=None,
+        help="output index path (defaults to package's install_index.db)",
+    )
+    p_refresh.add_argument(
+        "--all-connectors",
+        action="store_true",
+        help="index every Connectors/*.xcon (14k+ on full installs)",
+    )
     p_refresh.set_defaults(func=_cmd_catalog_refresh)
 
-    p_info = cat_sub.add_parser("info", help="print install path, fingerprint, category counts")
+    p_info = cat_sub.add_parser(
+        "info", help="print install path, fingerprint, category counts"
+    )
     p_info.set_defaults(func=_cmd_catalog_info)
 
     p_find = cat_sub.add_parser("find", help="substring search components by name")
@@ -152,6 +188,27 @@ def main(argv: Optional[list[str]] = None) -> int:
     p_find.add_argument("--category", help="filter by category")
     p_find.set_defaults(func=_cmd_catalog_find)
 
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="fluentcoder", description=__doc__.split("\n", 1)[0] if __doc__ else ""
+    )
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    _add_compile_parser(sub)
+    _add_simulate_parser(sub)
+    _add_decompile_parser(sub)
+    _add_catalog_parser(sub)
+
+    return parser
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    argv = list(argv if argv is not None else sys.argv[1:])
+    if len(argv) >= 2 and argv[0] == "decompile" and argv[1] != "corpus-report":
+        argv.insert(1, "file")
+
+    parser = build_parser()
     args = parser.parse_args(argv)
     return args.func(args)
 
@@ -303,10 +360,12 @@ def _print_simulation_result(wt, args) -> None:
         print(json.dumps(out, indent=2))
         return
     for s in wt.snapshots:
-        print(f"  step {s.step_index:3d} {type(s.step).__name__:24s}"
-              f"  labware={sum(len(st) for st in s.slot_map.values()):2d}"
-              f"  tips={len(s.mca_tips):3d}"
-              f"  tip_vol={sum(t.volume_ul for t in s.mca_tips):.1f} µL")
+        print(
+            f"  step {s.step_index:3d} {type(s.step).__name__:24s}"
+            f"  labware={sum(len(st) for st in s.slot_map.values()):2d}"
+            f"  tips={len(s.mca_tips):3d}"
+            f"  tip_vol={sum(t.volume_ul for t in s.mca_tips):.1f} µL"
+        )
     if args.coverage and wt.simulation_report is not None:
         report = wt.simulation_report
         print(
@@ -320,7 +379,8 @@ def _print_simulation_result(wt, args) -> None:
         )
         if report.unsupported_command_ids:
             unsupported = ", ".join(
-                f"{name}={count}" for name, count in report.unsupported_command_ids.items()
+                f"{name}={count}"
+                for name, count in report.unsupported_command_ids.items()
             )
             print(f"  unsupported: {unsupported}")
         for warning in report.warnings:
@@ -450,9 +510,7 @@ def _load_protocol(input_path: Path):
         return module.build_worktable()
     if hasattr(module, "wt"):
         return module.wt
-    raise ValueError(
-        f"{input_path}: expected `build_worktable()` or top-level `wt`"
-    )
+    raise ValueError(f"{input_path}: expected `build_worktable()` or top-level `wt`")
 
 
 # ── catalog subcommands ────────────────────────────────────────────
@@ -460,6 +518,7 @@ def _load_protocol(input_path: Path):
 
 def _cmd_catalog_refresh(args) -> int:
     from .catalog.indexer import build_index
+
     counts = build_index(
         install_path=args.install,
         db_path=args.db,
@@ -473,6 +532,7 @@ def _cmd_catalog_refresh(args) -> int:
 
 def _cmd_catalog_info(args) -> int:
     from .catalog.catalog import install_info, category_counts, index_exists
+
     if not index_exists():
         print("Catalog index is empty. Run `fluentcoder catalog refresh`.")
         return 1
@@ -488,6 +548,7 @@ def _cmd_catalog_info(args) -> int:
 
 def _cmd_catalog_find(args) -> int:
     from .catalog.catalog import find_components
+
     rows = find_components(args.pattern)
     if args.category:
         rows = [r for r in rows if r.category == args.category]
