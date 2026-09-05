@@ -9,6 +9,7 @@ calls; it is reconstructed by the Simulator from the IR list).
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Collection, Iterator, Optional, Union
@@ -32,6 +33,19 @@ from .labware.base import Labware
 if TYPE_CHECKING:
     from .simulator.snapshots import Snapshot
     from .simulator.report import SimulationReport
+
+
+
+@dataclass(frozen=True)
+class MoveAxisConfig:
+    available_id: Optional[str] = None
+    id_label: Optional[str] = None
+    position: Union[float, int, str, Expression] = 0
+    charge_condition: Union[str, Expression, None] = None
+    max_speed: Optional[str] = None
+    acceleration: Optional[str] = None
+    deceleration: Optional[str] = None
+    raw_xml: Optional[str] = None
 
 
 class Worktable:
@@ -608,28 +622,17 @@ class Worktable:
             variable_mappings_end=list(variable_mappings_end or []),
         ))
 
-    def move_axis_command(
-        self,
-        *,
-        available_id: Optional[str] = None,
-        id_label: Optional[str] = None,
-        position: Union[float, int, str, Expression] = 0,
-        charge_condition: Union[str, Expression, None] = None,
-        max_speed: Optional[str] = None,
-        acceleration: Optional[str] = None,
-        deceleration: Optional[str] = None,
-        raw_xml: Optional[str] = None,
-    ) -> None:
+    def move_axis_command(self, config: MoveAxisConfig) -> None:
         """Queue a hardware driver axis move (non-deck motion; simulator no-op)."""
         self._emit(MoveAxisCommandStep(
-            available_id=available_id,
-            id_label=id_label,
-            position=position,
-            charge_condition=charge_condition,
-            max_speed=max_speed,
-            acceleration=acceleration,
-            deceleration=deceleration,
-            raw_xml=raw_xml,
+            available_id=config.available_id,
+            id_label=config.id_label,
+            position=config.position,
+            charge_condition=config.charge_condition,
+            max_speed=config.max_speed,
+            acceleration=config.acceleration,
+            deceleration=config.deceleration,
+            raw_xml=config.raw_xml,
         ))
 
     def start_move_command(
