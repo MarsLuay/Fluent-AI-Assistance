@@ -154,12 +154,34 @@ class Worktable:
 
         The catalog index must be built; raises if not.
         """
+        from .catalog.xcmp import load_xwsp
+
+        ws_file_path = cls._resolve_workspace_file(name, workspace_guid)
+        ws = load_xwsp(ws_file_path)
+
+        wt = cls(name=protocol_name or name, comment=comment)
+        wt.workspace_name = ws.name
+        wt.workspace_guid = ws.guid
+
+        default_loc, slot_position_by_site = wt._initialize_slots_from_workspace(ws)
+
+        wt._place_workspace_occupants(
+            ws,
+            auto_place,
+            seed_simulation,
+            simulation_seed_labels,
+            default_loc,
+            slot_position_by_site,
+        )
+
+        return wt
+
+    @classmethod
+    def _resolve_workspace_file(cls, name: str, workspace_guid: Optional[str]) -> Any:
         from .catalog.catalog import (
-            index_exists, resolve_by_name, resolve_workspace_by_guid,
+            index_exists, resolve_workspace_by_guid,
             resolve_workspace_by_name,
         )
-        from .catalog.xcmp import load_xwsp
-        from .labware import CATEGORY_TO_CLASS
         from .simulator.invariants import MissingSimValueError
 
         if not index_exists():
@@ -192,33 +214,15 @@ class Worktable:
             lookup = workspace_guid or name
             raise ValueError(f"Workspace {lookup!r} not found in catalog index")
 
-        ws = load_xwsp(ws_entry.file_path)
+        return ws_entry.file_path
 
-        wt = cls(name=protocol_name or name, comment=comment)
-        wt.workspace_name = ws.name
-        wt.workspace_guid = ws.guid
-
-        def _workspace_position(site_path: tuple[int, ...]) -> int:
-            if len(site_path) >= 3 and site_path[-1] == 0:
-                return site_path[-2] + 1
-            return site_path[-1] + 1
-
+    def _initialize_slots_from_workspace(self, ws: Any) -> tuple[str, dict[tuple[tuple[int, ...], str], int]]:
         slot_position_by_site: dict[tuple[tuple[int, ...], str], int] = {}
         slot_counts_by_location: dict[str, int] = {}
         seen_sites: set[tuple[tuple[int, ...], str]] = set()
         generic_site_paths: list[tuple[int, ...]] = []
         seen_generic_site_paths: set[tuple[int, ...]] = set()
 
-        def _occupant_position(occ: Any) -> int:
-            site_path = getattr(occ, "site_path", None)
-            location_name = getattr(occ, "base_location_identifier", None)
-            if site_path and location_name:
-                mapped = slot_position_by_site.get((site_path, location_name))
-                if mapped is not None:
-                    return mapped
-            if site_path:
-                return _workspace_position(site_path)
-            return int(getattr(occ, "site_index", 0)) + 1
         # Build the valid-slots whitelist from EVERY visited site (occupied or
         # not). XWSP site indices are 0-based; FluentControl positions are
         # 1-based — translate at the boundary.
@@ -245,7 +249,37 @@ class Worktable:
         if ws.name == "780_Empty":
             for position, _ in enumerate(generic_site_paths, start=1):
                 valid.add(("Site", position))
-        wt.valid_slots = valid
+        self.valid_slots = valid
+
+        return default_loc, slot_position_by_site
+
+    def _place_workspace_occupants(
+        self,
+        ws: Any,
+        auto_place: bool,
+        seed_simulation: bool,
+        simulation_seed_labels: Optional[Collection[str]],
+        default_loc: str,
+        slot_position_by_site: dict[tuple[tuple[int, ...], str], int],
+    ) -> None:
+        from .catalog.catalog import resolve_by_name
+        from .labware import CATEGORY_TO_CLASS
+
+        def _workspace_position(site_path: tuple[int, ...]) -> int:
+            if len(site_path) >= 3 and site_path[-1] == 0:
+                return site_path[-2] + 1
+            return site_path[-1] + 1
+
+        def _occupant_position(occ: Any) -> int:
+            site_path = getattr(occ, "site_path", None)
+            location_name = getattr(occ, "base_location_identifier", None)
+            if site_path and location_name:
+                mapped = slot_position_by_site.get((site_path, location_name))
+                if mapped is not None:
+                    return mapped
+            if site_path:
+                return _workspace_position(site_path)
+            return int(getattr(occ, "site_index", 0)) + 1
 
         seed_labels = {
             str(label).strip()
@@ -255,7 +289,7 @@ class Worktable:
 
         if auto_place or seed_simulation:
             if auto_place:
-                wt.group("Worktable Setup")
+                self.group("Worktable Setup")
             used_labels: set[str] = set()
             for occ in ws.occupants:
                 if seed_simulation and not auto_place and str(occ.catalog_name) not in seed_labels:
@@ -265,8 +299,8 @@ class Worktable:
                 position = _occupant_position(occ)
                 if catalog_entry is None:
                     if seed_simulation and not auto_place:
-                        wt._simulation_unresolved_seed_labels.add(str(occ.catalog_name))
-                        wt._simulation_context_warnings.append(
+                        self._simulation_unresolved_seed_labels.add(str(occ.catalog_name))
+                        self._simulation_context_warnings.append(
                             f"Workspace seed {occ.catalog_name!r} was skipped because its catalog entry is unavailable."
                         )
                         continue
@@ -286,11 +320,9 @@ class Worktable:
                 lw = cls_for_category(label, catalog=occ.catalog_name)
                 loc = occ.base_location_identifier or default_loc
                 if auto_place:
-                    wt.place(lw, loc, position)
+                    self.place(lw, loc, position)
                 else:
-                    wt.seed_simulation_labware(lw, loc, position)
-
-        return wt
+                    self.seed_simulation_labware(lw, loc, position)
 
     # ── Authoring API ───────────────────────────────────────────────
 
