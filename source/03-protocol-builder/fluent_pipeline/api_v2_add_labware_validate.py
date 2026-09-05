@@ -167,6 +167,7 @@ def validate_add_labware_fields(
         _validate_fields_core(
             fields,
             declared_variables=declared,
+            check_bracket_variables=check_bracket_variables,
         )
     except ApiV2ValidationError as exc:
         return AddLabwareValidateResult(
