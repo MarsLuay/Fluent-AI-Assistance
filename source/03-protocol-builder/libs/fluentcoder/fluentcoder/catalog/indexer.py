@@ -106,6 +106,13 @@ def build_index(
         existing_sources = _load_indexed_sources(conn, install_key)
         seen_paths: set[str] = set()
 
+        existing_components = {
+            row["guid"]: row["category"]
+            for row in conn.execute(
+                "SELECT guid, category FROM components WHERE install_key = ?", (install_key,)
+            ).fetchall()
+        }
+
         for path in sorted(components_dir.glob("*.xcmp"), key=lambda p: p.as_posix()):
             rel = _relative_install_path(path, install)
             seen_paths.add(rel)
@@ -116,11 +123,7 @@ def build_index(
                 and cached["source_fingerprint"] == content_fp
                 and cached["entity_table"] == "components"
             ):
-                row = conn.execute(
-                    "SELECT category FROM components WHERE install_key = ? AND guid = ?",
-                    (install_key, cached["entity_key"]),
-                ).fetchone()
-                if row is not None:
+                if cached["entity_key"] in existing_components:
                     continue
 
             try:

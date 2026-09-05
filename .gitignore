@@ -39,3 +39,4 @@ source/04-protocol-simulator/public/models/fluent/merge-report.md
 source/04-protocol-simulator/dist/models/fluent/*.glb
 source/04-protocol-simulator/dist/models/fluent/manifest.json
 venv/
+mock_install/
