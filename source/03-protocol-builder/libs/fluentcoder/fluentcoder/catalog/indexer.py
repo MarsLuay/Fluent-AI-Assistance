@@ -221,6 +221,12 @@ def build_index(
                 )
 
         if sites_dir.exists():
+            existing_site_guids = {
+                row["guid"]
+                for row in conn.execute(
+                    "SELECT guid FROM sites WHERE install_key = ?", (install_key,)
+                ).fetchall()
+            }
             for path in sorted(sites_dir.glob("*.xsit"), key=lambda p: p.as_posix()):
                 rel = _relative_install_path(path, install)
                 seen_paths.add(rel)
@@ -232,10 +238,7 @@ def build_index(
                     and cached["source_fingerprint"] == content_fp
                     and cached["entity_table"] == "sites"
                 ):
-                    if conn.execute(
-                        "SELECT 1 FROM sites WHERE install_key = ? AND guid = ?",
-                        (install_key, cached["entity_key"]),
-                    ).fetchone():
+                    if cached["entity_key"] in existing_site_guids:
                         continue
 
                 conn.execute(
