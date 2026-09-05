@@ -156,5 +156,59 @@ class AddLabwareValidateTests(unittest.TestCase):
         cmd.validate()
 
 
+
+    def test_add_labware_fields_as_dict(self):
+        fields = AddLabwareFields(
+            labware_type="96 Well Flat",
+            labware_label="Plate1",
+            location="NestPlatform",
+            site=2,
+            rotation=180,
+            has_lid=True,
+        )
+        expected = {
+            "labware_type": "96 Well Flat",
+            "labware_label": "Plate1",
+            "location": "NestPlatform",
+            "site": 2,
+            "rotation": 180,
+            "has_lid": True,
+        }
+        self.assertEqual(fields.as_dict(), expected)
+
+    def test_add_labware_validate_result_as_dict_minimal(self):
+        from fluent_pipeline.api_v2_add_labware_validate import AddLabwareValidateResult, API_V2_METHOD, API_V2_ISSUE_ID
+        result = AddLabwareValidateResult(ok=True)
+        expected = {
+            "ok": True,
+            "source": "offline",
+            "api_v2_method": API_V2_METHOD,
+            "api_v2_issue": API_V2_ISSUE_ID,
+        }
+        self.assertEqual(result.as_dict(), expected)
+
+    def test_add_labware_validate_result_as_dict_full(self):
+        from fluent_pipeline.api_v2_add_labware_validate import AddLabwareValidateResult, API_V2_METHOD, API_V2_ISSUE_ID
+        result = AddLabwareValidateResult(
+            ok=False,
+            message="Something went wrong",
+            reason="duplicate_label",
+            field="labware_label",
+            source="native",
+            fields={"labware_type": "96 Well Flat"},
+        )
+        expected = {
+            "ok": False,
+            "source": "native",
+            "api_v2_method": API_V2_METHOD,
+            "api_v2_issue": API_V2_ISSUE_ID,
+            "message": "Something went wrong",
+            "reason": "duplicate_label",
+            "field": "labware_label",
+            "fields": {"labware_type": "96 Well Flat"},
+        }
+        self.assertEqual(result.as_dict(), expected)
+
+
 if __name__ == "__main__":
     unittest.main()
