@@ -274,6 +274,433 @@ def _iter_steps(steps: Iterable[Step]) -> Iterable[Step]:
             yield from _iter_steps(step.else_steps)
 
 
+class _StepEmitter:
+    def __init__(
+        self,
+        steps: Iterable[Step],
+        indent: str,
+        out: list[str],
+        classes_used: set[str],
+        label_to_var: dict[str, str],
+        placed_labware: list[tuple[str, str]],
+        fc_token_vars: dict[str, str],
+    ):
+        self.steps_list = list(steps)
+        self.indent = indent
+        self.out = out
+        self.classes_used = classes_used
+        self.label_to_var = label_to_var
+        self.placed_labware = placed_labware
+        self.fc_token_vars = fc_token_vars
+        self.head_var_emitted = False
+        self.i = 0
+
+    def emit_all(self) -> None:
+        while self.i < len(self.steps_list):
+            step = self.steps_list[self.i]
+
+            if step.disabled and not isinstance(step, (ConditionalStep, LoopStep, ScriptGroupStep)):
+                self.out.append(self.indent + "wt.disable_next_step()")
+
+            if self._emit_labware_and_device(step):
+                continue
+            if self._emit_head_and_pipetting(step):
+                continue
+            if self._emit_liha(step):
+                continue
+            if self._emit_control_flow(step):
+                continue
+            if self._emit_variables_and_timers(step):
+                continue
+            if self._emit_misc(step):
+                continue
+
+            self.out.append(self.indent + f"# [decompiler] unsupported step: {type(step).__name__}")
+            self.i += 1
+
+    def _emit_labware_and_device(self, step: Step) -> bool:
+        # Collapse Cga(Get|Drop)Fingers + transfer macro triplet into
+        # a single gripper.move(...) call.
+        if isinstance(step, CgaGetFingersStep) and self.i + 2 < len(self.steps_list):
+            rga = _as_rga_transfer_step(self.steps_list[self.i + 1])
+            if rga is not None and isinstance(self.steps_list[self.i + 2], CgaDropFingersStep):
+                self.out.append(_emit_gripper_move(rga, indent=self.indent, label_to_var=self.label_to_var, classes_used=self.classes_used))
+                self.i += 3
+                return True
+
+        if isinstance(step, AddLabwareStep):
+            if step.labware_type.startswith("EVA["):
+                # EVA AddLabware is auto-injected by the install-bundle
+                # checksum rewrite; mount_adapter() handles the IR side.
+                self.i += 1
+                return True
+            emitted, resolved = _emit_add_labware(
+                step, self.classes_used, self.label_to_var, self.placed_labware, self.fc_token_vars
+            )
+            for line in emitted:
+                self.out.append(self.indent + line)
+            if resolved:
+                fill = _emit_fill_all(step, self.label_to_var, self.placed_labware)
+                if fill is not None:
+                    self.out.append(self.indent + fill)
+            self.i += 1
+            return True
+
+        if isinstance(step, RemoveLabwareStep):
+            target = _label_arg(step.labware_name, self.label_to_var) or repr(step.labware_name)
+            self.out.append(self.indent + f"wt.remove({target})")
+            self.i += 1
+            return True
+
+        if isinstance(step, RgaTransferLabwareStep):
+            # Stray RGA without surrounding Cga* — emit standalone gripper.move.
+            self.out.append(_emit_gripper_move(step, indent=self.indent, label_to_var=self.label_to_var, classes_used=self.classes_used))
+            self.i += 1
+            return True
+
+        if isinstance(step, CgaGetFingersStep):
+            self.out.append(_emit_cga_get_fingers(step, indent=self.indent))
+            self.i += 1
+            return True
+
+        if isinstance(step, CgaDropFingersStep):
+            self.out.append(_emit_cga_drop_fingers(step, indent=self.indent))
+            self.i += 1
+            return True
+
+        if isinstance(step, SetLocationStep):
+            self.out.append(self.indent + (
+                f"wt.set_location({step.labware!r}, {step.location!r}, "
+                f"{_emit_expression_arg(step.site, self.classes_used)}, rotation={step.rotation!r})"
+            ))
+            self.i += 1
+            return True
+
+        if isinstance(step, InitializeDeviceStep):
+            self.out.append(self.indent + _emit_initialize_device(step))
+            self.i += 1
+            return True
+
+        if isinstance(step, TeGioSetPwmOutputStep):
+            self.out.append(self.indent + _emit_tegio_set_pwm_output(step, self.classes_used))
+            self.i += 1
+            return True
+
+        if isinstance(step, MoveAxisCommandStep):
+            self.out.append(self.indent + _emit_move_axis_command(step, self.classes_used))
+            self.i += 1
+            return True
+
+        if isinstance(step, StartMoveCommandStep):
+            self.out.append(self.indent + _emit_start_move_command(step))
+            self.i += 1
+            return True
+
+        return False
+
+    def _emit_head_and_pipetting(self, step: Step) -> bool:
+        if isinstance(step, GetHeadAdapterStep):
+            if not self.head_var_emitted:
+                self.out.append(self.indent + "head = wt.mca96")
+                self.head_var_emitted = True
+            self.out.append(self.indent + "head.mount_adapter()")
+            self.i += 1
+            return True
+
+        if isinstance(step, DropHeadAdapterStep):
+            self.out.append(self.indent + "head.drop_adapter()")
+            self.i += 1
+            return True
+
+        if isinstance(step, PickUpTipsStep):
+            target = _label_arg(step.labware_name, self.label_to_var) or repr(step.labware_name)
+            self.out.append(self.indent + f"head.pick_up({target})")
+            self.i += 1
+            return True
+
+        if isinstance(step, SetTipsBackStep):
+            if step.labware_name:
+                target = _label_arg(step.labware_name, self.label_to_var) or repr(step.labware_name)
+                self.out.append(self.indent + f"head.return_tips({target})")
+            else:
+                self.out.append(self.indent + "head.return_tips(None)")
+            self.i += 1
+            return True
+
+        if isinstance(step, AspirateStep):
+            self.out.append(self.indent + _emit_aspirate(step, self.label_to_var, self.classes_used))
+            self.i += 1
+            return True
+
+        if isinstance(step, DispenseStep):
+            self.out.append(self.indent + _emit_dispense(step, self.label_to_var, self.classes_used))
+            self.i += 1
+            return True
+
+        if isinstance(step, Mca384MixStep):
+            if not self.head_var_emitted:
+                self.out.append(self.indent + "head = wt.mca96")
+                self.head_var_emitted = True
+            target = _label_arg(step.labware_name, self.label_to_var) or repr(step.labware_name)
+            parts = [target, _emit_expression_arg(step.volume, self.classes_used), f"cycles={_emit_expression_arg(step.cycles, self.classes_used)}"]
+            parts.append(f"liquid_class={(step.liquid_class or 'Water Mix')!r}")
+            self.out.append(self.indent + f"head.mix({', '.join(parts)})")
+            self.i += 1
+            return True
+
+        if isinstance(step, Mca384EmptyTipsStep):
+            if not self.head_var_emitted:
+                self.out.append(self.indent + "head = wt.mca96")
+                self.head_var_emitted = True
+            target = _label_arg(step.labware_name, self.label_to_var) or repr(step.labware_name)
+            parts = [target, _emit_expression_arg(step.volume, self.classes_used)]
+            if step.liquid_class:
+                parts.append(f"liquid_class={step.liquid_class!r}")
+            self.out.append(self.indent + f"head.empty_tips({', '.join(parts)})")
+            self.i += 1
+            return True
+
+        if isinstance(step, (Mca384GetTipsStep, Mca384DropTipsStep, Mca384MoveArmStep)):
+            self.out.append(self.indent + _emit_mca384_generic_step(step))
+            self.i += 1
+            return True
+
+        return False
+
+    def _emit_liha(self, step: Step) -> bool:
+        if isinstance(step, LihaGetTipsStep):
+            self.out.append(self.indent + "liha = wt.liha")
+            arg = _label_arg(step.labware_name, self.label_to_var)
+            self.out.append(self.indent + f"liha.get_tips({arg})" if arg else self.indent + "liha.get_tips()")
+            self.i += 1
+            return True
+
+        if isinstance(step, LihaDropTipsStep):
+            self.out.append(self.indent + "liha = wt.liha")
+            arg = _label_arg(step.labware_name, self.label_to_var)
+            self.out.append(self.indent + f"liha.drop_tips({arg})" if arg else self.indent + "liha.drop_tips()")
+            self.i += 1
+            return True
+
+        if isinstance(step, LihaAspirateStep):
+            self.out.append(self.indent + "liha = wt.liha")
+            self.out.append(self.indent + _emit_liha_pipette("aspirate", step, self.label_to_var, self.classes_used))
+            self.i += 1
+            return True
+
+        if isinstance(step, LihaDispenseStep):
+            self.out.append(self.indent + "liha = wt.liha")
+            self.out.append(self.indent + _emit_liha_pipette("dispense", step, self.label_to_var, self.classes_used))
+            self.i += 1
+            return True
+
+        if isinstance(step, LihaMixStep):
+            self.out.append(self.indent + "liha = wt.liha")
+            self.out.append(self.indent + _emit_liha_pipette("mix", step, self.label_to_var, self.classes_used, cycles=step.cycles))
+            self.i += 1
+            return True
+
+        if isinstance(step, LihaDetectLiquidStep):
+            self.out.append(self.indent + _emit_liha_detect_liquid(step, self.label_to_var))
+            self.i += 1
+            return True
+
+        if isinstance(step, LihaEmptyTipsStep):
+            self.out.append(self.indent + "liha = wt.liha")
+            target = _label_arg(step.labware_name, self.label_to_var) or repr(step.labware_name)
+            parts = [target, _emit_expression_arg(step.volume, self.classes_used)]
+            if step.liquid_class:
+                parts.append(f"liquid_class={step.liquid_class!r}")
+            self.out.append(self.indent + f"liha.empty_tips({', '.join(parts)})")
+            self.i += 1
+            return True
+
+        return False
+
+    def _emit_control_flow(self, step: Step) -> bool:
+        if isinstance(step, LoopStep):
+            times_repr = _times_repr(step, self.classes_used)
+            loop_variable_arg = (
+                f", loop_variable={step.loop_variable!r}" if step.loop_variable else ""
+            )
+            disabled_arg = ", disabled=True" if step.disabled else ""
+            self.out.append(
+                self.indent
+                + f"with wt.loop(times={times_repr}, name={step.name!r}{loop_variable_arg}{disabled_arg}):"
+            )
+            _emit_steps(
+                step.steps,
+                indent=self.indent + "    ",
+                out=self.out,
+                classes_used=self.classes_used,
+                label_to_var=self.label_to_var,
+                placed_labware=self.placed_labware,
+                fc_token_vars=self.fc_token_vars,
+            )
+            _ensure_block_body(self.out, self.indent + "    ")
+            self.i += 1
+            return True
+
+        if isinstance(step, ConditionalStep):
+            cond_var = f"_cond_{self.i}"
+            disabled_arg = ", disabled=True" if step.disabled else ""
+            if step.condition is not None:
+                condition_repr = _emit_expression_arg(step.condition, self.classes_used, source_field=True)
+                self.out.append(
+                    self.indent
+                    + f"with wt.conditional(condition={condition_repr}, name={step.name!r}{disabled_arg}):"
+                )
+            else:
+                right_repr = _emit_expression_arg(step.right_value, self.classes_used)
+                self.out.append(
+                    self.indent + f"with wt.conditional(left={step.left_variable!r}, "
+                    f"op={step.operator!r}, right={right_repr}, "
+                    f"right_is_variable={step.right_is_variable!r}, name={step.name!r}{disabled_arg}):"
+                )
+            if step.else_steps:
+                self.out[-1] = self.out[-1].replace("):", f") as {cond_var}:")
+            _emit_steps(
+                step.then_steps,
+                indent=self.indent + "    ",
+                out=self.out,
+                classes_used=self.classes_used,
+                label_to_var=self.label_to_var,
+                placed_labware=self.placed_labware,
+                fc_token_vars=self.fc_token_vars,
+            )
+            _ensure_block_body(self.out, self.indent + "    ")
+            if step.else_steps:
+                self.out.append(self.indent + f"with wt.else_branch({cond_var}):")
+                _emit_steps(
+                    step.else_steps,
+                    indent=self.indent + "    ",
+                    out=self.out,
+                    classes_used=self.classes_used,
+                    label_to_var=self.label_to_var,
+                    placed_labware=self.placed_labware,
+                    fc_token_vars=self.fc_token_vars,
+                )
+                _ensure_block_body(self.out, self.indent + "    ")
+            self.i += 1
+            return True
+
+        if isinstance(step, ScriptGroupStep):
+            self.out.append(self.indent + f"with wt.nested_group({step.name!r}):")
+            _emit_steps(
+                step.steps,
+                indent=self.indent + "    ",
+                out=self.out,
+                classes_used=self.classes_used,
+                label_to_var=self.label_to_var,
+                placed_labware=self.placed_labware,
+                fc_token_vars=self.fc_token_vars,
+            )
+            _ensure_block_body(self.out, self.indent + "    ")
+            self.i += 1
+            return True
+
+        if isinstance(step, SubRoutineStep):
+            self.out.append(self.indent + _emit_call_subroutine(step, self.classes_used))
+            self.i += 1
+            return True
+
+        if isinstance(step, WaitStep):
+            self.out.append(self.indent + f"wt.wait({_emit_expression_arg(step.duration_seconds, self.classes_used)})")
+            self.i += 1
+            return True
+
+        if isinstance(step, WaitForAsyncResponseStep):
+            self.out.append(self.indent + _emit_wait_for_async_response(step))
+            self.i += 1
+            return True
+
+        if isinstance(step, LeaveStep):
+            self.out.append(self.indent + _emit_leave(step))
+            self.i += 1
+            return True
+
+        if isinstance(step, EndScriptStep):
+            self.out.append(self.indent + _emit_end_script(step))
+            self.i += 1
+            return True
+
+        return False
+
+    def _emit_variables_and_timers(self, step: Step) -> bool:
+        if isinstance(step, SetVariableStep):
+            self.out.append(self.indent + _emit_set_variable(step, self.classes_used))
+            self.i += 1
+            return True
+
+        if isinstance(step, ExportVariableStep):
+            self.out.append(self.indent + _emit_export_variables(step))
+            self.i += 1
+            return True
+
+        if isinstance(step, ImportVariableStep):
+            self.out.append(self.indent + _emit_import_variables(step))
+            self.i += 1
+            return True
+
+        if isinstance(step, QueryVariableStep):
+            self.out.append(self.indent + (
+                f"wt.query_variable({step.variable_name!r}, {step.query_prompt!r}, "
+                f"limit_range={step.limit_range!r})"
+            ))
+            self.i += 1
+            return True
+
+        if isinstance(step, StartTimerStep):
+            self.out.append(self.indent + f"wt.start_timer({step.timer!r})")
+            self.i += 1
+            return True
+
+        if isinstance(step, WaitForTimerStep):
+            self.out.append(self.indent + f"wt.wait_for_timer({step.timer!r}, {_emit_expression_arg(step.duration_seconds, self.classes_used)})")
+            self.i += 1
+            return True
+
+        return False
+
+    def _emit_misc(self, step: Step) -> bool:
+        if isinstance(step, CommentStep):
+            self.out.append(self.indent + f"wt.add_comment({step.comment!r})")
+            self.i += 1
+            return True
+
+        if isinstance(step, UserPromptStep):
+            self.out.append(self.indent + _emit_user_prompt(step))
+            self.i += 1
+            return True
+
+        if isinstance(step, ExecuteVbScriptStep):
+            self.out.append(self.indent + _emit_execute_vb_script(step))
+            self.i += 1
+            return True
+
+        if isinstance(step, ExecuteApplicationStep):
+            self.out.append(self.indent + _emit_execute_application(step))
+            self.i += 1
+            return True
+
+        if isinstance(step, GenerateReportStep):
+            self.out.append(self.indent + _emit_generate_report(step))
+            self.i += 1
+            return True
+
+        if isinstance(step, GenericStep):
+            self.out.append(self.indent + _emit_generic_step(step))
+            self.i += 1
+            return True
+
+        if isinstance(step, ApplicationDriverMacroStep):
+            self.out.append(self.indent + _emit_application_driver_macro(step))
+            self.i += 1
+            return True
+
+        return False
+
+
 def _emit_steps(
     steps: Iterable[Step],
     *,
@@ -284,383 +711,16 @@ def _emit_steps(
     placed_labware: list[tuple[str, str]],
     fc_token_vars: dict[str, str],
 ) -> None:
-    head_var_emitted = False
-    steps_list = list(steps)
-    i = 0
-    while i < len(steps_list):
-        step = steps_list[i]
-
-        if step.disabled and not isinstance(step, (ConditionalStep, LoopStep, ScriptGroupStep)):
-            out.append(indent + "wt.disable_next_step()")
-
-        # Collapse Cga(Get|Drop)Fingers + transfer macro triplet into
-        # a single gripper.move(...) call.
-        if isinstance(step, CgaGetFingersStep) and i + 2 < len(steps_list):
-            rga = _as_rga_transfer_step(steps_list[i + 1])
-            if rga is not None and isinstance(steps_list[i + 2], CgaDropFingersStep):
-                out.append(_emit_gripper_move(rga, indent=indent, label_to_var=label_to_var, classes_used=classes_used))
-                i += 3
-                continue
-
-        if isinstance(step, AddLabwareStep):
-            if step.labware_type.startswith("EVA["):
-                # EVA AddLabware is auto-injected by the install-bundle
-                # checksum rewrite; mount_adapter() handles the IR side.
-                i += 1
-                continue
-            emitted, resolved = _emit_add_labware(
-                step, classes_used, label_to_var, placed_labware, fc_token_vars
-            )
-            for line in emitted:
-                out.append(indent + line)
-            if resolved:
-                fill = _emit_fill_all(step, label_to_var, placed_labware)
-                if fill is not None:
-                    out.append(indent + fill)
-            i += 1
-            continue
-
-        if isinstance(step, GetHeadAdapterStep):
-            if not head_var_emitted:
-                out.append(indent + "head = wt.mca96")
-                head_var_emitted = True
-            out.append(indent + "head.mount_adapter()")
-            i += 1
-            continue
-
-        if isinstance(step, DropHeadAdapterStep):
-            out.append(indent + "head.drop_adapter()")
-            i += 1
-            continue
-
-        if isinstance(step, PickUpTipsStep):
-            target = _label_arg(step.labware_name, label_to_var) or repr(step.labware_name)
-            out.append(indent + f"head.pick_up({target})")
-            i += 1
-            continue
-
-        if isinstance(step, SetTipsBackStep):
-            if step.labware_name:
-                target = _label_arg(step.labware_name, label_to_var) or repr(step.labware_name)
-                out.append(indent + f"head.return_tips({target})")
-            else:
-                out.append(indent + "head.return_tips(None)")
-            i += 1
-            continue
-
-        if isinstance(step, AspirateStep):
-            out.append(indent + _emit_aspirate(step, label_to_var, classes_used))
-            i += 1
-            continue
-
-        if isinstance(step, DispenseStep):
-            out.append(indent + _emit_dispense(step, label_to_var, classes_used))
-            i += 1
-            continue
-
-        if isinstance(step, RgaTransferLabwareStep):
-            # Stray RGA without surrounding Cga* — emit standalone gripper.move.
-            out.append(_emit_gripper_move(step, indent=indent, label_to_var=label_to_var, classes_used=classes_used))
-            i += 1
-            continue
-
-        if isinstance(step, CgaGetFingersStep):
-            out.append(_emit_cga_get_fingers(step, indent=indent))
-            i += 1
-            continue
-
-        if isinstance(step, CgaDropFingersStep):
-            out.append(_emit_cga_drop_fingers(step, indent=indent))
-            i += 1
-            continue
-
-        if isinstance(step, RemoveLabwareStep):
-            target = _label_arg(step.labware_name, label_to_var) or repr(step.labware_name)
-            out.append(indent + f"wt.remove({target})")
-            i += 1
-            continue
-
-        if isinstance(step, LoopStep):
-            times_repr = _times_repr(step, classes_used)
-            loop_variable_arg = (
-                f", loop_variable={step.loop_variable!r}" if step.loop_variable else ""
-            )
-            disabled_arg = ", disabled=True" if step.disabled else ""
-            out.append(
-                indent
-                + f"with wt.loop(times={times_repr}, name={step.name!r}{loop_variable_arg}{disabled_arg}):"
-            )
-            _emit_steps(
-                step.steps,
-                indent=indent + "    ",
-                out=out,
-                classes_used=classes_used,
-                label_to_var=label_to_var,
-                placed_labware=placed_labware,
-                fc_token_vars=fc_token_vars,
-            )
-            _ensure_block_body(out, indent + "    ")
-            i += 1
-            continue
-
-        if isinstance(step, ConditionalStep):
-            cond_var = f"_cond_{i}"
-            disabled_arg = ", disabled=True" if step.disabled else ""
-            if step.condition is not None:
-                condition_repr = _emit_expression_arg(step.condition, classes_used, source_field=True)
-                out.append(
-                    indent
-                    + f"with wt.conditional(condition={condition_repr}, name={step.name!r}{disabled_arg}):"
-                )
-            else:
-                right_repr = _emit_expression_arg(step.right_value, classes_used)
-                out.append(
-                    indent + f"with wt.conditional(left={step.left_variable!r}, "
-                    f"op={step.operator!r}, right={right_repr}, "
-                    f"right_is_variable={step.right_is_variable!r}, name={step.name!r}{disabled_arg}):"
-                )
-            if step.else_steps:
-                out[-1] = out[-1].replace("):", f") as {cond_var}:")
-            _emit_steps(
-                step.then_steps,
-                indent=indent + "    ",
-                out=out,
-                classes_used=classes_used,
-                label_to_var=label_to_var,
-                placed_labware=placed_labware,
-                fc_token_vars=fc_token_vars,
-            )
-            _ensure_block_body(out, indent + "    ")
-            if step.else_steps:
-                out.append(indent + f"with wt.else_branch({cond_var}):")
-                _emit_steps(
-                    step.else_steps,
-                    indent=indent + "    ",
-                    out=out,
-                    classes_used=classes_used,
-                    label_to_var=label_to_var,
-                    placed_labware=placed_labware,
-                    fc_token_vars=fc_token_vars,
-                )
-                _ensure_block_body(out, indent + "    ")
-            i += 1
-            continue
-
-        # Unsupported steps — emit as a comment so round-trip won't break
-        # silently. The user (or v1.2) replaces with proper API.
-        if isinstance(step, ScriptGroupStep):
-            out.append(indent + f"with wt.nested_group({step.name!r}):")
-            _emit_steps(
-                step.steps,
-                indent=indent + "    ",
-                out=out,
-                classes_used=classes_used,
-                label_to_var=label_to_var,
-                placed_labware=placed_labware,
-                fc_token_vars=fc_token_vars,
-            )
-            _ensure_block_body(out, indent + "    ")
-            i += 1
-            continue
-
-        if isinstance(step, LihaGetTipsStep):
-            out.append(indent + "liha = wt.liha")
-            arg = _label_arg(step.labware_name, label_to_var)
-            out.append(indent + f"liha.get_tips({arg})" if arg else indent + "liha.get_tips()")
-            i += 1
-            continue
-
-        if isinstance(step, LihaDropTipsStep):
-            out.append(indent + "liha = wt.liha")
-            arg = _label_arg(step.labware_name, label_to_var)
-            out.append(indent + f"liha.drop_tips({arg})" if arg else indent + "liha.drop_tips()")
-            i += 1
-            continue
-
-        if isinstance(step, LihaAspirateStep):
-            out.append(indent + "liha = wt.liha")
-            out.append(indent + _emit_liha_pipette("aspirate", step, label_to_var, classes_used))
-            i += 1
-            continue
-
-        if isinstance(step, LihaDispenseStep):
-            out.append(indent + "liha = wt.liha")
-            out.append(indent + _emit_liha_pipette("dispense", step, label_to_var, classes_used))
-            i += 1
-            continue
-
-        if isinstance(step, LihaMixStep):
-            out.append(indent + "liha = wt.liha")
-            out.append(indent + _emit_liha_pipette("mix", step, label_to_var, classes_used, cycles=step.cycles))
-            i += 1
-            continue
-
-        if isinstance(step, LihaDetectLiquidStep):
-            out.append(indent + _emit_liha_detect_liquid(step, label_to_var))
-            i += 1
-            continue
-
-        if isinstance(step, GenerateReportStep):
-            out.append(indent + _emit_generate_report(step))
-            i += 1
-            continue
-
-        if isinstance(step, LihaEmptyTipsStep):
-            out.append(indent + "liha = wt.liha")
-            target = _label_arg(step.labware_name, label_to_var) or repr(step.labware_name)
-            parts = [target, _emit_expression_arg(step.volume, classes_used)]
-            if step.liquid_class:
-                parts.append(f"liquid_class={step.liquid_class!r}")
-            out.append(indent + f"liha.empty_tips({', '.join(parts)})")
-            i += 1
-            continue
-
-        if isinstance(step, Mca384MixStep):
-            if not head_var_emitted:
-                out.append(indent + "head = wt.mca96")
-                head_var_emitted = True
-            target = _label_arg(step.labware_name, label_to_var) or repr(step.labware_name)
-            parts = [target, _emit_expression_arg(step.volume, classes_used), f"cycles={_emit_expression_arg(step.cycles, classes_used)}"]
-            parts.append(f"liquid_class={(step.liquid_class or 'Water Mix')!r}")
-            out.append(indent + f"head.mix({', '.join(parts)})")
-            i += 1
-            continue
-
-        if isinstance(step, Mca384EmptyTipsStep):
-            if not head_var_emitted:
-                out.append(indent + "head = wt.mca96")
-                head_var_emitted = True
-            target = _label_arg(step.labware_name, label_to_var) or repr(step.labware_name)
-            parts = [target, _emit_expression_arg(step.volume, classes_used)]
-            if step.liquid_class:
-                parts.append(f"liquid_class={step.liquid_class!r}")
-            out.append(indent + f"head.empty_tips({', '.join(parts)})")
-            i += 1
-            continue
-
-        if isinstance(step, SetVariableStep):
-            out.append(indent + _emit_set_variable(step, classes_used))
-            i += 1
-            continue
-
-        if isinstance(step, WaitStep):
-            out.append(indent + f"wt.wait({_emit_expression_arg(step.duration_seconds, classes_used)})")
-            i += 1
-            continue
-
-        if isinstance(step, CommentStep):
-            out.append(indent + f"wt.add_comment({step.comment!r})")
-            i += 1
-            continue
-
-        if isinstance(step, UserPromptStep):
-            out.append(indent + _emit_user_prompt(step))
-            i += 1
-            continue
-
-        if isinstance(step, ExecuteVbScriptStep):
-            out.append(indent + _emit_execute_vb_script(step))
-            i += 1
-            continue
-
-        if isinstance(step, TeGioSetPwmOutputStep):
-            out.append(indent + _emit_tegio_set_pwm_output(step, classes_used))
-            i += 1
-            continue
-
-        if isinstance(step, LeaveStep):
-            out.append(indent + _emit_leave(step))
-            i += 1
-            continue
-
-        if isinstance(step, StartTimerStep):
-            out.append(indent + f"wt.start_timer({step.timer!r})")
-            i += 1
-            continue
-
-        if isinstance(step, WaitForTimerStep):
-            out.append(indent + f"wt.wait_for_timer({step.timer!r}, {_emit_expression_arg(step.duration_seconds, classes_used)})")
-            i += 1
-            continue
-
-        if isinstance(step, ExportVariableStep):
-            out.append(indent + _emit_export_variables(step))
-            i += 1
-            continue
-
-        if isinstance(step, ImportVariableStep):
-            out.append(indent + _emit_import_variables(step))
-            i += 1
-            continue
-
-        if isinstance(step, QueryVariableStep):
-            out.append(indent + (
-                f"wt.query_variable({step.variable_name!r}, {step.query_prompt!r}, "
-                f"limit_range={step.limit_range!r})"
-            ))
-            i += 1
-            continue
-
-        if isinstance(step, ExecuteApplicationStep):
-            out.append(indent + _emit_execute_application(step))
-            i += 1
-            continue
-
-        if isinstance(step, InitializeDeviceStep):
-            out.append(indent + _emit_initialize_device(step))
-            i += 1
-            continue
-
-        if isinstance(step, SubRoutineStep):
-            out.append(indent + _emit_call_subroutine(step, classes_used))
-            i += 1
-            continue
-
-        if isinstance(step, SetLocationStep):
-            out.append(indent + (
-                f"wt.set_location({step.labware!r}, {step.location!r}, "
-                f"{_emit_expression_arg(step.site, classes_used)}, rotation={step.rotation!r})"
-            ))
-            i += 1
-            continue
-
-        if isinstance(step, (Mca384GetTipsStep, Mca384DropTipsStep, Mca384MoveArmStep)):
-            out.append(indent + _emit_mca384_generic_step(step))
-            i += 1
-            continue
-
-        if isinstance(step, GenericStep):
-            out.append(indent + _emit_generic_step(step))
-            i += 1
-            continue
-
-        if isinstance(step, ApplicationDriverMacroStep):
-            out.append(indent + _emit_application_driver_macro(step))
-            i += 1
-            continue
-
-        if isinstance(step, MoveAxisCommandStep):
-            out.append(indent + _emit_move_axis_command(step, classes_used))
-            i += 1
-            continue
-
-        if isinstance(step, StartMoveCommandStep):
-            out.append(indent + _emit_start_move_command(step))
-            i += 1
-            continue
-
-        if isinstance(step, WaitForAsyncResponseStep):
-            out.append(indent + _emit_wait_for_async_response(step))
-            i += 1
-            continue
-
-        if isinstance(step, EndScriptStep):
-            out.append(indent + _emit_end_script(step))
-            i += 1
-            continue
-
-        out.append(indent + f"# [decompiler] unsupported step: {type(step).__name__}")
-        i += 1
+    emitter = _StepEmitter(
+        steps=steps,
+        indent=indent,
+        out=out,
+        classes_used=classes_used,
+        label_to_var=label_to_var,
+        placed_labware=placed_labware,
+        fc_token_vars=fc_token_vars,
+    )
+    emitter.emit_all()
 
 
 def _emit_add_labware(
