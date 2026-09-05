@@ -2020,7 +2020,7 @@ class Renderer:
         if step.step_type in (StepType.LIHA_ASPIRATE, StepType.LIHA_DISPENSE, StepType.LIHA_MIX):
             new_lc_names = self._build_liha_liquid_class_names_xml(liquid_class, num_channels)
             xml = re.sub(
-                r'(<LiquidClassNames>\s*)(?:<Object Type="System\.String">\s*<string\s*/>\s*</Object>\s*|<Object Type="System\.String">\s*<string>[^<]*</string>\s*</Object>\s*)+(\s*</LiquidClassNames>)',
+                r'(<LiquidClassNames>\s*)(?:<Object Type="System\.String">\s*(?:<string\s*/>|<string[^>]*>.*?</string>)\s*</Object>\s*)+(\s*</LiquidClassNames>)',
                 lambda m: m.group(1) + "\n" + new_lc_names + "\n        " + m.group(2).strip(),
                 xml,
                 flags=re.DOTALL
@@ -2028,7 +2028,7 @@ class Renderer:
             new_volumes = self._build_liha_volumes_xml(volume, num_channels, getattr(step, "volumes", None))
             # Match the <Volumes>...</Volumes> block and replace its content
             xml = re.sub(
-                r'(<Volumes>\s*)(?:<Object Type="System\.String">\s*<string>[^<]*</string>\s*</Object>\s*)+(\s*</Volumes>)',
+                r'(<Volumes>\s*)(?:<Object Type="System\.String">\s*(?:<string\s*/>|<string[^>]*>.*?</string>)\s*</Object>\s*)+(\s*</Volumes>)',
                 lambda m: m.group(1) + "\n" + new_volumes + "\n        " + m.group(2).strip(),
                 xml,
                 flags=re.DOTALL
