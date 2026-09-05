@@ -36,6 +36,24 @@ _GOOD_PAYLOAD = """<Object Type="Tecan.Core.Scripting.Worktable.Data.AddLabwareD
 
 
 class AddLabwareValidateTests(unittest.TestCase):
+    def test_slot_key(self):
+        fields = AddLabwareFields(
+            labware_type="96 Well Flat",
+            labware_label="Plate1",
+            location="  NestPlatform  ",
+            site=" 1 ",
+        )
+        self.assertEqual(fields.slot_key(), ("nestplatform", "1"))
+
+    def test_label_key(self):
+        fields = AddLabwareFields(
+            labware_type="96 Well Flat",
+            labware_label="  Plate1  ",
+            location="NestPlatform",
+            site=1,
+        )
+        self.assertEqual(fields.label_key(), "plate1")
+
     def test_valid_fields_pass(self):
         fields = AddLabwareFields(
             labware_type="96 Well Flat",
