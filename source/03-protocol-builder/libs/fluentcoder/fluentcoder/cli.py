@@ -1,5 +1,6 @@
 """fluentcoder CLI.
 
+
 Subcommands:
 
 - `fluentcoder compile <protocol.py>`   — execute the script and write `.xscr`.
@@ -12,6 +13,8 @@ Subcommands:
 """
 
 from __future__ import annotations
+from fluentcoder.simulator.options import SimulationOptions
+
 
 import argparse
 import importlib.util
@@ -321,7 +324,7 @@ def _simulate_worktable(wt, args) -> int:
         record_snapshots = getattr(args, "record_snapshots", None)
         if record_snapshots is not None:
             simulate_kwargs["record_snapshots"] = record_snapshots
-        wt.simulate(**simulate_kwargs)
+        wt.simulate(SimulationOptions(**simulate_kwargs))
     except Exception as exc:
         report = getattr(wt, "simulation_report", None)
         if args.as_json and report is not None:

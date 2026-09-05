@@ -1,6 +1,9 @@
 """Deterministic harness for decompiled `.xscr` corpus validation."""
 
+
 from __future__ import annotations
+from fluentcoder.simulator.options import SimulationOptions
+
 
 import importlib.util
 import sys
@@ -88,11 +91,9 @@ def run_decompiled_corpus(
             )
             module = _load_module(generated_python, alias=f"corpus_{xscr_path.stem}")
             wt = module.build_worktable()
-            wt.simulate(
-                strict=strict,
+            wt.simulate(SimulationOptions(strict=strict,
                 fail_on_opaque=fail_on_opaque,
-                subroutine_registry=registry,
-            )
+                subroutine_registry=registry,))
         except Exception as exc:
             simulation_report = getattr(wt, "simulation_report", None)
             failure = (

@@ -6,7 +6,6 @@ or decompiled flows. Each test asserts semantic state changes and report effects
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pytest

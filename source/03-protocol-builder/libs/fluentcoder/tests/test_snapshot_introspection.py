@@ -1,12 +1,14 @@
 """v1 acceptance: snapshot introspection works on a re-authored protocol.
 
+
 Verifies that after `wt.simulate()`, every step's snapshot reflects the
 correct twin state — well layers, tip flow, and is_magnetized stacking.
 """
 
 from __future__ import annotations
+from fluentcoder.simulator.options import SimulationOptions
 
-import sys
+
 from pathlib import Path
 
 import pytest
@@ -167,7 +169,7 @@ def test_record_snapshots_false_keeps_one_snapshot_with_correct_final_state() ->
         wt.mca96.return_tips()
 
     wt_full.simulate()
-    wt_final.simulate(record_snapshots=False)
+    wt_final.simulate(SimulationOptions(record_snapshots=False))
 
     assert len(wt_full.snapshots) > 1
     assert len(wt_final.snapshots) == 1
@@ -212,7 +214,7 @@ def test_delta_snapshot_mode_records_per_step_diffs_with_correct_final_state() -
     wt_delta = _build_transfer_worktable("snapshot mode delta")
 
     wt_full.simulate()
-    wt_delta.simulate(record_snapshots="delta")
+    wt_delta.simulate(SimulationOptions(record_snapshots="delta"))
 
     assert len(wt_delta.snapshots) == len(wt_full.snapshots)
     assert len(wt_delta.snapshots) > 1
@@ -242,8 +244,8 @@ def test_snapshot_mode_delta_alias_matches_record_snapshots_delta() -> None:
     wt_kw = _build_transfer_worktable("delta via record_snapshots")
     wt_mode = _build_transfer_worktable("delta via snapshot_mode")
 
-    wt_kw.simulate(record_snapshots="delta")
-    wt_mode.simulate(snapshot_mode="delta")
+    wt_kw.simulate(SimulationOptions(record_snapshots="delta"))
+    wt_mode.simulate(SimulationOptions(snapshot_mode="delta"))
 
     assert len(wt_kw.snapshots) == len(wt_mode.snapshots)
     for left, right in zip(wt_kw.snapshots, wt_mode.snapshots):
@@ -271,7 +273,7 @@ def test_delta_mode_uses_less_payload_than_full_on_long_protocol() -> None:
     wt_full = build_long("long full")
     wt_delta = build_long("long delta")
     wt_full.simulate()
-    wt_delta.simulate(record_snapshots="delta")
+    wt_delta.simulate(SimulationOptions(record_snapshots="delta"))
 
     assert len(wt_delta.snapshots) == len(wt_full.snapshots)
     assert _slot_map_labware_count(wt_full.snapshots) > len(wt_full.snapshots)

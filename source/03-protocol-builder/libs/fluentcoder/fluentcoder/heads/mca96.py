@@ -20,7 +20,6 @@ from ..labware.adapters import EvaAdapter
 from ..labware.base import Labware
 
 if TYPE_CHECKING:
-    from ..reagent import Reagent
     from ..worktable import Worktable
 
 

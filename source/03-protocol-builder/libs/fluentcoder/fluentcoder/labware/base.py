@@ -18,13 +18,12 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from ..fc_variables import FCVariableToken, encode_fc_variable
 
 if TYPE_CHECKING:
     from ..reagent import Reagent
-    from ..catalog.xcmp import XcmpComponent
 
 
 _ROW_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"

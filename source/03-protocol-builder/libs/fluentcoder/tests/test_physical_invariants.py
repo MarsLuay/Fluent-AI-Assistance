@@ -5,7 +5,6 @@ These are physics, not domain rules. No keyword lists, no scenario logic.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pytest
@@ -14,7 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 from fluentcoder import (  # noqa: E402
     CannotAspirateError, InsufficientVolumeError, MissingAdapterError,
-    MissingTipsError, OccupiedSlotError, OverdrawError,
+    MissingTipsError, OverdrawError,
     MCA100Box, MagnetRack, Plate96, Reagent, Worktable,
 )
 

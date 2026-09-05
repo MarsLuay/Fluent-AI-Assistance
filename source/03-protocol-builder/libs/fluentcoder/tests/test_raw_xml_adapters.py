@@ -1,12 +1,14 @@
 """Chunk 5: Raw XML / GenericStep adapter path tests.
 
+
 Confirms raw preserved commands are either modeled correctly or explicitly opaque.
 Each adapter family gets at least one passing test with an unknown-command control.
 """
 
 from __future__ import annotations
+from fluentcoder.simulator.options import SimulationOptions
 
-import sys
+
 from pathlib import Path
 
 import pytest
@@ -355,7 +357,7 @@ def test_unknown_raw_command_is_opaque() -> None:
     )
 
     with pytest.raises(SimulationError):
-        wt.simulate(fail_on_opaque=True)
+        wt.simulate(SimulationOptions(fail_on_opaque=True))
 
     report = wt.simulation_report
     assert report is not None

@@ -6,13 +6,12 @@ import copy
 import math
 import re
 from .. import xml_compat as ET
-from typing import TYPE_CHECKING, Any, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from ..fc_variables import decode_fc_variable
 from ..expressions import (
     BinaryExpression,
     BooleanLiteral,
-    Expression,
     FunctionCall,
     NumberLiteral,
     ReviewedRawExpression,
@@ -55,7 +54,6 @@ from .invariants import (
     MissingTipsError, OccupiedSlotError, OverdrawError,
 )
 from .snapshots import (
-    Snapshot,
     capture_state_fingerprint,
     compute_state_delta,
     take_delta_snapshot,
@@ -65,7 +63,6 @@ from .report import EffectKind, SimulationFailure, SimulationReport, StepCoverag
 from .invariants import SimulationError
 
 if TYPE_CHECKING:
-    from ..reagent import Reagent
     from ..subroutines.registry import SubroutineRegistry
     from ..worktable import Worktable
 
