@@ -623,19 +623,33 @@ def _purge_stale_sources(conn, seen_paths: set[str], install_key: str) -> None:
         "WHERE install_key = ?",
         (install_key,),
     ).fetchall()
+
+    stale_paths: list[tuple[str, str]] = []
+    table_to_keys: dict[str, list[tuple[str, str]]] = {}
+
     for row in rows:
         rel = str(row["relative_path"])
         if rel in seen_paths:
             continue
         table = str(row["entity_table"])
         key = str(row["entity_key"])
-        conn.execute(
-            f"DELETE FROM {table} WHERE install_key = ? AND guid = ?",
-            (install_key, key),
+
+        stale_paths.append((install_key, rel))
+        if table not in table_to_keys:
+            table_to_keys[table] = []
+        table_to_keys[table].append((install_key, key))
+
+    for table, keys in table_to_keys.items():
+        escaped_table = '"' + table.replace('"', '""') + '"'
+        conn.executemany(
+            f"DELETE FROM {escaped_table} WHERE install_key = ? AND guid = ?",
+            keys,
         )
-        conn.execute(
+
+    if stale_paths:
+        conn.executemany(
             "DELETE FROM indexed_sources WHERE install_key = ? AND relative_path = ?",
-            (install_key, rel),
+            stale_paths,
         )
 
 
