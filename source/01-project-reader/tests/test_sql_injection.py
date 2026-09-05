@@ -20,6 +20,16 @@ def test_project_index_count_valid(db_conn):
 def test_pattern_library_count_valid(db_conn):
     assert pl_count(db_conn, "dummy") == 2
 
+def test_project_index_count_nonexistent_table(db_conn):
+    with pytest.raises(ValueError) as exc_info:
+        pi_count(db_conn, "does_not_exist")
+    assert "Table name not found in schema: does_not_exist" in str(exc_info.value)
+
+def test_pattern_library_count_nonexistent_table(db_conn):
+    with pytest.raises(ValueError) as exc_info:
+        pl_count(db_conn, "does_not_exist")
+    assert "Table name not found in schema: does_not_exist" in str(exc_info.value)
+
 def test_project_index_count_sqli(db_conn):
     # Attempt SQL injection: close table name and comment out rest
     malicious_table = 'dummy" --'

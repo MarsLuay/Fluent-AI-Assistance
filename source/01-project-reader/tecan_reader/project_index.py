@@ -1134,6 +1134,14 @@ def _metadata_value(conn: sqlite3.Connection, key: str) -> str:
 def _count(conn: sqlite3.Connection, table: str) -> int:
     if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", table):
         raise ValueError(f"Invalid table name: {table}")
+
+    # Securely validate against a schema-derived allowlist
+    allowed_tables = {
+        r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    if table not in allowed_tables:
+        raise ValueError(f"Table name not found in schema: {table}")
+
     escaped_table = '"' + table.replace('"', '""') + '"'
     row = conn.execute(f"SELECT COUNT(*) AS count FROM {escaped_table}").fetchone()
     return int(row["count"] or 0)
