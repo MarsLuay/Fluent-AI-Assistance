@@ -20,6 +20,7 @@ with tests/docs** (offline scope — hardware caution unchanged):
 
 | Item | Resolution |
 |---|---|
+| Open-source license | MIT License recorded at the repository root; package metadata and reviewer docs identify MIT consistently |
 | MCA-384 liquid handling | `MCA384Head` (`wt.mca384`): tips, arm moves, aspirate/dispense, mix, empty-tips; documented in [docs/authoring.md](docs/authoring.md) |
 | LiHa / FCA-style pipetting | `LiHa` (`wt.liha`) and `FCAHead` (`wt.fca`) authoring facades; decompiler coverage for structured LiHa steps |
 | Subroutine calls | `wt.call_subroutine`, compile to `SubRoutineStep`, `SubroutineRegistry` + simulate inlining with cycle/depth limits |
@@ -40,26 +41,24 @@ with tests/docs** (offline scope — hardware caution unchanged):
 These should be cleared or explicitly accepted before calling fluentcoder
 "broadly release-ready" or safe for unattended robot use:
 
-1. **No open-source license** — source-visible review only until a license is
-   recorded ([NOTICE.md](NOTICE.md)).
-2. **`generation.yaml` machine-specific defaults** — workspace binding is now
+1. **`generation.yaml` machine-specific defaults** — workspace binding is now
    explicit on the `Protocol` IR with a documented legacy fallback (see
    [docs/compile-path.md](docs/compile-path.md)); device `available_id` strings
    and grounding layout remain developer-machine defaults. Decide whether those
    fields need neutral placeholders or required user config before public
    distribution.
-3. **Bundled reference provenance** — confirm `fluentcoder/_assets/reference/*`
+2. **Bundled reference provenance** — confirm `fluentcoder/_assets/reference/*`
    and templates are acceptable to ship under the chosen license; document what
    is observational vs install-sourced.
-4. **Install-backed test fixtures** — several tests intentionally reference
+3. **Install-backed test fixtures** — several tests intentionally reference
    real workspace names (`SAT_Fluent_780_Rev3`, `780_Empty`) to exercise catalog
    lookup. Keep these out of marketing claims; consider more synthetic fixtures
    for CI-only public branches.
-5. **Hardware qualification boundary** — simulate + compile do not substitute
+4. **Hardware qualification boundary** — simulate + compile do not substitute
    for FluentControl context-check, FC simulation mode, or site method
    validation. [docs/deployment.md](docs/deployment.md) documents loader vs
    semantic validation limits.
-6. **Authoring loop packaging** — `author` / `chat` / `deploy` require
+5. **Authoring loop packaging** — `author` / `chat` / `deploy` require
    `.[authoring]` and operator/API setup; protocol-builder **disables** these
    commands by design. Documented in [CONTRIBUTING.md](CONTRIBUTING.md) and
    [docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md).

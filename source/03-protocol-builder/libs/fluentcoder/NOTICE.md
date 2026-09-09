@@ -1,9 +1,8 @@
 # Notice
 
 fluentcoder is part of **Fluent AI-Assistance**, released under the
-[PolyForm Noncommercial License 1.0.0](../../../../LICENSE) at the repository
-root (noncommercial / hobby / education free; commercial use requires contacting
-[marwanluay2005@gmail.com](mailto:marwanluay2005@gmail.com)).
+[MIT License](../../../../LICENSE) at the repository root. Third-party material
+retains its original license.
 
 It is **not a production or instrument-qualified release**. Generated scripts
 require normal FluentControl validation and lab safety review before hardware

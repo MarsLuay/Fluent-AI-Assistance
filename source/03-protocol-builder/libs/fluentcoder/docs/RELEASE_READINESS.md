@@ -9,7 +9,7 @@ FluentControl or running anything on hardware.
 
 | Area | Current state |
 |---|---|
-| License | **PolyForm Noncommercial 1.0.0** — free for noncommercial use; companies contact [marwanluay2005@gmail.com](mailto:marwanluay2005@gmail.com) — see [LICENSE](../../../../LICENSE) and [NOTICE.md](../NOTICE.md) |
+| License | **MIT License** — see [LICENSE](../../../../LICENSE) and [NOTICE.md](../NOTICE.md) |
 | Core authoring / simulate / compile | **Usable offline** with documented limits |
 | Install-backed catalog / workspaces | Requires a **licensed local FluentControl** install |
 | LM authoring loop (`author` / `chat` / `deploy`) | **Optional extra** — needs `pip install -e ".[authoring]"` and API keys; disabled in protocol-builder by design |
@@ -17,10 +17,10 @@ FluentControl or running anything on hardware.
 
 ## 1. License and distribution
 
-- [x] PolyForm Noncommercial 1.0.0 recorded at the Fluent AI-Assistance repository root (`LICENSE`).
+- [x] MIT License recorded at the Fluent AI-Assistance repository root (`LICENSE`).
 - [ ] Third-party and Tecan/FluentControl-derived asset provenance is documented
   (see §4 below and [REVIEW_NOTES.md](../REVIEW_NOTES.md)).
-- [x] README and NOTICE match the PolyForm Noncommercial license posture.
+- [x] README and NOTICE match the MIT license posture.
 
 ## 2. Safety boundaries: simulate vs hardware
 

@@ -19,9 +19,8 @@ Python authoring code
 ## Review Status
 
 Fluent AI-Assistance (including fluentcoder) is released under the
-[PolyForm Noncommercial License 1.0.0](../../../../LICENSE). Noncommercial use
-is free; companies contact [marwanluay2005@gmail.com](mailto:marwanluay2005@gmail.com).
-It is not a production or instrument-qualified release.
+[MIT License](../../../../LICENSE). Third-party material retains its original
+license. It is not a production or instrument-qualified release.
 
 - See [NOTICE.md](NOTICE.md) for safety and FluentControl dependency boundaries.
 - Some features require a locally licensed FluentControl installation.
@@ -209,5 +208,5 @@ scripts/    Local development and validation helpers
 
 ## License
 
-No license has been granted yet. The code is source-visible for review only.
-See [NOTICE.md](NOTICE.md).
+fluentcoder is licensed under the [MIT License](../../../../LICENSE) as part of
+Fluent AI-Assistance. Third-party material retains its original license.

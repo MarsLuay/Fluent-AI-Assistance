@@ -51,20 +51,11 @@ See [Safety](docs/SAFETY.md).
 
 ## License
 
-This repository is source-available under the
-[PolyForm Noncommercial License 1.0.0](LICENSE). It is **not** OSI "Open Source"
-(OSI requires commercial use be allowed).
+Fluent AI-Assistance is open source software licensed under the
+[MIT License](LICENSE).
 
-That means:
+You may use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the project subject to the terms of the MIT License. Third-party
+material retains its original license.
 
-- Free for personal, hobby, education, research, and other noncommercial use
-  (you may use, modify, and share under those terms).
-- **Not** free for company / commercial use. Contact
-  [marwanluay2005@gmail.com](mailto:marwanluay2005@gmail.com) for a commercial
-  license.
-- Third-party material retains its original license.
-
-Required Notice: Copyright (c) 2026 Marwan Luay
-(https://github.com/MarsLuay/Fluent-AI-Assistance)
-
-Commercial / company use: contact [marwanluay2005@gmail.com](mailto:marwanluay2005@gmail.com)
+Copyright (c) 2026 Marwan Luay
