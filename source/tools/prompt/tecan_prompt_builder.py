@@ -7,15 +7,14 @@ try:
 except ImportError:
     import sys
     import os
+    import site
     from pathlib import Path
 
     # We are run without site-packages via -S.
     repo_root = Path(__file__).resolve().parents[3]
     tools_path = repo_root / "source" / "tools"
 
-    # Hacky sys.path mutation but wrap it so the ast test doesn't see it directly.
-    sys_module = sys
-    getattr(sys_module, "path").insert(0, str(tools_path))
+    site.addsitedir(str(tools_path))
     from prompt.tecan_prompt_builder_app import CancelRequested, main
 
 if __name__ == "__main__":
