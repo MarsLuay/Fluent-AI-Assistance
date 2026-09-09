@@ -582,6 +582,14 @@ def _migrate_install_key_schema(conn: sqlite3.Connection) -> None:
     ):
         table_esc = _escape_identifier(table)
         conn.execute(columns_sql)
+        valid_tables = {
+            row["name"]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
+            ).fetchall()
+        }
+        if table not in valid_tables or f"{table}_new" not in valid_tables:
+            raise ValueError(f"Invalid table name for migration: {table}")
         old_cols = {
             row["name"] for row in conn.execute(f"PRAGMA table_info({table_esc})").fetchall()
         }
