@@ -27,10 +27,11 @@ class PromptTextPolicyTests(unittest.TestCase):
         self.assertTrue(prompt_has_media_boilerplate(prompt))
 
     def test_prompt_text_is_placeholder_uses_shared_token_list(self):
-        for text in ("TODO", "n/a", "<fill in>", "..."):
-            with self.subTest(text=text):
-                self.assertTrue(prompt_text_is_placeholder(text))
+        for token in PROMPT_PLACEHOLDER_TOKENS:
+            with self.subTest(text=token):
+                self.assertTrue(prompt_text_is_placeholder(token))
+                self.assertTrue(prompt_text_is_placeholder(token.upper()))
+                self.assertTrue(prompt_text_is_placeholder(f"<{token}>"))
 
         self.assertIn("fill me in", PROMPT_PLACEHOLDER_TOKENS)
         self.assertFalse(prompt_text_is_placeholder("Confirm deck state."))
-
