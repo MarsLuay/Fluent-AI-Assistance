@@ -52,7 +52,7 @@ class ExplicitZeiaInputTests(unittest.TestCase):
             "obsidian_vault_root",
             "discover_vault_root_zeia",
             '".obsidian"',
-            "' .obsidian'".replace(" ", ""),
+            "'.obsidian'",
             '"Home.md"',
             "'Home.md'",
         )
