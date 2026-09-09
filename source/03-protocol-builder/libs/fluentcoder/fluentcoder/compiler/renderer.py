@@ -11,6 +11,51 @@ import re
 import uuid
 import warnings
 import yaml
+from pathlib import Path
+from typing import Optional, Dict
+
+from ..catalog.fc_install import rewrite_checksum_in_place
+from ..expressions import (
+    BinaryExpression,
+    NumberLiteral,
+    StringLiteral,
+    coerce_literal_expression,
+    coerce_source_expression,
+    expression_initial_value_text,
+    expression_python_value,
+    parse_expression,
+    render_expression,
+)
+from ..fc_variables import decode_fc_variable
+from ..ir.schema import (
+    Protocol,
+    Group,
+    Step,
+    StepType,
+    STEP_TO_COMMAND_ID,
+    RgaTransferLabwareStep,
+    LoopStep,
+    ConditionalStep,
+    UserPromptStep,
+    LihaAspirateStep,
+    LihaDispenseStep,
+    LihaMixStep,
+    LihaDetectLiquidStep,
+    GenerateReportStep,
+    LihaGetTipsStep,
+    MoveAxisCommandStep,
+    StartMoveCommandStep,
+    WaitForAsyncResponseStep,
+    EndScriptStep,
+    ExecuteVbScriptStep,
+    TeGioSetPwmOutputStep,
+    LeaveStep,
+    VariableMapping,
+    GenericStep,
+    ScriptGroupStep,
+    ApplicationDriverMacroStep,
+)
+
 
 _LIQUID_CLASS_INSTANCE_SUFFIX_RE = re.compile(r"\[\s*[^\]]+\s*\]\s*$")
 
@@ -42,37 +87,14 @@ def liquid_class_guid_from_catalog_entries(name: str, entries) -> str:
         if not isinstance(entry, dict):
             continue
         candidates = [entry.get("name"), *(entry.get("aliases") or [])]
-        if any(str(candidate or "").strip().casefold() in wanted for candidate in candidates):
+        if any(
+            str(candidate or "").strip().casefold() in wanted
+            for candidate in candidates
+        ):
             guid = str(entry.get("guid") or "").strip()
             if guid:
                 return guid
     return ""
-from pathlib import Path
-from typing import Optional, Dict
-
-from ..catalog.fc_install import rewrite_checksum_in_place
-from ..expressions import (
-    BinaryExpression,
-    NumberLiteral,
-    StringLiteral,
-    coerce_literal_expression,
-    coerce_source_expression,
-    expression_initial_value_text,
-    expression_python_value,
-    parse_expression,
-    render_expression,
-)
-from ..fc_variables import decode_fc_variable
-from ..ir.schema import (
-    Protocol, Group, Step, StepType, STEP_TO_COMMAND_ID,
-    RgaTransferLabwareStep, LoopStep,
-    ConditionalStep, UserPromptStep,
-    LihaAspirateStep, LihaDispenseStep, LihaMixStep,
-    LihaDetectLiquidStep, GenerateReportStep,
-    LihaGetTipsStep, MoveAxisCommandStep, StartMoveCommandStep, WaitForAsyncResponseStep, EndScriptStep,
-    ExecuteVbScriptStep, TeGioSetPwmOutputStep, LeaveStep,
-    VariableMapping, GenericStep, ScriptGroupStep, ApplicationDriverMacroStep,
-)
 
 
 _EVA_CONFIG = {
@@ -127,11 +149,16 @@ def _get_adapter_config(labware_name: str) -> Dict:
 
     try:
         from ..database import get_database
+
         db = get_database()
         config = db.get_adapter_config(labware_name)
         # Database returns 384 Combo default when adapter not found;
         # detect EVA patterns even if DB doesn't know the labware name.
-        if config.get("name") == "384_Combo" and labware_name and "eva" in labware_name.lower():
+        if (
+            config.get("name") == "384_Combo"
+            and labware_name
+            and "eva" in labware_name.lower()
+        ):
             return dict(_EVA_CONFIG)
         return config
     except Exception:
@@ -140,6 +167,7 @@ def _get_adapter_config(labware_name: str) -> Dict:
 
 class RenderError(Exception):
     """Raised when rendering fails."""
+
     pass
 
 
@@ -223,16 +251,24 @@ class Renderer:
         assets_dir = Path(__file__).resolve().parent.parent / "_assets"
 
         self.config_path = config_path or assets_dir / "config" / "generation.yaml"
-        self.reference_path = reference_path or assets_dir / "reference" / "commands.yaml"
+        self.reference_path = (
+            reference_path or assets_dir / "reference" / "commands.yaml"
+        )
         self.templates_path = templates_path or assets_dir / "templates"
 
         self.config = self._load_config()
         self.commands = self._load_commands()
         self.templates = self._load_templates()
         self.labware_reference = self._load_labware_reference()
-        self._current_adapter_config: Optional[Dict] = None  # Tracks adapter state during rendering
-        self._labware_types: Dict[str, str] = {}  # label -> labware_type mapping for tip type lookup
-        self._labware_placements: Dict[tuple[str, int], str] = {}  # (location, position) -> label
+        self._current_adapter_config: Optional[Dict] = (
+            None  # Tracks adapter state during rendering
+        )
+        self._labware_types: Dict[
+            str, str
+        ] = {}  # label -> labware_type mapping for tip type lookup
+        self._labware_placements: Dict[
+            tuple[str, int], str
+        ] = {}  # (location, position) -> label
 
     @staticmethod
     def _step_type_name(step) -> str:
@@ -278,7 +314,9 @@ class Renderer:
         return config_guid, config_name
 
     def _device_config_section(self, role: str) -> dict:
-        key = {"device": "device", "cga": "cga_device", "liha": "liha_device"}.get(role, "device")
+        key = {"device": "device", "cga": "cga_device", "liha": "liha_device"}.get(
+            role, "device"
+        )
         section = self.config.get(key)
         return section if isinstance(section, dict) else {}
 
@@ -371,9 +409,18 @@ class Renderer:
         """
         import os
 
-        if os.environ.get("FLUENTCODER_USE_LABWARE_YAML", "").strip().lower() not in {"1", "true", "yes"}:
+        if os.environ.get("FLUENTCODER_USE_LABWARE_YAML", "").strip().lower() not in {
+            "1",
+            "true",
+            "yes",
+        }:
             return {}
-        ref_path = Path(__file__).resolve().parent.parent / "_assets" / "reference" / "labware.yaml"
+        ref_path = (
+            Path(__file__).resolve().parent.parent
+            / "_assets"
+            / "reference"
+            / "labware.yaml"
+        )
         if not ref_path.exists():
             return {}
         with open(ref_path) as f:
@@ -396,6 +443,205 @@ class Renderer:
                     "functional_group": entry.get("functional_group"),
                 }
         return labware
+
+    def _build_variable_declarations_xml(self, protocol: Protocol) -> str:
+        # Build variable declarations XML
+        variable_declarations_xml = ""
+        declared_variables = [
+            v for v in (protocol.variables or []) if _is_valid_variable_name(v)
+        ]
+        declared_defaults = {
+            name: value
+            for name, value in (
+                getattr(protocol, "variable_defaults", {}) or {}
+            ).items()
+            if _is_valid_variable_name(name)
+        }
+        variable_metadata = {
+            name: metadata
+            for name, metadata in (
+                getattr(protocol, "variable_metadata", {}) or {}
+            ).items()
+            if _is_valid_variable_name(name) and isinstance(metadata, dict)
+        }
+        for var_name in declared_defaults:
+            if var_name not in declared_variables:
+                declared_variables.append(var_name)
+        for var_name in variable_metadata:
+            if var_name not in declared_variables:
+                declared_variables.append(var_name)
+        # Auto-declare target variables from calculate_variable steps — they are
+        # runtime-computed variables that FC must know about but the model often
+        # omits from the protocol.variables list.
+        declared_set = set(declared_variables)
+        for _grp in protocol.groups:
+            for _stp in _grp.steps:
+                stype = self._step_type_name(_stp)
+                if stype == "calculate_variable":
+                    tv = (_stp.target_variable or "").strip()
+                    if tv and _is_valid_variable_name(tv) and tv not in declared_set:
+                        declared_variables.append(tv)
+                        declared_set.add(tv)
+                elif stype == "loop":
+                    # Auto-declare the loop variable so it's resolvable in expressions.
+                    lv = (_stp.loop_variable or "").strip()
+                    if lv and _is_valid_variable_name(lv) and lv not in declared_set:
+                        declared_variables.append(lv)
+                        declared_set.add(lv)
+                    for _inner in _stp.steps or []:
+                        if self._step_type_name(_inner) == "calculate_variable":
+                            tv = (_inner.target_variable or "").strip()
+                            if (
+                                tv
+                                and _is_valid_variable_name(tv)
+                                and tv not in declared_set
+                            ):
+                                declared_variables.append(tv)
+                                declared_set.add(tv)
+        if declared_variables:
+            # Detect variable types and initial values from declared defaults and runtime set steps
+            var_info: dict[str, tuple[str, str]] = {}  # name -> (type, initial_value)
+
+            # First pass: collect variables used in string-typed fields (labware names, types)
+            string_vars: set[str] = set()
+            volume_vars: set[str] = set()
+            STRING_FIELDS = {
+                "labware_name",
+                "labware_type",
+                "label",
+                "location",
+                "destination_location",
+                "liquid_class",
+            }
+            VOLUME_FIELDS = {"volume"}
+            for group in protocol.groups:
+                for step in group.steps:
+                    for field_name in STRING_FIELDS:
+                        val = getattr(step, field_name, None)
+                        if not isinstance(val, str):
+                            continue
+                        fc_name = decode_fc_variable(val)
+                        if fc_name:
+                            string_vars.add(fc_name)
+                        elif val in declared_variables:
+                            string_vars.add(val)
+                    for field_name in VOLUME_FIELDS:
+                        val = getattr(step, field_name, None)
+                        if isinstance(val, str) and val in declared_variables:
+                            volume_vars.add(val)
+
+            def _infer_var_info(name: str, value):
+                expr_value = coerce_literal_expression(value)
+                py_value = expression_python_value(expr_value)
+                if (
+                    name in string_vars
+                    or name.endswith("LocationName")
+                    or name.endswith("RunnerName")
+                ):
+                    return ("String", str(py_value) if py_value is not None else "")
+                if name in volume_vars:
+                    try:
+                        return ("Floating Point", str(float(py_value)))
+                    except (TypeError, ValueError):
+                        return ("Floating Point", "0")
+                if isinstance(expr_value, NumberLiteral):
+                    number = expr_value.value
+                    return (
+                        "Floating Point",
+                        str(float(number)) if isinstance(number, int) else str(number),
+                    )
+                if (
+                    isinstance(py_value, str)
+                    and py_value.replace(".", "", 1).lstrip("-").isdigit()
+                ):
+                    return ("Floating Point", py_value)
+                return ("String", str(py_value) if py_value is not None else "")
+
+            def _metadata_type(name: str) -> Optional[str]:
+                metadata = variable_metadata.get(name) or {}
+                raw = str(
+                    metadata.get("type_name") or metadata.get("type") or ""
+                ).strip()
+                if not raw:
+                    return None
+                folded = raw.casefold()
+                if folded in {"system.string", "string"}:
+                    return "String"
+                if folded in {
+                    "system.int32",
+                    "system.integer",
+                    "integer",
+                    "int",
+                    "int32",
+                }:
+                    return "Integer"
+                if folded in {
+                    "system.double",
+                    "system.single",
+                    "double",
+                    "single",
+                    "float",
+                    "floating point",
+                }:
+                    return "Floating Point"
+                return raw
+
+            def _metadata_scope(name: str) -> str:
+                metadata = variable_metadata.get(name) or {}
+                return str(metadata.get("scope") or "Script").strip() or "Script"
+
+            def _coerce_initial_value(var_type: str, value) -> str:
+                text = expression_initial_value_text(value)
+                if var_type == "Integer":
+                    try:
+                        return str(int(float(text)))
+                    except (TypeError, ValueError):
+                        return "0"
+                return text
+
+            # Second pass: get types and initial values from declared defaults and runtime set_variable steps
+            for var_name, value in declared_defaults.items():
+                var_info[var_name] = _infer_var_info(var_name, value)
+
+            for group in protocol.groups:
+                for step in group.steps:
+                    if self._step_type_name(step) == "set_variable":
+                        if step.variable_name not in var_info:
+                            var_info[step.variable_name] = _infer_var_info(
+                                step.variable_name, step.value
+                            )
+
+            ns = "http://schemas.datacontract.org/2004/07/Tecan.VisionX.VariableHandling.Shared"
+            vars_list = []
+            for var_name in declared_variables:
+                if var_name in string_vars:
+                    default_type = ("String", "")
+                elif var_name in volume_vars:
+                    default_type = ("Floating Point", "0")
+                else:
+                    default_type = ("Floating Point", "0")
+                var_type, initial_value = var_info.get(var_name, default_type)
+                var_type = _metadata_type(var_name) or var_type
+                initial_value = _coerce_initial_value(var_type, initial_value)
+                scope = _metadata_scope(var_name)
+                vars_list.append(
+                    f'                <d2p1:anyType xmlns:d3p1="{ns}" i:type="d3p1:VariableDefinitionHelper">\n'
+                    f"                  <d3p1:IdOfParentItem>00000000-0000-0000-0000-000000000000</d3p1:IdOfParentItem>\n"
+                    f"                  <d3p1:Item></d3p1:Item>\n"
+                    f"                  <d3p1:Name>{var_name}</d3p1:Name>\n"
+                    f"                  <d3p1:QueryOnStartup>false</d3p1:QueryOnStartup>\n"
+                    f"                  <d3p1:QueryOnStartupString></d3p1:QueryOnStartupString>\n"
+                    f"                  <d3p1:ReadOnly>false</d3p1:ReadOnly>\n"
+                    f"                  <d3p1:Scope>{sanitize_text(scope)}</d3p1:Scope>\n"
+                    f"                  <d3p1:TypeName>{sanitize_text(var_type)}</d3p1:TypeName>\n"
+                    f"                  <d3p1:Values>\n"
+                    f"                    <d2p1:string>{sanitize_text(str(initial_value))}</d2p1:string>\n"
+                    f"                  </d3p1:Values>\n"
+                    f"                </d2p1:anyType>"
+                )
+            variable_declarations_xml = "\n".join(vars_list)
+
+        return variable_declarations_xml
 
     def render(self, protocol: Protocol) -> str:
         """
@@ -427,12 +673,16 @@ class Renderer:
         # Pre-scan set_variable steps to build variable value map
         # (needed to resolve variable references in labware types, e.g. DitiType)
         self._variable_values: Dict[str, str] = {}
-        for var_name, value in (getattr(protocol, "variable_defaults", {}) or {}).items():
+        for var_name, value in (
+            getattr(protocol, "variable_defaults", {}) or {}
+        ).items():
             self._variable_values[var_name] = expression_initial_value_text(value)
         for group in protocol.groups:
             for step in group.steps:
                 if self._step_type_name(step) == "set_variable":
-                    self._variable_values[step.variable_name] = expression_initial_value_text(step.value)
+                    self._variable_values[step.variable_name] = (
+                        expression_initial_value_text(step.value)
+                    )
 
         # Assign line numbers if not already done
         protocol.assign_line_numbers()
@@ -444,160 +694,7 @@ class Renderer:
             groups_xml.append(group_xml)
 
         # Build variable declarations XML
-        variable_declarations_xml = ""
-        declared_variables = [
-            v for v in (protocol.variables or [])
-            if _is_valid_variable_name(v)
-        ]
-        declared_defaults = {
-            name: value
-            for name, value in (getattr(protocol, "variable_defaults", {}) or {}).items()
-            if _is_valid_variable_name(name)
-        }
-        variable_metadata = {
-            name: metadata
-            for name, metadata in (getattr(protocol, "variable_metadata", {}) or {}).items()
-            if _is_valid_variable_name(name) and isinstance(metadata, dict)
-        }
-        for var_name in declared_defaults:
-            if var_name not in declared_variables:
-                declared_variables.append(var_name)
-        for var_name in variable_metadata:
-            if var_name not in declared_variables:
-                declared_variables.append(var_name)
-        # Auto-declare target variables from calculate_variable steps — they are
-        # runtime-computed variables that FC must know about but the model often
-        # omits from the protocol.variables list.
-        declared_set = set(declared_variables)
-        for _grp in protocol.groups:
-            for _stp in _grp.steps:
-                stype = self._step_type_name(_stp)
-                if stype == "calculate_variable":
-                    tv = (_stp.target_variable or "").strip()
-                    if tv and _is_valid_variable_name(tv) and tv not in declared_set:
-                        declared_variables.append(tv)
-                        declared_set.add(tv)
-                elif stype == "loop":
-                    # Auto-declare the loop variable so it's resolvable in expressions.
-                    lv = (_stp.loop_variable or "").strip()
-                    if lv and _is_valid_variable_name(lv) and lv not in declared_set:
-                        declared_variables.append(lv)
-                        declared_set.add(lv)
-                    for _inner in (_stp.steps or []):
-                        if self._step_type_name(_inner) == "calculate_variable":
-                            tv = (_inner.target_variable or "").strip()
-                            if tv and _is_valid_variable_name(tv) and tv not in declared_set:
-                                declared_variables.append(tv)
-                                declared_set.add(tv)
-        if declared_variables:
-            # Detect variable types and initial values from declared defaults and runtime set steps
-            var_info: dict[str, tuple[str, str]] = {}  # name -> (type, initial_value)
-
-            # First pass: collect variables used in string-typed fields (labware names, types)
-            string_vars: set[str] = set()
-            volume_vars: set[str] = set()
-            STRING_FIELDS = {'labware_name', 'labware_type', 'label', 'location',
-                             'destination_location', 'liquid_class'}
-            VOLUME_FIELDS = {'volume'}
-            for group in protocol.groups:
-                for step in group.steps:
-                    for field_name in STRING_FIELDS:
-                        val = getattr(step, field_name, None)
-                        if not isinstance(val, str):
-                            continue
-                        fc_name = decode_fc_variable(val)
-                        if fc_name:
-                            string_vars.add(fc_name)
-                        elif val in declared_variables:
-                            string_vars.add(val)
-                    for field_name in VOLUME_FIELDS:
-                        val = getattr(step, field_name, None)
-                        if isinstance(val, str) and val in declared_variables:
-                            volume_vars.add(val)
-
-            def _infer_var_info(name: str, value):
-                expr_value = coerce_literal_expression(value)
-                py_value = expression_python_value(expr_value)
-                if name in string_vars or name.endswith("LocationName") or name.endswith("RunnerName"):
-                    return ("String", str(py_value) if py_value is not None else "")
-                if name in volume_vars:
-                    try:
-                        return ("Floating Point", str(float(py_value)))
-                    except (TypeError, ValueError):
-                        return ("Floating Point", "0")
-                if isinstance(expr_value, NumberLiteral):
-                    number = expr_value.value
-                    return ("Floating Point", str(float(number)) if isinstance(number, int) else str(number))
-                if isinstance(py_value, str) and py_value.replace('.', '', 1).lstrip('-').isdigit():
-                    return ("Floating Point", py_value)
-                return ("String", str(py_value) if py_value is not None else "")
-
-            def _metadata_type(name: str) -> Optional[str]:
-                metadata = variable_metadata.get(name) or {}
-                raw = str(metadata.get("type_name") or metadata.get("type") or "").strip()
-                if not raw:
-                    return None
-                folded = raw.casefold()
-                if folded in {"system.string", "string"}:
-                    return "String"
-                if folded in {"system.int32", "system.integer", "integer", "int", "int32"}:
-                    return "Integer"
-                if folded in {"system.double", "system.single", "double", "single", "float", "floating point"}:
-                    return "Floating Point"
-                return raw
-
-            def _metadata_scope(name: str) -> str:
-                metadata = variable_metadata.get(name) or {}
-                return str(metadata.get("scope") or "Script").strip() or "Script"
-
-            def _coerce_initial_value(var_type: str, value) -> str:
-                text = expression_initial_value_text(value)
-                if var_type == "Integer":
-                    try:
-                        return str(int(float(text)))
-                    except (TypeError, ValueError):
-                        return "0"
-                return text
-
-            # Second pass: get types and initial values from declared defaults and runtime set_variable steps
-            for var_name, value in declared_defaults.items():
-                var_info[var_name] = _infer_var_info(var_name, value)
-
-            for group in protocol.groups:
-                for step in group.steps:
-                    if self._step_type_name(step) == "set_variable":
-                        if step.variable_name not in var_info:
-                            var_info[step.variable_name] = _infer_var_info(step.variable_name, step.value)
-
-            ns = "http://schemas.datacontract.org/2004/07/Tecan.VisionX.VariableHandling.Shared"
-            vars_list = []
-            for var_name in declared_variables:
-                if var_name in string_vars:
-                    default_type = ("String", "")
-                elif var_name in volume_vars:
-                    default_type = ("Floating Point", "0")
-                else:
-                    default_type = ("Floating Point", "0")
-                var_type, initial_value = var_info.get(var_name, default_type)
-                var_type = _metadata_type(var_name) or var_type
-                initial_value = _coerce_initial_value(var_type, initial_value)
-                scope = _metadata_scope(var_name)
-                vars_list.append(
-                    f'                <d2p1:anyType xmlns:d3p1="{ns}" i:type="d3p1:VariableDefinitionHelper">\n'
-                    f'                  <d3p1:IdOfParentItem>00000000-0000-0000-0000-000000000000</d3p1:IdOfParentItem>\n'
-                    f'                  <d3p1:Item></d3p1:Item>\n'
-                    f'                  <d3p1:Name>{var_name}</d3p1:Name>\n'
-                    f'                  <d3p1:QueryOnStartup>false</d3p1:QueryOnStartup>\n'
-                    f'                  <d3p1:QueryOnStartupString></d3p1:QueryOnStartupString>\n'
-                    f'                  <d3p1:ReadOnly>false</d3p1:ReadOnly>\n'
-                    f'                  <d3p1:Scope>{sanitize_text(scope)}</d3p1:Scope>\n'
-                    f'                  <d3p1:TypeName>{sanitize_text(var_type)}</d3p1:TypeName>\n'
-                    f'                  <d3p1:Values>\n'
-                    f'                    <d2p1:string>{sanitize_text(str(initial_value))}</d2p1:string>\n'
-                    f'                  </d3p1:Values>\n'
-                    f'                </d2p1:anyType>'
-                )
-            variable_declarations_xml = "\n".join(vars_list)
+        variable_declarations_xml = self._build_variable_declarations_xml(protocol)
 
         # Fill in script wrapper template
         wrapper = self.templates.get("script_wrapper")
@@ -608,22 +705,29 @@ class Renderer:
         # generation.yaml fallback warns unless strict mode is enabled.
         worktable_guid, worktable_name = self._resolve_worktable_binding(protocol)
         liquid_class_name = self._protocol_liquid_class_name(protocol)
-        liquid_class_guid = self._resolve_liquid_class_guid(liquid_class_name) if liquid_class_name else ""
+        liquid_class_guid = (
+            self._resolve_liquid_class_guid(liquid_class_name)
+            if liquid_class_name
+            else ""
+        )
 
-        xml = self._fill_template(wrapper, {
-            "script_name": sanitize_text(protocol.name),  # Escape & < > for XML
-            "comment": sanitize_text(protocol.comment or ""),
-            "worktable_guid": worktable_guid,
-            "worktable_name": worktable_name,
-            "liquid_class_guid": liquid_class_guid,
-            "liquid_class_name": liquid_class_name,
-            "script_version": self.config["script"]["version"],
-            "data_version": self.config["script"]["data_version"],
-            "expected_duration": str(self.config["script"]["expected_duration"]),
-            "workspace_delta_guid": self._workspace_delta_guid(protocol),
-            "groups": "\n".join(groups_xml),
-            "variable_declarations": variable_declarations_xml
-        })
+        xml = self._fill_template(
+            wrapper,
+            {
+                "script_name": sanitize_text(protocol.name),  # Escape & < > for XML
+                "comment": sanitize_text(protocol.comment or ""),
+                "worktable_guid": worktable_guid,
+                "worktable_name": worktable_name,
+                "liquid_class_guid": liquid_class_guid,
+                "liquid_class_name": liquid_class_name,
+                "script_version": self.config["script"]["version"],
+                "data_version": self.config["script"]["data_version"],
+                "expected_duration": str(self.config["script"]["expected_duration"]),
+                "workspace_delta_guid": self._workspace_delta_guid(protocol),
+                "groups": "\n".join(groups_xml),
+                "variable_declarations": variable_declarations_xml,
+            },
+        )
 
         return xml
 
@@ -640,13 +744,18 @@ class Renderer:
             if step_xml and step_xml.strip():
                 statements_xml.append(step_xml)
 
-        return self._fill_template(template, {
-            "group_name": sanitize_text(group.name),  # Escape & < > for XML
-            "group_line_number": str(group.line_number or 1),
-            "statements": "\n".join(statements_xml)
-        })
+        return self._fill_template(
+            template,
+            {
+                "group_name": sanitize_text(group.name),  # Escape & < > for XML
+                "group_line_number": str(group.line_number or 1),
+                "statements": "\n".join(statements_xml),
+            },
+        )
 
-    def _render_step(self, step: Step, protocol: Protocol, group: Group, loop_depth: int = 0) -> str:
+    def _render_step(
+        self, step: Step, protocol: Protocol, group: Group, loop_depth: int = 0
+    ) -> str:
         """Render a single step to XML using command templates."""
         stype = self._step_type_name(step)
         if isinstance(step, GenericStep) and step.parameters.get("raw_xml"):
@@ -655,7 +764,11 @@ class Renderer:
         if isinstance(step, ApplicationDriverMacroStep) and step.raw_xml:
             lines = step.raw_xml.strip().split("\n")
             return "\n".join("                        " + line for line in lines)
-        if isinstance(step, UserPromptStep) and step.raw_xml and step.rup_kind == "worktable":
+        if (
+            isinstance(step, UserPromptStep)
+            and step.raw_xml
+            and step.rup_kind == "worktable"
+        ):
             lines = str(step.raw_xml).strip().split("\n")
             return "\n".join("                        " + line for line in lines)
         if isinstance(step, UserPromptStep) and (
@@ -665,11 +778,30 @@ class Renderer:
             xml = self._render_rup_worktable_prompt_step(step)
             lines = xml.strip().split("\n")
             return "\n".join("                        " + line for line in lines)
-        if isinstance(step, (MoveAxisCommandStep, StartMoveCommandStep, WaitForAsyncResponseStep, EndScriptStep,
-                           ExecuteVbScriptStep, TeGioSetPwmOutputStep, LeaveStep)) and getattr(step, "raw_xml", None):
+        if isinstance(
+            step,
+            (
+                MoveAxisCommandStep,
+                StartMoveCommandStep,
+                WaitForAsyncResponseStep,
+                EndScriptStep,
+                ExecuteVbScriptStep,
+                TeGioSetPwmOutputStep,
+                LeaveStep,
+            ),
+        ) and getattr(step, "raw_xml", None):
             lines = str(step.raw_xml).strip().split("\n")
             return "\n".join("                        " + line for line in lines)
-        if isinstance(step, (LihaAspirateStep, LihaDispenseStep, LihaMixStep, LihaDetectLiquidStep, GenerateReportStep)) and getattr(step, "raw_xml", None):
+        if isinstance(
+            step,
+            (
+                LihaAspirateStep,
+                LihaDispenseStep,
+                LihaMixStep,
+                LihaDetectLiquidStep,
+                GenerateReportStep,
+            ),
+        ) and getattr(step, "raw_xml", None):
             lines = str(step.raw_xml).strip().split("\n")
             return "\n".join("                        " + line for line in lines)
 
@@ -687,15 +819,22 @@ class Renderer:
         if stype == "loop":
             return self._render_loop(step, protocol, group, loop_depth=loop_depth + 1)
         if stype == "conditional":
-            return self._render_conditional(step, protocol, group, loop_depth=loop_depth + 1)
+            return self._render_conditional(
+                step, protocol, group, loop_depth=loop_depth + 1
+            )
         if stype == "script_group":
-            return self._render_script_group_step(step, protocol, group, loop_depth=loop_depth + 1)
+            return self._render_script_group_step(
+                step, protocol, group, loop_depth=loop_depth + 1
+            )
         if stype == "application_driver_macro":
-            return self._render_application_driver_macro_step(step, params={
-                "LineNumber": str(step.line_number or 0),
-                "IsBreakpoint": str(step.breakpoint).lower(),
-                "IsDisabledForExecution": str(step.disabled).lower(),
-            })
+            return self._render_application_driver_macro_step(
+                step,
+                params={
+                    "LineNumber": str(step.line_number or 0),
+                    "IsBreakpoint": str(step.breakpoint).lower(),
+                    "IsDisabledForExecution": str(step.disabled).lower(),
+                },
+            )
 
         command_id = None
 
@@ -742,10 +881,10 @@ class Renderer:
         if not command:
             # Fallback: Check if it's an RGA command that maps to ApplicationDriverMacro
             if "Rga" in command_id and "Transfer" in command_id:
-                 # Check if we have ApplicationDriverMacro in reference
-                 if "ApplicationDriverMacro" in self.commands:
-                     command_id = "ApplicationDriverMacro"
-                     command = self.commands.get(command_id)
+                # Check if we have ApplicationDriverMacro in reference
+                if "ApplicationDriverMacro" in self.commands:
+                    command_id = "ApplicationDriverMacro"
+                    command = self.commands.get(command_id)
 
         if not command:
             raise RenderError(f"Command '{command_id}' not found in reference")
@@ -787,7 +926,9 @@ class Renderer:
 
         inner_steps_xml = []
         for inner_step in step.steps:
-            inner_xml = self._render_step(inner_step, protocol, group, loop_depth=loop_depth)
+            inner_xml = self._render_step(
+                inner_step, protocol, group, loop_depth=loop_depth
+            )
             trimmed = inner_xml.strip()
             if trimmed:
                 inner_steps_xml.append(trimmed)
@@ -796,11 +937,14 @@ class Renderer:
             for step_xml in inner_steps_xml
             for line in step_xml.split("\n")
         )
-        xml = self._fill_template(template, {
-            "group_name": sanitize_text(step.name),
-            "group_line_number": str(step.line_number or 1),
-            "statements": statements,
-        })
+        xml = self._fill_template(
+            template,
+            {
+                "group_name": sanitize_text(step.name),
+                "group_line_number": str(step.line_number or 1),
+                "statements": statements,
+            },
+        )
         lines = xml.strip().split("\n")
         return "\n".join("                        " + line for line in lines)
 
@@ -825,15 +969,19 @@ class Renderer:
                 labware_name=step.parameters.get("Labware", ""),
                 destination_location=step.parameters.get("Location", "Site"),
                 destination_site=site_int,
-                fixed_site=str(step.parameters.get("FixedSite", "true")).lower() == "true",
-                move_to_base=str(step.parameters.get("MoveToBase", "false")).lower() == "true",
+                fixed_site=str(step.parameters.get("FixedSite", "true")).lower()
+                == "true",
+                move_to_base=str(step.parameters.get("MoveToBase", "false")).lower()
+                == "true",
                 module_name=step.module_name,
                 available_id=step.available_id,
                 line_number=step.line_number,
                 disabled=step.disabled,
                 breakpoint=step.breakpoint,
             )
-            return self._render_step(transfer, Protocol(name=""), Group(name=""), loop_depth=0)
+            return self._render_step(
+                transfer, Protocol(name=""), Group(name=""), loop_depth=0
+            )
 
         # FluentControl stores ExecutionSettings as escaped inner XML.  The
         # decompiler receives its once-decoded text (``&lt;...``), so escape it
@@ -855,7 +1003,9 @@ class Renderer:
         lines = xml.strip().split("\n")
         return "\n".join("                        " + line for line in lines)
 
-    def _render_loop(self, step: LoopStep, protocol: Protocol, group: Group, loop_depth: int = 1) -> str:
+    def _render_loop(
+        self, step: LoopStep, protocol: Protocol, group: Group, loop_depth: int = 1
+    ) -> str:
         """Render a LoopStep recursively."""
         template = self.templates.get("loop_group")
         if not template:
@@ -864,16 +1014,20 @@ class Renderer:
         # Render all steps inside the loop
         inner_steps_xml = []
         for inner_step in step.steps:
-            inner_xml = self._render_step(inner_step, protocol, group, loop_depth=loop_depth)
+            inner_xml = self._render_step(
+                inner_step, protocol, group, loop_depth=loop_depth
+            )
             # Remove the base indentation added by _render_step because we'll add it ourselves
             trimmed = inner_xml.strip()
             if trimmed:
                 inner_steps_xml.append(trimmed)
 
         # Indent inner steps for loop nesting (one level deeper than group statements)
-        loop_statements = "\n".join("                              " + line 
-                                   for step_xml in inner_steps_xml 
-                                   for line in step_xml.split("\n"))
+        loop_statements = "\n".join(
+            "                              " + line
+            for step_xml in inner_steps_xml
+            for line in step_xml.split("\n")
+        )
 
         # Use the loop variable name from the step so FC makes it available in-scope.
         # This allows calculate_variable expressions inside the loop to reference it.
@@ -900,17 +1054,23 @@ class Renderer:
             "LineNumber": str(step.line_number or 0),
             "IsBreakpoint": str(step.breakpoint).lower().capitalize(),
             "IsDisabledForExecution": str(step.disabled).lower().capitalize(),
-            "LoopStatements": loop_statements
+            "LoopStatements": loop_statements,
         }
 
         xml = self._fill_template(template, params)
-        
+
         # Indent the loop group itself to align with other steps in the group
         lines = xml.strip().split("\n")
         indented = "\n".join("                        " + line for line in lines)
         return indented
 
-    def _render_conditional(self, step: ConditionalStep, protocol: Protocol, group: Group, loop_depth: int = 1) -> str:
+    def _render_conditional(
+        self,
+        step: ConditionalStep,
+        protocol: Protocol,
+        group: Group,
+        loop_depth: int = 1,
+    ) -> str:
         if_template = self.templates.get("conditional_group")
         else_template = self.templates.get("alternate_group")
         if not if_template or not else_template:
@@ -918,7 +1078,9 @@ class Renderer:
 
         then_xml = []
         for inner_step in step.then_steps:
-            inner = self._render_step(inner_step, protocol, group, loop_depth=loop_depth)
+            inner = self._render_step(
+                inner_step, protocol, group, loop_depth=loop_depth
+            )
             trimmed = inner.strip()
             if trimmed:
                 then_xml.append(trimmed)
@@ -954,7 +1116,9 @@ class Renderer:
         if step.else_steps:
             else_xml = []
             for inner_step in step.else_steps:
-                inner = self._render_step(inner_step, protocol, group, loop_depth=loop_depth)
+                inner = self._render_step(
+                    inner_step, protocol, group, loop_depth=loop_depth
+                )
                 trimmed = inner.strip()
                 if trimmed:
                     else_xml.append(trimmed)
@@ -970,7 +1134,9 @@ class Renderer:
                         "AlternateName": sanitize_text(f"{step.name} Else"),
                         "LineNumber": str(step.line_number or 0),
                         "IsBreakpoint": str(step.breakpoint).lower().capitalize(),
-                        "IsDisabledForExecution": str(step.disabled).lower().capitalize(),
+                        "IsDisabledForExecution": str(step.disabled)
+                        .lower()
+                        .capitalize(),
                         "ElseStatements": else_statements,
                     },
                 ).strip()
@@ -984,36 +1150,99 @@ class Renderer:
         if stype in {"export_variable", "import_variable"}:
             xml = re.sub(
                 r"<Variables>.*?</Variables>",
-                lambda _: f"<Variables>\n{params.get('Variables', '')}\n    </Variables>",
+                lambda _: (
+                    f"<Variables>\n{params.get('Variables', '')}\n    </Variables>"
+                ),
                 xml,
                 count=1,
                 flags=re.DOTALL,
             )
             tag = "ExportFile" if stype == "export_variable" else "ImportFile"
-            for name in (tag, "WriteHeader", "ReplaceExistingFile", "ExportStringsWithQuotes", "DelimiterCode",
-                         "ReadLine", "Line", "StartInColumn", "Column", "HasHeader"):
+            for name in (
+                tag,
+                "WriteHeader",
+                "ReplaceExistingFile",
+                "ExportStringsWithQuotes",
+                "DelimiterCode",
+                "ReadLine",
+                "Line",
+                "StartInColumn",
+                "Column",
+                "HasHeader",
+            ):
                 value = params.get(name)
                 if value is None:
                     continue
-                xml = re.sub(fr"<{name}>.*?</{name}>", lambda _, n=name, v=value: f"<{n}>{v}</{n}>", xml, count=1, flags=re.DOTALL)
+                xml = re.sub(
+                    rf"<{name}>.*?</{name}>",
+                    lambda _, n=name, v=value: f"<{n}>{v}</{n}>",
+                    xml,
+                    count=1,
+                    flags=re.DOTALL,
+                )
 
         elif stype == "query_variable":
             for name in ("Name", "QueryPrompt", "LimitRange"):
-                xml = re.sub(fr"<{name}>.*?</{name}>", lambda _, n=name: f"<{n}>{params.get(n, '')}</{n}>", xml, count=1, flags=re.DOTALL)
+                xml = re.sub(
+                    rf"<{name}>.*?</{name}>",
+                    lambda _, n=name: f"<{n}>{params.get(n, '')}</{n}>",
+                    xml,
+                    count=1,
+                    flags=re.DOTALL,
+                )
 
         elif stype == "execute_application":
-            for name in ("Application", "Wait", "StoreReturn", "IsBreakpoint", "IsDisabledForExecution", "LineNumber"):
-                xml = re.sub(fr"<{name}>.*?</{name}>", lambda _, n=name: f"<{n}>{params.get(n, '')}</{n}>", xml, count=1, flags=re.DOTALL)
+            for name in (
+                "Application",
+                "Wait",
+                "StoreReturn",
+                "IsBreakpoint",
+                "IsDisabledForExecution",
+                "LineNumber",
+            ):
+                xml = re.sub(
+                    rf"<{name}>.*?</{name}>",
+                    lambda _, n=name: f"<{n}>{params.get(n, '')}</{n}>",
+                    xml,
+                    count=1,
+                    flags=re.DOTALL,
+                )
             arguments = params.get("Arguments", "")
             variable = params.get("Variable", "")
-            xml = re.sub(r"<Arguments\s*/>", lambda _: f"<Arguments>{arguments}</Arguments>", xml, count=1)
-            xml = re.sub(r"<Arguments>.*?</Arguments>", lambda _: f"<Arguments>{arguments}</Arguments>", xml, count=1, flags=re.DOTALL)
-            xml = re.sub(r"<Variable\s*/>", lambda _: f"<Variable>{variable}</Variable>", xml, count=1)
-            xml = re.sub(r"<Variable>.*?</Variable>", lambda _: f"<Variable>{variable}</Variable>", xml, count=1, flags=re.DOTALL)
+            xml = re.sub(
+                r"<Arguments\s*/>",
+                lambda _: f"<Arguments>{arguments}</Arguments>",
+                xml,
+                count=1,
+            )
+            xml = re.sub(
+                r"<Arguments>.*?</Arguments>",
+                lambda _: f"<Arguments>{arguments}</Arguments>",
+                xml,
+                count=1,
+                flags=re.DOTALL,
+            )
+            xml = re.sub(
+                r"<Variable\s*/>",
+                lambda _: f"<Variable>{variable}</Variable>",
+                xml,
+                count=1,
+            )
+            xml = re.sub(
+                r"<Variable>.*?</Variable>",
+                lambda _: f"<Variable>{variable}</Variable>",
+                xml,
+                count=1,
+                flags=re.DOTALL,
+            )
 
         elif stype == "user_prompt":
             sound_file = params.get("SoundFile", "")
-            sound_xml = f"<SoundFile>{sound_file}</SoundFile>" if sound_file else "<SoundFile />"
+            sound_xml = (
+                f"<SoundFile>{sound_file}</SoundFile>"
+                if sound_file
+                else "<SoundFile />"
+            )
             xml = re.sub(
                 r"<SoundFile\b[^>]*>.*?</SoundFile>|<SoundFile\s*/>",
                 lambda _: sound_xml,
@@ -1023,14 +1252,22 @@ class Renderer:
             )
             xml = re.sub(
                 r"<RepeatSound\b[^>]*>.*?</RepeatSound>|<RepeatSound\s*/>",
-                lambda _: f"<RepeatSound>{params.get('RepeatSound', 'False')}</RepeatSound>",
+                lambda _: (
+                    f"<RepeatSound>{params.get('RepeatSound', 'False')}</RepeatSound>"
+                ),
                 xml,
                 count=1,
                 flags=re.DOTALL,
             )
 
         elif stype == "delay":
-            xml = re.sub(r"<Delay>.*?</Delay>", lambda _: f"<Delay>{params.get('Delay', '')}</Delay>", xml, count=1, flags=re.DOTALL)
+            xml = re.sub(
+                r"<Delay>.*?</Delay>",
+                lambda _: f"<Delay>{params.get('Delay', '')}</Delay>",
+                xml,
+                count=1,
+                flags=re.DOTALL,
+            )
 
         elif stype == "initialize_device":
             for name in ("InitType", "DeviceAlias", "AvailableID"):
@@ -1038,7 +1275,7 @@ class Renderer:
                 if value is None:
                     continue
                 xml = re.sub(
-                    fr"<{name}>.*?</{name}>",
+                    rf"<{name}>.*?</{name}>",
                     lambda _, n=name, v=value: f"<{n}>{v}</{n}>",
                     xml,
                     count=1,
@@ -1047,21 +1284,41 @@ class Renderer:
 
         elif stype == "set_location":
             for name in ("Labware", "Location", "Site", "Rotation"):
-                xml = re.sub(fr"<{name}>.*?</{name}>", lambda _, n=name: f"<{n}>{params.get(n, '')}</{n}>", xml, count=1, flags=re.DOTALL)
+                xml = re.sub(
+                    rf"<{name}>.*?</{name}>",
+                    lambda _, n=name: f"<{n}>{params.get(n, '')}</{n}>",
+                    xml,
+                    count=1,
+                    flags=re.DOTALL,
+                )
 
         elif stype == "subroutine":
-            xml = re.sub(r"<SubRoutine>.*?</SubRoutine>", lambda _: f"<SubRoutine>{params.get('SubRoutine', '')}</SubRoutine>", xml, count=1, flags=re.DOTALL)
-            xml = re.sub(r"<ExecutionMode>.*?</ExecutionMode>", lambda _: f"<ExecutionMode>{params.get('ExecutionMode', '')}</ExecutionMode>", xml, count=1, flags=re.DOTALL)
+            xml = re.sub(
+                r"<SubRoutine>.*?</SubRoutine>",
+                lambda _: f"<SubRoutine>{params.get('SubRoutine', '')}</SubRoutine>",
+                xml,
+                count=1,
+                flags=re.DOTALL,
+            )
+            xml = re.sub(
+                r"<ExecutionMode>.*?</ExecutionMode>",
+                lambda _: (
+                    f"<ExecutionMode>{params.get('ExecutionMode', '')}</ExecutionMode>"
+                ),
+                xml,
+                count=1,
+                flags=re.DOTALL,
+            )
             for name in ("VariableMappingsStart", "VariableMappingsEnd"):
-                if re.search(fr"<{name}\s*/>", xml):
+                if re.search(rf"<{name}\s*/>", xml):
                     xml = re.sub(
-                        fr"<{name}\s*/>",
+                        rf"<{name}\s*/>",
                         lambda _, n=name: f"<{n}>\n{params.get(n, '')}\n    </{n}>",
                         xml,
                         count=1,
                     )
                 xml = re.sub(
-                    fr"<{name}>.*?</{name}>",
+                    rf"<{name}>.*?</{name}>",
                     lambda _, n=name: f"<{n}>\n{params.get(n, '')}\n    </{n}>",
                     xml,
                     count=1,
@@ -1072,8 +1329,8 @@ class Renderer:
     def _step_type_to_command_id(self, step_type: str) -> str:
         """Convert snake_case step_type to PascalCase command ID."""
         # snake_case to PascalCase: mca384_pick_up_tips -> Mca384PickUpTips
-        parts = step_type.split('_')
-        return ''.join(word.capitalize() for word in parts)
+        parts = step_type.split("_")
+        return "".join(word.capitalize() for word in parts)
 
     def _render_rup_worktable_prompt_step(self, step: UserPromptStep) -> str:
         """Render a generated TouchTools worktable prompt.
@@ -1083,7 +1340,9 @@ class Renderer:
         prompts default to RUPStandardStatement; this template is for legacy
         worktable-bound prompts only.
         """
-        auto_close = bool(step.auto_close) if step.auto_close is not None else step.timeout > 0
+        auto_close = (
+            bool(step.auto_close) if step.auto_close is not None else step.timeout > 0
+        )
         line_number = str(step.line_number or 0)
         prompt = self._xml_escape_multiline(step.prompt)
         image_path = self._xml_escape(step.image_path or "")
@@ -1093,7 +1352,7 @@ class Renderer:
         labware_type = self._xml_escape(step.selected_labware_type or "")
         grid = self._worktable_int_text(step.grid)
         site = self._worktable_int_text(step.site)
-        return f'''<Object Type="Tecan.VisionX.TouchTools.Driver.RUP.RUPWorktableStatement">
+        return f"""<Object Type="Tecan.VisionX.TouchTools.Driver.RUP.RUPWorktableStatement">
   <RUPWorktableStatement>
     <WorktableProperties>
       <WorktableStatementDataClass>
@@ -1136,7 +1395,7 @@ class Renderer:
     <ChangeStatusLightColor>False</ChangeStatusLightColor>
     <StatusLightColorString />
   </RUPWorktableStatement>
-</Object>'''
+</Object>"""
 
     @staticmethod
     def _bool_text(value: bool) -> str:
@@ -1155,11 +1414,7 @@ class Renderer:
     @staticmethod
     def _xml_escape(value: str) -> str:
         text = "" if value is None else str(value)
-        return (
-            text.replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-        )
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     @classmethod
     def _xml_escape_multiline(cls, value: str) -> str:
@@ -1173,8 +1428,8 @@ class Renderer:
         for value in values:
             escaped = self._xml_escape(value)
             lines.append('      <Object Type="System.String">')
-            lines.append(f'        <string>{escaped}</string>')
-            lines.append('      </Object>')
+            lines.append(f"        <string>{escaped}</string>")
+            lines.append("      </Object>")
         return "\n".join(lines)
 
     def _variable_mappings_xml(self, mappings: list[VariableMapping]) -> str:
@@ -1183,11 +1438,15 @@ class Renderer:
         lines = []
         for mapping in mappings:
             lines.append('      <Object Type="Tecan.Core.Scripting.VariableMapping">')
-            lines.append('        <VariableMapping>')
-            lines.append(f'          <Target>{self._xml_escape(mapping.target)}</Target>')
-            lines.append(f'          <Source>{self._xml_escape(self._expression_text(mapping.source))}</Source>')
-            lines.append('        </VariableMapping>')
-            lines.append('      </Object>')
+            lines.append("        <VariableMapping>")
+            lines.append(
+                f"          <Target>{self._xml_escape(mapping.target)}</Target>"
+            )
+            lines.append(
+                f"          <Source>{self._xml_escape(self._expression_text(mapping.source))}</Source>"
+            )
+            lines.append("        </VariableMapping>")
+            lines.append("      </Object>")
         return "\n".join(lines)
 
     @staticmethod
@@ -1202,19 +1461,29 @@ class Renderer:
     def _expression_python_value(value):
         return expression_python_value(coerce_source_expression(value))
 
-    def _step_to_params(self, step: Step, protocol: Protocol, group: Group, loop_depth: int = 0) -> dict:
+    def _step_to_params(
+        self, step: Step, protocol: Protocol, group: Group, loop_depth: int = 0
+    ) -> dict:
         """Convert step to template parameters."""
         # Resolve device / LC defaults from protocol + site config only — no USB invent.
-        default_device, default_available_id = self._resolve_device_pair(protocol, role="device")
+        default_device, default_available_id = self._resolve_device_pair(
+            protocol, role="device"
+        )
         default_liquid_class = str(
-            protocol.liquid_class or self.config.get("liquid_class", {}).get("name") or ""
+            protocol.liquid_class
+            or self.config.get("liquid_class", {}).get("name")
+            or ""
         ).strip()
 
         # Normalize liquid classes. Prefer protocol / catalog / generation.yaml
         # (site-supplied). Never invent a lab liquid-class name like AcidExtract
         # or a hardcoded "Water Free Single" string in product code.
         def _normalize_liquid_class(requested: str | None, *, mix: bool = False) -> str:
-            config_lc = self.config.get("liquid_class") if isinstance(self.config.get("liquid_class"), dict) else {}
+            config_lc = (
+                self.config.get("liquid_class")
+                if isinstance(self.config.get("liquid_class"), dict)
+                else {}
+            )
             if mix:
                 mix_default = str(config_lc.get("mix_name") or "").strip()
                 return (requested or mix_default or "").strip()
@@ -1267,12 +1536,18 @@ class Renderer:
 
         # CGA / LiHa labware overlays from config; device pair resolved via `_step_device`.
         cga_config = self._device_config_section("cga")
-        cga_get_fingers_labware = str(cga_config.get("get_fingers_labware") or "").strip()
-        cga_drop_fingers_labware = str(cga_config.get("drop_fingers_labware") or "").strip()
+        cga_get_fingers_labware = str(
+            cga_config.get("get_fingers_labware") or ""
+        ).strip()
+        cga_drop_fingers_labware = str(
+            cga_config.get("drop_fingers_labware") or ""
+        ).strip()
 
         liha_config = self._device_config_section("liha")
-        liha_device, liha_available_id = self._resolve_device_pair(protocol, role="liha")
-        liha_diti_type = str(liha_config.get("diti_type") or "").strip()
+        liha_device, liha_available_id = self._resolve_device_pair(
+            protocol, role="liha"
+        )
+
         liha_waste_labware = str(liha_config.get("waste_labware") or "").strip()
 
         def _step_device(step_obj, *, role: str = "device") -> tuple[str, str]:
@@ -1282,6 +1557,7 @@ class Renderer:
                 step_available_id=getattr(step_obj, "available_id", None),
                 role=role,
             )
+
         params = {
             "LineNumber": str(step.line_number or 0),
             "GroupLineNumber": "0",  # Always 0 for individual steps (matches Tecan convention)
@@ -1301,7 +1577,7 @@ class Renderer:
 
             for key, value in step.parameters.items():
                 # Convert snake_case to PascalCase for template placeholders
-                pascal_key = ''.join(word.capitalize() for word in key.split('_'))
+                pascal_key = "".join(word.capitalize() for word in key.split("_"))
                 params[pascal_key] = str(value) if value is not None else ""
 
             # Fill missing keys from protocol/config only (shipped yaml leaves these
@@ -1314,11 +1590,18 @@ class Renderer:
                 params["LiquidClassName"] = default_liquid_class
 
             # Prefer explicit GenericStep device fields when present.
-            if any(k in step.parameters for k in ("device_alias", "DeviceAlias", "available_id", "AvailableID")):
+            if any(
+                k in step.parameters
+                for k in ("device_alias", "DeviceAlias", "available_id", "AvailableID")
+            ):
                 alias, avail = self._resolve_device_pair(
                     protocol,
-                    step_alias=step.parameters.get("device_alias") or step.parameters.get("DeviceAlias") or params.get("DeviceAlias"),
-                    step_available_id=step.parameters.get("available_id") or step.parameters.get("AvailableID") or params.get("AvailableID"),
+                    step_alias=step.parameters.get("device_alias")
+                    or step.parameters.get("DeviceAlias")
+                    or params.get("DeviceAlias"),
+                    step_available_id=step.parameters.get("available_id")
+                    or step.parameters.get("AvailableID")
+                    or params.get("AvailableID"),
                     role="device",
                 )
                 params["DeviceAlias"] = alias
@@ -1347,92 +1630,127 @@ class Renderer:
                 # Track placement so we can infer cover-site moves (e.g. placing a plate onto a magnet plate).
                 position_text = self._expression_text(step.position)
                 try:
-                    self._labware_placements[(step.location, int(self._expression_python_value(step.position)))] = step.label
+                    self._labware_placements[
+                        (
+                            step.location,
+                            int(self._expression_python_value(step.position)),
+                        )
+                    ] = step.label
                 except Exception:
                     pass
-                params.update({
-                    "LabwareType": labware_type_out,
-                    "LabwareLable": step.label,  # Note: Tecan uses "Lable" not "Label"
-                    "Location": step.location,
-                    "Position": position_text,
-                    "Rotation": str(step.rotation),
-                    "HasLid": str(step.has_lid).lower().capitalize(),
-                })
+                params.update(
+                    {
+                        "LabwareType": labware_type_out,
+                        "LabwareLable": step.label,  # Note: Tecan uses "Lable" not "Label"
+                        "Location": step.location,
+                        "Position": position_text,
+                        "Rotation": str(step.rotation),
+                        "HasLid": str(step.has_lid).lower().capitalize(),
+                    }
+                )
 
             case StepType.REMOVE_LABWARE:
-                params.update({
-                    "LabwareName": step.labware_name,
-                })
+                params.update(
+                    {
+                        "LabwareName": step.labware_name,
+                    }
+                )
 
             case StepType.GET_HEAD_ADAPTER:
                 # Update adapter tracking
                 self._current_adapter_config = _get_adapter_config(step.labware_name)
-                params.update({
-                    "LabwareName": step.labware_name,
-                    "DeviceAlias": step.device_alias or default_device,
-                    "AvailableID": step.available_id or default_available_id,
-                    "BlowoutAirgap": str(step.blowout_airgap),
-                })
+                params.update(
+                    {
+                        "LabwareName": step.labware_name,
+                        "DeviceAlias": step.device_alias or default_device,
+                        "AvailableID": step.available_id or default_available_id,
+                        "BlowoutAirgap": str(step.blowout_airgap),
+                    }
+                )
 
             case StepType.DROP_HEAD_ADAPTER:
                 # Clear adapter tracking
                 self._current_adapter_config = None
-                params.update({
-                    "LabwareName": step.labware_name,
-                    "DeviceAlias": step.device_alias or default_device,
-                    "AvailableID": step.available_id or default_available_id,
-                    "BlowoutAirgap": str(step.blowout_airgap),
-                    "UseSourceAsBackPosition": step.back_position,
-                    "AdapterAfterDrop": str(step.adapter_after_drop).lower().capitalize(),
-                })
+                params.update(
+                    {
+                        "LabwareName": step.labware_name,
+                        "DeviceAlias": step.device_alias or default_device,
+                        "AvailableID": step.available_id or default_available_id,
+                        "BlowoutAirgap": str(step.blowout_airgap),
+                        "UseSourceAsBackPosition": step.back_position,
+                        "AdapterAfterDrop": str(step.adapter_after_drop)
+                        .lower()
+                        .capitalize(),
+                    }
+                )
 
             case StepType.PICK_UP_TIPS:
                 # Use adapter config for defaults if available
                 adapter = self._current_adapter_config
                 default_cols = adapter["partial_columns"] if adapter else 24
                 default_rows = adapter["partial_rows"] if adapter else 16
-                params.update({
-                    "LabwareName": step.labware_name,
-                    "DeviceAlias": step.device_alias or default_device,
-                    "AvailableID": step.available_id or default_available_id,
-                    "BlowoutAirgap": str(step.blowout_airgap),
-                    "PartialColumns": str(step.partial_columns if step.partial_columns else default_cols),
-                    "PartialRows": str(step.partial_rows if step.partial_rows else default_rows),
-                    "HeadPosition": step.head_position,
-                })
+                params.update(
+                    {
+                        "LabwareName": step.labware_name,
+                        "DeviceAlias": step.device_alias or default_device,
+                        "AvailableID": step.available_id or default_available_id,
+                        "BlowoutAirgap": str(step.blowout_airgap),
+                        "PartialColumns": str(
+                            step.partial_columns
+                            if step.partial_columns
+                            else default_cols
+                        ),
+                        "PartialRows": str(
+                            step.partial_rows if step.partial_rows else default_rows
+                        ),
+                        "HeadPosition": step.head_position,
+                    }
+                )
 
             case StepType.SET_TIPS_BACK:
                 # Use adapter config for defaults if available
                 adapter = self._current_adapter_config
                 default_cols = adapter["partial_columns"] if adapter else 24
                 default_rows = adapter["partial_rows"] if adapter else 16
-                params.update({
-                    "LabwareName": step.labware_name,
-                    "DeviceAlias": step.device_alias or default_device,
-                    "AvailableID": step.available_id or default_available_id,
-                    "UseSourceAsBackPosition": step.back_position,
-                    "PartialColumns": str(step.partial_columns if step.partial_columns else default_cols),
-                    "PartialRows": str(step.partial_rows if step.partial_rows else default_rows),
-                    "HeadPosition": step.head_position,
-                })
+                params.update(
+                    {
+                        "LabwareName": step.labware_name,
+                        "DeviceAlias": step.device_alias or default_device,
+                        "AvailableID": step.available_id or default_available_id,
+                        "UseSourceAsBackPosition": step.back_position,
+                        "PartialColumns": str(
+                            step.partial_columns
+                            if step.partial_columns
+                            else default_cols
+                        ),
+                        "PartialRows": str(
+                            step.partial_rows if step.partial_rows else default_rows
+                        ),
+                        "HeadPosition": step.head_position,
+                    }
+                )
 
             case StepType.ASPIRATE:
-                params.update({
-                    "LabwareName": step.labware_name,
-                    "DeviceAlias": step.device_alias or default_device,
-                    "AvailableID": step.available_id or default_available_id,
-                    "LiquidClassName": _normalize_liquid_class(step.liquid_class),
-                    "Volume": self._expression_text(step.volume),
-                })
+                params.update(
+                    {
+                        "LabwareName": step.labware_name,
+                        "DeviceAlias": step.device_alias or default_device,
+                        "AvailableID": step.available_id or default_available_id,
+                        "LiquidClassName": _normalize_liquid_class(step.liquid_class),
+                        "Volume": self._expression_text(step.volume),
+                    }
+                )
 
             case StepType.DISPENSE:
-                params.update({
-                    "LabwareName": step.labware_name,
-                    "DeviceAlias": step.device_alias or default_device,
-                    "AvailableID": step.available_id or default_available_id,
-                    "LiquidClassName": _normalize_liquid_class(step.liquid_class),
-                    "Volume": self._expression_text(step.volume),
-                })
+                params.update(
+                    {
+                        "LabwareName": step.labware_name,
+                        "DeviceAlias": step.device_alias or default_device,
+                        "AvailableID": step.available_id or default_available_id,
+                        "LiquidClassName": _normalize_liquid_class(step.liquid_class),
+                        "Volume": self._expression_text(step.volume),
+                    }
+                )
 
             case StepType.RGA_TRANSFER_LABWARE:
                 # Correctly mapping to the template placeholders found in reference/commands.yaml
@@ -1446,7 +1764,12 @@ class Renderer:
                 # using VisionX helpers: GetCoverSiteName/Index(<magnet_label>).
                 magnet_label = None
                 try:
-                    magnet_label = self._labware_placements.get((step.destination_location, int(self._expression_python_value(step.destination_site))))
+                    magnet_label = self._labware_placements.get(
+                        (
+                            step.destination_location,
+                            int(self._expression_python_value(step.destination_site)),
+                        )
+                    )
                 except Exception:
                     magnet_label = None
 
@@ -1461,69 +1784,87 @@ class Renderer:
                         dest_site = f'GetCoverSiteIndex("{magnet_label}")'
                         fixed_site = "true"
 
-                params.update({
-                    "LabwareName": step.labware_name,
-                    "DestinationLocation": dest_location,
-                    "DestinationSite": dest_site,
-                    "FixedSite": fixed_site,
-                    "MoveToBase": str(step.move_to_base).lower(),
-                    "ModuleName": str(
-                        getattr(step, "module_name", None)
-                        or getattr(protocol, "rga_module_name", None)
-                        or ""
-                    ).strip(),
-                    "AvailableID": str(getattr(step, "available_id", None) or default_available_id).strip(),
-                    # Robotic driver macros require lowercase bools for these specific attributes
-                    "IsBreakpoint": str(step.breakpoint).lower(),
-                    "IsDisabledForExecution": str(step.disabled).lower(),
-                })
+                params.update(
+                    {
+                        "LabwareName": step.labware_name,
+                        "DestinationLocation": dest_location,
+                        "DestinationSite": dest_site,
+                        "FixedSite": fixed_site,
+                        "MoveToBase": str(step.move_to_base).lower(),
+                        "ModuleName": str(
+                            getattr(step, "module_name", None)
+                            or getattr(protocol, "rga_module_name", None)
+                            or ""
+                        ).strip(),
+                        "AvailableID": str(
+                            getattr(step, "available_id", None) or default_available_id
+                        ).strip(),
+                        # Robotic driver macros require lowercase bools for these specific attributes
+                        "IsBreakpoint": str(step.breakpoint).lower(),
+                        "IsDisabledForExecution": str(step.disabled).lower(),
+                    }
+                )
                 if not params["ModuleName"]:
                     raise RenderError(_RGA_MODULE_MISSING_ERROR)
 
-
-
             case StepType.CGA_GET_FINGERS:
                 device_alias, available_id = _step_device(step, role="cga")
-                params.update({
-                    "LabwareName": cga_get_fingers_labware if step.labware_name is None else step.labware_name,
-                    "DeviceAlias": device_alias,
-                    "AvailableID": available_id,
-                })
+                params.update(
+                    {
+                        "LabwareName": cga_get_fingers_labware
+                        if step.labware_name is None
+                        else step.labware_name,
+                        "DeviceAlias": device_alias,
+                        "AvailableID": available_id,
+                    }
+                )
 
             case StepType.CGA_DROP_FINGERS:
                 device_alias, available_id = _step_device(step, role="cga")
-                params.update({
-                    "LabwareName": cga_drop_fingers_labware if step.labware_name is None else step.labware_name,
-                    "DeviceAlias": device_alias,
-                    "AvailableID": available_id,
-                    "UseSourceAsBackPosition": step.use_source_as_back_position,
-                })
+                params.update(
+                    {
+                        "LabwareName": cga_drop_fingers_labware
+                        if step.labware_name is None
+                        else step.labware_name,
+                        "DeviceAlias": device_alias,
+                        "AvailableID": available_id,
+                        "UseSourceAsBackPosition": step.use_source_as_back_position,
+                    }
+                )
 
             case StepType.MCA384_MIX:
                 # FluentControl requires a mix-capable liquid subclass for MCA mix.
-                mca_mix_liquid_class = _normalize_liquid_class(step.liquid_class, mix=True)
-                params.update({
-                    "LabwareName": step.labware_name,
-                    "DeviceAlias": step.device_alias or default_device,
-                    "AvailableID": step.available_id or default_available_id,
-                    "LiquidClassName": mca_mix_liquid_class,
-                    "Volume": self._expression_text(step.volume),
-                    "Cycles": self._expression_text(step.cycles),
-                })
+                mca_mix_liquid_class = _normalize_liquid_class(
+                    step.liquid_class, mix=True
+                )
+                params.update(
+                    {
+                        "LabwareName": step.labware_name,
+                        "DeviceAlias": step.device_alias or default_device,
+                        "AvailableID": step.available_id or default_available_id,
+                        "LiquidClassName": mca_mix_liquid_class,
+                        "Volume": self._expression_text(step.volume),
+                        "Cycles": self._expression_text(step.cycles),
+                    }
+                )
 
             case StepType.WAIT:
-                params.update({
-                    "Duration": self._expression_text(step.duration_seconds),
-                })
+                params.update(
+                    {
+                        "Duration": self._expression_text(step.duration_seconds),
+                    }
+                )
 
             case StepType.LIHA_ASPIRATE:
-                params.update({
-                    "LabwareName": step.labware_name or "",
-                    "DeviceAlias": step.device_alias or liha_device,
-                    "AvailableID": step.available_id or liha_available_id,
-                    "LiquidClassName": _normalize_liquid_class(step.liquid_class),
-                    "Volume": self._expression_text(step.volume),
-                })
+                params.update(
+                    {
+                        "LabwareName": step.labware_name or "",
+                        "DeviceAlias": step.device_alias or liha_device,
+                        "AvailableID": step.available_id or liha_available_id,
+                        "LiquidClassName": _normalize_liquid_class(step.liquid_class),
+                        "Volume": self._expression_text(step.volume),
+                    }
+                )
                 if step.well_offset is not None:
                     params["WellOffset"] = _normalize_well_offset_expr(step.well_offset)
                 meta = self._resolve_labware_meta(step.labware_name)
@@ -1533,13 +1874,15 @@ class Renderer:
                     params["_labware_category"] = meta.get("category")
 
             case StepType.LIHA_DISPENSE:
-                params.update({
-                    "LabwareName": step.labware_name or "",
-                    "DeviceAlias": step.device_alias or liha_device,
-                    "AvailableID": step.available_id or liha_available_id,
-                    "LiquidClassName": _normalize_liquid_class(step.liquid_class),
-                    "Volume": self._expression_text(step.volume),
-                })
+                params.update(
+                    {
+                        "LabwareName": step.labware_name or "",
+                        "DeviceAlias": step.device_alias or liha_device,
+                        "AvailableID": step.available_id or liha_available_id,
+                        "LiquidClassName": _normalize_liquid_class(step.liquid_class),
+                        "Volume": self._expression_text(step.volume),
+                    }
+                )
                 if step.well_offset is not None:
                     params["WellOffset"] = _normalize_well_offset_expr(step.well_offset)
                 meta = self._resolve_labware_meta(step.labware_name)
@@ -1552,14 +1895,16 @@ class Renderer:
                 # FluentControl expects a mixing-specific liquid class for LiHa mix.
                 # Operator convention (current): "Water Mix".
                 mix_liquid_class = _normalize_liquid_class(step.liquid_class, mix=True)
-                params.update({
-                    "LabwareName": step.labware_name or "",
-                    "DeviceAlias": step.device_alias or liha_device,
-                    "AvailableID": step.available_id or liha_available_id,
-                    "LiquidClassName": mix_liquid_class,
-                    "Volume": self._expression_text(step.volume),
-                    "Cycles": self._expression_text(step.cycles),
-                })
+                params.update(
+                    {
+                        "LabwareName": step.labware_name or "",
+                        "DeviceAlias": step.device_alias or liha_device,
+                        "AvailableID": step.available_id or liha_available_id,
+                        "LiquidClassName": mix_liquid_class,
+                        "Volume": self._expression_text(step.volume),
+                        "Cycles": self._expression_text(step.cycles),
+                    }
+                )
                 if step.well_offset is not None:
                     params["WellOffset"] = _normalize_well_offset_expr(step.well_offset)
                 meta = self._resolve_labware_meta(step.labware_name)
@@ -1577,12 +1922,14 @@ class Renderer:
                     if raw_type:
                         # Resolve through variable map if it's a variable reference
                         tip_labware_type = self._variable_values.get(raw_type, raw_type)
-                params.update({
-                    "LabwareName": "",
-                    "DeviceAlias": step.device_alias or liha_device,
-                    "AvailableID": step.available_id or liha_available_id,
-                    "_tip_labware_type": tip_labware_type,  # passed to post-processing
-                })
+                params.update(
+                    {
+                        "LabwareName": "",
+                        "DeviceAlias": step.device_alias or liha_device,
+                        "AvailableID": step.available_id or liha_available_id,
+                        "_tip_labware_type": tip_labware_type,  # passed to post-processing
+                    }
+                )
 
             case StepType.LIHA_DROP_TIPS:
                 # DropTips always targets the waste chute/disposal target.
@@ -1590,165 +1937,217 @@ class Renderer:
                 # Local models frequently (and incorrectly) provide the tipbox name here.
                 # FluentControl expects a waste chute labware (see extracted example:
                 # "FCA Thru Deck Waste Chute_1"), not a tipbox.
-                params.update({
-                    "LabwareName": liha_waste_labware,
-                    "DeviceAlias": step.device_alias or liha_device,
-                    "AvailableID": step.available_id or liha_available_id,
-                })
+                params.update(
+                    {
+                        "LabwareName": liha_waste_labware,
+                        "DeviceAlias": step.device_alias or liha_device,
+                        "AvailableID": step.available_id or liha_available_id,
+                    }
+                )
 
             case StepType.MCA384_EMPTY_TIPS:
-                params.update({
-                    "LabwareName": step.labware_name,
-                    "DeviceAlias": step.device_alias or default_device,
-                    "AvailableID": step.available_id or default_available_id,
-                    "LiquidClassName": _normalize_liquid_class(step.liquid_class),
-                    "Volume": self._expression_text(step.volume),
-                })
+                params.update(
+                    {
+                        "LabwareName": step.labware_name,
+                        "DeviceAlias": step.device_alias or default_device,
+                        "AvailableID": step.available_id or default_available_id,
+                        "LiquidClassName": _normalize_liquid_class(step.liquid_class),
+                        "Volume": self._expression_text(step.volume),
+                    }
+                )
 
             case StepType.MCA384_GET_TIPS:
-                params.update({
-                    "LabwareName": step.labware_name or "",
-                    "DeviceAlias": step.device_alias or default_device,
-                    "AvailableID": step.available_id or default_available_id,
-                })
+                params.update(
+                    {
+                        "LabwareName": step.labware_name or "",
+                        "DeviceAlias": step.device_alias or default_device,
+                        "AvailableID": step.available_id or default_available_id,
+                    }
+                )
 
             case StepType.MCA384_DROP_TIPS:
-                params.update({
-                    "LabwareName": step.labware_name or "",
-                    "DeviceAlias": step.device_alias or default_device,
-                    "AvailableID": step.available_id or default_available_id,
-                })
+                params.update(
+                    {
+                        "LabwareName": step.labware_name or "",
+                        "DeviceAlias": step.device_alias or default_device,
+                        "AvailableID": step.available_id or default_available_id,
+                    }
+                )
 
             case StepType.MCA384_MOVE_ARM:
-                params.update({
-                    "MovementType": step.movement_type,
-                    "LabwareName": step.labware_name or "",
-                    "DeviceAlias": step.device_alias or default_device,
-                    "AvailableID": step.available_id or default_available_id,
-                })
+                params.update(
+                    {
+                        "MovementType": step.movement_type,
+                        "LabwareName": step.labware_name or "",
+                        "DeviceAlias": step.device_alias or default_device,
+                        "AvailableID": step.available_id or default_available_id,
+                    }
+                )
 
             case StepType.LIHA_EMPTY_TIPS:
-                params.update({
-                    "LabwareName": step.labware_name,
-                    "DeviceAlias": step.device_alias or liha_device,
-                    "AvailableID": step.available_id or liha_available_id,
-                    "LiquidClassName": _normalize_liquid_class(step.liquid_class),
-                    "Volume": self._expression_text(step.volume),
-                })
+                params.update(
+                    {
+                        "LabwareName": step.labware_name,
+                        "DeviceAlias": step.device_alias or liha_device,
+                        "AvailableID": step.available_id or liha_available_id,
+                        "LiquidClassName": _normalize_liquid_class(step.liquid_class),
+                        "Volume": self._expression_text(step.volume),
+                    }
+                )
 
             case StepType.COMMENT:
-                params.update({
-                    "Comment": step.comment,
-                })
+                params.update(
+                    {
+                        "Comment": step.comment,
+                    }
+                )
 
             case StepType.USER_PROMPT:
-                auto_close = bool(step.auto_close) if step.auto_close is not None else step.timeout > 0
+                auto_close = (
+                    bool(step.auto_close)
+                    if step.auto_close is not None
+                    else step.timeout > 0
+                )
                 # FluentControl requires Timeout 1-7200 even when AutoClose is False
                 # (wait-for-operator). Source scripts use 1 as the sentinel minimum.
                 timeout_value = step.timeout if auto_close else max(step.timeout, 1)
                 prompt_text = self._xml_escape_multiline(step.prompt)
-                params.update({
-                    "Prompt": prompt_text,
-                    "AutoClose": str(auto_close),
-                    "Timeout": str(timeout_value),
-                    # RUPStandardStatement (image-capable) fields. These are
-                    # ignored by the plain UserPrompt template and only consumed
-                    # by the UserPromptImage template when image_path is set.
-                    "MessageText": prompt_text,
-                    "SelectedImagePath": step.image_path or "",
-                    "SelectedSoundPath": step.sound_path or "",
-                    "SoundFile": step.sound_path or "",
-                    "RepeatSound": "False",
-                    "RUPScreenTitle": step.screen_title or "User Prompt",
-                    "RUPDisplayAndWait": str(not auto_close),
-                    "RUPAutoClose": str(auto_close),
-                    "RUPTimeOut": str(timeout_value),
-                })
+                params.update(
+                    {
+                        "Prompt": prompt_text,
+                        "AutoClose": str(auto_close),
+                        "Timeout": str(timeout_value),
+                        # RUPStandardStatement (image-capable) fields. These are
+                        # ignored by the plain UserPrompt template and only consumed
+                        # by the UserPromptImage template when image_path is set.
+                        "MessageText": prompt_text,
+                        "SelectedImagePath": step.image_path or "",
+                        "SelectedSoundPath": step.sound_path or "",
+                        "SoundFile": step.sound_path or "",
+                        "RepeatSound": "False",
+                        "RUPScreenTitle": step.screen_title or "User Prompt",
+                        "RUPDisplayAndWait": str(not auto_close),
+                        "RUPAutoClose": str(auto_close),
+                        "RUPTimeOut": str(timeout_value),
+                    }
+                )
 
             case StepType.START_TIMER:
-                params.update({
-                    "Timer": str(step.timer),
-                })
+                params.update(
+                    {
+                        "Timer": str(step.timer),
+                    }
+                )
 
             case StepType.WAIT_FOR_TIMER:
-                params.update({
-                    "Timer": str(step.timer),
-                    "Duration": self._expression_text(step.duration_seconds),
-                })
+                params.update(
+                    {
+                        "Timer": str(step.timer),
+                        "Duration": self._expression_text(step.duration_seconds),
+                    }
+                )
 
             case StepType.EXPORT_VARIABLE:
-                params.update({
-                    "Variables": self._string_objects_xml(step.variables),
-                    "ExportFile": f'"{self._xml_escape(step.export_file)}"',
-                    "WriteHeader": self._bool_text(step.write_header),
-                    "ReplaceExistingFile": self._bool_text(step.replace_existing_file),
-                    "ExportStringsWithQuotes": self._bool_text(step.export_strings_with_quotes),
-                    "DelimiterCode": str(step.delimiter_code),
-                })
+                params.update(
+                    {
+                        "Variables": self._string_objects_xml(step.variables),
+                        "ExportFile": f'"{self._xml_escape(step.export_file)}"',
+                        "WriteHeader": self._bool_text(step.write_header),
+                        "ReplaceExistingFile": self._bool_text(
+                            step.replace_existing_file
+                        ),
+                        "ExportStringsWithQuotes": self._bool_text(
+                            step.export_strings_with_quotes
+                        ),
+                        "DelimiterCode": str(step.delimiter_code),
+                    }
+                )
 
             case StepType.IMPORT_VARIABLE:
-                params.update({
-                    "Variables": self._string_objects_xml(step.variables),
-                    "ImportFile": f'"{self._xml_escape(step.import_file)}"',
-                    "ReadLine": self._bool_text(step.read_line),
-                    "Line": str(step.line),
-                    "StartInColumn": self._bool_text(step.start_in_column),
-                    "Column": str(step.column),
-                    "HasHeader": self._bool_text(step.has_header),
-                    "DelimiterCode": str(step.delimiter_code),
-                })
+                params.update(
+                    {
+                        "Variables": self._string_objects_xml(step.variables),
+                        "ImportFile": f'"{self._xml_escape(step.import_file)}"',
+                        "ReadLine": self._bool_text(step.read_line),
+                        "Line": str(step.line),
+                        "StartInColumn": self._bool_text(step.start_in_column),
+                        "Column": str(step.column),
+                        "HasHeader": self._bool_text(step.has_header),
+                        "DelimiterCode": str(step.delimiter_code),
+                    }
+                )
 
             case StepType.QUERY_VARIABLE:
-                params.update({
-                    "Name": step.variable_name,
-                    "QueryPrompt": step.query_prompt,
-                    "LimitRange": self._bool_text(step.limit_range),
-                })
+                params.update(
+                    {
+                        "Name": step.variable_name,
+                        "QueryPrompt": step.query_prompt,
+                        "LimitRange": self._bool_text(step.limit_range),
+                    }
+                )
 
             case StepType.INITIALIZE_DEVICE:
                 # No alias↔AvailableID cross-fill — both must come from ZEIA/recipe/config.
                 device_alias, available_id = _step_device(step, role="device")
-                params.update({
-                    "InitType": step.init_type or "Initialize",
-                    "DeviceAlias": device_alias,
-                    "AvailableID": available_id,
-                })
+                params.update(
+                    {
+                        "InitType": step.init_type or "Initialize",
+                        "DeviceAlias": device_alias,
+                        "AvailableID": available_id,
+                    }
+                )
 
             case StepType.EXECUTE_APPLICATION:
-                params.update({
-                    "Application": self._xml_escape(step.application),
-                    "Arguments": self._xml_escape(step.arguments),
-                    "Wait": self._bool_text(step.wait),
-                    "StoreReturn": self._bool_text(step.store_return),
-                    "Variable": self._xml_escape(step.variable),
-                })
+                params.update(
+                    {
+                        "Application": self._xml_escape(step.application),
+                        "Arguments": self._xml_escape(step.arguments),
+                        "Wait": self._bool_text(step.wait),
+                        "StoreReturn": self._bool_text(step.store_return),
+                        "Variable": self._xml_escape(step.variable),
+                    }
+                )
 
             case StepType.DELAY:
-                params.update({
-                    "Delay": self._expression_text(step.delay),
-                })
+                params.update(
+                    {
+                        "Delay": self._expression_text(step.delay),
+                    }
+                )
 
             case StepType.SET_LOCATION:
-                params.update({
-                    "Labware": step.labware,
-                    "Location": step.location,
-                    "Site": self._expression_text(step.site),
-                    "Rotation": str(step.rotation),
-                })
+                params.update(
+                    {
+                        "Labware": step.labware,
+                        "Location": step.location,
+                        "Site": self._expression_text(step.site),
+                        "Rotation": str(step.rotation),
+                    }
+                )
 
             case StepType.SUBROUTINE:
-                params.update({
-                    "SubRoutine": f'"{self._xml_escape(step.subroutine)}"',
-                    "ExecutionMode": self._xml_escape(step.execution_mode),
-                    "VariableMappingsStart": self._variable_mappings_xml(step.variable_mappings_start),
-                    "VariableMappingsEnd": self._variable_mappings_xml(step.variable_mappings_end),
-                })
+                params.update(
+                    {
+                        "SubRoutine": f'"{self._xml_escape(step.subroutine)}"',
+                        "ExecutionMode": self._xml_escape(step.execution_mode),
+                        "VariableMappingsStart": self._variable_mappings_xml(
+                            step.variable_mappings_start
+                        ),
+                        "VariableMappingsEnd": self._variable_mappings_xml(
+                            step.variable_mappings_end
+                        ),
+                    }
+                )
 
             case StepType.SET_VARIABLE:
-                params.update({
-                    "Name": (step.variable_name or "").strip(),
-                    "Value": self._xml_escape(render_expression(coerce_literal_expression(step.value))),
-                })
+                params.update(
+                    {
+                        "Name": (step.variable_name or "").strip(),
+                        "Value": self._xml_escape(
+                            render_expression(coerce_literal_expression(step.value))
+                        ),
+                    }
+                )
 
             case StepType.CALCULATE_VARIABLE:
                 # Tecan has no separate CalculateVariable command — render as
@@ -1767,15 +2166,19 @@ class Renderer:
                     "/": "/",
                 }
                 op_sym = op_map.get(str(step.operation or "").strip().lower(), "+")
-                expr = render_expression(BinaryExpression(
-                    operator=op_sym,  # type: ignore[arg-type]
-                    left=self._calculation_operand_expression(step.operand_a),
-                    right=self._calculation_operand_expression(step.operand_b),
-                ))
-                params.update({
-                    "Name": (step.target_variable or "").strip(),
-                    "Value": self._xml_escape(expr),
-                })
+                expr = render_expression(
+                    BinaryExpression(
+                        operator=op_sym,  # type: ignore[arg-type]
+                        left=self._calculation_operand_expression(step.operand_a),
+                        right=self._calculation_operand_expression(step.operand_b),
+                    )
+                )
+                params.update(
+                    {
+                        "Name": (step.target_variable or "").strip(),
+                        "Value": self._xml_escape(expr),
+                    }
+                )
 
             case StepType.LOOP:
                 # Loop rendering is handled separately in _render_step
@@ -1805,7 +2208,9 @@ class Renderer:
                 params["AvailableID"] = avail
             elif "AvailableID" in params and stype == StepType.RGA_TRANSFER_LABWARE:
                 # RGA uses AvailableID only (no DeviceAlias); keep step/config resolve.
-                params["AvailableID"] = str(getattr(step, "available_id", None) or default_available_id).strip()
+                params["AvailableID"] = str(
+                    getattr(step, "available_id", None) or default_available_id
+                ).strip()
 
         # Add adapter params for MCA operations that need AdapterData
         adapter_params = self._get_adapter_params(default_available_id)
@@ -1827,20 +2232,20 @@ class Renderer:
             # Build UsableTips XML based on adapter type
             if adapter["name"] == "EVA":
                 usable_tips_xml = (
-                    '                <UsableTips>\n'
-                    '                  <UsableTips>All</UsableTips>\n'
-                    '                </UsableTips>\n'
+                    "                <UsableTips>\n"
+                    "                  <UsableTips>All</UsableTips>\n"
+                    "                </UsableTips>\n"
                 )
                 sort_number = "50"
                 mount_column_row_wise = "false"
             else:
                 # 384 Combo
                 usable_tips_xml = (
-                    '                <UsableTips>\n'
-                    '                  <UsableTips>All</UsableTips>\n'
-                    '                  <UsableTips>Column</UsableTips>\n'
-                    '                  <UsableTips>Row</UsableTips>\n'
-                    '                </UsableTips>\n'
+                    "                <UsableTips>\n"
+                    "                  <UsableTips>All</UsableTips>\n"
+                    "                  <UsableTips>Column</UsableTips>\n"
+                    "                  <UsableTips>Row</UsableTips>\n"
+                    "                </UsableTips>\n"
                 )
                 sort_number = "10"
                 mount_column_row_wise = "true"
@@ -1888,11 +2293,11 @@ class Renderer:
                 "AdapterYSpacing": "4.5",
                 "AdapterToolId": "TOOLTYPE:Mca384.Adapter/TOOLNAME:DiTi384.Combo",
                 "AdapterUsableTipsXml": (
-                    '                <UsableTips>\n'
-                    '                  <UsableTips>All</UsableTips>\n'
-                    '                  <UsableTips>Column</UsableTips>\n'
-                    '                  <UsableTips>Row</UsableTips>\n'
-                    '                </UsableTips>\n'
+                    "                <UsableTips>\n"
+                    "                  <UsableTips>All</UsableTips>\n"
+                    "                  <UsableTips>Column</UsableTips>\n"
+                    "                  <UsableTips>Row</UsableTips>\n"
+                    "                </UsableTips>\n"
                 ),
                 "AdapterSortNumber": "10",
                 "AdapterMountColumnRowWise": "true",
@@ -1900,8 +2305,12 @@ class Renderer:
 
     # LiHa step types that need XML post-processing
     _LIHA_STEP_TYPES = {
-        StepType.LIHA_ASPIRATE, StepType.LIHA_DISPENSE, StepType.LIHA_MIX,
-        StepType.LIHA_GET_TIPS, StepType.LIHA_DROP_TIPS, StepType.LIHA_EMPTY_TIPS,
+        StepType.LIHA_ASPIRATE,
+        StepType.LIHA_DISPENSE,
+        StepType.LIHA_MIX,
+        StepType.LIHA_GET_TIPS,
+        StepType.LIHA_DROP_TIPS,
+        StepType.LIHA_EMPTY_TIPS,
     }
 
     def _is_liha_step(self, step: Step, command_id: str | None) -> bool:
@@ -1916,27 +2325,35 @@ class Renderer:
                     return True
         return bool(command_id and command_id.startswith("Liha"))
 
-    def _build_liha_volumes_xml(self, volume: str, num_channels: int = 8, volumes: list | None = None) -> str:
+    def _build_liha_volumes_xml(
+        self, volume: str, num_channels: int = 8, volumes: list | None = None
+    ) -> str:
         """Build XML fragment for LiHa per-channel volumes."""
-        rendered_volumes = [self._expression_text(item) for item in volumes] if volumes else [volume] * num_channels
+        rendered_volumes = (
+            [self._expression_text(item) for item in volumes]
+            if volumes
+            else [volume] * num_channels
+        )
         entries = []
         for rendered_volume in rendered_volumes:
             entries.append(
                 f'          <Object Type="System.String">\n'
-                f'            <string>{rendered_volume}</string>\n'
-                f'          </Object>'
+                f"            <string>{rendered_volume}</string>\n"
+                f"          </Object>"
             )
         return "\n".join(entries)
 
-    def _build_liha_tips_xml(self, channels: list[int] | None = None, *, num_tips: int = 8) -> str:
+    def _build_liha_tips_xml(
+        self, channels: list[int] | None = None, *, num_tips: int = 8
+    ) -> str:
         """Build XML fragment for LiHa SelectedTipsIndexes."""
         selected = list(range(num_tips)) if channels is None else list(channels)
         entries = []
         for i in selected:
             entries.append(
                 f'                  <Object Type="System.Int32">\n'
-                f'                    <int>{i}</int>\n'
-                f'                  </Object>'
+                f"                    <int>{i}</int>\n"
+                f"                  </Object>"
             )
         return "\n".join(entries)
 
@@ -1948,7 +2365,9 @@ class Renderer:
             return [step.tip_index]
         return list(range(8))
 
-    def _build_liha_well_selection(self, num_channels: int = 8, mode: str = "range") -> tuple:
+    def _build_liha_well_selection(
+        self, num_channels: int = 8, mode: str = "range"
+    ) -> tuple:
         """Build serialized well indexes and well string for LiHa.
 
         Returns (SerializedWellIndexes, SelectedWellsString) for column A1-H1.
@@ -1988,14 +2407,16 @@ class Renderer:
         meta["type"] = labware_type
         return meta
 
-    def _build_liha_liquid_class_names_xml(self, liquid_class: str, num_channels: int) -> str:
+    def _build_liha_liquid_class_names_xml(
+        self, liquid_class: str, num_channels: int
+    ) -> str:
         """Build the <LiquidClassNames> block for all channels."""
         objects = []
         for _ in range(num_channels):
             objects.append(
                 '          <Object Type="System.String">\n'
-                f'            <string>{liquid_class}</string>\n'
-                '          </Object>'
+                f"            <string>{liquid_class}</string>\n"
+                "          </Object>"
             )
         return "\n".join(objects)
 
@@ -2006,38 +2427,58 @@ class Renderer:
         liquid_class = params.get("LiquidClassName", "")
 
         # Replace hardcoded volumes block (8 entries of <string>NNN</string>)
-        if step.step_type in (StepType.LIHA_ASPIRATE, StepType.LIHA_DISPENSE, StepType.LIHA_MIX):
-            new_lc_names = self._build_liha_liquid_class_names_xml(liquid_class, num_channels)
+        if step.step_type in (
+            StepType.LIHA_ASPIRATE,
+            StepType.LIHA_DISPENSE,
+            StepType.LIHA_MIX,
+        ):
+            new_lc_names = self._build_liha_liquid_class_names_xml(
+                liquid_class, num_channels
+            )
             xml = re.sub(
                 r'(<LiquidClassNames>\s*)(?:<Object Type="System\.String">\s*(?:<string\s*/>|<string[^>]*>.*?</string>)\s*</Object>\s*)+(\s*</LiquidClassNames>)',
-                lambda m: m.group(1) + "\n" + new_lc_names + "\n        " + m.group(2).strip(),
+                lambda m: (
+                    m.group(1) + "\n" + new_lc_names + "\n        " + m.group(2).strip()
+                ),
                 xml,
-                flags=re.DOTALL
+                flags=re.DOTALL,
             )
-            new_volumes = self._build_liha_volumes_xml(volume, num_channels, getattr(step, "volumes", None))
+            new_volumes = self._build_liha_volumes_xml(
+                volume, num_channels, getattr(step, "volumes", None)
+            )
             # Match the <Volumes>...</Volumes> block and replace its content
             xml = re.sub(
                 r'(<Volumes>\s*)(?:<Object Type="System\.String">\s*(?:<string\s*/>|<string[^>]*>.*?</string>)\s*</Object>\s*)+(\s*</Volumes>)',
-                lambda m: m.group(1) + "\n" + new_volumes + "\n        " + m.group(2).strip(),
+                lambda m: (
+                    m.group(1) + "\n" + new_volumes + "\n        " + m.group(2).strip()
+                ),
                 xml,
-                flags=re.DOTALL
+                flags=re.DOTALL,
             )
 
         # Replace hardcoded SelectedTipsIndexes block
-        if step.step_type == StepType.LIHA_GET_TIPS and isinstance(step, LihaGetTipsStep):
+        if step.step_type == StepType.LIHA_GET_TIPS and isinstance(
+            step, LihaGetTipsStep
+        ):
             selected_channels = self._resolve_liha_get_tips_channels(step)
         else:
             selected_channels = None
         new_tips = self._build_liha_tips_xml(selected_channels, num_tips=num_channels)
         xml = re.sub(
             r'(<SelectedTipsIndexes>\s*)(?:<Object Type="System\.Int32">\s*<int>\d+</int>\s*</Object>\s*)+(\s*</SelectedTipsIndexes>)',
-            lambda m: m.group(1) + "\n" + new_tips + "\n                " + m.group(2).strip(),
+            lambda m: (
+                m.group(1) + "\n" + new_tips + "\n                " + m.group(2).strip()
+            ),
             xml,
-            flags=re.DOTALL
+            flags=re.DOTALL,
         )
 
         # Replace hardcoded well indexes for aspirate/dispense/mix
-        if step.step_type in (StepType.LIHA_ASPIRATE, StepType.LIHA_DISPENSE, StepType.LIHA_MIX):
+        if step.step_type in (
+            StepType.LIHA_ASPIRATE,
+            StepType.LIHA_DISPENSE,
+            StepType.LIHA_MIX,
+        ):
             labware_wells = params.get("_labware_wells")
             labware_category = params.get("_labware_category")
             labware_type = str(params.get("_labware_type") or "").lower()
@@ -2047,37 +2488,36 @@ class Renderer:
                 token in labware_type
                 for token in ("trough", "reservoir", "waste", "25ml", "100ml", "300ml")
             )
-            is_single_well = labware_wells == 1 or labware_category == "reservoir" or inferred_single
+            is_single_well = (
+                labware_wells == 1 or labware_category == "reservoir" or inferred_single
+            )
             mode = "repeat_single" if is_single_well else "range"
             indexes, wells = self._build_liha_well_selection(num_channels, mode=mode)
             xml = re.sub(
-                r'<SerializedWellIndexes>[^<]*</SerializedWellIndexes>',
-                f'<SerializedWellIndexes>{indexes}</SerializedWellIndexes>',
-                xml
+                r"<SerializedWellIndexes>[^<]*</SerializedWellIndexes>",
+                f"<SerializedWellIndexes>{indexes}</SerializedWellIndexes>",
+                xml,
             )
             xml = re.sub(
-                r'<SelectedWellsString>[^<]*</SelectedWellsString>',
-                f'<SelectedWellsString>{wells}</SelectedWellsString>',
-                xml
+                r"<SelectedWellsString>[^<]*</SelectedWellsString>",
+                f"<SelectedWellsString>{wells}</SelectedWellsString>",
+                xml,
             )
             # Some extracted templates contain non-zero hardcoded offsets.
             # Force explicit offset: use provided value, otherwise reset to 0.
             well_offset = params.get("WellOffset", "0")
             xml = re.sub(
-                r'<WellOffset>[^<]*</WellOffset>',
-                f'<WellOffset>{well_offset}</WellOffset>',
+                r"<WellOffset>[^<]*</WellOffset>",
+                f"<WellOffset>{well_offset}</WellOffset>",
                 xml,
-                count=1
+                count=1,
             )
 
         # Replace hardcoded cycles for mix
         if step.step_type == StepType.LIHA_MIX:
             cycles = params.get("Cycles", "10")
             xml = re.sub(
-                r'<Cycles>\d+</Cycles>',
-                f'<Cycles>{cycles}</Cycles>',
-                xml,
-                count=1
+                r"<Cycles>\d+</Cycles>", f"<Cycles>{cycles}</Cycles>", xml, count=1
             )
 
         # Fix DitiType AvailableID for LiHa tips (should use TOOLTYPE identifier)
@@ -2087,21 +2527,25 @@ class Renderer:
             if tip_labware_type:
                 diti_type_id = f"TOOLTYPE:LiHa.TecanDiTi/TOOLNAME:{tip_labware_type}"
             else:
-                liha_config = self.config.get("liha_device", {}) if isinstance(self.config.get("liha_device"), dict) else {}
+                liha_config = (
+                    self.config.get("liha_device", {})
+                    if isinstance(self.config.get("liha_device"), dict)
+                    else {}
+                )
                 # Config/site overlay only — never invent FCA tip TOOLNAME placeholders.
                 diti_type_id = str(liha_config.get("diti_type") or "").strip()
             if diti_type_id:
                 # Replace <DitiType><AvailableID>...</AvailableID></DitiType>
                 xml = re.sub(
-                    r'(<DitiType>\s*<AvailableID>)[^<]*(</AvailableID>)',
+                    r"(<DitiType>\s*<AvailableID>)[^<]*(</AvailableID>)",
                     lambda m: m.group(1) + diti_type_id + m.group(2),
-                    xml
+                    xml,
                 )
                 # Replace <DitiType>...</DitiType> without <AvailableID>
                 xml = re.sub(
-                    r'(<DitiType>)(?![\s\n]*<AvailableID>)[^<]*(</DitiType>)',
+                    r"(<DitiType>)(?![\s\n]*<AvailableID>)[^<]*(</DitiType>)",
                     lambda m: m.group(1) + diti_type_id + m.group(2),
-                    xml
+                    xml,
                 )
 
         return xml
@@ -2126,7 +2570,11 @@ class Renderer:
         env = os.environ.get("FLUENTCODER_LABWARE_CATALOG", "").strip()
         if env:
             paths.append(Path(env).expanduser())
-        cfg = self.config.get("labware_catalog") if isinstance(self.config.get("labware_catalog"), dict) else {}
+        cfg = (
+            self.config.get("labware_catalog")
+            if isinstance(self.config.get("labware_catalog"), dict)
+            else {}
+        )
         cfg_path = str(cfg.get("path") or "").strip()
         if cfg_path:
             path = Path(cfg_path).expanduser()
@@ -2180,7 +2628,9 @@ class Renderer:
         """
         exact = self._get_exact_labware_map()
         corrections: list[tuple[str, str]] = []
-        variable_names = {str(v) for v in (protocol.variables or []) if isinstance(v, str)}
+        variable_names = {
+            str(v) for v in (protocol.variables or []) if isinstance(v, str)
+        }
 
         def _iter_steps_recursive(steps):
             for st in steps or []:
@@ -2218,7 +2668,17 @@ class Renderer:
                     if not isinstance(expr_value, StringLiteral):
                         continue
                     var_name = (step.variable_name or "").lower()
-                    if any(tok in var_name for tok in ("type", "labware", "plate", "tip", "reservoir", "trough")):
+                    if any(
+                        tok in var_name
+                        for tok in (
+                            "type",
+                            "labware",
+                            "plate",
+                            "tip",
+                            "reservoir",
+                            "trough",
+                        )
+                    ):
                         step.value = StringLiteral(value=_exact_only(expr_value.value))
 
         for var_name, value in list(default_var_values.items()):
@@ -2226,8 +2686,13 @@ class Renderer:
             if not isinstance(expr_value, StringLiteral):
                 continue
             low_name = str(var_name).lower()
-            if any(tok in low_name for tok in ("type", "labware", "plate", "tip", "reservoir", "trough")):
-                default_var_values[var_name] = StringLiteral(value=_exact_only(expr_value.value))
+            if any(
+                tok in low_name
+                for tok in ("type", "labware", "plate", "tip", "reservoir", "trough")
+            ):
+                default_var_values[var_name] = StringLiteral(
+                    value=_exact_only(expr_value.value)
+                )
 
         if corrections:
             for old, new in corrections:
@@ -2252,7 +2717,11 @@ class Renderer:
         explicit = str(protocol.liquid_class or "").strip()
         if explicit:
             return explicit
-        config_lc = self.config.get("liquid_class") if isinstance(self.config.get("liquid_class"), dict) else {}
+        config_lc = (
+            self.config.get("liquid_class")
+            if isinstance(self.config.get("liquid_class"), dict)
+            else {}
+        )
         configured = str(config_lc.get("name") or "").strip()
         if configured:
             return configured
@@ -2283,6 +2752,7 @@ class Renderer:
             return ""
         try:
             from ..catalog import index_exists, resolve_liquid_class_by_name
+
             if index_exists():
                 entry = resolve_liquid_class_by_name(text)
                 if entry is not None:
@@ -2292,10 +2762,16 @@ class Renderer:
         catalog_guid = self._resolve_liquid_class_guid_from_json(text)
         if catalog_guid:
             return catalog_guid
-        config_lc = self.config.get("liquid_class") if isinstance(self.config.get("liquid_class"), dict) else {}
+        config_lc = (
+            self.config.get("liquid_class")
+            if isinstance(self.config.get("liquid_class"), dict)
+            else {}
+        )
         config_name = str(config_lc.get("name") or "").strip()
         config_guid = str(config_lc.get("guid") or "").strip()
-        if config_guid and (not config_name or config_name.casefold() == text.casefold()):
+        if config_guid and (
+            not config_name or config_name.casefold() == text.casefold()
+        ):
             return config_guid
         return ""
 
@@ -2332,7 +2808,9 @@ class Renderer:
                 guid = ""
             if not guid:
                 # Same matching rules as resolve_liquid_class_guid (instance suffix).
-                guid = liquid_class_guid_from_catalog_entries(name, payload.get("entries"))
+                guid = liquid_class_guid_from_catalog_entries(
+                    name, payload.get("entries")
+                )
             if guid:
                 return guid
         return ""
