@@ -7,6 +7,7 @@ import re
 import shutil
 import zipfile
 from html import unescape
+from functools import lru_cache
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -17,7 +18,12 @@ from . import xml_compat as ET
 
 from .archive_cache import archive_reference_fingerprint
 from .command_registry import registry_command_family
-from .config import ACTIVE_CONTEXT_FILE, COLLECTIONS_DIR, PROJECTS_DIR, TEMP_FILES_DIRNAME
+from .config import (
+    ACTIVE_CONTEXT_FILE,
+    COLLECTIONS_DIR,
+    PROJECTS_DIR,
+    TEMP_FILES_DIRNAME,
+)
 from .import_identity import build_source_import_identity
 from .progress import ProgressCallback, ProgressEmitter, ProgressStage
 from .project_store import ProjectStore
@@ -51,7 +57,9 @@ DETAILED_XML_OBJECT_ENTRY_LIMIT = 2500
 SUMMARY_XML_TEXT_SUFFIXES: set[str] = set()
 PROJECT_MANIFEST_SCHEMA_VERSION = 3
 PROJECT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$")
-GUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
+GUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
+)
 ZERO_GUID = "00000000-0000-0000-0000-000000000000"
 FULL_ZEIA_ASK = (
     "Ask the user for a full FluentControl ZEIA export that includes the source "
@@ -193,12 +201,16 @@ def import_project(
         raise PipelineError(f"project archive not found: {archive}")
     if not zipfile.is_zipfile(archive):
         raise PipelineError(f"not a readable .zeia/zip archive: {archive}")
-    snapshots = [Path(path).expanduser().resolve() for path in (snapshot_archives or [])]
+    snapshots = [
+        Path(path).expanduser().resolve() for path in (snapshot_archives or [])
+    ]
     for snapshot in snapshots:
         if not snapshot.exists():
             raise PipelineError(f"snapshot archive not found: {snapshot}")
         if not zipfile.is_zipfile(snapshot):
-            raise PipelineError(f"not a readable FluentControl Snapshot zip archive: {snapshot}")
+            raise PipelineError(
+                f"not a readable FluentControl Snapshot zip archive: {snapshot}"
+            )
     source_import_identity = build_source_import_identity(
         archive,
         snapshots,
@@ -231,7 +243,9 @@ def import_project(
             names = [info.filename for info in infos]
             _safe_extract(zf, extracted_dir)
     except zipfile.BadZipFile as exc:
-        raise PipelineError(f"not a readable .zeia/zip archive: {archive} ({exc})") from exc
+        raise PipelineError(
+            f"not a readable .zeia/zip archive: {archive} ({exc})"
+        ) from exc
 
     entries = list(names)
     snapshot_sources = _import_snapshot_archives(
@@ -252,7 +266,9 @@ def import_project(
         source_import_identity=source_import_identity,
     )
     _write_manifest(root, manifest)
-    _project_store().write_text(root / "project_report.md", render_project_report(manifest))
+    _project_store().write_text(
+        root / "project_report.md", render_project_report(manifest)
+    )
 
     return ProjectContext(project_name, root, manifest)
 
@@ -260,7 +276,9 @@ def import_project(
 def load_project(name: str | None = None) -> ProjectContext:
     resolved_name = name or active_project_name()
     if not resolved_name:
-        raise PipelineError("no project context selected; pass --context or run use-project")
+        raise PipelineError(
+            "no project context selected; pass --context or run use-project"
+        )
     path = manifest_path(resolved_name)
     if not path.exists():
         raise PipelineError(f"project context not found: {resolved_name}")
@@ -278,9 +296,13 @@ def create_project_collection(
     """Create a persistent generation collection from imported project contexts."""
     collection_name = sanitize_project_name(name, name)
     if not project_names:
-        raise PipelineError("project collection must include at least one project context")
+        raise PipelineError(
+            "project collection must include at least one project context"
+        )
     stages = tuple(
-        ProgressStage(f"load_context_{index}", f"Loading source context: {project_name}")
+        ProgressStage(
+            f"load_context_{index}", f"Loading source context: {project_name}"
+        )
         for index, project_name in enumerate(project_names, start=1)
     ) + (
         ProgressStage("resolve_source_identities", "Resolving source identities"),
@@ -338,7 +360,9 @@ def create_project_collection(
                 root / "project_report.md",
                 render_project_collection_report(manifest),
             )
-        progress.completed("write_manifest", "Manifest and collection report published.")
+        progress.completed(
+            "write_manifest", "Manifest and collection report published."
+        )
     except Exception as exc:
         progress.failed_current(str(exc))
         raise
@@ -359,7 +383,9 @@ def list_project_collections() -> list[dict[str, Any]]:
         return []
     out = []
     for project_dir_path in sorted(COLLECTIONS_DIR.iterdir()):
-        if not project_dir_path.is_dir() or not project_dir_path.name.startswith("collection-"):
+        if not project_dir_path.is_dir() or not project_dir_path.name.startswith(
+            "collection-"
+        ):
             continue
         path = project_dir_path / TEMP_FILES_DIRNAME
         manifest_file = path / "manifest.json"
@@ -375,7 +401,9 @@ def list_project_collections() -> list[dict[str, Any]]:
                 "name": manifest.get("name") or path.name,
                 "created_at": manifest.get("created_at"),
                 "project_count": len(source_projects),
-                "projects": [item.get("name") for item in source_projects if item.get("name")],
+                "projects": [
+                    item.get("name") for item in source_projects if item.get("name")
+                ],
                 "script_count": len(manifest.get("scripts") or []),
                 "workspace_count": len(manifest.get("workspaces") or []),
                 "object_count": len(manifest.get("objects") or []),
@@ -391,9 +419,8 @@ def list_projects() -> list[dict[str, Any]]:
         return []
     out = []
     for project_dir_path in sorted(PROJECTS_DIR.iterdir()):
-        if (
-            not project_dir_path.is_dir()
-            or project_dir_path.name.startswith((".", "_", "collection-"))
+        if not project_dir_path.is_dir() or project_dir_path.name.startswith(
+            (".", "_", "collection-")
         ):
             continue
         path = project_dir_path / TEMP_FILES_DIRNAME
@@ -661,7 +688,9 @@ def query_project(
     }
 
 
-def inspection_payload(ctx: ProjectLike, *, report_path: Path | None = None) -> dict[str, Any]:
+def inspection_payload(
+    ctx: ProjectLike, *, report_path: Path | None = None
+) -> dict[str, Any]:
     """Compact inspect payload: summary + path pointers, never full manifest."""
     root = Path(getattr(ctx, "root"))
     resolved_report = report_path
@@ -702,7 +731,9 @@ def build_manifest(
         relative = extracted_path.relative_to(root).as_posix()
         if _should_inspect_snapshot_evidence(entry, suffix):
             try:
-                snapshot = _inspect_snapshot_evidence(extracted_path, entry, relative, suffix)
+                snapshot = _inspect_snapshot_evidence(
+                    extracted_path, entry, relative, suffix
+                )
                 if snapshot is not None:
                     snapshot_evidence.append(snapshot)
             except Exception as exc:
@@ -714,15 +745,29 @@ def build_manifest(
                 scripts.append(_inspect_xscr_fast(extracted_path, entry, relative))
             elif suffix in XML_OBJECT_EXTS:
                 if detailed_xml_objects:
-                    objects.append(_inspect_xml_object_fast(extracted_path, entry, relative, suffix))
+                    objects.append(
+                        _inspect_xml_object_fast(
+                            extracted_path, entry, relative, suffix
+                        )
+                    )
                 else:
-                    objects.append(_inspect_xml_object_summary(extracted_path, entry, relative, suffix))
+                    objects.append(
+                        _inspect_xml_object_summary(
+                            extracted_path, entry, relative, suffix
+                        )
+                    )
             elif suffix in ASSET_EXTS:
-                objects.append(_inspect_asset_object(extracted_path, entry, relative, suffix))
+                objects.append(
+                    _inspect_asset_object(extracted_path, entry, relative, suffix)
+                )
         except Exception as exc:
             errors.append({"entry": entry, "error": str(exc)})
 
-    extension_counts = dict(sorted(Counter(Path(entry).suffix.lower() or "<none>" for entry in entries).items()))
+    extension_counts = dict(
+        sorted(
+            Counter(Path(entry).suffix.lower() or "<none>" for entry in entries).items()
+        )
+    )
     all_object_names = sorted(
         {
             item.get("object_name", "")
@@ -732,12 +777,7 @@ def build_manifest(
     )
     project_names = sorted(
         set(all_object_names)
-        | {
-            name
-            for obj in objects
-            for name in obj.get("names", [])
-            if name
-        }
+        | {name for obj in objects for name in obj.get("names", []) if name}
     )
     liquid_classes = sorted(
         {
@@ -766,15 +806,13 @@ def build_manifest(
         }
     )
     worklist_paths = sorted(
-        {
-            entry
-            for entry in entries
-            if Path(entry).suffix.lower() == ".gwl"
-        }
+        {entry for entry in entries if Path(entry).suffix.lower() == ".gwl"}
         | {
             name
             for script in scripts
-            for name in script.get("dependencies", {}).get("external_or_worklist_refs", [])
+            for name in script.get("dependencies", {}).get(
+                "external_or_worklist_refs", []
+            )
             if str(name).lower().endswith(".gwl")
         }
     )
@@ -888,24 +926,41 @@ def build_collection_manifest(
             snapshot_evidence.append(_collection_item(ctx, snapshot))
         for snapshot_archive in manifest.get("snapshot_archives") or []:
             if isinstance(snapshot_archive, dict):
-                snapshot_archives.append({"source_context": ctx.name, **snapshot_archive})
+                snapshot_archives.append(
+                    {"source_context": ctx.name, **snapshot_archive}
+                )
 
-        object_names.update(str(name) for name in manifest.get("object_names") or [] if name)
-        project_names.update(str(name) for name in manifest.get("project_names") or [] if name)
-        liquid_classes.update(str(name) for name in manifest.get("liquid_classes") or [] if name)
-        labware_names.update(str(name) for name in manifest.get("labware_names") or [] if name)
-        rack_types.update(str(name) for name in manifest.get("rack_types") or [] if name)
+        object_names.update(
+            str(name) for name in manifest.get("object_names") or [] if name
+        )
+        project_names.update(
+            str(name) for name in manifest.get("project_names") or [] if name
+        )
+        liquid_classes.update(
+            str(name) for name in manifest.get("liquid_classes") or [] if name
+        )
+        labware_names.update(
+            str(name) for name in manifest.get("labware_names") or [] if name
+        )
+        rack_types.update(
+            str(name) for name in manifest.get("rack_types") or [] if name
+        )
 
         for path in manifest.get("worklist_paths") or []:
             worklist_paths.add(str(path))
-            source_worklist_paths.append({"source_context": ctx.name, "path": str(path)})
+            source_worklist_paths.append(
+                {"source_context": ctx.name, "path": str(path)}
+            )
 
         for alias in manifest.get("catalog_alias_candidates") or []:
             base_name = str(alias.get("base_name") or "")
             project_name = str(alias.get("project_name") or "")
             key = (base_name, project_name)
             if base_name and project_name and key not in alias_candidates:
-                alias_candidates[key] = {"base_name": base_name, "project_name": project_name}
+                alias_candidates[key] = {
+                    "base_name": base_name,
+                    "project_name": project_name,
+                }
 
         for error in manifest.get("errors") or []:
             errors.append({"source_context": ctx.name, **error})
@@ -920,7 +975,9 @@ def build_collection_manifest(
 
     total_scripts = sum(len(ctx.manifest.get("scripts") or []) for ctx in contexts)
     if progress is not None:
-        progress.started("merge_scripts", total_units=total_scripts, unit_name="scripts")
+        progress.started(
+            "merge_scripts", total_units=total_scripts, unit_name="scripts"
+        )
     merged_script_count = 0
     for ctx in contexts:
         for script in ctx.manifest.get("scripts") or []:
@@ -931,9 +988,17 @@ def build_collection_manifest(
                 custom_part_counters["script_pin_refs"] += 1
             if deps.get("custom_asset_refs"):
                 custom_part_counters["script_asset_refs"] += 1
-            custom_pin_refs.update(str(value) for value in deps.get("pin_refs") or [] if value)
-            custom_pin_refs.update(str(value) for value in deps.get("worktable_pin_locations") or [] if value)
-            custom_asset_refs.update(str(value) for value in deps.get("custom_asset_refs") or [] if value)
+            custom_pin_refs.update(
+                str(value) for value in deps.get("pin_refs") or [] if value
+            )
+            custom_pin_refs.update(
+                str(value)
+                for value in deps.get("worktable_pin_locations") or []
+                if value
+            )
+            custom_asset_refs.update(
+                str(value) for value in deps.get("custom_asset_refs") or [] if value
+            )
             merged_script_count += 1
             if progress is not None and _should_report_collection_progress(
                 merged_script_count,
@@ -956,7 +1021,9 @@ def build_collection_manifest(
 
     total_objects = sum(len(ctx.manifest.get("objects") or []) for ctx in contexts)
     if progress is not None:
-        progress.started("merge_objects", total_units=total_objects, unit_name="objects")
+        progress.started(
+            "merge_objects", total_units=total_objects, unit_name="objects"
+        )
     merged_object_count = 0
     for ctx in contexts:
         for obj in ctx.manifest.get("objects") or []:
@@ -964,7 +1031,9 @@ def build_collection_manifest(
             objects.append(item)
             if item.get("kind") == "workspace":
                 workspaces.append(item)
-            _update_custom_part_rollup(custom_part_counters, custom_pin_refs, custom_asset_refs, item)
+            _update_custom_part_rollup(
+                custom_part_counters, custom_pin_refs, custom_asset_refs, item
+            )
             merged_object_count += 1
             if progress is not None and _should_report_collection_progress(
                 merged_object_count,
@@ -984,7 +1053,9 @@ def build_collection_manifest(
             total_units=total_objects,
             unit_name="objects",
         )
-        progress.started("validate_collection", "Checking duplicate collection identities.")
+        progress.started(
+            "validate_collection", "Checking duplicate collection identities."
+        )
 
     manifest = {
         "schema_version": 1,
@@ -1022,7 +1093,9 @@ def build_collection_manifest(
         manifest["full_zeia_export"] = _collection_full_zeia_assessment(contexts)
         manifest["worktable_geometry"] = _merge_context_worktable_geometry(
             contexts
-        ) or build_worktable_geometry(manifest, max_xml_bytes=PROJECT_CONTEXT_XML_MAX_BYTES)
+        ) or build_worktable_geometry(
+            manifest, max_xml_bytes=PROJECT_CONTEXT_XML_MAX_BYTES
+        )
     else:
         with progress.heartbeat(
             "validate_collection",
@@ -1031,10 +1104,14 @@ def build_collection_manifest(
             manifest["full_zeia_export"] = _collection_full_zeia_assessment(contexts)
             manifest["worktable_geometry"] = _merge_context_worktable_geometry(
                 contexts
-            ) or build_worktable_geometry(manifest, max_xml_bytes=PROJECT_CONTEXT_XML_MAX_BYTES)
+            ) or build_worktable_geometry(
+                manifest, max_xml_bytes=PROJECT_CONTEXT_XML_MAX_BYTES
+            )
     _validate_collection_manifest(manifest, progress=progress)
     if progress is not None:
-        progress.completed("validate_collection", "Collection structure and identities are valid.")
+        progress.completed(
+            "validate_collection", "Collection structure and identities are valid."
+        )
     return manifest
 
 
@@ -1099,10 +1176,17 @@ def _merge_context_worktable_geometry(contexts: list[ProjectContext]) -> dict[st
                 item.get("guid") or "",
             ),
         ),
-        "workspaces": sorted(workspaces, key=lambda item: (item.get("name") or "", item.get("guid") or "")),
-        "pin_sites": sorted(pin_sites.values(), key=lambda item: item.get("pin_name") or item.get("guid") or ""),
+        "workspaces": sorted(
+            workspaces,
+            key=lambda item: (item.get("name") or "", item.get("guid") or ""),
+        ),
+        "pin_sites": sorted(
+            pin_sites.values(),
+            key=lambda item: item.get("pin_name") or item.get("guid") or "",
+        ),
         "nest_cap_sites": sorted(
-            nest_cap_sites.values(), key=lambda item: item.get("pin_name") or item.get("guid") or ""
+            nest_cap_sites.values(),
+            key=lambda item: item.get("pin_name") or item.get("guid") or "",
         ),
         "errors": errors,
     }
@@ -1166,7 +1250,9 @@ def assess_full_zeia_export(manifest: dict[str, Any]) -> dict[str, Any]:
     """Conservatively assess whether an imported project looks like a full ZEIA export."""
     scripts = [item for item in manifest.get("scripts") or [] if isinstance(item, dict)]
     objects = [item for item in manifest.get("objects") or [] if isinstance(item, dict)]
-    workspaces = [item for item in manifest.get("workspaces") or [] if isinstance(item, dict)]
+    workspaces = [
+        item for item in manifest.get("workspaces") or [] if isinstance(item, dict)
+    ]
     liquid_class_objects = [
         str(item.get("object_name") or "")
         for item in objects
@@ -1211,7 +1297,9 @@ def assess_full_zeia_export(manifest: dict[str, Any]) -> dict[str, Any]:
     missing_worktables = []
     missing_liquid_classes = []
     for script in scripts:
-        script_name = script.get("object_name") or script.get("entry") or "unknown script"
+        script_name = (
+            script.get("object_name") or script.get("entry") or "unknown script"
+        )
         for ref in script.get("references") or []:
             if not isinstance(ref, dict):
                 continue
@@ -1219,7 +1307,9 @@ def assess_full_zeia_export(manifest: dict[str, Any]) -> dict[str, Any]:
             ref_guid = str(ref.get("guid") or "").strip()
             ref_type = str(ref.get("type_id") or "").strip()
             if ref_type == "WorktableWorkspace":
-                if not _ref_resolves(ref_name, ref_guid, workspace_names, workspace_guids):
+                if not _ref_resolves(
+                    ref_name, ref_guid, workspace_names, workspace_guids
+                ):
                     missing_worktables.append(
                         {
                             "script": script_name,
@@ -1274,7 +1364,10 @@ def assess_full_zeia_export(manifest: dict[str, Any]) -> dict[str, Any]:
             {
                 "id": "low_supporting_object_count",
                 "summary": "The archive contains scripts but very few supporting objects, which is typical of a non-full export.",
-                "details": {"object_count": len(objects), "entry_count": manifest.get("entry_count", 0)},
+                "details": {
+                    "object_count": len(objects),
+                    "entry_count": manifest.get("entry_count", 0),
+                },
             }
         )
     if scripts and not workspaces:
@@ -1309,7 +1402,9 @@ def assess_full_zeia_export(manifest: dict[str, Any]) -> dict[str, Any]:
         workspaces=workspaces,
         liquid_class_objects=liquid_class_objects,
     ):
-        warnings.extend(_full_zeia_warning_record(finding) for finding in warning_eligible_findings)
+        warnings.extend(
+            _full_zeia_warning_record(finding) for finding in warning_eligible_findings
+        )
     else:
         blocking_findings.extend(warning_eligible_findings)
 
@@ -1348,7 +1443,9 @@ def _collection_full_zeia_assessment(contexts: list[ProjectContext]) -> dict[str
     blocking = []
     accepted = []
     for ctx in contexts:
-        assessment = ctx.manifest.get("full_zeia_export") or assess_full_zeia_export(ctx.manifest)
+        assessment = ctx.manifest.get("full_zeia_export") or assess_full_zeia_export(
+            ctx.manifest
+        )
         source_record = {
             "source_context": ctx.name,
             "status": assessment.get("status"),
@@ -1413,7 +1510,10 @@ def _ref_resolves(
     object_names: set[str],
     object_guids: set[str],
 ) -> bool:
-    return bool((name and name.casefold() in object_names) or (guid and guid.casefold() in object_guids))
+    return bool(
+        (name and name.casefold() in object_names)
+        or (guid and guid.casefold() in object_guids)
+    )
 
 
 def _has_dependency_rich_full_export_evidence(
@@ -1427,7 +1527,10 @@ def _has_dependency_rich_full_export_evidence(
     if not scripts or not workspaces or not liquid_class_objects:
         return False
     supporting_object_floor = max(5, len(scripts))
-    return len(objects) >= supporting_object_floor and int(manifest.get("entry_count") or 0) >= supporting_object_floor
+    return (
+        len(objects) >= supporting_object_floor
+        and int(manifest.get("entry_count") or 0) >= supporting_object_floor
+    )
 
 
 def _full_zeia_warning_record(finding: dict[str, Any]) -> dict[str, Any]:
@@ -1437,7 +1540,9 @@ def _full_zeia_warning_record(finding: dict[str, Any]) -> dict[str, Any]:
     return {**finding, "summary": summary}
 
 
-def _append_full_zeia_export_report(lines: list[str], assessment: dict[str, Any]) -> None:
+def _append_full_zeia_export_report(
+    lines: list[str], assessment: dict[str, Any]
+) -> None:
     if not assessment:
         return
     lines.extend(
@@ -1452,18 +1557,24 @@ def _append_full_zeia_export_report(lines: list[str], assessment: dict[str, Any]
         ]
     )
     if not assessment.get("accepted"):
-        lines.append(f"- Required user action: {assessment.get('ask_user') or FULL_ZEIA_ASK}")
+        lines.append(
+            f"- Required user action: {assessment.get('ask_user') or FULL_ZEIA_ASK}"
+        )
     signals = assessment.get("signals") or {}
     for key, value in signals.items():
         lines.append(f"- `{key}`: `{value}`")
     for finding in assessment.get("blocking_findings") or []:
         if not isinstance(finding, dict):
             continue
-        lines.append(f"- Blocking signal `{finding.get('id')}`: {finding.get('summary')}")
+        lines.append(
+            f"- Blocking signal `{finding.get('id')}`: {finding.get('summary')}"
+        )
     for warning in assessment.get("warnings") or []:
         if not isinstance(warning, dict):
             continue
-        lines.append(f"- Warning signal `{warning.get('id')}`: {warning.get('summary')}")
+        lines.append(
+            f"- Warning signal `{warning.get('id')}`: {warning.get('summary')}"
+        )
 
 
 def render_project_report(manifest: dict[str, Any]) -> str:
@@ -1496,16 +1607,24 @@ def render_project_report(manifest: dict[str, Any]) -> str:
     if manifest.get("workspaces"):
         lines.extend(["", "## Workspaces", ""])
         for workspace in manifest["workspaces"][:30]:
-            lines.append(f"- `{workspace.get('object_name')}`: `{workspace.get('entry')}`")
+            lines.append(
+                f"- `{workspace.get('object_name')}`: `{workspace.get('entry')}`"
+            )
 
     geometry = manifest.get("worktable_geometry") or {}
     if geometry:
         lines.extend(["", "## Worktable Geometry", ""])
         lines.append(f"- Parsed workspaces: `{geometry.get('workspace_count', 0)}`")
-        lines.append(f"- Parsed components/carriers: `{geometry.get('component_count', 0)}`")
+        lines.append(
+            f"- Parsed components/carriers: `{geometry.get('component_count', 0)}`"
+        )
         lines.append(f"- Parsed sites: `{geometry.get('site_count', 0)}`")
         lines.append(f"- Parsed connectors: `{geometry.get('connector_count', 0)}`")
-        pin_sites = [site.get("pin_name") for site in geometry.get("pin_sites", []) if site.get("pin_name")]
+        pin_sites = [
+            site.get("pin_name")
+            for site in geometry.get("pin_sites", [])
+            if site.get("pin_name")
+        ]
         if pin_sites:
             lines.append(f"- Worktable pins: `{', '.join(pin_sites[:20])}`")
 
@@ -1514,12 +1633,18 @@ def render_project_report(manifest: dict[str, Any]) -> str:
     custom_parts = manifest.get("custom_part_summary") or {}
     if custom_parts and custom_parts.get("total_custom_objects"):
         lines.extend(["", "## Custom Parts And Pins", ""])
-        lines.append(f"- Custom objects/assets: `{custom_parts.get('total_custom_objects', 0)}`")
-        lines.append(f"- Pin connector objects: `{custom_parts.get('pin_connector_count', 0)}`")
+        lines.append(
+            f"- Custom objects/assets: `{custom_parts.get('total_custom_objects', 0)}`"
+        )
+        lines.append(
+            f"- Pin connector objects: `{custom_parts.get('pin_connector_count', 0)}`"
+        )
         if custom_parts.get("pin_refs"):
             lines.append(f"- Pin refs: `{', '.join(custom_parts['pin_refs'][:20])}`")
         if custom_parts.get("asset_refs"):
-            lines.append(f"- Asset refs: `{', '.join(custom_parts['asset_refs'][:20])}`")
+            lines.append(
+                f"- Asset refs: `{', '.join(custom_parts['asset_refs'][:20])}`"
+            )
 
     if manifest.get("liquid_classes"):
         lines.extend(["", "## Liquid Classes", ""])
@@ -1582,16 +1707,24 @@ def render_project_collection_report(manifest: dict[str, Any]) -> str:
         lines.extend(["", "## Workspaces", ""])
         for workspace in manifest["workspaces"][:50]:
             source = workspace.get("source_context") or "unknown"
-            lines.append(f"- `{source}:{workspace.get('object_name')}`: `{workspace.get('entry')}`")
+            lines.append(
+                f"- `{source}:{workspace.get('object_name')}`: `{workspace.get('entry')}`"
+            )
 
     geometry = manifest.get("worktable_geometry") or {}
     if geometry:
         lines.extend(["", "## Worktable Geometry", ""])
         lines.append(f"- Parsed workspaces: `{geometry.get('workspace_count', 0)}`")
-        lines.append(f"- Parsed components/carriers: `{geometry.get('component_count', 0)}`")
+        lines.append(
+            f"- Parsed components/carriers: `{geometry.get('component_count', 0)}`"
+        )
         lines.append(f"- Parsed sites: `{geometry.get('site_count', 0)}`")
         lines.append(f"- Parsed connectors: `{geometry.get('connector_count', 0)}`")
-        pin_sites = [site.get("pin_name") for site in geometry.get("pin_sites", []) if site.get("pin_name")]
+        pin_sites = [
+            site.get("pin_name")
+            for site in geometry.get("pin_sites", [])
+            if site.get("pin_name")
+        ]
         if pin_sites:
             lines.append(f"- Worktable pins: `{', '.join(pin_sites[:20])}`")
 
@@ -1600,12 +1733,18 @@ def render_project_collection_report(manifest: dict[str, Any]) -> str:
     custom_parts = manifest.get("custom_part_summary") or {}
     if custom_parts and custom_parts.get("total_custom_objects"):
         lines.extend(["", "## Custom Parts And Pins", ""])
-        lines.append(f"- Custom objects/assets: `{custom_parts.get('total_custom_objects', 0)}`")
-        lines.append(f"- Pin connector objects: `{custom_parts.get('pin_connector_count', 0)}`")
+        lines.append(
+            f"- Custom objects/assets: `{custom_parts.get('total_custom_objects', 0)}`"
+        )
+        lines.append(
+            f"- Pin connector objects: `{custom_parts.get('pin_connector_count', 0)}`"
+        )
         if custom_parts.get("pin_refs"):
             lines.append(f"- Pin refs: `{', '.join(custom_parts['pin_refs'][:20])}`")
         if custom_parts.get("asset_refs"):
-            lines.append(f"- Asset refs: `{', '.join(custom_parts['asset_refs'][:20])}`")
+            lines.append(
+                f"- Asset refs: `{', '.join(custom_parts['asset_refs'][:20])}`"
+            )
 
     if manifest.get("liquid_classes"):
         lines.extend(["", "## Liquid Classes", ""])
@@ -1639,7 +1778,9 @@ def _collection_item(ctx: ProjectContext, item: dict[str, Any]) -> dict[str, Any
     return out
 
 
-def _should_report_collection_progress(completed: int, total: int, *, interval: int) -> bool:
+def _should_report_collection_progress(
+    completed: int, total: int, *, interval: int
+) -> bool:
     return completed == total or (interval > 0 and completed % interval == 0)
 
 
@@ -1656,8 +1797,12 @@ def _validate_collection_manifest(
 
     scripts = manifest.get("scripts") or []
     objects = manifest.get("objects") or []
-    expected_scripts = sum(int(item.get("script_count") or 0) for item in source_projects)
-    expected_objects = sum(int(item.get("object_count") or 0) for item in source_projects)
+    expected_scripts = sum(
+        int(item.get("script_count") or 0) for item in source_projects
+    )
+    expected_objects = sum(
+        int(item.get("object_count") or 0) for item in source_projects
+    )
     if len(scripts) != expected_scripts or len(objects) != expected_objects:
         raise PipelineError(
             "project collection item counts do not match the loaded source manifests"
@@ -1671,7 +1816,9 @@ def _validate_collection_manifest(
         qualified_name = str(item.get("qualified_name") or "")
         identity = qualified_entry or qualified_name
         if not source_context or not identity:
-            raise PipelineError("project collection item is missing a stable source identity")
+            raise PipelineError(
+                "project collection item is missing a stable source identity"
+            )
         if identity in identities:
             raise PipelineError(f"duplicate collection identity: {identity}")
         identities.add(identity)
@@ -1720,7 +1867,12 @@ def _script_resolution_candidates(script: dict[str, Any]) -> set[str]:
 
 
 def _script_resolved_path(ctx: ProjectLike, script: dict[str, Any]) -> Path:
-    raw = script.get("resolved_path") or script.get("extracted_path") or script.get("entry") or ""
+    raw = (
+        script.get("resolved_path")
+        or script.get("extracted_path")
+        or script.get("entry")
+        or ""
+    )
     path = Path(str(raw)).expanduser()
     if path.is_absolute():
         return path.resolve()
@@ -1796,7 +1948,11 @@ def filter_generation_source_script_records(
             record
             for record in items
             if str(record.get("object_name") or "").strip().casefold() in requested
-            or str(record.get("qualified_name") or "").rsplit(":", 1)[-1].strip().casefold() in requested
+            or str(record.get("qualified_name") or "")
+            .rsplit(":", 1)[-1]
+            .strip()
+            .casefold()
+            in requested
         ]
         if filtered:
             return filtered
@@ -1867,7 +2023,9 @@ def _write_manifest(root: Path, manifest: dict[str, Any]) -> None:
     from .connector_coverage_export import write_connector_coverage_for_context
     from .labware_catalog_export import write_labware_catalog_for_context
 
-    write_labware_catalog_for_context(root, geometry if isinstance(geometry, dict) else None)
+    write_labware_catalog_for_context(
+        root, geometry if isinstance(geometry, dict) else None
+    )
     if isinstance(geometry, dict) and geometry.get("components"):
         write_connector_coverage_for_context(root, geometry)
     # Always try Snap graph write: large ZEIA imports skip detailed geometry, but
@@ -1875,7 +2033,9 @@ def _write_manifest(root: Path, manifest: dict[str, Any]) -> None:
     from .connector_graph_export import write_connector_graph_for_context
     from .liquid_classes_export import write_liquid_classes_for_context
 
-    write_connector_graph_for_context(root, geometry if isinstance(geometry, dict) else None)
+    write_connector_graph_for_context(
+        root, geometry if isinstance(geometry, dict) else None
+    )
     write_liquid_classes_for_context(root, manifest)
     write_driver_macros_for_context(root, manifest)
     write_script_folder_bindings_for_context(root, manifest)
@@ -1947,7 +2107,10 @@ def _import_snapshot_archives(
         prefix_name = _unique_snapshot_prefix(snapshot, index, used_prefixes)
         copied = source_snapshots_dir / snapshot.name
         if copied.exists():
-            copied = source_snapshots_dir / f"{prefix_name}{snapshot.suffix.lower() or '.zip'}"
+            copied = (
+                source_snapshots_dir
+                / f"{prefix_name}{snapshot.suffix.lower() or '.zip'}"
+            )
         shutil.copy2(snapshot, copied)
         target_dir = extracted_snapshots_dir / prefix_name
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -1963,14 +2126,19 @@ def _import_snapshot_archives(
                 "extracted_dir": str(target_dir),
                 "prefix": prefix,
                 "entry_count": len(snapshot_entries),
-                "archive_kind": "snapshot" if _entries_have_snapshot_hints(snapshot_entries) else "zip",
+                "archive_kind": "snapshot"
+                if _entries_have_snapshot_hints(snapshot_entries)
+                else "zip",
             }
         )
     return records
 
 
 def _entries_have_snapshot_hints(entries: list[str]) -> bool:
-    return any(_snapshot_roles_for_entry(entry, Path(entry).suffix.lower(), "") for entry in entries)
+    return any(
+        _snapshot_roles_for_entry(entry, Path(entry).suffix.lower(), "")
+        for entry in entries
+    )
 
 
 def _unique_snapshot_prefix(snapshot: Path, index: int, used: set[str]) -> str:
@@ -1996,7 +2164,9 @@ def _remove_project_dir(root: Path) -> None:
     projects_root = PROJECTS_DIR.resolve()
     resolved = root.resolve()
     if projects_root not in resolved.parents:
-        raise PipelineError(f"refusing to remove path outside ready-to-import directory: {resolved}")
+        raise PipelineError(
+            f"refusing to remove path outside ready-to-import directory: {resolved}"
+        )
     shutil.rmtree(resolved)
 
 
@@ -2004,7 +2174,9 @@ def _remove_collection_dir(root: Path) -> None:
     collections_root = COLLECTIONS_DIR.resolve()
     resolved = root.resolve()
     if collections_root not in resolved.parents:
-        raise PipelineError(f"refusing to remove path outside ready-to-import directory: {resolved}")
+        raise PipelineError(
+            f"refusing to remove path outside ready-to-import directory: {resolved}"
+        )
     shutil.rmtree(resolved)
 
 
@@ -2022,7 +2194,9 @@ def _read_large_xml_text(path: Path) -> str:
     if path.stat().st_size <= PROJECT_CONTEXT_XML_MAX_BYTES:
         return _read_text(path)
     with path.open("rb") as handle:
-        data = handle.read(min(OVERSIZED_XML_SUMMARY_BYTES, LARGE_XML_TEXT_SCAN_MAX_BYTES))
+        data = handle.read(
+            min(OVERSIZED_XML_SUMMARY_BYTES, LARGE_XML_TEXT_SCAN_MAX_BYTES)
+        )
     for encoding in ("utf-8-sig", "utf-8", "utf-16"):
         try:
             return data.decode(encoding)
@@ -2058,18 +2232,24 @@ def _texts_by_name(root: ET.Element, names: set[str]) -> dict[str, list[str]]:
     return out
 
 
+@lru_cache(maxsize=128)
+def _compile_name_pattern(name: str) -> tuple[re.Pattern, str]:
+    open_pattern = re.compile(
+        rf"<(?:[A-Za-z_][\w.-]*:)?{re.escape(name)}(?:\s[^>]*)?>",
+        flags=re.IGNORECASE,
+    )
+    closing = f"</{name.casefold()}>"
+    return open_pattern, closing
+
+
 def _regex_texts_by_name(text: str, names: set[str]) -> dict[str, list[str]]:
     out = {name: [] for name in names}
     if not text:
         return out
+    lowered = text.casefold()
     for name in names:
-        open_pattern = re.compile(
-            rf"<(?:[A-Za-z_][\w.-]*:)?{re.escape(name)}(?:\s[^>]*)?>",
-            flags=re.IGNORECASE,
-        )
-        closing = f"</{name.casefold()}>"
+        open_pattern, closing = _compile_name_pattern(name)
         seen: set[str] = set()
-        lowered = text.casefold()
         for match in open_pattern.finditer(text):
             start = match.end()
             end = lowered.find(closing, start)
@@ -2091,7 +2271,9 @@ def _clean_xml_text(value: str) -> str:
     return re.sub(r"\s+", " ", unescape(str(value or ""))).strip()
 
 
-def _inspect_xml_object(path: Path, entry: str, relative: str, suffix: str) -> dict[str, Any]:
+def _inspect_xml_object(
+    path: Path, entry: str, relative: str, suffix: str
+) -> dict[str, Any]:
     root = _parse_xml(path)
     grouped = _texts_by_name(
         root,
@@ -2129,23 +2311,31 @@ def _inspect_xml_object(path: Path, entry: str, relative: str, suffix: str) -> d
         "component_guid": _first_text(root, "ComponentGuid"),
         "site_guid": _first_text(root, "SiteGuid"),
         "names": grouped.get("Name", [])[:50],
-        "guids": _dedupe_strings([*grouped.get("Guid", []), *grouped.get("GUID", [])])[:20],
+        "guids": _dedupe_strings([*grouped.get("Guid", []), *grouped.get("GUID", [])])[
+            :20
+        ],
         "pin_refs": pin_refs,
         "asset_refs": asset_refs,
-        "custom_part": _looks_custom_object(suffix, object_name, text, pin_refs, asset_refs),
+        "custom_part": _looks_custom_object(
+            suffix, object_name, text, pin_refs, asset_refs
+        ),
     }
     if suffix.lower() == ".xwsp":
         record["workspace_guid"] = Path(entry.replace("\\", "/")).stem
     return record
 
 
-def _inspect_xml_object_fast(path: Path, entry: str, relative: str, suffix: str) -> dict[str, Any]:
+def _inspect_xml_object_fast(
+    path: Path, entry: str, relative: str, suffix: str
+) -> dict[str, Any]:
     if path.stat().st_size <= PROJECT_CONTEXT_XML_MAX_BYTES:
         return _inspect_xml_object(path, entry, relative, suffix)
     return _inspect_xml_object_summary(path, entry, relative, suffix)
 
 
-def _inspect_xml_object_summary(path: Path, entry: str, relative: str, suffix: str) -> dict[str, Any]:
+def _inspect_xml_object_summary(
+    path: Path, entry: str, relative: str, suffix: str
+) -> dict[str, Any]:
     should_read_text = suffix.lower() in SUMMARY_XML_TEXT_SUFFIXES
     text = _read_large_xml_text(path) if should_read_text else ""
     names = _regex_texts_by_name(
@@ -2165,7 +2355,9 @@ def _inspect_xml_object_summary(path: Path, entry: str, relative: str, suffix: s
         },
     )
     stem_name = Path(entry.replace("\\", "/")).stem
-    object_name = _first_regex_text(names, "ObjectName") or _first_regex_text(names, "Name")
+    object_name = _first_regex_text(names, "ObjectName") or _first_regex_text(
+        names, "Name"
+    )
     record = {
         "kind": _kind_from_suffix(suffix),
         "entry": entry,
@@ -2191,7 +2383,9 @@ def _inspect_xml_object_summary(path: Path, entry: str, relative: str, suffix: s
     return record
 
 
-def _inspect_asset_object(path: Path, entry: str, relative: str, suffix: str) -> dict[str, Any]:
+def _inspect_asset_object(
+    path: Path, entry: str, relative: str, suffix: str
+) -> dict[str, Any]:
     return {
         "kind": "asset",
         "entry": entry,
@@ -2209,7 +2403,9 @@ def _inspect_asset_object(path: Path, entry: str, relative: str, suffix: str) ->
     }
 
 
-def _inspect_snapshot_evidence(path: Path, entry: str, relative: str, suffix: str) -> dict[str, Any] | None:
+def _inspect_snapshot_evidence(
+    path: Path, entry: str, relative: str, suffix: str
+) -> dict[str, Any] | None:
     size = path.stat().st_size if path.exists() else 0
     text = ""
     text_error = ""
@@ -2274,7 +2470,10 @@ def _should_read_snapshot_text(suffix: str, size: int) -> bool:
 
 
 def _entries_have_snapshot_hints(entries: list[str]) -> bool:
-    return any(_snapshot_roles_for_entry(entry, Path(entry).suffix.lower(), "") for entry in entries)
+    return any(
+        _snapshot_roles_for_entry(entry, Path(entry).suffix.lower(), "")
+        for entry in entries
+    )
 
 
 def _snapshot_roles_for_entry(entry: str, suffix: str, text: str) -> list[str]:
@@ -2308,7 +2507,10 @@ def _snapshot_roles_for_entry(entry: str, suffix: str, text: str) -> list[str]:
         ],
     ) or (suffix in {".cfg", ".config"} and "instrument" in haystack):
         add("instrument_configuration")
-    if _has_any(haystack, ["simulation", "simulator", "demo mode", "system.config", "3d simulator"]):
+    if _has_any(
+        haystack,
+        ["simulation", "simulator", "demo mode", "system.config", "3d simulator"],
+    ):
         add("simulation_setup")
     if suffix == ".reg" or _has_any(
         haystack,
@@ -2334,34 +2536,41 @@ def _snapshot_roles_for_entry(entry: str, suffix: str, text: str) -> list[str]:
         ],
     ):
         add("hardware_details")
-    if suffix in SNAPSHOT_BINARY_EXTS or suffix == ".log" or _has_any(
-        haystack,
-        [
-            "user description",
-            "userdescription",
-            "issue description",
-            "issuedescription",
-            "screenshot",
-            "screen shot",
-            "windows event",
-            "event log",
-            "audit trail",
-            "audittrail",
-            "sample tracking",
-            "sampletracking",
-            "journal",
-            "dump file",
-            "dumpfile",
-            "deckcheck",
-            "deck check",
-            "log file",
-            "logfiles",
-            "crash",
-            "error",
-        ],
+    if (
+        suffix in SNAPSHOT_BINARY_EXTS
+        or suffix == ".log"
+        or _has_any(
+            haystack,
+            [
+                "user description",
+                "userdescription",
+                "issue description",
+                "issuedescription",
+                "screenshot",
+                "screen shot",
+                "windows event",
+                "event log",
+                "audit trail",
+                "audittrail",
+                "sample tracking",
+                "sampletracking",
+                "journal",
+                "dump file",
+                "dumpfile",
+                "deckcheck",
+                "deck check",
+                "log file",
+                "logfiles",
+                "crash",
+                "error",
+            ],
+        )
     ):
         add("troubleshooting_context")
-    if suffix in ASSET_EXTS and _has_any(entry_text, ["screenshot", "screen shot", "deckcheck", "deck check", "picture", "monitor"]):
+    if suffix in ASSET_EXTS and _has_any(
+        entry_text,
+        ["screenshot", "screen shot", "deckcheck", "deck check", "picture", "monitor"],
+    ):
         add("troubleshooting_context")
     if "snapshot" in entry_text and suffix in SNAPSHOT_TEXT_EXTS | SNAPSHOT_BINARY_EXTS:
         add("troubleshooting_context")
@@ -2372,7 +2581,9 @@ def _has_any(haystack: str, needles: list[str]) -> bool:
     return any(needle in haystack for needle in needles)
 
 
-def _snapshot_signals(entry: str, suffix: str, text: str, roles: list[str]) -> list[str]:
+def _snapshot_signals(
+    entry: str, suffix: str, text: str, roles: list[str]
+) -> list[str]:
     normalized = entry.replace("\\", "/")
     basename = Path(normalized).name
     signals = list(roles)
@@ -2445,8 +2656,15 @@ def _snapshot_xml_fields(text: str) -> dict[str, list[str]]:
             attr_name = _local_name(attr)
             if attr_name in wanted and raw.strip():
                 out[attr_name].append(raw.strip())
-            elif name in {"Arm", "Device", "Driver", "Instrument"} and attr_name in {"Name", "Version", "SerialNumber"} and raw.strip():
-                out[f"{name}.{attr_name}"] = [*out.get(f"{name}.{attr_name}", []), raw.strip()]
+            elif (
+                name in {"Arm", "Device", "Driver", "Instrument"}
+                and attr_name in {"Name", "Version", "SerialNumber"}
+                and raw.strip()
+            ):
+                out[f"{name}.{attr_name}"] = [
+                    *out.get(f"{name}.{attr_name}", []),
+                    raw.strip(),
+                ]
     return {key: _dedupe_strings(values) for key, values in out.items() if values}
 
 
@@ -2459,7 +2677,9 @@ def _snapshot_key_value_fields(text: str) -> dict[str, list[str]]:
     for line in text.splitlines()[:600]:
         if not line or len(line) > 500:
             continue
-        match = re.match(r"\s*([A-Za-z][A-Za-z0-9_. /-]{1,80})\s*[:=]\s*(.+?)\s*$", line)
+        match = re.match(
+            r"\s*([A-Za-z][A-Za-z0-9_. /-]{1,80})\s*[:=]\s*(.+?)\s*$", line
+        )
         if not match:
             continue
         key = re.sub(r"\s+", " ", match.group(1).strip())
@@ -2472,7 +2692,9 @@ def _snapshot_key_value_fields(text: str) -> dict[str, list[str]]:
     return out
 
 
-def _merge_field_values(target: dict[str, list[str]], source: dict[str, list[str]]) -> None:
+def _merge_field_values(
+    target: dict[str, list[str]], source: dict[str, list[str]]
+) -> None:
     for key, values in source.items():
         current = target.setdefault(key, [])
         for value in values:
@@ -2480,10 +2702,16 @@ def _merge_field_values(target: dict[str, list[str]], source: dict[str, list[str
                 current.append(value)
 
 
-def _snapshot_record_summary(entry: str, roles: list[str], fields: dict[str, list[str]]) -> str:
+def _snapshot_record_summary(
+    entry: str, roles: list[str], fields: dict[str, list[str]]
+) -> str:
     bits = ["/".join(roles)]
-    serials = _values_for_field_names(fields, {"serial", "serialnumber", "instrumentserialnumber"})
-    versions = _values_for_field_names(fields, {"firmwareversion", "softwareversion", "driverversion", "version"})
+    serials = _values_for_field_names(
+        fields, {"serial", "serialnumber", "instrumentserialnumber"}
+    )
+    versions = _values_for_field_names(
+        fields, {"firmwareversion", "softwareversion", "driverversion", "version"}
+    )
     if serials:
         bits.append(f"serial={serials[0]}")
     if versions:
@@ -2564,7 +2792,9 @@ def _inspect_xscr(path: Path, entry: str, relative: str) -> dict[str, Any]:
         "checksum": _first_text(root, "Checksum"),
         "command_count": len(commands),
         "command_counts": dict(Counter(commands).most_common()),
-        "family_counts": dict(Counter(_command_family(command) for command in commands).most_common()),
+        "family_counts": dict(
+            Counter(_command_family(command) for command in commands).most_common()
+        ),
         "references": references,
         "dependencies": {
             "workspace_guids": grouped.get("BaseWorkspaceName", []),
@@ -2574,7 +2804,9 @@ def _inspect_xscr(path: Path, entry: str, relative: str) -> dict[str, Any]:
                 | set(grouped.get("LabwareLable", []))
             ),
             "rack_labels": sorted(set(grouped.get("RackLabel", []))),
-            "rack_types": sorted(set(grouped.get("RackType", [])) | set(grouped.get("LabwareType", []))),
+            "rack_types": sorted(
+                set(grouped.get("RackType", [])) | set(grouped.get("LabwareType", []))
+            ),
             "liquid_classes": liquid_classes,
             "device_aliases": sorted(set(grouped.get("DeviceAlias", []))),
             "available_ids": sorted(set(grouped.get("AvailableID", []))),
@@ -2589,8 +2821,13 @@ def _inspect_xscr(path: Path, entry: str, relative: str) -> dict[str, Any]:
             ),
             "subroutine_refs": sorted(set(grouped.get("SubRoutine", []))),
             "barcode_refs": sorted(set(grouped.get("Barcode", []))),
-            "custom_asset_refs": sorted(set(grouped.get("CustomDetailImageFilePath", [])) | set(_asset_refs(text))),
-            "pin_refs": sorted(set(grouped.get("PinNumber", [])) | set(_pin_refs(text))),
+            "custom_asset_refs": sorted(
+                set(grouped.get("CustomDetailImageFilePath", []))
+                | set(_asset_refs(text))
+            ),
+            "pin_refs": sorted(
+                set(grouped.get("PinNumber", [])) | set(_pin_refs(text))
+            ),
             "worktable_pin_locations": sorted(
                 value
                 for value in set(grouped.get("Location", []))
@@ -2651,7 +2888,8 @@ def _inspect_xscr_fast(path: Path, entry: str, relative: str) -> dict[str, Any]:
         "kind": "script",
         "entry": entry,
         "extracted_path": relative,
-        "object_name": _first_regex_text(grouped, "ObjectName") or Path(entry.replace("\\", "/")).stem,
+        "object_name": _first_regex_text(grouped, "ObjectName")
+        or Path(entry.replace("\\", "/")).stem,
         "guid": script_guid,
         "script_guid": script_guid,
         "guids": [script_guid] if script_guid else [],
@@ -2662,7 +2900,9 @@ def _inspect_xscr_fast(path: Path, entry: str, relative: str) -> dict[str, Any]:
         "checksum": _first_regex_text(grouped, "Checksum"),
         "command_count": len(commands),
         "command_counts": dict(Counter(commands).most_common()),
-        "family_counts": dict(Counter(_command_family(command) for command in commands).most_common()),
+        "family_counts": dict(
+            Counter(_command_family(command) for command in commands).most_common()
+        ),
         "references": [],
         "dependencies": {
             "workspace_guids": grouped.get("BaseWorkspaceName", []),
@@ -2672,7 +2912,9 @@ def _inspect_xscr_fast(path: Path, entry: str, relative: str) -> dict[str, Any]:
                 | set(grouped.get("LabwareLable", []))
             ),
             "rack_labels": sorted(set(grouped.get("RackLabel", []))),
-            "rack_types": sorted(set(grouped.get("RackType", [])) | set(grouped.get("LabwareType", []))),
+            "rack_types": sorted(
+                set(grouped.get("RackType", [])) | set(grouped.get("LabwareType", []))
+            ),
             "liquid_classes": liquid_classes,
             "device_aliases": sorted(set(grouped.get("DeviceAlias", []))),
             "available_ids": sorted(set(grouped.get("AvailableID", []))),
@@ -2687,7 +2929,9 @@ def _inspect_xscr_fast(path: Path, entry: str, relative: str) -> dict[str, Any]:
             ),
             "subroutine_refs": sorted(set(grouped.get("SubRoutine", []))),
             "barcode_refs": sorted(set(grouped.get("Barcode", []))),
-            "custom_asset_refs": sorted(set(grouped.get("CustomDetailImageFilePath", []))),
+            "custom_asset_refs": sorted(
+                set(grouped.get("CustomDetailImageFilePath", []))
+            ),
             "pin_refs": sorted(set(grouped.get("PinNumber", []))),
             "worktable_pin_locations": sorted(
                 value
@@ -2756,7 +3000,8 @@ def _variable_declarations(root: ET.Element) -> list[dict[str, Any]]:
                 "prompt": prompt,
                 "read_only": _child_bool(el, "ReadOnly"),
                 "default_values": values,
-                "manual_review_required": _child_bool(el, "QueryOnStartup") or bool(prompt),
+                "manual_review_required": _child_bool(el, "QueryOnStartup")
+                or bool(prompt),
             }
         )
     return variables
@@ -2766,7 +3011,11 @@ def _operator_prompts(root: ET.Element) -> list[dict[str, Any]]:
     prompts = []
     for el in root.iter():
         statement_name = _local_name(el.tag)
-        if statement_name not in {"RUPVariableStatement", "RUPWorktableStatement", "RUPStandardStatement"}:
+        if statement_name not in {
+            "RUPVariableStatement",
+            "RUPWorktableStatement",
+            "RUPStandardStatement",
+        }:
             continue
         title = _first_text(el, "RUPScreenTitle")
         variables = _rup_variable_items(el)
@@ -2880,13 +3129,20 @@ def _alias_candidates(names: list[str]) -> list[dict[str, str]]:
 
 
 def _pin_refs(text: str) -> list[str]:
-    refs = set(re.findall(r"\b(?:GIO\d+_Pin\d+|Worktable_[A-Za-z0-9_]*Pin[A-Za-z0-9_]*|WorktablePin_[A-Za-z0-9_]+)\b", text))
+    refs = set(
+        re.findall(
+            r"\b(?:GIO\d+_Pin\d+|Worktable_[A-Za-z0-9_]*Pin[A-Za-z0-9_]*|WorktablePin_[A-Za-z0-9_]+)\b",
+            text,
+        )
+    )
     return sorted(refs)
 
 
 def _asset_refs(text: str) -> list[str]:
     refs = set()
-    for match in re.findall(r"[^<>\"]+\.(?:bmp|gif|jpe?g|png|tiff?)", text, flags=re.IGNORECASE):
+    for match in re.findall(
+        r"[^<>\"]+\.(?:bmp|gif|jpe?g|png|tiff?)", text, flags=re.IGNORECASE
+    ):
         value = match.strip()
         if value:
             refs.add(Path(value.replace("\\", "/")).name)
@@ -2913,7 +3169,9 @@ def _looks_custom_object(
     )
 
 
-def _custom_part_summary(objects: list[dict[str, Any]], scripts: list[dict[str, Any]]) -> dict[str, Any]:
+def _custom_part_summary(
+    objects: list[dict[str, Any]], scripts: list[dict[str, Any]]
+) -> dict[str, Any]:
     counters: Counter[str] = Counter()
     pin_refs: set[str] = set()
     asset_refs: set[str] = set()
@@ -2926,8 +3184,12 @@ def _custom_part_summary(objects: list[dict[str, Any]], scripts: list[dict[str, 
         if deps.get("custom_asset_refs"):
             counters["script_asset_refs"] += 1
         pin_refs.update(str(value) for value in deps.get("pin_refs") or [] if value)
-        pin_refs.update(str(value) for value in deps.get("worktable_pin_locations") or [] if value)
-        asset_refs.update(str(value) for value in deps.get("custom_asset_refs") or [] if value)
+        pin_refs.update(
+            str(value) for value in deps.get("worktable_pin_locations") or [] if value
+        )
+        asset_refs.update(
+            str(value) for value in deps.get("custom_asset_refs") or [] if value
+        )
     return _custom_part_summary_payload(counters, pin_refs, asset_refs)
 
 
@@ -3010,22 +3272,39 @@ def _snapshot_summary(evidence: list[dict[str, Any]]) -> dict[str, Any]:
             dump_count += 1
         extracted_fields = item.get("extracted_fields") or {}
         if isinstance(extracted_fields, dict):
-            _merge_field_values(fields, {str(key): [str(value) for value in values] for key, values in extracted_fields.items() if isinstance(values, list)})
+            _merge_field_values(
+                fields,
+                {
+                    str(key): [str(value) for value in values]
+                    for key, values in extracted_fields.items()
+                    if isinstance(values, list)
+                },
+            )
 
     return {
         "status": "snapshot_evidence_found" if evidence else "no_snapshot_evidence",
         "evidence_count": len(evidence),
         "role_counts": dict(sorted(role_counts.items())),
         "extension_counts": dict(sorted(extension_counts.items())),
-        "instrument_configuration_files": paths_by_role["instrument_configuration"][:50],
+        "instrument_configuration_files": paths_by_role["instrument_configuration"][
+            :50
+        ],
         "simulation_setup_files": paths_by_role["simulation_setup"][:50],
         "hardware_detail_files": paths_by_role["hardware_details"][:50],
         "troubleshooting_context_files": paths_by_role["troubleshooting_context"][:50],
         "system_config_paths": _dedupe_strings(system_config_paths)[:20],
-        "instrument_serial_numbers": _values_for_field_names(fields, {"serial", "serialnumber", "instrumentserialnumber"})[:20],
-        "software_versions": _values_for_field_names(fields, {"softwareversion", "version"})[:20],
-        "firmware_versions": _values_for_field_names(fields, {"firmware", "firmwareversion"})[:20],
-        "driver_versions": _values_for_field_names(fields, {"driver", "driverversion"})[:20],
+        "instrument_serial_numbers": _values_for_field_names(
+            fields, {"serial", "serialnumber", "instrumentserialnumber"}
+        )[:20],
+        "software_versions": _values_for_field_names(
+            fields, {"softwareversion", "version"}
+        )[:20],
+        "firmware_versions": _values_for_field_names(
+            fields, {"firmware", "firmwareversion"}
+        )[:20],
+        "driver_versions": _values_for_field_names(fields, {"driver", "driverversion"})[
+            :20
+        ],
         "log_file_count": log_count,
         "screenshot_file_count": screenshot_count,
         "dump_file_count": dump_count,
@@ -3060,18 +3339,31 @@ def _append_snapshot_report(lines: list[str], manifest: dict[str, Any]) -> None:
     role_counts = summary.get("role_counts") or {}
     lines.extend(["", "## Snapshot Evidence", ""])
     lines.append(f"- Evidence files: `{len(evidence)}`")
-    for role in ("instrument_configuration", "simulation_setup", "hardware_details", "troubleshooting_context"):
+    for role in (
+        "instrument_configuration",
+        "simulation_setup",
+        "hardware_details",
+        "troubleshooting_context",
+    ):
         if role_counts.get(role):
             label = role.replace("_", " ")
             lines.append(f"- {label.title()}: `{role_counts[role]}`")
     if summary.get("system_config_paths"):
-        lines.append(f"- system.config files: `{', '.join(summary['system_config_paths'][:10])}`")
+        lines.append(
+            f"- system.config files: `{', '.join(summary['system_config_paths'][:10])}`"
+        )
     if summary.get("instrument_serial_numbers"):
-        lines.append(f"- Instrument serials: `{', '.join(summary['instrument_serial_numbers'][:10])}`")
+        lines.append(
+            f"- Instrument serials: `{', '.join(summary['instrument_serial_numbers'][:10])}`"
+        )
     if summary.get("firmware_versions"):
-        lines.append(f"- Firmware versions: `{', '.join(summary['firmware_versions'][:10])}`")
+        lines.append(
+            f"- Firmware versions: `{', '.join(summary['firmware_versions'][:10])}`"
+        )
     if summary.get("driver_versions"):
-        lines.append(f"- Driver versions: `{', '.join(summary['driver_versions'][:10])}`")
+        lines.append(
+            f"- Driver versions: `{', '.join(summary['driver_versions'][:10])}`"
+        )
     for item in evidence[:30]:
         roles = ", ".join(item.get("roles") or [])
         lines.append(f"- `{item.get('object_name')}`: `{item.get('entry')}` ({roles})")
