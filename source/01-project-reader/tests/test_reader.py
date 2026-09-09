@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+import logging
 import unittest
 import zipfile
 from pathlib import Path
@@ -472,8 +473,8 @@ class ReaderTests(unittest.TestCase):
                 import time
                 time.sleep(0.1)
                 db_path.unlink()
-            except OSError:
-                pass
+            except OSError as e:
+                logging.debug("Ignored OSError during manual db_path cleanup: %s", e)
 
     def test_build_project_index_closes_connection_on_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
