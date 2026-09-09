@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from pathlib import Path
+import sqlite3
 from typing import Any, Iterable
 import re
 
@@ -132,3 +133,20 @@ def to_jsonable(value: Any) -> Any:
     if isinstance(value, dict):
         return {str(key): to_jsonable(item) for key, item in value.items()}
     return value
+
+
+def _connect(path: str | Path) -> sqlite3.Connection:
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+def _connection_arg(
+    value: str | Path | sqlite3.Connection,
+) -> tuple[sqlite3.Connection, bool, str]:
+    if isinstance(value, sqlite3.Connection):
+        value.row_factory = sqlite3.Row
+        return value, False, ""
+    path = Path(value)
+    return _connect(path), True, str(path)
