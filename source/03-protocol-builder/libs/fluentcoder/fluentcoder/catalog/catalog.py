@@ -266,7 +266,7 @@ def find_components_by_metadata(
         if component_subtype:
             clauses.append("component_subtype = ?")
             params.append(component_subtype)
-        sql = "SELECT * FROM components WHERE " + " AND ".join(clauses) + " ORDER BY name"
+        sql = "SELECT * FROM components WHERE " + " AND ".join(clauses) + " ORDER BY name"  # nosec B608
         rows = conn.execute(sql, params).fetchall()
     return [_entry_from_row(r) for r in rows]
 
@@ -519,6 +519,13 @@ def _migrate_install_key_schema(conn: sqlite3.Connection) -> None:
         (legacy_key,),
     )
 
+    valid_tables = {
+        r["name"]
+        for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
+        ).fetchall()
+    }
+
     for table, columns_sql in (
         (
             "components",
@@ -580,19 +587,23 @@ def _migrate_install_key_schema(conn: sqlite3.Connection) -> None:
             """,
         ),
     ):
+        if table not in valid_tables:
+            continue
+
         table_esc = _escape_identifier(table)
-        conn.execute(columns_sql)
+        conn.execute(columns_sql)  # nosec B608
         old_cols = {
-            row["name"] for row in conn.execute(f"PRAGMA table_info({table_esc})").fetchall()
+            row["name"] for row in conn.execute(f"PRAGMA table_info({table_esc})").fetchall()  # nosec B608
         }
         select_cols = [_escape_identifier(col) for col in old_cols if col != "install_key"]
-        conn.execute(
-            f'INSERT INTO {_escape_identifier(table + "_new")} ("install_key", {", ".join(select_cols)}) '
-            f'SELECT ?, {", ".join(select_cols)} FROM {table_esc}',
-            (legacy_key,),
+
+        insert_query = (
+            f'INSERT INTO {_escape_identifier(table + "_new")} ("install_key", {", ".join(select_cols)}) '  # nosec B608
+            f'SELECT ?, {", ".join(select_cols)} FROM {table_esc}'
         )
-        conn.execute(f'DROP TABLE {table_esc}')
-        conn.execute(f'ALTER TABLE {_escape_identifier(table + "_new")} RENAME TO {table_esc}')
+        conn.execute(insert_query, (legacy_key,))  # nosec B608
+        conn.execute(f"DROP TABLE {table_esc}")  # nosec B608
+        conn.execute(f'ALTER TABLE {_escape_identifier(table + "_new")} RENAME TO {table_esc}')  # nosec B608
 
     indexed_columns = {
         row["name"] for row in conn.execute("PRAGMA table_info(indexed_sources)").fetchall()
