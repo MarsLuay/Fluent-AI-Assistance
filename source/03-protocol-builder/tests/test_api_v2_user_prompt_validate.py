@@ -53,7 +53,7 @@ class UserPromptValidateTests(unittest.TestCase):
             index=1,
             group="Checks",
             operation="prompt_user",
-            payload_xml="<UserPromptStatement><Prompt>TODO</Prompt></UserPromptStatement>",
+            payload_xml="<UserPromptStatement><Prompt>placeholder</Prompt></UserPromptStatement>",
         )
         result = validate_user_prompt_offline(command)
         self.assertFalse(result.ok)
@@ -101,7 +101,7 @@ class UserPromptValidateTests(unittest.TestCase):
             index=0,
             group="Checks",
             operation="prompt_user",
-            payload_xml="<UserPromptStatement><Prompt>TODO</Prompt></UserPromptStatement>",
+            payload_xml="<UserPromptStatement><Prompt>placeholder</Prompt></UserPromptStatement>",
         )
         result = SteppedRunner(channel).run(method="Demo", commands=[command])
 
