@@ -41,6 +41,7 @@ class TecanDatabase:
         self._init_schema()
         self._migrate_schema()
         self.seed_dsl_recipes()
+        self._liquid_classes_key_cols: Optional[List[str]] = None
 
     def _validate_identifier(self, name: str) -> str:
         """Validate SQL identifier to prevent SQL injection."""
@@ -828,46 +829,52 @@ class TecanDatabase:
 
         with self._connection() as conn:
             columns = {row["name"] for row in conn.execute("PRAGMA table_info(liquid_classes)").fetchall()}
-            key_cols = None
-            try:
-                # Optimized query utilizing SQLite pragma functions to retrieve all index information in one go
-                rows = conn.execute("""
-                    SELECT il.name as idx_name, ii.name as col_name
-                    FROM pragma_index_list('liquid_classes') il,
-                         pragma_index_info(il.name) ii
-                    WHERE il."unique" = 1
-                """).fetchall()
 
-                idx_to_cols = {}
-                for row in rows:
-                    idx_name = row["idx_name"]
-                    col_name = row["col_name"]
-                    if idx_name not in idx_to_cols:
-                        idx_to_cols[idx_name] = []
-                    idx_to_cols[idx_name].append(col_name)
-
-                for cols in idx_to_cols.values():
-                    if "name" in cols:
-                        key_cols = [c for c in cols if c in columns]
-                        break
-            except Exception:
-                # Fallback for older SQLite versions that don't support table-valued PRAGMA functions (pre-3.16.0)
+            if self._liquid_classes_key_cols is not None:
+                key_cols = self._liquid_classes_key_cols
+            else:
+                key_cols = None
                 try:
-                    indexes = conn.execute("PRAGMA index_list(liquid_classes)").fetchall()
-                    for idx in indexes:
-                        if idx["unique"]:
-                            idx_cols = [row["name"] for row in conn.execute(f"PRAGMA index_info({idx['name']})").fetchall()]
-                            if "name" in idx_cols:
-                                key_cols = [c for c in idx_cols if c in columns]
-                                break
-                except Exception:
-                    key_cols = None
+                    # Optimized query utilizing SQLite pragma functions to retrieve all index information in one go
+                    rows = conn.execute("""
+                        SELECT il.name as idx_name, ii.name as col_name
+                        FROM pragma_index_list('liquid_classes') il,
+                             pragma_index_info(il.name) ii
+                        WHERE il."unique" = 1
+                    """).fetchall()
 
-            if not key_cols:
-                key_cols = ["name", "device_type"] if "device_type" in columns else ["name"]
-            key_cols = [c for c in key_cols if c in columns]
-            if not key_cols:
-                key_cols = ["name"]
+                    idx_to_cols = {}
+                    for row in rows:
+                        idx_name = row["idx_name"]
+                        col_name = row["col_name"]
+                        if idx_name not in idx_to_cols:
+                            idx_to_cols[idx_name] = []
+                        idx_to_cols[idx_name].append(col_name)
+
+                    for cols in idx_to_cols.values():
+                        if "name" in cols:
+                            key_cols = [c for c in cols if c in columns]
+                            break
+                except Exception:
+                    # Fallback for older SQLite versions that don't support table-valued PRAGMA functions (pre-3.16.0)
+                    try:
+                        indexes = conn.execute("PRAGMA index_list(liquid_classes)").fetchall()
+                        for idx in indexes:
+                            if idx["unique"]:
+                                idx_cols = [row["name"] for row in conn.execute(f"PRAGMA index_info({idx['name']})").fetchall()]
+                                if "name" in idx_cols:
+                                    key_cols = [c for c in idx_cols if c in columns]
+                                    break
+                    except Exception:
+                        key_cols = None
+
+                if not key_cols:
+                    key_cols = ["name", "device_type"] if "device_type" in columns else ["name"]
+                key_cols = [c for c in key_cols if c in columns]
+                if not key_cols:
+                    key_cols = ["name"]
+
+                self._liquid_classes_key_cols = key_cols
 
             key_values = []
             safe_key_cols = [self._validate_identifier(c) for c in key_cols]
