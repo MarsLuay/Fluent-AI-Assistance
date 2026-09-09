@@ -52,6 +52,244 @@ def _index_all_connectors_enabled(include_all_connectors: Optional[bool] = None)
     }
 
 
+def _index_components(
+    conn,
+    *,
+    install,
+    install_key: str,
+    components_dir,
+    seen_paths: set[str],
+    existing_sources: dict[str, dict[str, str]],
+) -> None:
+    existing_components = {
+        row["guid"]: row["category"]
+        for row in conn.execute(
+            "SELECT guid, category FROM components WHERE install_key = ?",
+            (install_key,),
+        ).fetchall()
+    }
+
+    for path in sorted(components_dir.glob("*.xcmp"), key=lambda p: p.as_posix()):
+        rel = _relative_install_path(path, install)
+        seen_paths.add(rel)
+        content_fp = _source_content_fingerprint(path, install)
+        cached = existing_sources.get(rel)
+        if (
+            cached
+            and cached["source_fingerprint"] == content_fp
+            and cached["entity_table"] == "components"
+        ):
+            if cached["entity_key"] in existing_components:
+                continue
+
+        try:
+            comp = load_xcmp(path)
+        except Exception:
+            continue
+        category = infer_category(comp)
+
+        grid_x, grid_y = _component_grid(comp)
+        dim = comp.dim_mm or (None, None, None)
+        site_count = comp.arrangement.site_count if comp.arrangement else None
+        functional_group, component_kind, component_subtype = component_taxonomy(
+            comp.functional_group
+        )
+
+        conn.execute(
+            """INSERT OR REPLACE INTO components
+               (install_key, guid, name, category, file_path, grid_x, grid_y,
+                dim_x_mm, dim_y_mm, dim_z_mm, site_count,
+                functional_group, component_kind, component_subtype)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                install_key,
+                comp.guid,
+                comp.name,
+                category,
+                str(comp.file_path),
+                grid_x,
+                grid_y,
+                dim[0],
+                dim[1],
+                dim[2],
+                site_count,
+                functional_group,
+                component_kind,
+                component_subtype,
+            ),
+        )
+        _upsert_indexed_source(
+            conn,
+            install_key=install_key,
+            relative_path=rel,
+            source_fingerprint=content_fp,
+            entity_table="components",
+            entity_key=comp.guid,
+        )
+
+
+def _index_workspaces(
+    conn,
+    *,
+    install,
+    install_key: str,
+    workspaces_dir,
+    seen_paths: set[str],
+    existing_sources: dict[str, dict[str, str]],
+) -> None:
+    indexed_ws_guids = {
+        row["guid"]
+        for row in conn.execute(
+            "SELECT guid FROM workspaces WHERE install_key = ?", (install_key,)
+        ).fetchall()
+    }
+    for path in sorted(workspaces_dir.glob("*.xwsp"), key=lambda p: p.as_posix()):
+        rel = _relative_install_path(path, install)
+        seen_paths.add(rel)
+        content_fp = _source_content_fingerprint(path, install)
+        cached = existing_sources.get(rel)
+        if (
+            cached
+            and cached["source_fingerprint"] == content_fp
+            and cached["entity_table"] == "workspaces"
+        ):
+            if cached["entity_key"] in indexed_ws_guids:
+                continue
+
+        try:
+            ws = load_xwsp(path)
+        except Exception:
+            continue
+        conn.execute(
+            "INSERT OR REPLACE INTO workspaces (install_key, guid, name, file_path) VALUES (?, ?, ?, ?)",
+            (install_key, ws.guid, ws.name, str(ws.file_path)),
+        )
+        _upsert_indexed_source(
+            conn,
+            install_key=install_key,
+            relative_path=rel,
+            source_fingerprint=content_fp,
+            entity_table="workspaces",
+            entity_key=ws.guid,
+        )
+
+    workspace_count = conn.execute(
+        "SELECT COUNT(*) AS n FROM workspaces WHERE install_key = ?",
+        (install_key,),
+    ).fetchone()["n"]
+    indexed_workspace_count = conn.execute(
+        "SELECT COUNT(*) AS n FROM indexed_sources "
+        "WHERE install_key = ? AND entity_table = 'workspaces'",
+        (install_key,),
+    ).fetchone()["n"]
+    if indexed_workspace_count and workspace_count != indexed_workspace_count:
+        raise RuntimeError(
+            "Workspace index build collapsed parsed `.xwsp` files into fewer rows. "
+            "Check workspace GUID extraction for collisions."
+        )
+
+
+def _index_sites(
+    conn,
+    *,
+    install,
+    install_key: str,
+    sites_dir,
+    seen_paths: set[str],
+    existing_sources: dict[str, dict[str, str]],
+) -> None:
+    existing_site_guids = {
+        row["guid"]
+        for row in conn.execute(
+            "SELECT guid FROM sites WHERE install_key = ?", (install_key,)
+        ).fetchall()
+    }
+    for path in sorted(sites_dir.glob("*.xsit"), key=lambda p: p.as_posix()):
+        rel = _relative_install_path(path, install)
+        seen_paths.add(rel)
+        content_fp = _source_content_fingerprint(path, install)
+        cached = existing_sources.get(rel)
+        guid = path.stem
+        if (
+            cached
+            and cached["source_fingerprint"] == content_fp
+            and cached["entity_table"] == "sites"
+        ):
+            if cached["entity_key"] in existing_site_guids:
+                continue
+
+        conn.execute(
+            "INSERT OR REPLACE INTO sites (install_key, guid, file_path) VALUES (?, ?, ?)",
+            (install_key, guid, str(path)),
+        )
+        _upsert_indexed_source(
+            conn,
+            install_key=install_key,
+            relative_path=rel,
+            source_fingerprint=content_fp,
+            entity_table="sites",
+            entity_key=guid,
+        )
+
+
+def _index_liquid_classes(
+    conn,
+    *,
+    install,
+    install_key: str,
+    liquid_classes_dir,
+    seen_paths: set[str],
+    existing_sources: dict[str, dict[str, str]],
+) -> None:
+    from .xlqc import load_xlqc
+
+    known_liquid_classes = {
+        row["guid"]
+        for row in conn.execute(
+            "SELECT guid FROM liquid_classes WHERE install_key = ?",
+            (install_key,),
+        ).fetchall()
+    }
+
+    for path in sorted(liquid_classes_dir.glob("*.xlqc"), key=lambda p: p.as_posix()):
+        rel = _relative_install_path(path, install)
+        seen_paths.add(rel)
+        content_fp = _source_content_fingerprint(path, install)
+        cached = existing_sources.get(rel)
+        if (
+            cached
+            and cached["source_fingerprint"] == content_fp
+            and cached["entity_table"] == "liquid_classes"
+        ):
+            if cached["entity_key"] in known_liquid_classes:
+                continue
+
+        try:
+            lc = load_xlqc(path)
+        except Exception:
+            continue
+        conn.execute(
+            "INSERT OR REPLACE INTO liquid_classes "
+            "(install_key, guid, name, head, supported_heads, file_path) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                install_key,
+                lc.guid,
+                lc.name,
+                lc.head,
+                json.dumps(list(lc.supported_heads)),
+                str(lc.file_path),
+            ),
+        )
+        _upsert_indexed_source(
+            conn,
+            install_key=install_key,
+            relative_path=rel,
+            source_fingerprint=content_fp,
+            entity_table="liquid_classes",
+            entity_key=lc.guid,
+        )
+
+
 def build_index(
     install_path: Optional[Path | str] = None,
     db_path: Optional[Path | str] = None,
@@ -106,156 +344,34 @@ def build_index(
         existing_sources = _load_indexed_sources(conn, install_key)
         seen_paths: set[str] = set()
 
-        existing_components = {
-            row["guid"]: row["category"]
-            for row in conn.execute(
-                "SELECT guid, category FROM components WHERE install_key = ?", (install_key,)
-            ).fetchall()
-        }
-
-        for path in sorted(components_dir.glob("*.xcmp"), key=lambda p: p.as_posix()):
-            rel = _relative_install_path(path, install)
-            seen_paths.add(rel)
-            content_fp = _source_content_fingerprint(path, install)
-            cached = existing_sources.get(rel)
-            if (
-                cached
-                and cached["source_fingerprint"] == content_fp
-                and cached["entity_table"] == "components"
-            ):
-                if cached["entity_key"] in existing_components:
-                    continue
-
-            try:
-                comp = load_xcmp(path)
-            except Exception:
-                continue
-            category = infer_category(comp)
-
-            grid_x, grid_y = _component_grid(comp)
-            dim = comp.dim_mm or (None, None, None)
-            site_count = comp.arrangement.site_count if comp.arrangement else None
-            functional_group, component_kind, component_subtype = component_taxonomy(
-                comp.functional_group
-            )
-
-            conn.execute(
-                """INSERT OR REPLACE INTO components
-                   (install_key, guid, name, category, file_path, grid_x, grid_y,
-                    dim_x_mm, dim_y_mm, dim_z_mm, site_count,
-                    functional_group, component_kind, component_subtype)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    install_key,
-                    comp.guid,
-                    comp.name,
-                    category,
-                    str(comp.file_path),
-                    grid_x,
-                    grid_y,
-                    dim[0],
-                    dim[1],
-                    dim[2],
-                    site_count,
-                    functional_group,
-                    component_kind,
-                    component_subtype,
-                ),
-            )
-            _upsert_indexed_source(
-                conn,
-                install_key=install_key,
-                relative_path=rel,
-                source_fingerprint=content_fp,
-                entity_table="components",
-                entity_key=comp.guid,
-            )
+        _index_components(
+            conn,
+            install=install,
+            install_key=install_key,
+            components_dir=components_dir,
+            seen_paths=seen_paths,
+            existing_sources=existing_sources,
+        )
 
         if workspaces_dir.exists():
-            indexed_ws_guids = {
-                row["guid"] for row in conn.execute(
-                    "SELECT guid FROM workspaces WHERE install_key = ?",
-                    (install_key,)
-                ).fetchall()
-            }
-            for path in sorted(workspaces_dir.glob("*.xwsp"), key=lambda p: p.as_posix()):
-                rel = _relative_install_path(path, install)
-                seen_paths.add(rel)
-                content_fp = _source_content_fingerprint(path, install)
-                cached = existing_sources.get(rel)
-                if (
-                    cached
-                    and cached["source_fingerprint"] == content_fp
-                    and cached["entity_table"] == "workspaces"
-                ):
-                    if cached["entity_key"] in indexed_ws_guids:
-                        continue
-
-                try:
-                    ws = load_xwsp(path)
-                except Exception:
-                    continue
-                conn.execute(
-                    "INSERT OR REPLACE INTO workspaces (install_key, guid, name, file_path) VALUES (?, ?, ?, ?)",
-                    (install_key, ws.guid, ws.name, str(ws.file_path)),
-                )
-                _upsert_indexed_source(
-                    conn,
-                    install_key=install_key,
-                    relative_path=rel,
-                    source_fingerprint=content_fp,
-                    entity_table="workspaces",
-                    entity_key=ws.guid,
-                )
-
-            workspace_count = conn.execute(
-                "SELECT COUNT(*) AS n FROM workspaces WHERE install_key = ?",
-                (install_key,),
-            ).fetchone()["n"]
-            indexed_workspace_count = conn.execute(
-                "SELECT COUNT(*) AS n FROM indexed_sources "
-                "WHERE install_key = ? AND entity_table = 'workspaces'",
-                (install_key,),
-            ).fetchone()["n"]
-            if indexed_workspace_count and workspace_count != indexed_workspace_count:
-                raise RuntimeError(
-                    "Workspace index build collapsed parsed `.xwsp` files into fewer rows. "
-                    "Check workspace GUID extraction for collisions."
-                )
+            _index_workspaces(
+                conn,
+                install=install,
+                install_key=install_key,
+                workspaces_dir=workspaces_dir,
+                seen_paths=seen_paths,
+                existing_sources=existing_sources,
+            )
 
         if sites_dir.exists():
-            existing_site_guids = {
-                row["guid"]
-                for row in conn.execute(
-                    "SELECT guid FROM sites WHERE install_key = ?", (install_key,)
-                ).fetchall()
-            }
-            for path in sorted(sites_dir.glob("*.xsit"), key=lambda p: p.as_posix()):
-                rel = _relative_install_path(path, install)
-                seen_paths.add(rel)
-                content_fp = _source_content_fingerprint(path, install)
-                cached = existing_sources.get(rel)
-                guid = path.stem
-                if (
-                    cached
-                    and cached["source_fingerprint"] == content_fp
-                    and cached["entity_table"] == "sites"
-                ):
-                    if cached["entity_key"] in existing_site_guids:
-                        continue
-
-                conn.execute(
-                    "INSERT OR REPLACE INTO sites (install_key, guid, file_path) VALUES (?, ?, ?)",
-                    (install_key, guid, str(path)),
-                )
-                _upsert_indexed_source(
-                    conn,
-                    install_key=install_key,
-                    relative_path=rel,
-                    source_fingerprint=content_fp,
-                    entity_table="sites",
-                    entity_key=guid,
-                )
+            _index_sites(
+                conn,
+                install=install,
+                install_key=install_key,
+                sites_dir=sites_dir,
+                seen_paths=seen_paths,
+                existing_sources=existing_sources,
+            )
 
         connectors_dir = install / "SystemSpecific" / "Worktable" / "Connectors"
         if connectors_dir.exists():
@@ -280,53 +396,14 @@ def build_index(
                 )
 
         if liquid_classes_dir.exists():
-            from .xlqc import load_xlqc
-
-            known_liquid_classes = {
-                row["guid"]
-                for row in conn.execute(
-                    "SELECT guid FROM liquid_classes WHERE install_key = ?",
-                    (install_key,),
-                ).fetchall()
-            }
-
-            for path in sorted(liquid_classes_dir.glob("*.xlqc"), key=lambda p: p.as_posix()):
-                rel = _relative_install_path(path, install)
-                seen_paths.add(rel)
-                content_fp = _source_content_fingerprint(path, install)
-                cached = existing_sources.get(rel)
-                if (
-                    cached
-                    and cached["source_fingerprint"] == content_fp
-                    and cached["entity_table"] == "liquid_classes"
-                ):
-                    if cached["entity_key"] in known_liquid_classes:
-                        continue
-
-                try:
-                    lc = load_xlqc(path)
-                except Exception:
-                    continue
-                conn.execute(
-                    "INSERT OR REPLACE INTO liquid_classes "
-                    "(install_key, guid, name, head, supported_heads, file_path) VALUES (?, ?, ?, ?, ?, ?)",
-                    (
-                        install_key,
-                        lc.guid,
-                        lc.name,
-                        lc.head,
-                        json.dumps(list(lc.supported_heads)),
-                        str(lc.file_path),
-                    ),
-                )
-                _upsert_indexed_source(
-                    conn,
-                    install_key=install_key,
-                    relative_path=rel,
-                    source_fingerprint=content_fp,
-                    entity_table="liquid_classes",
-                    entity_key=lc.guid,
-                )
+            _index_liquid_classes(
+                conn,
+                install=install,
+                install_key=install_key,
+                liquid_classes_dir=liquid_classes_dir,
+                seen_paths=seen_paths,
+                existing_sources=existing_sources,
+            )
 
         _purge_stale_sources(conn, seen_paths, install_key)
 
