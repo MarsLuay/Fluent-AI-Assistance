@@ -25,39 +25,51 @@ class ExplicitZeiaInputTests(unittest.TestCase):
             self.assertNotIn("discover_vault_root_zeia", source, str(path))
             self.assertNotIn('".obsidian"', source, str(path))
 
-    def test_cli_explicit_archive_wins_inside_unrelated_obsidian_vault(self):
+    def test_cli_relative_archive_does_not_search_obsidian_vault_root(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            requested = root / "requested.zeia"
-            requested.write_bytes(b"requested")
-
             vault = root / "unrelated-vault"
+            inside_vault = vault / "notes"
             (vault / ".obsidian").mkdir(parents=True)
+            inside_vault.mkdir()
+
+            requested = inside_vault / "requested.zeia"
+            requested.write_bytes(b"requested")
             wrong = vault / "newer-wrong.zeia"
             wrong.write_bytes(b"wrong")
             os.utime(wrong, (requested.stat().st_mtime + 60, requested.stat().st_mtime + 60))
 
-            inside_vault = vault / "notes"
-            inside_vault.mkdir()
-            plain_directory = root / "plain"
-            plain_directory.mkdir()
-
             args = argparse.Namespace(
-                archive=str(requested),
+                archive="requested.zeia",
                 name="demo",
                 force=False,
                 snapshot=[],
                 activate=False,
             )
-
             with mock.patch.object(Path, "cwd", return_value=inside_vault):
-                from_vault = project_import_request_from_cli(args)
-            with mock.patch.object(Path, "cwd", return_value=plain_directory):
-                without_vault = project_import_request_from_cli(args)
+                request = project_import_request_from_cli(args)
 
-            self.assertEqual(from_vault.archive, requested.resolve())
-            self.assertEqual(without_vault.archive, requested.resolve())
-            self.assertNotEqual(from_vault.archive, wrong.resolve())
+            self.assertEqual(request.archive, requested.resolve())
+            self.assertNotEqual(request.archive, wrong.resolve())
+
+    def test_cli_relative_archive_behaves_the_same_without_obsidian(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            plain_directory = Path(tmp) / "plain"
+            plain_directory.mkdir()
+            requested = plain_directory / "requested.zeia"
+            requested.write_bytes(b"requested")
+
+            args = argparse.Namespace(
+                archive="requested.zeia",
+                name="demo",
+                force=False,
+                snapshot=[],
+                activate=False,
+            )
+            with mock.patch.object(Path, "cwd", return_value=plain_directory):
+                request = project_import_request_from_cli(args)
+
+            self.assertEqual(request.archive, requested.resolve())
 
     def test_mcp_preserves_explicit_archive(self):
         archive = Path("explicit/project.zeia")
