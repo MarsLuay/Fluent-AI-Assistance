@@ -397,7 +397,7 @@ function resolveSamplePath(samplePath: string): string {
   return resolveProjectPath(samplePath);
 }
 
-function resolveProjectPath(relativePath: string): string {
+export function resolveProjectPath(relativePath: string): string {
   const absolutePath = path.resolve(projectRoot, relativePath);
   if (!isWithinProjectRoot(absolutePath)) throw new Error("Path outside project root");
   return absolutePath;
