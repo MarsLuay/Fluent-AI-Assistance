@@ -592,9 +592,21 @@ def _search_pattern_rows(
     limit: int,
 ) -> list[dict[str, Any]]:
     pattern = f"%{query.lower()}%"
-    params: list[Any] = [pattern, pattern, pattern, pattern, pattern, pattern, pattern]
-    clauses = ["""
-        (
+    script_pattern = f"%{source_script.lower()}%" if source_script else None
+    params: list[Any] = [
+        pattern, pattern, pattern, pattern, pattern, pattern, pattern,
+        pattern, pattern,
+        pattern_type, pattern_type,
+        script_pattern, script_pattern,
+        limit
+    ]
+
+    rows = conn.execute(
+        """
+        SELECT p.*, z.path AS zeia_file
+        FROM script_patterns p
+        JOIN zeia_files z ON z.id = p.zeia_file_id
+        WHERE (
             lower(p.pattern_type) LIKE ?
             OR lower(p.name) LIKE ?
             OR lower(p.source_script) LIKE ?
@@ -612,22 +624,8 @@ def _search_pattern_rows(
                   )
             )
         )
-        """]
-    params.extend([pattern, pattern])
-    if pattern_type:
-        clauses.append("p.pattern_type = ?")
-        params.append(pattern_type)
-    if source_script:
-        clauses.append("lower(p.source_script) LIKE ?")
-        params.append(f"%{source_script.lower()}%")
-    params.append(limit)
-
-    rows = conn.execute(
-        f"""
-        SELECT p.*, z.path AS zeia_file
-        FROM script_patterns p
-        JOIN zeia_files z ON z.id = p.zeia_file_id
-        WHERE {" AND ".join(clauses)}
+        AND (? IS NULL OR p.pattern_type = ?)
+        AND (? IS NULL OR lower(p.source_script) LIKE ?)
         ORDER BY p.pattern_type, p.source_script, p.start_command_index
         LIMIT ?
         """,
@@ -737,7 +735,8 @@ def _count(conn: sqlite3.Connection, table: str) -> int:
         raise ValueError(f"Table name not found in schema: {table}")
 
     escaped_table = '"' + table.replace('"', '""') + '"'
-    row = conn.execute(f"SELECT COUNT(*) AS count FROM {escaped_table}").fetchone()
+    # nosec B608 - Table name is validated against sqlite_master schema above.
+    row = conn.execute(f"SELECT COUNT(*) AS count FROM {escaped_table}").fetchone()  # nosec B608
     return int(row["count"] or 0)
 
 

@@ -946,14 +946,9 @@ def _search_entities(
     kind: str | None,
     limit: int,
 ) -> list[dict[str, Any]]:
-    params: list[Any] = [pattern, pattern, pattern, pattern, pattern]
-    kind_clause = ""
-    if kind:
-        kind_clause = "AND e.kind = ?"
-        params.append(kind)
-    params.append(limit)
+    params: list[Any] = [pattern, pattern, pattern, pattern, pattern, kind, kind, limit]
     rows = conn.execute(
-        f"""
+        """
         SELECT e.kind, e.name, e.value, e.source_path, e.command_index,
                e.metadata_json, z.path AS zeia_file, s.object_name AS script_name
         FROM entities e
@@ -966,7 +961,7 @@ def _search_entities(
             OR lower(e.source_path) LIKE ?
             OR lower(e.metadata_json) LIKE ?
         )
-        {kind_clause}
+        AND (? IS NULL OR e.kind = ?)
         ORDER BY e.kind, e.name, z.file_name, e.source_path
         LIMIT ?
         """,
@@ -1143,7 +1138,8 @@ def _count(conn: sqlite3.Connection, table: str) -> int:
         raise ValueError(f"Table name not found in schema: {table}")
 
     escaped_table = '"' + table.replace('"', '""') + '"'
-    row = conn.execute(f"SELECT COUNT(*) AS count FROM {escaped_table}").fetchone()
+    # nosec B608 - Table name is validated against sqlite_master schema above.
+    row = conn.execute(f"SELECT COUNT(*) AS count FROM {escaped_table}").fetchone()  # nosec B608
     return int(row["count"] or 0)
 
 
