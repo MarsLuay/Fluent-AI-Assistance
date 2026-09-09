@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import logging
 import math
 import re
 from .. import xml_compat as ET
@@ -61,6 +62,8 @@ from .snapshots import (
 )
 from .report import EffectKind, SimulationFailure, SimulationReport, StepCoverage
 from .invariants import SimulationError
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from ..subroutines.registry import SubroutineRegistry
@@ -1379,7 +1382,7 @@ class Simulator:
                     try:
                         start, stride, end = (int(part) for part in parts)
                     except ValueError:
-                        pass
+                        logger.warning("Failed to parse LiHa selection stride token: %r", token)
                     else:
                         if stride == 0:
                             raise MissingSimValueError(
