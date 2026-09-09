@@ -516,7 +516,7 @@ class _StepEmitter:
 
         return False
 
-    def _emit_control_flow(self, step: Step) -> bool:
+    def _emit_loop(self, step: Step) -> bool:
         if isinstance(step, LoopStep):
             times_repr = _times_repr(step, self.classes_used)
             loop_variable_arg = (
@@ -539,7 +539,9 @@ class _StepEmitter:
             _ensure_block_body(self.out, self.indent + "    ")
             self.i += 1
             return True
+        return False
 
+    def _emit_conditional(self, step: Step) -> bool:
         if isinstance(step, ConditionalStep):
             cond_var = f"_cond_{self.i}"
             disabled_arg = ", disabled=True" if step.disabled else ""
@@ -582,7 +584,9 @@ class _StepEmitter:
                 _ensure_block_body(self.out, self.indent + "    ")
             self.i += 1
             return True
+        return False
 
+    def _emit_script_group(self, step: Step) -> bool:
         if isinstance(step, ScriptGroupStep):
             self.out.append(self.indent + f"with wt.nested_group({step.name!r}):")
             _emit_steps(
@@ -596,6 +600,15 @@ class _StepEmitter:
             )
             _ensure_block_body(self.out, self.indent + "    ")
             self.i += 1
+            return True
+        return False
+
+    def _emit_control_flow(self, step: Step) -> bool:
+        if self._emit_loop(step):
+            return True
+        if self._emit_conditional(step):
+            return True
+        if self._emit_script_group(step):
             return True
 
         if isinstance(step, SubRoutineStep):
