@@ -35,7 +35,6 @@ fluentcoder = [
   "_assets/config/*.yaml",
   "_assets/config/*.yaml.example",
   "catalog/*.db",
-  "catalog/sql/*.sql",
 ]
 
 [tool.setuptools.packages.find]

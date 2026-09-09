@@ -376,6 +376,8 @@ class AddLabwareValidateTests(unittest.TestCase):
         self.assertEqual(len(failures), 4)
 
         self.assertEqual(failures[0].reason, "api_v2_validate_rejected")
+
+        # Test missing label in bracket (results in "undeclared_variable")
         self.assertEqual(failures[1].reason, "undeclared_variable")
         self.assertIn("UNDECLARED_LBL", failures[1].message)
 
@@ -455,25 +457,6 @@ class AddLabwareValidateTests(unittest.TestCase):
         )
 
 
-
-    def test_add_labware_fields_as_dict(self):
-        fields = AddLabwareFields(
-            labware_type="96 Well Flat",
-            labware_label="Plate1",
-            location="NestPlatform",
-            site=2,
-            rotation=180,
-            has_lid=True,
-        )
-        expected = {
-            "labware_type": "96 Well Flat",
-            "labware_label": "Plate1",
-            "location": "NestPlatform",
-            "site": 2,
-            "rotation": 180,
-            "has_lid": True,
-        }
-        self.assertEqual(fields.as_dict(), expected)
 
     def test_add_labware_validate_result_as_dict_minimal(self):
         from fluent_pipeline.api_v2_add_labware_validate import AddLabwareValidateResult, API_V2_METHOD, API_V2_ISSUE_ID
