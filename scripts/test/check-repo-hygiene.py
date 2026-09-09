@@ -6,11 +6,32 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+SELF = Path("scripts/test/check-repo-hygiene.py")
 
-# These files intentionally contain path samples used to verify sanitization logic.
-ALLOWLIST = {
-    Path("scripts/test/check-repo-hygiene.py"),
-    Path("source/03-protocol-builder/tests/test_determinism.py"),
+# Narrow exceptions for explicit synthetic path strings used by tests. The
+# exception is tied to the file, diagnostic kind, and exact normalized match so
+# a different developer-specific path in the same test file still fails.
+ALLOWED_MATCHES = {
+    (
+        Path("source/03-protocol-builder/tests/test_determinism.py"),
+        "Windows user home",
+        "C:\\Users\\me\\",
+    ),
+    (
+        Path("source/03-protocol-builder/tests/test_bundle_setup.py"),
+        "Windows user home",
+        "C:\\Users\\Tecan\\",
+    ),
+    (
+        Path("source/03-protocol-builder/tests/test_external_file_dependencies.py"),
+        "Windows user home",
+        "C:\\Users\\me\\",
+    ),
+    (
+        Path("source/03-protocol-builder/tests/test_fluent_log_parser.py"),
+        "Windows user home",
+        "C:\\Users\\Tecan\\",
+    ),
 }
 
 PATTERNS = (
@@ -45,7 +66,7 @@ def main() -> int:
     violations: list[str] = []
 
     for relative_path in tracked_paths():
-        if relative_path in ALLOWLIST:
+        if relative_path == SELF:
             continue
 
         path = ROOT / relative_path
@@ -62,8 +83,11 @@ def main() -> int:
 
         for label, pattern in PATTERNS:
             for match in pattern.finditer(normalized):
+                matched_text = match.group(0)
+                if (relative_path, label, matched_text) in ALLOWED_MATCHES:
+                    continue
                 violations.append(
-                    f"{relative_path}:{line_number(normalized, match.start())}: {label}: {match.group(0)!r}"
+                    f"{relative_path}:{line_number(normalized, match.start())}: {label}: {matched_text!r}"
                 )
 
     if not violations:
@@ -74,7 +98,7 @@ def main() -> int:
     for violation in violations:
         print(f"  {violation}", file=sys.stderr)
     print(
-        "Remove generated state, use repository-relative/deterministic paths, or add a narrowly scoped allowlist entry for an intentional sanitization fixture.",
+        "Remove generated state, use repository-relative/deterministic paths, or add a narrowly scoped exact exception for an intentional test fixture.",
         file=sys.stderr,
     )
     return 1
