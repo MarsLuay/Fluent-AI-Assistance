@@ -40,3 +40,9 @@ source/04-protocol-simulator/dist/models/fluent/*.glb
 source/04-protocol-simulator/dist/models/fluent/manifest.json
 venv/
 mock_install/
+
+# Local/generated agent state and protocol smoke output
+.agent-state/
+source/03-protocol-builder/ready-to-import/*
+!source/03-protocol-builder/ready-to-import/README.md
+**/AGENTS.details/manifest.json
