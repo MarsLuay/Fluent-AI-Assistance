@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .command_registry import registry_manual_step, registry_pattern_type
-from .common import to_jsonable
+from .common import _connect, _connection_arg, to_jsonable
 from .project_index import DEFAULT_INDEX_PATH
 
 PATTERN_SCHEMA_VERSION = "1"
@@ -266,23 +266,6 @@ def classify_command_pattern(command: dict[str, Any]) -> list[str]:
     ):
         matches.append("initialize_device")
     return matches
-
-
-def _connect(path: str | Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(path)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
-
-
-def _connection_arg(
-    value: str | Path | sqlite3.Connection,
-) -> tuple[sqlite3.Connection, bool, str]:
-    if isinstance(value, sqlite3.Connection):
-        value.row_factory = sqlite3.Row
-        return value, False, ""
-    path = Path(value)
-    return _connect(path), True, str(path)
 
 
 def _initialize_pattern_tables(conn: sqlite3.Connection) -> None:
