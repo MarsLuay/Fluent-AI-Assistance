@@ -471,7 +471,12 @@ def stop_existing_server(port: int) -> bool:
                         "-ExecutionPolicy",
                         "Bypass",
                         "-Command",
-                        f"Stop-Process -Id {pid} -Force -ErrorAction SilentlyContinue",
+                        "Stop-Process",
+                        "-Id",
+                        pid,
+                        "-Force",
+                        "-ErrorAction",
+                        "SilentlyContinue",
                     ],
                     check=False,
                 )

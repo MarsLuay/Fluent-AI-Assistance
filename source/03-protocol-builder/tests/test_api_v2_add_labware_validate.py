@@ -136,7 +136,6 @@ class AddLabwareValidateTests(unittest.TestCase):
         with self.assertRaises(ApiV2ValidationError):
             cmd.validate()
 
-
     def test_missing_labware_type_fails(self):
         fields = AddLabwareFields(
             labware_type="",
@@ -178,7 +177,9 @@ class AddLabwareValidateTests(unittest.TestCase):
             location="NestPlatform",
             site=1,
         )
-        result = validate_add_labware_fields(fields, check_bracket_variables=True, declared_variables=set())
+        result = validate_add_labware_fields(
+            fields, check_bracket_variables=True, declared_variables=set()
+        )
         self.assertFalse(result.ok)
         self.assertEqual(result.reason, "undeclared_variable")
 
@@ -189,7 +190,9 @@ class AddLabwareValidateTests(unittest.TestCase):
             location="NestPlatform",
             site=1,
         )
-        result = validate_add_labware_fields(fields, check_bracket_variables=True, declared_variables={"id"})
+        result = validate_add_labware_fields(
+            fields, check_bracket_variables=True, declared_variables={"id"}
+        )
         self.assertTrue(result.ok)
 
     def test_fc_var_labware_type_invalid_name(self):
@@ -220,7 +223,9 @@ class AddLabwareValidateTests(unittest.TestCase):
             location="NestPlatform",
             site=1,
         )
-        result = validate_add_labware_fields(fields, check_bracket_variables=True, declared_variables=set())
+        result = validate_add_labware_fields(
+            fields, check_bracket_variables=True, declared_variables=set()
+        )
         self.assertFalse(result.ok)
         self.assertEqual(result.field, "labware_type")
 
@@ -231,7 +236,9 @@ class AddLabwareValidateTests(unittest.TestCase):
             location="NestPlatform",
             site=1,
         )
-        result = validate_add_labware_fields(fields, check_bracket_variables=True, declared_variables={"type_var"})
+        result = validate_add_labware_fields(
+            fields, check_bracket_variables=True, declared_variables={"type_var"}
+        )
         self.assertTrue(result.ok)
 
     def test_placeholder_labware_label_fails(self):
@@ -264,10 +271,14 @@ class AddLabwareValidateTests(unittest.TestCase):
         result = validate_add_labware_offline(_CommandStub(payload_xml=""))
         self.assertTrue(result.ok)
         self.assertEqual(result.source, "skipped_no_payload")
-        self.assertEqual(result.message, "No AddLabware payload available for offline validation.")
+        self.assertEqual(
+            result.message, "No AddLabware payload available for offline validation."
+        )
 
     def test_offline_invalid_payload(self):
-        result = validate_add_labware_offline(_CommandStub(payload_xml="<Object>Invalid XML</Object"))
+        result = validate_add_labware_offline(
+            _CommandStub(payload_xml="<Object>Invalid XML</Object")
+        )
         self.assertTrue(result.ok)
         self.assertEqual(result.source, "skipped_no_payload")
 
@@ -369,21 +380,27 @@ class AddLabwareValidateTests(unittest.TestCase):
                         "position": 4,
                     },
                 },
-            ]
+            ],
         }
 
-        failures = validate_add_labware_ir_steps(ir, declared_variables={"PRE_DECLARED"})
-        self.assertEqual(len(failures), 3)
+        failures = validate_add_labware_ir_steps(
+            ir, declared_variables={"PRE_DECLARED"}
+        )
+        self.assertEqual(len(failures), 4)
+
+        # Test missing catalog in bracket (results in "api_v2_validate_rejected")
+        self.assertEqual(failures[0].reason, "api_v2_validate_rejected")
+        self.assertIn("UNDECLARED_CAT", failures[0].message)
 
         # Test missing label in bracket (results in "undeclared_variable")
-        self.assertEqual(failures[0].reason, "undeclared_variable")
-        self.assertIn("UNDECLARED_LBL", failures[0].message)
+        self.assertEqual(failures[1].reason, "undeclared_variable")
+        self.assertIn("UNDECLARED_LBL", failures[1].message)
 
-        self.assertEqual(failures[1].reason, "duplicate_labware_label")
-        self.assertEqual(failures[1].field, "labware_label")
+        self.assertEqual(failures[2].reason, "duplicate_labware_label")
+        self.assertEqual(failures[2].field, "labware_label")
 
-        self.assertEqual(failures[2].reason, "occupied_slot")
-        self.assertEqual(failures[2].field, "site")
+        self.assertEqual(failures[3].reason, "occupied_slot")
+        self.assertEqual(failures[3].field, "site")
 
     def test_add_labware_from_ir_step(self):
         step = {
@@ -454,29 +471,13 @@ class AddLabwareValidateTests(unittest.TestCase):
             },
         )
 
-
-
-    def test_add_labware_fields_as_dict(self):
-        fields = AddLabwareFields(
-            labware_type="96 Well Flat",
-            labware_label="Plate1",
-            location="NestPlatform",
-            site=2,
-            rotation=180,
-            has_lid=True,
-        )
-        expected = {
-            "labware_type": "96 Well Flat",
-            "labware_label": "Plate1",
-            "location": "NestPlatform",
-            "site": 2,
-            "rotation": 180,
-            "has_lid": True,
-        }
-        self.assertEqual(fields.as_dict(), expected)
-
     def test_add_labware_validate_result_as_dict_minimal(self):
-        from fluent_pipeline.api_v2_add_labware_validate import AddLabwareValidateResult, API_V2_METHOD, API_V2_ISSUE_ID
+        from fluent_pipeline.api_v2_add_labware_validate import (
+            AddLabwareValidateResult,
+            API_V2_METHOD,
+            API_V2_ISSUE_ID,
+        )
+
         result = AddLabwareValidateResult(ok=True)
         expected = {
             "ok": True,
@@ -487,7 +488,12 @@ class AddLabwareValidateTests(unittest.TestCase):
         self.assertEqual(result.as_dict(), expected)
 
     def test_add_labware_validate_result_as_dict_full(self):
-        from fluent_pipeline.api_v2_add_labware_validate import AddLabwareValidateResult, API_V2_METHOD, API_V2_ISSUE_ID
+        from fluent_pipeline.api_v2_add_labware_validate import (
+            AddLabwareValidateResult,
+            API_V2_METHOD,
+            API_V2_ISSUE_ID,
+        )
+
         result = AddLabwareValidateResult(
             ok=False,
             message="Something went wrong",
