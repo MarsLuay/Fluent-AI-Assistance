@@ -101,28 +101,3 @@ def resolve_user_path(value: str | Path, *, base: Path | None = None) -> Path:
     if not path.is_absolute():
         path = (base or Path.cwd()) / path
     return path.resolve()
-
-
-def obsidian_vault_root(*, start: Path | None = None) -> Path | None:
-    """Best-effort Obsidian vault root (directory containing ``.obsidian`` or ``Home.md``)."""
-    seeds = [start, TECAN_AI_DIR, TECAN_AI_DIR.parent, Path.cwd()]
-    seen: set[str] = set()
-    for seed in seeds:
-        if seed is None:
-            continue
-        path = seed.expanduser().resolve()
-        for candidate in [path, *path.parents]:
-            key = str(candidate)
-            if key in seen:
-                continue
-            seen.add(key)
-            if (candidate / ".obsidian").exists() or (candidate / "Home.md").exists():
-                return candidate
-    return None
-
-
-def discover_vault_root_zeia(*, start: Path | None = None) -> Path | None:
-    """Return the newest ``*.zeia`` in the Obsidian vault root, if any."""
-    vault = obsidian_vault_root(start=start) or (start or Path.cwd()).resolve()
-    zeias = sorted(vault.glob("*.zeia"), key=lambda item: item.stat().st_mtime, reverse=True)
-    return zeias[0] if zeias else None
