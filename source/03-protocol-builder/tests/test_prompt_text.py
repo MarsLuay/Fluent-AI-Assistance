@@ -27,7 +27,7 @@ class PromptTextPolicyTests(unittest.TestCase):
         self.assertTrue(prompt_has_media_boilerplate(prompt))
 
     def test_prompt_text_is_placeholder_uses_shared_token_list(self):
-        for text in ("TODO", "n/a", "<fill in>", "..."):
+        for text in ("tbd", "n/a", "<fill in>", "..."):
             with self.subTest(text=text):
                 self.assertTrue(prompt_text_is_placeholder(text))
 
