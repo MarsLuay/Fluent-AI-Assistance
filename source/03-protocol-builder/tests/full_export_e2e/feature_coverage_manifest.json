@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "name": "full-export-feature-coverage",
+  "issue": "https://github.com/MarsLuay/Fluent-AI-Assistance/issues/136",
+  "hardware_readiness_claim": false,
+  "privacy": {
+    "classification": "synthetic_public",
+    "contains_private_goldens": false
+  },
+  "fixture": {
+    "kind": "synthetic_zeia_recipe",
+    "path": "tests/fixtures/full_export_e2e/complete.zeia.json",
+    "immutable": true
+  },
+  "default_test_groups": {
+    "cli": ["test_cli_entry_points_against_full_export"],
+    "mcp": ["test_mcp_tools_against_full_export"],
+    "stage": ["test_full_export_workflow_completes"],
+    "reader": ["test_project_reader_against_full_export"],
+    "worklist": ["test_worklist_builder_against_full_export"],
+    "pipeline": ["test_full_export_workflow_completes"],
+    "workflow": ["test_full_export_workflow_completes"]
+  },
+  "feature_overrides": {
+    "cli.generate": {
+      "tests": ["test_full_export_workflow_completes", "test_cli_entry_points_against_full_export"]
+    },
+    "cli.import-project": {
+      "tests": ["test_full_export_workflow_completes", "test_cli_entry_points_against_full_export"]
+    },
+    "cli.clear-project": {
+      "tests": ["test_cli_project_lifecycle"]
+    },
+    "cli.create-collection": {
+      "tests": ["test_cli_project_lifecycle"]
+    },
+    "cli.collection-info": {
+      "tests": ["test_cli_project_lifecycle"]
+    },
+    "mcp.fluent_generate_protocol": {
+      "tests": ["test_full_export_workflow_completes", "test_mcp_tools_against_full_export"]
+    },
+    "cli.setup": {
+      "tests": ["test_environment_mutating_commands_stay_opt_in"],
+      "coverage": "declared_gap",
+      "gap_reason": "setup creates a local venv and installs packages; it is not an offline full-export pipeline stage."
+    },
+    "cli.launch-simulator": {
+      "tests": ["test_launch_simulator_rejects_missing_bundle"],
+      "coverage": "full_export_fail_closed",
+      "gap_reason": "The live Vite/npm simulator process is not started in pytest. Missing-bundle fail-closed is exercised; the web-simulator CI job covers the UI app."
+    },
+    "cli.fluent-prepare-check": {
+      "tests": ["test_environment_mutating_commands_stay_opt_in"],
+      "coverage": "declared_gap",
+      "gap_reason": "Requires attaching FluentControl in simulation mode on a host instrument install."
+    },
+    "stage.fluent_context_check": {
+      "tests": ["test_full_export_workflow_completes"],
+      "coverage": "declared_gap",
+      "gap_reason": "Optional live FluentControl import/load diagnostic remains disabled in the offline suite (fluent_context_check=false)."
+    },
+    "mcp.fluent_run_opt_in_cli": {
+      "tests": ["test_environment_mutating_commands_stay_opt_in"],
+      "coverage": "declared_gap",
+      "gap_reason": "Opt-in MCP execution of compile/simulate/setup/launch is server-environment gated and is not enabled for the offline suite."
+    },
+    "pipeline.gripper_state": {
+      "tests": ["test_feature_coverage_gaps_are_explicit"],
+      "coverage": "declared_gap",
+      "gap_reason": "The synthetic full-export fixture has no CGA/RGA gripper commands; covering gripper state from this fixture would be a silent synthetic success path."
+    }
+  },
+  "pipeline_features": [
+    {
+      "id": "pipeline.export_parsing",
+      "tests": ["test_full_export_workflow_completes", "test_project_reader_against_full_export"]
+    },
+    {
+      "id": "pipeline.script_inspection",
+      "tests": ["test_full_export_workflow_completes", "test_cli_entry_points_against_full_export"]
+    },
+    {
+      "id": "pipeline.worktable_inspection",
+      "tests": ["test_full_export_workflow_completes"]
+    },
+    {
+      "id": "pipeline.dependency_resolution",
+      "tests": ["test_full_export_workflow_completes"]
+    },
+    {
+      "id": "pipeline.labware_handling",
+      "tests": ["test_full_export_workflow_completes"]
+    },
+    {
+      "id": "pipeline.liquid_class_handling",
+      "tests": ["test_full_export_workflow_completes"]
+    },
+    {
+      "id": "pipeline.worklist_handling",
+      "tests": ["test_worklist_builder_against_full_export"]
+    },
+    {
+      "id": "pipeline.project_index_catalog",
+      "tests": ["test_project_reader_against_full_export", "test_cli_entry_points_against_full_export"]
+    },
+    {
+      "id": "pipeline.pattern_library",
+      "tests": ["test_project_reader_against_full_export"]
+    },
+    {
+      "id": "pipeline.request_spec",
+      "tests": ["test_full_export_workflow_completes", "test_full_export_negative_paths"]
+    },
+    {
+      "id": "pipeline.protocol_ir",
+      "tests": ["test_full_export_workflow_completes", "test_full_export_negative_paths"]
+    },
+    {
+      "id": "pipeline.python_generation",
+      "tests": ["test_full_export_workflow_completes"]
+    },
+    {
+      "id": "pipeline.control_flow_generation",
+      "tests": ["test_full_export_workflow_completes"]
+    },
+    {
+      "id": "pipeline.variable_declarations",
+      "tests": ["test_full_export_workflow_completes"]
+    },
+    {
+      "id": "pipeline.command_generation",
+      "tests": ["test_full_export_workflow_completes"]
+    },
+    {
+      "id": "pipeline.simulator",
+      "tests": ["test_full_export_workflow_completes"]
+    },
+    {
+      "id": "pipeline.deck_geometry_validation",
+      "tests": ["test_full_export_workflow_completes"]
+    },
+    {
+      "id": "pipeline.repair",
+      "tests": ["test_full_export_workflow_completes"]
+    },
+    {
+      "id": "pipeline.xscr_compile_reinspect",
+      "tests": ["test_full_export_workflow_completes"]
+    },
+    {
+      "id": "pipeline.archive_validation",
+      "tests": ["test_full_export_workflow_completes"]
+    },
+    {
+      "id": "pipeline.command_inventory",
+      "tests": ["test_full_export_workflow_completes"]
+    },
+    {
+      "id": "pipeline.checksum_integrity",
+      "tests": ["test_full_export_workflow_completes"]
+    },
+    {
+      "id": "pipeline.validation_diff",
+      "tests": ["test_full_export_workflow_completes"]
+    },
+    {
+      "id": "pipeline.ready_to_import",
+      "tests": ["test_full_export_workflow_completes"]
+    },
+    {
+      "id": "pipeline.negative_paths",
+      "tests": ["test_full_export_negative_paths"]
+    },
+    {
+      "id": "pipeline.offline_not_hardware_ready",
+      "tests": ["test_offline_suite_does_not_claim_hardware_readiness"]
+    },
+    {
+      "id": "pipeline.gripper_state",
+      "tests": ["test_feature_coverage_gaps_are_explicit"],
+      "coverage": "declared_gap",
+      "gap_reason": "The synthetic full-export fixture has no CGA/RGA gripper commands; covering gripper state from this fixture would be a silent synthetic success path."
+    }
+  ]
+}

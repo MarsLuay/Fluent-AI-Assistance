@@ -43,3 +43,9 @@ python3 -m pytest tests/test_verification_v12_golden_regression.py -q
 ```
 
 Public clones run helper unit tests only; the private golden class skips.
+
+## Full-export E2E recipe
+
+`full_export_e2e/` holds a synthetic complete-export *recipe* used by
+`tests/test_full_export_e2e.py`. Tests copy it into temporary workspaces and
+must not modify the canonical files. Do not commit a materialized `.zeia`.

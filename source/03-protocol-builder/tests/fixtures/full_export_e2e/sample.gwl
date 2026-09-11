@@ -1,0 +1,8 @@
+C;Synthetic 2-well transfer
+A;Demo_Source;;Synthetic_Plate_Type;1;;20;Synthetic_Water_LC;;;
+D;Demo_Destination;;Synthetic_Plate_Type;1;;20;Synthetic_Water_LC;;;
+W;
+A;Demo_Source;;Synthetic_Plate_Type;2;;20;Synthetic_Water_LC;;;
+D;Demo_Destination;;Synthetic_Plate_Type;2;;20;Synthetic_Water_LC;;;
+W;
+B;
