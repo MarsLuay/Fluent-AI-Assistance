@@ -128,7 +128,7 @@ class AddLabwareValidateTests(unittest.TestCase):
 
     def test_placeholder_catalog_fails(self):
         cmd = AddLabware(
-            labware_type="TODO",
+            labware_type="TBD",
             labware_label="Plate1",
             location="NestPlatform",
             site=1,
@@ -244,7 +244,7 @@ class AddLabwareValidateTests(unittest.TestCase):
     def test_placeholder_labware_label_fails(self):
         fields = AddLabwareFields(
             labware_type="96 Well Flat",
-            labware_label="TODO",
+            labware_label="TBD",
             location="NestPlatform",
             site=1,
         )
@@ -334,7 +334,7 @@ class AddLabwareValidateTests(unittest.TestCase):
                     "id": "step_002",
                     "operation": "add_labware",
                     "parameters": {
-                        "catalog": "[UNDECLARED_CAT]",
+                        "catalog": "96 Well Flat",
                         "label": "Plate2",
                         "location": "NestPlatform",
                         "position": 2,
@@ -416,7 +416,7 @@ class AddLabwareValidateTests(unittest.TestCase):
         self.assertIsInstance(cmd, AddLabware)
         cmd.validate()
 
-    def test_add_labware_fields_as_dict(self):
+    def test_add_labware_fields_as_dict_alt(self):
         fields = AddLabwareFields(
             labware_type="96 Well Flat",
             labware_label="Plate1",
