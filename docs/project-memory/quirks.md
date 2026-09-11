@@ -12,3 +12,7 @@
   the installed `protocol-builder` script; the MCP server is `tecan-ai-mcp`.
 - The worklist and project-reader packages expose separate CLI entrypoints and
   depend on the shared package rather than duplicating its helpers.
+- The full-export E2E suite uses a synthetic complete ZEIA recipe under
+  `tests/fixtures/full_export_e2e/`. It is not a lab template. Private goldens
+  stay opt-in outside git. Gripper/CGA state is an explicit coverage gap on
+  that fixture rather than a silent synthetic success.

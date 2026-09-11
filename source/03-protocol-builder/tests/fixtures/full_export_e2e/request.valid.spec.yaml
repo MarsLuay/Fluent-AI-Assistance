@@ -1,0 +1,20 @@
+schema_version: tecan.request_spec.v1
+request:
+  intent: Inspect the synthetic DemoScript transfer without claiming hardware readiness.
+  verbatim_prompt: Inspect the synthetic DemoScript transfer without claiming hardware readiness.
+  protocol_name: DemoScript_FullExportE2E
+  status: reviewed
+source:
+  contexts:
+    - name: full-export-e2e
+  source_scripts:
+    - full-export-e2e:DemoScript
+generation:
+  simulate: true
+  compile_xscr: true
+  approve_partial_zeia: false
+review: {}
+acceptance:
+  required_checks:
+    - Preserve synthetic source provenance.
+    - Do not claim Script Editor or hardware readiness.

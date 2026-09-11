@@ -1,0 +1,31 @@
+{
+  "schema_version": "tecan.synthetic_zeia_recipe.v1",
+  "archive_name": "synthetic_complete.zeia",
+  "classification": "synthetic_public",
+  "entries": [
+    {
+      "archive_path": "Scripts/DemoScript.xscr",
+      "source": "tests/fixtures/full_export_e2e/DemoScript.xscr"
+    },
+    {
+      "archive_path": "Worktables/WT_Demo.xwsp",
+      "source": "tests/fixtures/full_export_e2e/WT_Demo.xwsp"
+    },
+    {
+      "archive_path": "LiquidClasses/synthetic_water.xlqc",
+      "source": "tests/fixtures/full_export_e2e/synthetic_water.xlqc"
+    },
+    {
+      "archive_path": "LiquidClasses/synthetic_wash.xlqc",
+      "source": "tests/fixtures/full_export_e2e/synthetic_wash.xlqc"
+    },
+    {
+      "archive_path": "Sites/demo_nest.xsit",
+      "source": "tests/fixtures/full_export_e2e/demo_nest.xsit"
+    },
+    {
+      "archive_path": "Worklists/sample.gwl",
+      "source": "tests/fixtures/full_export_e2e/sample.gwl"
+    }
+  ]
+}

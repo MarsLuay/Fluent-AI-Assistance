@@ -3,7 +3,7 @@
 Project ID/key: `fluent-ai-assistance`  
 Schema version: `1`
 
-The JSON ledger is canonical; this Markdown view mirrors the same four task
+The JSON ledger is canonical; this Markdown view mirrors the same task
 records and their verified routing metadata.
 
 ## Tasks
@@ -118,3 +118,31 @@ Invariants:
 - Keep generated handoff and host-derived assets outside canonical source edits.
 
 Tests/checks: `project-reader`, `worklist-builder`, `launch-simulator`.
+
+### `full-export-e2e-coverage` — Keep full-export end-to-end coverage mapped to every live surface
+
+Summary: Use the synthetic complete ZEIA recipe and feature coverage manifest so
+every CLI, MCP, generation-stage, reader, and worklist surface has a mapped
+offline full-export test or an explicit gap reason.
+
+Task paths:
+
+- `source/03-protocol-builder/tests/test_full_export_e2e.py`
+- `source/03-protocol-builder/tests/test_feature_coverage_manifest.py`
+- `source/03-protocol-builder/tests/full_export_e2e/feature_coverage_manifest.json`
+- `source/03-protocol-builder/tests/fixtures/full_export_e2e/complete.zeia.json`
+
+Required reads:
+
+- `AGENTS.md`
+- `source/03-protocol-builder/tests/fixtures/README.md`
+- `docs/project-memory/architecture.md`
+
+Invariants:
+
+- The committed full-export fixture is a synthetic recipe, not a lab template.
+- CI fails when a live CLI, MCP, or generation-stage surface has no mapped test.
+- Passing the suite does not claim Script Editor or hardware readiness.
+
+Tests/checks: `pytest source/03-protocol-builder/tests/test_feature_coverage_manifest.py`,
+`pytest source/03-protocol-builder/tests/test_full_export_e2e.py`.

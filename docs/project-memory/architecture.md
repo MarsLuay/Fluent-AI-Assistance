@@ -34,3 +34,10 @@ The generation flow is evidence-first: imported project data and shared
 registries supply contracts, then request specs and protocol IR feed rendering,
 validation, and packaging. Generated outputs and host-derived assets are not
 canonical source files for hand edits.
+
+Offline full-export end-to-end coverage lives in
+`source/03-protocol-builder/tests/test_full_export_e2e.py` plus
+`tests/full_export_e2e/feature_coverage_manifest.json`. The suite materializes
+a synthetic complete ZEIA from an immutable recipe, walks import through
+ready-to-import packaging, and fails CI when a live CLI/MCP/stage surface has
+no mapped test. Passing it does not mean Script Editor or hardware readiness.
