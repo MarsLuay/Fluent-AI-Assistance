@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import importlib.util
 import io
 import json
 import re
@@ -30,6 +31,8 @@ for _sibling in ("00-shared", "01-project-reader", "02-worklist-builder"):
         sys.path.insert(0, _sibling_path)
 FIXTURE_DIR = PROTOCOL_ROOT / "tests" / "fixtures" / "full_export_e2e"
 RECIPE_PATH = FIXTURE_DIR / "complete.zeia.json"
+COMPATIBILITY_DIR = SOURCE_ROOT / "01-project-reader" / "tests" / "fixtures" / "zeia_compatibility"
+COMPATIBILITY_MANIFEST_PATH = COMPATIBILITY_DIR / "compatibility_manifest.json"
 MANIFEST_PATH = PROTOCOL_ROOT / "tests" / "full_export_e2e" / "feature_coverage_manifest.json"
 ZEIA_RECIPE_SCHEMA_VERSION = "tecan.synthetic_zeia_recipe.v1"
 FIXED_ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
@@ -80,6 +83,25 @@ def materialize_complete_zeia(output_dir: Path, recipe_path: Path = RECIPE_PATH)
             info.external_attr = 0o100644 << 16
             zf.writestr(info, source.read_bytes())
     return archive
+
+
+def materialize_compatibility_zeia(
+    output_dir: Path,
+    variant_id: str = "structured-legacy",
+) -> Path:
+    """Materialize one compatibility-matrix fixture through its shared helper."""
+    manifest = json.loads(COMPATIBILITY_MANIFEST_PATH.read_text(encoding="utf-8"))
+    rows = {str(row["variant_id"]): row for row in manifest.get("variants") or []}
+    row = rows.get(variant_id)
+    if row is None or not row.get("representative_fixture"):
+        raise ValueError(f"no supported compatibility representative: {variant_id!r}")
+    support_path = SOURCE_ROOT / "01-project-reader" / "tests" / "compatibility_matrix_support.py"
+    spec = importlib.util.spec_from_file_location("zeia_compatibility_matrix_support", support_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"could not load compatibility fixture support: {support_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.materialize_recipe(COMPATIBILITY_DIR / row["representative_fixture"], output_dir)
 
 
 def copy_archive(archive: Path, destination: Path) -> Path:

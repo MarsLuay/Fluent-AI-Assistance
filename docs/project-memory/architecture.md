@@ -41,3 +41,10 @@ Offline full-export end-to-end coverage lives in
 a synthetic complete ZEIA from an immutable recipe, walks import through
 ready-to-import packaging, and fails CI when a live CLI/MCP/stage surface has
 no mapped test. Passing it does not mean Script Editor or hardware readiness.
+
+Cross-variant ZEIA compatibility is contract-tested by the fixture matrix at
+`source/01-project-reader/tests/fixtures/zeia_compatibility/`. Its manifest
+maps supported structural adapters to deterministic detection, canonical
+normalization/index goldens, negative neighbors, malformed/dependency cases,
+and a multi-archive folder scenario. Matrix recipes are sanitized synthetic
+schema evidence only; they do not claim a FluentControl release.

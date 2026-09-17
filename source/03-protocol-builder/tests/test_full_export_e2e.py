@@ -16,6 +16,7 @@ from full_export_e2e.harness import (
     isolated_pipeline_home,
     live_cli_commands,
     materialize_complete_zeia,
+    materialize_compatibility_zeia,
     resolved_features,
     run_cli,
 )
@@ -197,6 +198,43 @@ def test_full_export_workflow_completes(full_export_env: dict) -> None:
     assert RECIPE_PATH.exists()
     # Canonical fixture is unchanged by materialization.
     assert RECIPE_PATH.stat().st_mtime_ns
+
+
+def test_compatibility_matrix_representative_runs_through_full_export_e2e(tmp_path: Path) -> None:
+    context_name = "compatibility-matrix-e2e"
+    with isolated_pipeline_home(tmp_path) as paths:
+        archive = materialize_compatibility_zeia(tmp_path / "inputs")
+        imported = run_cli(
+            ["import-project", str(archive), "--name", context_name, "--force", "--activate"]
+        )
+        assert imported["code"] == 0, imported
+        context_root = paths["ready"] / context_name / "temp_files"
+        project_manifest = json.loads((context_root / "manifest.json").read_text(encoding="utf-8"))
+        canonical = project_manifest.get("canonical_model") or {}
+        assert canonical.get("schema_version") == "tecan.canonical_project.v1", project_manifest
+        assert canonical.get("adapter_id") == "structured-zeia", project_manifest
+        assert (canonical.get("detection") or {}).get("status") == "supported", project_manifest
+        assert len(project_manifest.get("scripts") or []) >= 2, project_manifest
+        out_dir = context_root / "generate-e2e"
+        generated = run_cli(
+            [
+                "generate",
+                WORKFLOW_INTENT,
+                "--context",
+                context_name,
+                "--source-script",
+                "DemoScript",
+                "--protocol-name",
+                "DemoScript_CompatibilityMatrixE2E",
+                "--out-dir",
+                str(out_dir),
+                "--progress",
+                "none",
+                "--no-event-log",
+            ]
+        )
+        assert generated["code"] in {0, 1}, generated
+        assert (out_dir / "generation_manifest.json").is_file(), generated
 
 
 def test_cli_entry_points_against_full_export(full_export_env: dict) -> None:

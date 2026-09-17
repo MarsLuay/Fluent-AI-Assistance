@@ -1,0 +1,26 @@
+{
+  "adapter_id": "visionx-datastore",
+  "detection": {
+    "format_family": "visionx-datastore",
+    "selected_adapter": "visionx-datastore",
+    "status": "supported"
+  },
+  "counts": {
+    "objects": 6,
+    "scripts": 2,
+    "worklists": 1
+  },
+  "names": {
+    "objects": [
+      "Demo_Nest_Pos",
+      "Synthetic_Wash_LC",
+      "Synthetic_Water_LC",
+      "Unicode Ω Component",
+      "WT_Demo",
+      "custom.png"
+    ],
+    "scripts": ["DemoScript", "Unicode Ω Script"],
+    "worklists": ["Worklists/sample.gwl"]
+  },
+  "schema_version": "tecan.canonical_project.v1"
+}

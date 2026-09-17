@@ -1,0 +1,20 @@
+{
+  "schema_version": "tecan.compatibility_recipe.v1",
+  "archive_name": "visionx-namespace-representative.zeia",
+  "source_recipe": "source/03-protocol-builder/tests/fixtures/full_export_e2e/complete.zeia.json",
+  "xml_transform": {"namespace": true},
+  "extra_entries": [
+    {
+      "archive_path": "Scripts/Unicode_Ω.xscr",
+      "content": "<?xml version=\"1.0\"?><VxData><Payload><ObjectName>Unicode Ω Script</ObjectName><Script version=\"3.0\" /><VariableDeclarations /></Payload></VxData>"
+    },
+    {
+      "archive_path": "DataStore/SystemSpecific/Worktable/Components/unicode-custom.xcmp",
+      "content": "<?xml version=\"1.0\"?><VxData><Payload><ObjectName>Unicode Ω Component</ObjectName><TypeId>Custom.Part.V1</TypeId><Image>custom.png</Image><FutureField>additive-value</FutureField></Payload></VxData>"
+    },
+    {
+      "archive_path": "DataStore/SystemSpecific/Assets/custom.png",
+      "content_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    }
+  ]
+}

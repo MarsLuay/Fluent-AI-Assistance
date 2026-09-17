@@ -45,6 +45,8 @@ class ZeiaAdapterTests(unittest.TestCase):
             visionx_model = ingest_zeia(visionx)
 
         self.assertEqual(legacy_model.schema_version, visionx_model.schema_version)
+        self.assertEqual(legacy_model.adapter_id, "structured-zeia")
+        self.assertEqual(visionx_model.adapter_id, "visionx-datastore-v3")
         self.assertEqual(set(legacy_model.scripts[0]), set(visionx_model.scripts[0]))
         self.assertEqual(legacy_model.scripts[0]["kind"], "script")
         self.assertEqual(visionx_model.scripts[0]["kind"], "script")
@@ -56,6 +58,28 @@ class ZeiaAdapterTests(unittest.TestCase):
             legacy_model.scripts[0]["provenance"]["entry_path"],
             "Scripts/main.xscr",
         )
+
+    def test_versioned_visionx_variants_are_selected_deterministically(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            v2 = self._archive(
+                root,
+                "visionx-v2.zeia",
+                {"DataStore/v2.xscr": '<VxData dataStoreVersion="2"><ObjectName>Two</ObjectName><Script /></VxData>'},
+            )
+            v3 = self._archive(
+                root,
+                "visionx-v3.zeia",
+                {"DataStore/v3.xscr": '<VxData dataStoreVersion="3"><ObjectName>Three</ObjectName><Script /></VxData>'},
+            )
+
+            v2_detection = probe_zeia(v2)
+            v3_detection = probe_zeia(v3)
+
+        self.assertEqual(v2_detection.status, "supported")
+        self.assertEqual(v2_detection.selected.adapter_id, "visionx-datastore-v2")
+        self.assertEqual(v3_detection.status, "supported")
+        self.assertEqual(v3_detection.selected.adapter_id, "visionx-datastore-v3")
 
     def test_worklists_are_canonical_entities(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

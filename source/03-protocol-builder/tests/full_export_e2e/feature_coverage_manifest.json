@@ -2,6 +2,7 @@
   "schema_version": 1,
   "name": "full-export-feature-coverage",
   "issue": "https://github.com/MarsLuay/Fluent-AI-Assistance/issues/136",
+  "related_issue": "https://github.com/MarsLuay/Fluent-AI-Assistance/issues/139",
   "hardware_readiness_claim": false,
   "privacy": {
     "classification": "synthetic_public",
@@ -11,6 +12,11 @@
     "kind": "synthetic_zeia_recipe",
     "path": "tests/fixtures/full_export_e2e/complete.zeia.json",
     "immutable": true
+  },
+  "compatibility_matrix": {
+    "kind": "fixture_backed_zeia_compatibility_manifest",
+    "path": "../../01-project-reader/tests/fixtures/zeia_compatibility/compatibility_manifest.json",
+    "version_claims": "schema_evidence_only"
   },
   "default_test_groups": {
     "cli": ["test_cli_entry_points_against_full_export"],
@@ -74,11 +80,15 @@
   "pipeline_features": [
     {
       "id": "pipeline.export_parsing",
-      "tests": ["test_full_export_workflow_completes", "test_project_reader_against_full_export"]
+      "tests": ["test_full_export_workflow_completes", "test_project_reader_against_full_export", "test_compatibility_matrix_representative_runs_through_full_export_e2e"]
+    },
+    {
+      "id": "pipeline.zeia_compatibility_matrix",
+      "tests": ["test_compatibility_matrix_representative_runs_through_full_export_e2e"]
     },
     {
       "id": "pipeline.canonical_project_model",
-      "tests": ["test_full_export_workflow_completes", "test_project_reader_against_full_export"]
+      "tests": ["test_full_export_workflow_completes", "test_project_reader_against_full_export", "test_compatibility_matrix_representative_runs_through_full_export_e2e"]
     },
     {
       "id": "pipeline.script_inspection",
@@ -106,7 +116,7 @@
     },
     {
       "id": "pipeline.project_index_catalog",
-      "tests": ["test_project_reader_against_full_export", "test_cli_entry_points_against_full_export"]
+      "tests": ["test_project_reader_against_full_export", "test_cli_entry_points_against_full_export", "test_compatibility_matrix_representative_runs_through_full_export_e2e"]
     },
     {
       "id": "pipeline.pattern_library",
