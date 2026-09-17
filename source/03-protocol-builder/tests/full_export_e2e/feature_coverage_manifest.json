@@ -77,6 +77,10 @@
       "tests": ["test_full_export_workflow_completes", "test_project_reader_against_full_export"]
     },
     {
+      "id": "pipeline.canonical_project_model",
+      "tests": ["test_full_export_workflow_completes", "test_project_reader_against_full_export"]
+    },
+    {
       "id": "pipeline.script_inspection",
       "tests": ["test_full_export_workflow_completes", "test_cli_entry_points_against_full_export"]
     },

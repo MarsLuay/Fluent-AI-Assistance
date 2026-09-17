@@ -8,6 +8,7 @@ import fluent_pipeline.project_context as pc
 from fluent_pipeline.import_identity import build_source_import_identity
 from fluent_pipeline.provenance import policy_profile_sha256s, sha256_path
 from tecan_common.command_registry import command_registry_sha256
+from tecan_reader.zeia_adapters import ingest_zeia
 
 
 class ProjectContextTests(unittest.TestCase):
@@ -106,6 +107,9 @@ class ProjectContextTests(unittest.TestCase):
                 self.assertEqual(ctx.manifest["scripts"][0]["object_path"], "Demo")
                 self.assertEqual(ctx.manifest["scripts"][0]["references"][0]["object_subfolder_path"], "Demo")
                 self.assertEqual(len(ctx.manifest["workspaces"]), 1)
+                self.assertEqual(len(ctx.manifest["worklists"]), 1)
+                self.assertEqual(ctx.manifest["worklists"][0]["provenance"]["entry_path"], "Worklists/sample.gwl")
+                self.assertEqual(ctx.manifest["canonical_model"]["schema_version"], "tecan.canonical_project.v1")
                 self.assertEqual(ctx.manifest["liquid_classes"], ["Water Free Single"])
                 self.assertEqual(ctx.manifest["worklist_paths"], ["Worklists/sample.gwl"])
                 self.assertEqual(
@@ -1155,49 +1159,31 @@ _SAMPLE_XSCR_XML = """<?xml version="1.0"?>
 """
 
 
-class ScriptGuidCaptureTests(unittest.TestCase):
-    """A script's own Script GUID is its datastore entry filename stem."""
+class CanonicalScriptGuidTests(unittest.TestCase):
+    """Canonical ingestion preserves a script entry's source GUID."""
 
-    def test_entry_object_guid_extracts_guid_named_entries(self):
+    def _ingest(self, tmp, entry):
+        archive = Path(tmp) / "guid-test.zeia"
+        with zipfile.ZipFile(archive, "w") as source:
+            source.writestr(entry, _SAMPLE_XSCR_XML)
+        return ingest_zeia(archive).scripts[0]
+
+    def test_canonical_ingestion_extracts_guid_named_entries(self):
         guid = "fd461d1d-b4b4-52fe-abc8-6a030b971a29"
-        self.assertEqual(pc._entry_object_guid(f"DataStore/UserSpecific/{guid}.xscr"), guid)
-        self.assertEqual(pc._entry_object_guid(f"DataStore\\UserSpecific\\{guid}.xscr"), guid)
-
-    def test_entry_object_guid_ignores_non_guid_and_zero(self):
-        self.assertEqual(pc._entry_object_guid("source/original-sources/source_script_1.xscr"), "")
-        self.assertEqual(
-            pc._entry_object_guid("DataStore/00000000-0000-0000-0000-000000000000.xscr"), ""
-        )
-        self.assertEqual(pc._entry_object_guid(""), "")
-
-    def _write(self, tmp, name):
-        path = Path(tmp) / name
-        path.write_text(_SAMPLE_XSCR_XML, encoding="utf-8")
-        return path
-
-    def test_inspect_xscr_captures_own_guid(self):
-        guid = "11111111-2222-3333-4444-555555555555"
         with tempfile.TemporaryDirectory() as tmp:
-            entry = f"DataStore/UserSpecific/{guid}.xscr"
-            record = pc._inspect_xscr(self._write(tmp, f"{guid}.xscr"), entry, entry)
+            record = self._ingest(tmp, f"DataStore/UserSpecific/{guid}.xscr")
         self.assertEqual(record["guid"], guid)
-        self.assertEqual(record["script_guid"], guid)
-        self.assertIn(guid, record["guids"])
+        self.assertEqual(record["provenance"]["entry_path"], f"DataStore/UserSpecific/{guid}.xscr")
+        self.assertEqual(record["provenance"]["original_identifiers"]["guid"], guid)
 
-    def test_inspect_xscr_fast_captures_own_guid(self):
-        guid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    def test_canonical_ingestion_ignores_non_guid_and_zero(self):
         with tempfile.TemporaryDirectory() as tmp:
-            entry = f"DataStore/UserSpecific/{guid}.xscr"
-            record = pc._inspect_xscr_fast(self._write(tmp, f"{guid}.xscr"), entry, entry)
-        self.assertEqual(record["guid"], guid)
-        self.assertIn(guid, record["guids"])
-
-    def test_inspect_xscr_no_guid_for_named_entry(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            entry = "source/original-sources/source_script_1.xscr"
-            record = pc._inspect_xscr(self._write(tmp, "source_script_1.xscr"), entry, entry)
-        self.assertEqual(record["guid"], "")
-        self.assertEqual(record["guids"], [])
+            named = self._ingest(tmp, "source/original-sources/source_script_1.xscr")
+            zero = self._ingest(tmp, "DataStore/00000000-0000-0000-0000-000000000000.xscr")
+        self.assertEqual(named["guid"], "")
+        self.assertEqual(named["guids"], [])
+        self.assertEqual(zero["guid"], "")
+        self.assertNotIn("guid", zero["provenance"]["original_identifiers"])
 
 
 if __name__ == "__main__":
