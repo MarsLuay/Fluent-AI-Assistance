@@ -3,7 +3,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tecan_reader.project_index import discover_zeia_paths, search_project_index, _initialize_database
+from tecan_reader.project_index import (
+    _initialize_database,
+    discover_zeia_paths,
+    search_project_index,
+)
 
 
 class TestDiscoverZeiaPaths(unittest.TestCase):
@@ -63,6 +67,41 @@ class TestDiscoverZeiaPaths(unittest.TestCase):
         paths = discover_zeia_paths([self.file2, self.file1])
         expected = sorted([self.file1.resolve(), self.file2.resolve()], key=str)
         self.assertEqual(paths, expected)
+
+
+class TestIndexSchemaMigration(unittest.TestCase):
+    def test_existing_index_gets_completeness_column(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            database = Path(tmp) / "legacy.db"
+            conn = sqlite3.connect(database)
+            conn.execute("CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            conn.execute(
+                """CREATE TABLE zeia_files (
+                    id INTEGER PRIMARY KEY,
+                    path TEXT NOT NULL UNIQUE,
+                    file_name TEXT NOT NULL,
+                    sha256 TEXT NOT NULL,
+                    indexed_at TEXT NOT NULL,
+                    entry_count INTEGER NOT NULL DEFAULT 0,
+                    script_count_total INTEGER NOT NULL DEFAULT 0,
+                    script_count_summarized INTEGER NOT NULL DEFAULT 0,
+                    object_count_summarized INTEGER NOT NULL DEFAULT 0,
+                    gwl_count_summarized INTEGER NOT NULL DEFAULT 0,
+                    extension_counts_json TEXT NOT NULL DEFAULT '{}'
+                )"""
+            )
+
+            _initialize_database(conn)
+            columns = {
+                str(row[1]) for row in conn.execute("PRAGMA table_info(zeia_files)")
+            }
+            version = conn.execute(
+                "SELECT value FROM metadata WHERE key = 'schema_version'"
+            ).fetchone()[0]
+            conn.close()
+
+        self.assertIn("completeness_json", columns)
+        self.assertEqual(version, "2")
 
 
 class TestSearchProjectIndex(unittest.TestCase):

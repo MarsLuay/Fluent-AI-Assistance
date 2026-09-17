@@ -17,7 +17,7 @@ from .common import _connect, _connection_arg, to_jsonable
 from .project_model import CanonicalProjectModel
 from .zeia_adapters import ingest_zeia
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 SCHEMA_SQL = """
         CREATE TABLE IF NOT EXISTS metadata (
             key TEXT PRIMARY KEY,
@@ -35,7 +35,8 @@ SCHEMA_SQL = """
             script_count_summarized INTEGER NOT NULL DEFAULT 0,
             object_count_summarized INTEGER NOT NULL DEFAULT 0,
             gwl_count_summarized INTEGER NOT NULL DEFAULT 0,
-            extension_counts_json TEXT NOT NULL DEFAULT '{}'
+            extension_counts_json TEXT NOT NULL DEFAULT '{}',
+            completeness_json TEXT NOT NULL DEFAULT '{}'
         );
 
         CREATE TABLE IF NOT EXISTS scripts (
@@ -258,10 +259,16 @@ def summarize_project_index(
         files = [dict(row) for row in conn.execute("""
                 SELECT path, file_name, sha256, indexed_at, entry_count,
                        script_count_total, script_count_summarized,
-                       object_count_summarized, gwl_count_summarized
+                       object_count_summarized, gwl_count_summarized,
+                       completeness_json
                 FROM zeia_files
                 ORDER BY file_name, path
                 """)]
+        for file in files:
+            try:
+                file["completeness"] = json.loads(file.pop("completeness_json") or "{}")
+            except (TypeError, ValueError):
+                file["completeness"] = {}
         return {
             "kind": "project_index_summary",
             "database": database,
@@ -310,6 +317,13 @@ def search_project_index(
 
 def _initialize_database(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA_SQL)
+    columns = {
+        str(row[1]) for row in conn.execute("PRAGMA table_info(zeia_files)")
+    }
+    if "completeness_json" not in columns:
+        conn.execute(
+            "ALTER TABLE zeia_files ADD COLUMN completeness_json TEXT NOT NULL DEFAULT '{}'"
+        )
     conn.execute(
         "INSERT OR REPLACE INTO metadata(key, value) VALUES('schema_version', ?)",
         (SCHEMA_VERSION,),
@@ -346,9 +360,9 @@ def _index_archive(
             path, file_name, sha256, indexed_at, entry_count,
             script_count_total, script_count_summarized,
             object_count_summarized, gwl_count_summarized,
-            extension_counts_json
+            extension_counts_json, completeness_json
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             archive_path,
@@ -361,6 +375,7 @@ def _index_archive(
             int(view.get("object_count_summarized") or 0),
             int(view.get("gwl_count_summarized") or 0),
             _dump(view.get("extension_counts", {})),
+            _dump(view.get("completeness", {})),
         ),
     )
     zeia_id = int(cursor.lastrowid)
