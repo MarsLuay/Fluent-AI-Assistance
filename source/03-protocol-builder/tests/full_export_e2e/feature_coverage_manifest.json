@@ -177,6 +177,10 @@
       "tests": ["test_full_export_negative_paths"]
     },
     {
+      "id": "pipeline.completeness_guard",
+      "tests": ["test_malformed_referenced_dependency_blocks_full_export_readiness"]
+    },
+    {
       "id": "pipeline.offline_not_hardware_ready",
       "tests": ["test_offline_suite_does_not_claim_hardware_readiness"]
     },

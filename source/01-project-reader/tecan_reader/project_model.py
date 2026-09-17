@@ -9,13 +9,71 @@ from __future__ import annotations
 
 from collections import Counter
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
 
 CANONICAL_PROJECT_MODEL_SCHEMA_VERSION = "tecan.canonical_project.v1"
+
+
+def build_completeness_metadata(
+    *,
+    script_limit: int | None,
+    object_limit: int | None,
+    eligible_member_counts: Mapping[str, int],
+    summarized_counts: Mapping[str, int],
+    errors: list[Mapping[str, Any]] | tuple[Mapping[str, Any], ...] = (),
+    oversized_members: list[str] | tuple[str, ...] = (),
+) -> dict[str, Any]:
+    """Describe whether an inspection saw every eligible project member."""
+    eligible = {
+        key: int(value or 0) for key, value in eligible_member_counts.items()
+    }
+    summarized = {
+        key: int(value or 0) for key, value in summarized_counts.items()
+    }
+    truncated_scripts = (
+        max(eligible.get("scripts", 0) - int(script_limit), 0)
+        if script_limit is not None
+        else 0
+    )
+    truncated_objects = (
+        max(eligible.get("objects", 0) - int(object_limit), 0)
+        if object_limit is not None
+        else 0
+    )
+    blocking_errors = [
+        error
+        for error in errors
+        if str(error.get("severity") or "error") != "warning"
+    ]
+    limited = script_limit is not None or object_limit is not None
+    oversized = sorted({str(entry) for entry in oversized_members if entry})
+    complete = (
+        not limited
+        and not truncated_scripts
+        and not truncated_objects
+        and not blocking_errors
+        and not oversized
+    )
+    return {
+        "complete": complete,
+        "mode": "complete" if not limited else "preview",
+        "configured_limits": {
+            "scripts": script_limit,
+            "objects": object_limit,
+        },
+        "eligible_member_counts": dict(sorted(eligible.items())),
+        "summarized_counts": dict(sorted(summarized.items())),
+        "truncated_scripts": truncated_scripts,
+        "truncated_objects": truncated_objects,
+        "error_count": len(errors),
+        "blocking_error_count": len(blocking_errors),
+        "oversized_member_count": len(oversized),
+        "oversized_members": oversized,
+    }
 
 
 @dataclass(frozen=True)
@@ -97,6 +155,7 @@ class CanonicalProjectModel:
     worklists: list[dict[str, Any]]
     errors: list[dict[str, Any]]
     source_metadata: dict[str, Any]
+    completeness: dict[str, Any] = field(default_factory=dict)
 
     @property
     def schema_version(self) -> str:
@@ -129,6 +188,7 @@ class CanonicalProjectModel:
             "entities": self.entities,
             "errors": deepcopy(self.errors),
             "source_metadata": deepcopy(self.source_metadata),
+            "completeness": deepcopy(self.completeness),
         }
 
     def to_json(self) -> str:
@@ -147,6 +207,23 @@ class CanonicalProjectModel:
             command_counts.update(script.get("command_counts") or {})
             warning_counts.update(script.get("warnings") or [])
         names = [script.get("object_name") or script.get("source") for script in scripts]
+        completeness = deepcopy(self.completeness)
+        if not completeness:
+            completeness = build_completeness_metadata(
+                script_limit=None,
+                object_limit=None,
+                eligible_member_counts={
+                    "scripts": len(scripts),
+                    "objects": len(objects),
+                    "worklists": len(worklists),
+                },
+                summarized_counts={
+                    "scripts": len(scripts),
+                    "objects": len(objects),
+                    "worklists": len(worklists),
+                },
+                errors=self.errors,
+            )
         return {
             "kind": "zeia",
             "source": self.source_archive,
@@ -164,6 +241,13 @@ class CanonicalProjectModel:
             "objects": objects,
             "gwls": worklists,
             "errors": deepcopy(self.errors),
+            "complete": bool(completeness.get("complete")),
+            "truncated_scripts": int(completeness.get("truncated_scripts") or 0),
+            "truncated_objects": int(completeness.get("truncated_objects") or 0),
+            "configured_limits": deepcopy(completeness.get("configured_limits") or {}),
+            "eligible_member_counts": deepcopy(completeness.get("eligible_member_counts") or {}),
+            "summarized_counts": deepcopy(completeness.get("summarized_counts") or {}),
+            "completeness": completeness,
         }
 
     def context_records(
@@ -222,6 +306,25 @@ class CanonicalProjectModel:
             "extension_counts": deepcopy(report.get("extension_counts") or {}),
             "script_count_total": report.get("script_count_total", len(scripts)),
         }
+        completeness = deepcopy(report.get("completeness") or {})
+        if not completeness:
+            completeness = build_completeness_metadata(
+                script_limit=(report.get("configured_limits") or {}).get("scripts"),
+                object_limit=(report.get("configured_limits") or {}).get("objects"),
+                eligible_member_counts=report.get("eligible_member_counts") or {
+                    "scripts": report.get("script_count_total", len(scripts)),
+                    "objects": len(objects),
+                    "worklists": len(worklists),
+                },
+                summarized_counts=report.get("summarized_counts") or {
+                    "scripts": len(scripts),
+                    "objects": len(objects),
+                    "worklists": len(worklists),
+                },
+                errors=report.get("errors") or [],
+                oversized_members=report.get("oversized_members") or (),
+            )
+        metadata["completeness"] = deepcopy(completeness)
         return cls(
             source_archive=str(Path(source_archive).resolve()),
             adapter_id=adapter_id,
@@ -231,6 +334,7 @@ class CanonicalProjectModel:
             worklists=worklists,
             errors=deepcopy(list(report.get("errors") or [])),
             source_metadata=metadata,
+            completeness=completeness,
         )
 
 

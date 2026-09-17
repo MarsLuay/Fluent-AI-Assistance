@@ -219,6 +219,57 @@ class ProjectContextTests(unittest.TestCase):
                 pc.COLLECTIONS_DIR = old_collections_dir
                 pc.ACTIVE_CONTEXT_FILE = old_active_file
 
+    def test_malformed_referenced_dependency_blocks_full_export_readiness(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            old_projects_dir = pc.PROJECTS_DIR
+            old_collections_dir = pc.COLLECTIONS_DIR
+            old_active_file = pc.ACTIVE_CONTEXT_FILE
+            pc.PROJECTS_DIR = tmp_path / "projects"
+            pc.COLLECTIONS_DIR = pc.PROJECTS_DIR / ".collections"
+            pc.ACTIVE_CONTEXT_FILE = pc.PROJECTS_DIR / ".active_context"
+            try:
+                archive = tmp_path / "malformed-dependency.zeia"
+                with zipfile.ZipFile(archive, "w") as zf:
+                    zf.writestr(
+                        "Scripts/source.xscr",
+                        """<?xml version="1.0"?>
+<Root>
+  <ObjectName>Source</ObjectName>
+  <Reference>
+    <Guid>broken-worktable-guid</Guid>
+    <TypeId>WorktableWorkspace</TypeId>
+    <ObjectName>Broken Worktable</ObjectName>
+  </Reference>
+  <Script version="1.0" />
+</Root>
+""",
+                    )
+                    zf.writestr(
+                        "Worktables/broken.xwsp",
+                        "<Workspace><ObjectName>Broken Worktable</Workspace>",
+                    )
+                    zf.writestr(
+                        "LiquidClasses/water.xlqc",
+                        "<LiquidClass><ObjectName>Water Free Single</ObjectName></LiquidClass>",
+                    )
+
+                ctx = pc.import_project(archive, name="malformed-dependency")
+            finally:
+                pc.PROJECTS_DIR = old_projects_dir
+                pc.COLLECTIONS_DIR = old_collections_dir
+                pc.ACTIVE_CONTEXT_FILE = old_active_file
+
+        self.assertFalse(ctx.manifest["inspection_completeness"]["complete"])
+        self.assertFalse(ctx.manifest["full_zeia_export"]["accepted"])
+        finding_ids = {
+            finding["id"]
+            for finding in ctx.manifest["full_zeia_export"]["blocking_findings"]
+        }
+        self.assertIn("incomplete_canonical_ingestion", finding_ids)
+        self.assertEqual(ctx.manifest["errors"][0]["classification"], "malformed")
+        self.assertEqual(ctx.manifest["errors"][0]["entry"], "Worktables/broken.xwsp")
+
     def test_project_collection_merges_contexts_and_resolves_qualified_scripts(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

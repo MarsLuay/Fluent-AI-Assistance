@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import json
 import sys
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -506,6 +507,52 @@ def test_full_export_negative_paths(tmp_path: Path) -> None:
             ["inspect-external-command", "DefinitelyMissingMacro", "--context", CONTEXT_NAME, "--json"]
         )
         assert missing_command["code"] in {0, 1, 2}, missing_command
+
+
+def test_malformed_referenced_dependency_blocks_full_export_readiness(tmp_path: Path) -> None:
+    with isolated_pipeline_home(tmp_path / "home") as paths:
+        archive = tmp_path / "malformed-dependency.zeia"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr(
+                "Scripts/source.xscr",
+                """<?xml version="1.0"?>
+<Root>
+  <ObjectName>Source</ObjectName>
+  <Reference>
+    <Guid>broken-worktable-guid</Guid>
+    <TypeId>WorktableWorkspace</TypeId>
+    <ObjectName>Broken Worktable</ObjectName>
+  </Reference>
+  <Script version="1.0" />
+</Root>
+""",
+            )
+            zf.writestr(
+                "Worktables/broken.xwsp",
+                "<Workspace><ObjectName>Broken Worktable</Workspace>",
+            )
+            zf.writestr(
+                "LiquidClasses/water.xlqc",
+                "<LiquidClass><ObjectName>Water Free Single</ObjectName></LiquidClass>",
+            )
+
+        imported = run_cli(
+            ["import-project", str(archive), "--name", "malformed-dependency", "--force"]
+        )
+        assert imported["code"] == 0, imported
+        info = run_cli(["project-info", "malformed-dependency", "--json"])
+        manifest_path = paths["ready"] / "malformed-dependency" / "temp_files" / "manifest.json"
+
+    assert info["code"] == 0, info
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert not manifest["inspection_completeness"]["complete"], manifest
+    assessment = manifest["full_zeia_export"]
+    assert assessment["accepted"] is False, manifest
+    assert any(
+        finding["id"] == "incomplete_canonical_ingestion"
+        for finding in assessment["blocking_findings"]
+    ), manifest
+    assert manifest["errors"][0]["classification"] == "malformed", manifest
 
 
 def test_cli_project_lifecycle(tmp_path: Path) -> None:

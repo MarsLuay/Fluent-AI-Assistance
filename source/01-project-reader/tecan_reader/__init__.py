@@ -8,6 +8,7 @@ from .project_index import build_project_index, search_project_index, summarize_
 from .project_model import (
     CANONICAL_PROJECT_MODEL_SCHEMA_VERSION,
     CanonicalProjectModel,
+    build_completeness_metadata,
     InspectionReport,
     SourceProvenance,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "ArchiveProbe",
     "CanonicalProjectModel",
     "DetectionResult",
+    "build_completeness_metadata",
     "InspectionReport",
     "SourceProvenance",
     "ZeiaAdapter",

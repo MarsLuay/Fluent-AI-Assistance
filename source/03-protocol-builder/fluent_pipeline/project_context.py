@@ -28,7 +28,7 @@ from .project_store import ProjectStore
 from .runner import PipelineError
 from .worktable_geometry import build_worktable_geometry
 from tecan_common.zeia_limits import validate_zeia_archive_limits
-from tecan_reader.project_model import CanonicalProjectModel
+from tecan_reader.project_model import CanonicalProjectModel, build_completeness_metadata
 from tecan_reader.zeia_adapters import ZeiaFormatError, ingest_zeia, probe_zeia
 
 
@@ -51,7 +51,9 @@ SNAPSHOT_TEXT_EXTS = {
 SNAPSHOT_BINARY_EXTS = {".cab", ".dmp", ".dump", ".evtx"}
 SNAPSHOT_TEXT_MAX_BYTES = 1024 * 1024
 PROJECT_CONTEXT_XML_MAX_BYTES = 4 * 1024 * 1024
-DETAILED_XML_OBJECT_ENTRY_LIMIT = 2500
+# Geometry parsing is an optional derived artifact; it never defines canonical
+# project completeness or full-export readiness.
+WORKTABLE_GEOMETRY_ENTRY_LIMIT = 2500
 PROJECT_MANIFEST_SCHEMA_VERSION = 3
 PROJECT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$")
 FULL_ZEIA_ASK = (
@@ -568,6 +570,7 @@ def compact_full_zeia_export(payload: Any) -> dict[str, Any] | None:
 def compact_project_summary(ctx: ProjectLike) -> dict[str, Any]:
     """Token-cheap project summary for MCP/CLI JSON (no script/object arrays)."""
     manifest = ctx.manifest if isinstance(getattr(ctx, "manifest", None), dict) else {}
+    completeness = manifest.get("inspection_completeness") or {}
     summary: dict[str, Any] = {
         "script_count": len(manifest.get("scripts") or []),
         "workspace_count": len(manifest.get("workspaces") or []),
@@ -575,6 +578,12 @@ def compact_project_summary(ctx: ProjectLike) -> dict[str, Any]:
         "worklist_count": len(manifest.get("worklists") or []),
         "snapshot_evidence_count": len(manifest.get("snapshot_evidence") or []),
         "entry_count": manifest.get("entry_count"),
+        "inspection_complete": completeness.get("complete"),
+        "inspection_mode": completeness.get("mode"),
+        "inspection_limits": completeness.get("configured_limits") or {},
+        "truncated_scripts": completeness.get("truncated_scripts", 0),
+        "truncated_objects": completeness.get("truncated_objects", 0),
+        "oversized_member_count": completeness.get("oversized_member_count", 0),
         "source_archive": manifest.get("source_archive"),
         "imported_at": manifest.get("imported_at"),
     }
@@ -742,7 +751,19 @@ def _ingest_context_model(archive: Path) -> CanonicalProjectModel:
                 ),
                 "script_count_total": 0,
                 "context_kind": "support",
+                "completeness": build_completeness_metadata(
+                    script_limit=None,
+                    object_limit=None,
+                    eligible_member_counts={"scripts": 0, "objects": 0, "worklists": 0},
+                    summarized_counts={"scripts": 0, "objects": 0, "worklists": 0},
+                ),
             },
+            completeness=build_completeness_metadata(
+                script_limit=None,
+                object_limit=None,
+                eligible_member_counts={"scripts": 0, "objects": 0, "worklists": 0},
+                summarized_counts={"scripts": 0, "objects": 0, "worklists": 0},
+            ),
         )
 
 
@@ -781,7 +802,28 @@ def build_manifest(
     scripts, objects, worklists = canonical_model.context_records(root=root)
     snapshot_evidence = []
     errors = list(canonical_model.errors)
-    detailed_xml_objects = len(entries) <= DETAILED_XML_OBJECT_ENTRY_LIMIT
+    completeness = dict(
+        canonical_model.completeness
+        or canonical_model.source_metadata.get("completeness")
+        or {}
+    )
+    if not completeness:
+        completeness = build_completeness_metadata(
+            script_limit=None,
+            object_limit=None,
+            eligible_member_counts={
+                "scripts": len(scripts),
+                "objects": len(objects),
+                "worklists": len(worklists),
+            },
+            summarized_counts={
+                "scripts": len(scripts),
+                "objects": len(objects),
+                "worklists": len(worklists),
+            },
+            errors=errors,
+        )
+    detailed_geometry = len(entries) <= WORKTABLE_GEOMETRY_ENTRY_LIMIT
 
     # Snapshot/support evidence is deliberately separate from ZEIA semantics;
     # canonical project-reader records own every script/object/worklist above.
@@ -885,7 +927,9 @@ def build_manifest(
             "adapter_id": canonical_model.adapter_id,
             "detection": canonical_model.detection,
             "source_metadata": canonical_model.source_metadata,
+            "completeness": completeness,
         },
+        "inspection_completeness": completeness,
         "snapshot_evidence": snapshot_evidence,
         "snapshot_summary": snapshot_summary,
         "custom_part_summary": custom_part_summary,
@@ -898,11 +942,11 @@ def build_manifest(
         # Worktable labware/rack labels like FilterDWP[001] are instance IDs, not
         # catalog aliases. Only mine project/object names for catalog alias hints.
         "catalog_alias_candidates": _alias_candidates(project_names),
-        "xml_inspection_mode": "detailed" if detailed_xml_objects else "summary",
+        "xml_inspection_mode": "complete" if completeness.get("complete") else "preview",
         "errors": errors,
     }
     manifest["full_zeia_export"] = assess_full_zeia_export(manifest)
-    if detailed_xml_objects:
+    if detailed_geometry:
         manifest["worktable_geometry"] = build_worktable_geometry(
             manifest,
             max_xml_bytes=PROJECT_CONTEXT_XML_MAX_BYTES,
@@ -1113,6 +1157,54 @@ def build_collection_manifest(
             "validate_collection", "Checking duplicate collection identities."
         )
 
+    source_completeness = [
+        ctx.manifest.get("inspection_completeness") or {}
+        for ctx in contexts
+    ]
+    oversized_members = sorted(
+        {
+            str(entry)
+            for item in source_completeness
+            for entry in item.get("oversized_members") or []
+            if entry
+        }
+    )
+    collection_completeness = {
+        "complete": all(item.get("complete", False) for item in source_completeness),
+        "mode": "complete"
+        if all(item.get("mode") == "complete" for item in source_completeness)
+        else "preview",
+        "configured_limits": {
+            "scripts": None,
+            "objects": None,
+        },
+        "eligible_member_counts": {
+            key: sum(
+                int((item.get("eligible_member_counts") or {}).get(key) or 0)
+                for item in source_completeness
+            )
+            for key in ("scripts", "objects", "worklists")
+        },
+        "summarized_counts": {
+            "scripts": len(scripts),
+            "objects": len(objects),
+            "worklists": len(worklists),
+        },
+        "truncated_scripts": sum(
+            int(item.get("truncated_scripts") or 0) for item in source_completeness
+        ),
+        "truncated_objects": sum(
+            int(item.get("truncated_objects") or 0) for item in source_completeness
+        ),
+        "error_count": len(errors),
+        "blocking_error_count": sum(
+            1
+            for error in errors
+            if str(error.get("severity") or "error") != "warning"
+        ),
+        "oversized_member_count": len(oversized_members),
+        "oversized_members": oversized_members[:50],
+    }
     manifest = {
         "schema_version": 1,
         "kind": "project_collection",
@@ -1129,6 +1221,7 @@ def build_collection_manifest(
         "worklists": worklists,
         "workspaces": workspaces,
         "canonical_models": canonical_models,
+        "inspection_completeness": collection_completeness,
         "snapshot_archives": snapshot_archives,
         "snapshot_evidence": snapshot_evidence,
         "snapshot_summary": _snapshot_summary(snapshot_evidence),
@@ -1443,6 +1536,27 @@ def assess_full_zeia_export(manifest: dict[str, Any]) -> dict[str, Any]:
             }
         )
 
+    completeness = manifest.get("inspection_completeness")
+    if isinstance(completeness, dict) and not completeness.get("complete", False):
+        findings.append(
+            {
+                "id": "incomplete_canonical_ingestion",
+                "summary": (
+                    "Canonical ZEIA inspection is incomplete; full-export readiness "
+                    "cannot be established from a bounded preview or failed member parse."
+                ),
+                "details": {
+                    "mode": completeness.get("mode"),
+                    "configured_limits": completeness.get("configured_limits") or {},
+                    "truncated_scripts": completeness.get("truncated_scripts", 0),
+                    "truncated_objects": completeness.get("truncated_objects", 0),
+                    "blocking_error_count": completeness.get("blocking_error_count", 0),
+                    "oversized_member_count": completeness.get("oversized_member_count", 0),
+                    "oversized_members": completeness.get("oversized_members", [])[:50],
+                },
+            }
+        )
+
     warning_eligible_findings = [
         finding
         for finding in findings
@@ -1466,6 +1580,20 @@ def assess_full_zeia_export(manifest: dict[str, Any]) -> dict[str, Any]:
     else:
         blocking_findings.extend(warning_eligible_findings)
 
+    for error in manifest.get("errors") or []:
+        if not isinstance(error, dict) or error.get("severity") != "warning":
+            continue
+        warnings.append(
+            {
+                "id": "non_semantic_member_diagnostic",
+                "summary": (
+                    "A known non-semantic archive member was not fully interpreted; "
+                    "it was retained as an explicit warning."
+                ),
+                "items": [error],
+            }
+        )
+
     if not blocking_findings:
         status = "likely_full_export"
         summary = (
@@ -1478,19 +1606,32 @@ def assess_full_zeia_export(manifest: dict[str, Any]) -> dict[str, Any]:
         status = "needs_user"
         summary = "The ZEIA looks partial/non-full or lacks enough dependency evidence for protocol generation."
 
+    signals = {
+        "entry_count": manifest.get("entry_count", 0),
+        "script_count": len(scripts),
+        "object_count": len(objects),
+        "workspace_count": len(workspaces),
+        "liquid_class_object_count": len(liquid_class_objects),
+    }
+    if isinstance(completeness, dict):
+        signals.update(
+            {
+                "inspection_complete": bool(completeness.get("complete")),
+                "truncated_scripts": int(completeness.get("truncated_scripts") or 0),
+                "truncated_objects": int(completeness.get("truncated_objects") or 0),
+                "oversized_member_count": int(
+                    completeness.get("oversized_member_count") or 0
+                ),
+            }
+        )
+
     return {
         "required": True,
         "status": status,
         "accepted": status == "likely_full_export",
         "summary": summary,
         "ask_user": FULL_ZEIA_ASK,
-        "signals": {
-            "entry_count": manifest.get("entry_count", 0),
-            "script_count": len(scripts),
-            "object_count": len(objects),
-            "workspace_count": len(workspaces),
-            "liquid_class_object_count": len(liquid_class_objects),
-        },
+        "signals": signals,
         "blocking_findings": blocking_findings,
         "warnings": warnings,
     }
@@ -1636,6 +1777,7 @@ def _append_full_zeia_export_report(
 
 
 def render_project_report(manifest: dict[str, Any]) -> str:
+    completeness = manifest.get("inspection_completeness") or {}
     lines = [
         "# Fluent Project Context",
         "",
@@ -1647,6 +1789,11 @@ def render_project_report(manifest: dict[str, Any]) -> str:
         f"- Objects: `{len(manifest.get('objects', []))}`",
         f"- Workspaces: `{len(manifest.get('workspaces', []))}`",
         f"- Snapshot evidence: `{len(manifest.get('snapshot_evidence', []))}`",
+        f"- Canonical inspection complete: `{completeness.get('complete')}`",
+        f"- Canonical inspection mode: `{completeness.get('mode') or 'unknown'}`",
+        f"- Canonical inspection limits: `{completeness.get('configured_limits') or {}}`",
+        f"- Truncated scripts/objects: `{completeness.get('truncated_scripts', 0)}`/`{completeness.get('truncated_objects', 0)}`",
+        f"- Oversized XML members: `{completeness.get('oversized_member_count', 0)}`",
     ]
     _append_full_zeia_export_report(lines, manifest.get("full_zeia_export") or {})
     lines.extend(["", "## Extensions", ""])
@@ -1722,12 +1869,16 @@ def render_project_report(manifest: dict[str, Any]) -> str:
     if manifest.get("errors"):
         lines.extend(["", "## Import Errors", ""])
         for error in manifest["errors"][:30]:
-            lines.append(f"- `{error['entry']}`: {error['error']}")
+            lines.append(
+                f"- `{error['entry']}` [{error.get('classification', 'unknown')}; "
+                f"{error.get('parser', 'unknown')}]: {error['error']}"
+            )
 
     return "\n".join(lines).rstrip() + "\n"
 
 
 def render_project_collection_report(manifest: dict[str, Any]) -> str:
+    completeness = manifest.get("inspection_completeness") or {}
     lines = [
         "# Fluent Project Collection",
         "",
@@ -1739,6 +1890,11 @@ def render_project_collection_report(manifest: dict[str, Any]) -> str:
         f"- Objects: `{len(manifest.get('objects', []))}`",
         f"- Workspaces: `{len(manifest.get('workspaces', []))}`",
         f"- Snapshot evidence: `{len(manifest.get('snapshot_evidence', []))}`",
+        f"- Canonical inspection complete: `{completeness.get('complete')}`",
+        f"- Canonical inspection mode: `{completeness.get('mode') or 'unknown'}`",
+        f"- Canonical inspection limits: `{completeness.get('configured_limits') or {}}`",
+        f"- Truncated scripts/objects: `{completeness.get('truncated_scripts', 0)}`/`{completeness.get('truncated_objects', 0)}`",
+        f"- Oversized XML members: `{completeness.get('oversized_member_count', 0)}`",
     ]
     _append_full_zeia_export_report(lines, manifest.get("full_zeia_export") or {})
     lines.extend(["", "## Source Projects", ""])

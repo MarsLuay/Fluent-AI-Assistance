@@ -20,6 +20,7 @@ from .gwl import inspect_gwl_lines
 from .project_model import (
     CanonicalProjectModel,
     InspectionReport,
+    build_completeness_metadata,
     normalize_record,
 )
 from .script import inspect_xscr_text
@@ -165,6 +166,10 @@ class _GenericStructuredAdapter:
         return AdapterMatch(self.adapter_id, self.format_family, 0.7, False, tuple(evidence))
 
 
+XML_OBJECT_EXTS = {".xcmp", ".xwsp", ".xlqc", ".xlcp", ".xsit", ".xcon", ".xml"}
+ASSET_EXTS = {".bmp", ".gif", ".jpeg", ".jpg", ".png", ".tif", ".tiff"}
+
+
 ADAPTERS: tuple[ZeiaAdapter, ...] = (
     _VisionXVersionAdapter("2"),
     _VisionXVersionAdapter("3"),
@@ -256,6 +261,8 @@ def ingest_zeia(
     scripts: list[dict[str, Any]] = []
     objects: list[dict[str, Any]] = []
     worklists: list[dict[str, Any]] = []
+    eligible_member_counts = _eligible_member_counts(detection.entries)
+    oversized_members: list[str] = []
     try:
         with zipfile.ZipFile(archive_path) as zf:
             infos = validate_zeia_archive_limits(
@@ -263,6 +270,17 @@ def ingest_zeia(
                 max_entry_count=max_entry_count,
                 max_total_uncompressed_bytes=max_total_uncompressed_bytes,
             )
+            eligible_member_counts = _eligible_member_counts(
+                [info.filename for info in infos]
+            )
+            oversized_members = [
+                _normal_entry(info.filename)
+                for info in infos
+                if not info.is_dir()
+                and info.file_size > MAX_XML_BYTES
+                and Path(info.filename).suffix.casefold() in {".xscr", *XML_OBJECT_EXTS}
+                and not _is_known_irrelevant_metadata(_normal_entry(info.filename))
+            ]
             for info in infos:
                 if info.is_dir():
                     continue
@@ -284,7 +302,9 @@ def ingest_zeia(
                             )
                         )
                     except Exception as exc:
-                        errors.append(_parse_error(entry, exc))
+                        errors.append(
+                            _parse_error(entry, exc, suffix=suffix, parser="xscr")
+                        )
                 elif suffix == ".gwl":
                     try:
                         text = zf.read(info).decode("utf-8-sig")
@@ -296,29 +316,39 @@ def ingest_zeia(
                             )
                         )
                     except Exception as exc:
-                        errors.append(_parse_error(entry, exc))
-                elif suffix in {".xcmp", ".xwsp", ".xlqc", ".xlcp", ".xsit", ".xcon", ".xml"}:
+                        errors.append(
+                            _parse_error(entry, exc, suffix=suffix, parser="gwl")
+                        )
+                elif suffix in XML_OBJECT_EXTS:
                     if object_limit is not None and len(objects) >= object_limit:
                         continue
                     try:
-                        objects.append(
-                            normalize_record(
-                                _inspect_object_member(
-                                    _read_member_data(zf, info),
-                                    entry,
-                                    suffix,
-                                    size_bytes=info.file_size,
-                                ),
-                                kind=_object_kind(suffix),
-                                source_archive=archive_path,
+                        record = normalize_record(
+                            _inspect_object_member(
+                                _read_member_data(zf, info),
+                                entry,
+                                suffix,
+                                size_bytes=info.file_size,
+                            ),
+                            kind=_object_kind(suffix),
+                            source_archive=archive_path,
+                        )
+                        objects.append(record)
+                        diagnostic = _object_subtype_diagnostic(record, entry, suffix)
+                        if diagnostic is not None:
+                            errors.append(diagnostic)
+                    except Exception as exc:
+                        # Preserve every failed member as a classified diagnostic;
+                        # completeness and readiness decide whether it is blocking.
+                        errors.append(
+                            _parse_error(
+                                entry,
+                                exc,
+                                suffix=suffix,
+                                parser=f"xml:{suffix.lstrip('.')}",
                             )
                         )
-                    except Exception as exc:
-                        # Metadata XML is commonly unrelated to object indexing;
-                        # retain the failure in the canonical model rather than
-                        # silently dropping the archive member.
-                        errors.append(_parse_error(entry, exc))
-                elif suffix in {".bmp", ".gif", ".jpeg", ".jpg", ".png", ".tif", ".tiff"}:
+                elif suffix in ASSET_EXTS:
                     if object_limit is not None and len(objects) >= object_limit:
                         continue
                     objects.append(
@@ -344,16 +374,33 @@ def ingest_zeia(
                         )
                     )
     except (OSError, zipfile.BadZipFile) as exc:
-        errors.append(_parse_error("<archive>", exc))
+        errors.append(_parse_error("<archive>", exc, suffix=".zeia", parser="archive"))
 
+    summarized_counts = {
+        "scripts": len(scripts),
+        "objects": len(objects),
+        "worklists": len(worklists),
+    }
+    completeness = build_completeness_metadata(
+        script_limit=script_limit,
+        object_limit=object_limit,
+        eligible_member_counts=eligible_member_counts,
+        summarized_counts=summarized_counts,
+        errors=errors,
+        oversized_members=oversized_members,
+    )
     source_metadata = {
         "entry_count": len(detection.entries),
         "extension_counts": extension_counts(detection.entries),
-        "script_count_total": sum(
-            1 for entry in detection.entries if Path(entry).suffix.casefold() == ".xscr"
-        ),
+        "script_count_total": eligible_member_counts["scripts"],
         "format_family": selected.format_family,
         "adapter_matches": [match.to_dict() for match in detection.matches],
+        "completeness": completeness,
+        "complete": completeness["complete"],
+        "eligible_member_counts": completeness["eligible_member_counts"],
+        "summarized_counts": completeness["summarized_counts"],
+        "truncated_scripts": completeness["truncated_scripts"],
+        "truncated_objects": completeness["truncated_objects"],
     }
     return CanonicalProjectModel(
         source_archive=str(archive_path),
@@ -364,6 +411,7 @@ def ingest_zeia(
         worklists=worklists,
         errors=errors,
         source_metadata=source_metadata,
+        completeness=completeness,
     )
 
 
@@ -598,5 +646,80 @@ def _object_kind(suffix: str) -> str:
     }.get(suffix, suffix.lstrip(".") or "xml")
 
 
-def _parse_error(entry: str, exc: Exception) -> dict[str, str]:
-    return {"entry": entry, "error": f"{type(exc).__name__}: {exc}"}
+def _eligible_member_counts(entries: list[str] | tuple[str, ...]) -> dict[str, int]:
+    return {
+        "scripts": sum(1 for entry in entries if Path(entry).suffix.casefold() == ".xscr"),
+        "objects": sum(
+            1
+            for entry in entries
+            if Path(entry).suffix.casefold() in XML_OBJECT_EXTS | ASSET_EXTS
+        ),
+        "worklists": sum(1 for entry in entries if Path(entry).suffix.casefold() == ".gwl"),
+    }
+
+
+def _parse_error(
+    entry: str,
+    exc: Exception,
+    *,
+    suffix: str,
+    parser: str,
+) -> dict[str, str]:
+    if _is_known_irrelevant_metadata(entry):
+        classification = "known_irrelevant_metadata"
+        severity = "warning"
+    elif isinstance(exc, (OSError, EOFError, RuntimeError, zipfile.BadZipFile)):
+        classification = "unreadable_or_encoding_failure"
+        severity = "error"
+    elif isinstance(exc, UnicodeDecodeError):
+        classification = "unreadable_or_encoding_failure"
+        severity = "error"
+    elif type(exc).__name__.lower().endswith("parseerror"):
+        classification = "malformed"
+        severity = "error"
+    else:
+        classification = "parser_failure"
+        severity = "error"
+    return {
+        "entry": entry,
+        "kind": _object_kind(suffix) if suffix in XML_OBJECT_EXTS else suffix.lstrip("."),
+        "parser": parser,
+        "classification": classification,
+        "severity": severity,
+        "error": f"{type(exc).__name__}: {exc}",
+    }
+
+
+def _is_known_irrelevant_metadata(entry: str) -> bool:
+    name = Path(entry).name.casefold()
+    parts = {part.casefold() for part in PurePosixPath(entry).parts}
+    return name in {"nodedescription.xml", "metadata.xml"} or "metadata" in parts
+
+
+def _object_subtype_diagnostic(
+    record: dict[str, Any], entry: str, suffix: str
+) -> dict[str, str] | None:
+    if suffix != ".xml":
+        return None
+    if any(
+        record.get(field)
+        for field in ("object_name", "type_id", "functional_group", "names", "guids")
+    ):
+        return None
+    if _is_known_irrelevant_metadata(entry):
+        classification = "known_irrelevant_metadata"
+        severity = "warning"
+    else:
+        classification = "unsupported_xml_subtype"
+        severity = "error"
+    record["inspection_status"] = "unsupported_subtype"
+    record.setdefault("source_metadata", {})["classification"] = classification
+    return {
+        "entry": entry,
+        "kind": _object_kind(suffix),
+        "parser": "xml:generic",
+        "classification": classification,
+        "handling": "intentionally_unsupported",
+        "severity": severity,
+        "error": "unsupported XML object subtype preserved as a generic record",
+    }
