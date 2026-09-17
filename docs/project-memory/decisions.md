@@ -10,3 +10,10 @@
   out of hand-edited source fixes; change the generator or source pipeline.
 - Preserve lab-agnostic defaults. Names and contracts must come from the
   user-provided project evidence, not invented examples or fixture data.
+- Keep shallow `tecan.driver_macros.v1` as capability inventory. Persist
+  per-usage DriverFramework parameter contracts (ExecutionSettings,
+  `~Variable~` closure, companions, fingerprints) in the adjacent
+  `tecan.driver_command_contracts.v1` artifact so incompatible same-macro
+  usages are not collapsed. Generation selects an exact source-backed
+  contract or fails deterministically on ambiguity; never rewrite
+  `~Variable~` tokens to host absolute paths.

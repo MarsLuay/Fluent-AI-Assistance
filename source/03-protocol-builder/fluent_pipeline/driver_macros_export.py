@@ -1,8 +1,10 @@
-"""Build ``driver_macros.json`` from ZEIA scripts / DataStore driver objects.
+"""Build ``driver_macros.json`` and adjacent driver-command contracts.
 
-Inventory is mined only from real ``LegacyDriverMacro`` / ``ApplicationDriverMacro``
-usages (and optional ApplicationDriver DataStore objects). Soft-fail to an empty
-catalog when absent — never invent vendor macro/module names.
+``tecan.driver_macros.v1`` remains the shallow capability inventory keyed by
+macro/module/kind for existing consumers. Per-usage ExecutionSettings and
+``~Variable~`` contracts live in the adjacent
+``tecan.driver_command_contracts.v1`` artifact so incompatible usages are not
+collapsed.
 """
 
 from __future__ import annotations
@@ -12,10 +14,16 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from . import xml_compat as ET
+from .external_commands import (
+    ambiguity_groups_for_contracts,
+    build_driver_usage_contracts,
+)
 from .runner import write_json
 
 DRIVER_MACROS_SCHEMA_VERSION = "tecan.driver_macros.v1"
 DRIVER_MACROS_FILENAME = "driver_macros.json"
+DRIVER_COMMAND_CONTRACTS_SCHEMA_VERSION = "tecan.driver_command_contracts.v1"
+DRIVER_COMMAND_CONTRACTS_FILENAME = "driver_command_contracts.json"
 _MACRO_TAGS = frozenset({"legacydrivermacro", "applicationdrivermacro"})
 _DRIVER_OBJECT_HINTS = frozenset(
     {
@@ -86,6 +94,68 @@ def build_driver_macros_catalog(
     return catalog
 
 
+def build_driver_command_contracts(
+    *,
+    manifest: Mapping[str, Any] | None = None,
+    context_root: Path | str | None = None,
+    source: str = "zeia_scripts",
+    max_xml_bytes: int = 4 * 1024 * 1024,
+) -> dict[str, Any]:
+    """Build per-usage driver contracts plus DataStore-only inventory evidence."""
+    root = Path(context_root).expanduser() if context_root else None
+    usages = build_driver_usage_contracts(manifest, context_root=root)
+    for usage in usages:
+        usage["source_kind"] = "script_usage"
+
+    datastore_inventory: list[dict[str, Any]] = []
+    seen_inventory: set[tuple[str, str, str]] = set()
+    errors: list[dict[str, str]] = []
+    for path in _driver_object_paths(manifest, context_root):
+        try:
+            for entry in _macros_from_driver_object(path, max_xml_bytes=max_xml_bytes):
+                key = (
+                    str(entry.get("macro_name") or "").casefold(),
+                    str(entry.get("module_name") or "").casefold(),
+                    str(entry.get("macro_kind") or "").casefold(),
+                )
+                if not key[0] or key in seen_inventory:
+                    continue
+                seen_inventory.add(key)
+                datastore_inventory.append(
+                    {
+                        "macro_name": entry.get("macro_name"),
+                        "module_name": entry.get("module_name"),
+                        "macro_kind": entry.get("macro_kind"),
+                        "source_kind": "datastore_inventory",
+                        "source_path": Path(str(entry.get("source_path") or "")).name,
+                        "executable": False,
+                    }
+                )
+        except Exception as exc:  # noqa: BLE001
+            errors.append({"path": str(path), "error": str(exc)})
+
+    datastore_inventory.sort(
+        key=lambda item: (
+            str(item.get("macro_name") or "").casefold(),
+            str(item.get("module_name") or "").casefold(),
+            str(item.get("macro_kind") or ""),
+        )
+    )
+    catalog: dict[str, Any] = {
+        "schema_version": DRIVER_COMMAND_CONTRACTS_SCHEMA_VERSION,
+        "source": source,
+        "usage_count": len(usages),
+        "usages": usages,
+        "ambiguity_groups": ambiguity_groups_for_contracts(usages),
+        "datastore_inventory_count": len(datastore_inventory),
+        "datastore_inventory": datastore_inventory,
+    }
+    if errors:
+        catalog["parse_errors"] = errors[:50]
+        catalog["parse_error_count"] = len(errors)
+    return catalog
+
+
 def write_driver_macros_catalog(
     destination: Path,
     *,
@@ -105,19 +175,56 @@ def write_driver_macros_catalog(
     return destination
 
 
+def write_driver_command_contracts(
+    destination: Path,
+    *,
+    manifest: Mapping[str, Any] | None = None,
+    context_root: Path | str | None = None,
+    source: str = "zeia_scripts",
+) -> Path | None:
+    """Write adjacent ``driver_command_contracts.json`` (soft-empty OK)."""
+    catalog = build_driver_command_contracts(
+        manifest=manifest,
+        context_root=context_root or Path(destination).parent,
+        source=source,
+    )
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    write_json(destination, catalog)
+    return destination
+
+
 def write_driver_macros_for_context(
     context_root: Path,
     manifest: Mapping[str, Any] | None = None,
 ) -> Path | None:
-    return write_driver_macros_catalog(
-        Path(context_root) / DRIVER_MACROS_FILENAME,
+    root = Path(context_root)
+    written = write_driver_macros_catalog(
+        root / DRIVER_MACROS_FILENAME,
         manifest=manifest,
-        context_root=context_root,
+        context_root=root,
         source="zeia_scripts",
     )
+    write_driver_command_contracts(
+        root / DRIVER_COMMAND_CONTRACTS_FILENAME,
+        manifest=manifest,
+        context_root=root,
+        source="zeia_scripts",
+    )
+    return written
 
 
 def load_driver_macros_catalog(path: Path | None) -> dict[str, Any] | None:
+    if path is None or not Path(path).is_file():
+        return None
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def load_driver_command_contracts(path: Path | None) -> dict[str, Any] | None:
     if path is None or not Path(path).is_file():
         return None
     try:
