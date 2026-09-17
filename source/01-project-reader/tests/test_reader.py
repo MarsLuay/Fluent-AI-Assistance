@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 import zipfile
@@ -438,8 +439,8 @@ class ReaderTests(unittest.TestCase):
             db_path = tmp_path / "new_dir" / "nested" / "test.db"
             self.assertFalse(db_path.parent.exists())
 
-            with patch("tecan_reader.project_index.inspect_archive") as mock_inspect:
-                mock_inspect.return_value = {"scripts": []}
+            with patch("tecan_reader.project_index.ingest_zeia") as mock_ingest:
+                mock_ingest.return_value = {"scripts": []}
                 build_project_index([zeia_path], db_path)
 
             self.assertTrue(db_path.parent.exists())
@@ -455,8 +456,8 @@ class ReaderTests(unittest.TestCase):
             db_path = tmp_path / "test.db"
             db_path.write_text("dummy data")
 
-            with patch("tecan_reader.project_index.inspect_archive") as mock_inspect:
-                mock_inspect.return_value = {"scripts": []}
+            with patch("tecan_reader.project_index.ingest_zeia") as mock_ingest:
+                mock_ingest.return_value = {"scripts": []}
                 build_project_index([zeia_path], db_path, force=True)
 
             # The dummy data should have been overwritten by a new sqlite database
@@ -484,8 +485,8 @@ class ReaderTests(unittest.TestCase):
 
             db_path = tmp_path / "test.db"
 
-            with patch("tecan_reader.project_index.inspect_archive") as mock_inspect:
-                mock_inspect.side_effect = ValueError("Simulated error")
+            with patch("tecan_reader.project_index.ingest_zeia") as mock_ingest:
+                mock_ingest.side_effect = ValueError("Simulated error")
                 with patch("tecan_reader.project_index._connect") as mock_connect:
                     mock_conn = MagicMock()
                     mock_connect.return_value = mock_conn
@@ -502,10 +503,36 @@ class ReaderTests(unittest.TestCase):
 
             db_path = tmp_path / "test.db"
 
-            with patch("tecan_reader.project_index.inspect_archive") as mock_inspect:
-                mock_inspect.return_value = {"scripts": []}
+            with patch("tecan_reader.project_index.ingest_zeia") as mock_ingest:
+                mock_ingest.return_value = {"scripts": []}
                 build_project_index([zeia_path], db_path, script_limit=42, object_limit=99)
-                mock_inspect.assert_called_once_with(zeia_path.resolve(), script_limit=42, object_limit=99)
+                mock_ingest.assert_called_once_with(zeia_path.resolve(), script_limit=42, object_limit=99)
+
+    def test_build_project_index_persists_canonical_entity_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            zeia_path = _write_sample_archive(tmp_path / "canonical.zeia", SAMPLE_XSCR)
+            db_path = tmp_path / "canonical.db"
+
+            summary = build_project_index([zeia_path], db_path)
+
+            conn = sqlite3.connect(db_path)
+            try:
+                conn.row_factory = sqlite3.Row
+                row = conn.execute(
+                    "SELECT metadata_json FROM entities WHERE kind = 'script'"
+                ).fetchone()
+            finally:
+                conn.close()
+
+        self.assertEqual(summary["script_count"], 1)
+        self.assertIsNotNone(row)
+        metadata = json.loads(row["metadata_json"])
+        self.assertEqual(
+            metadata["provenance"]["entry_path"],
+            "DataStore/UserSpecific/sample.xscr",
+        )
+        self.assertIn("unknown_fields", metadata)
 
 
 def _write_sample_archive(path: Path, script: str) -> Path:

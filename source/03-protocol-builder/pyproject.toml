@@ -9,6 +9,7 @@ dependencies = [
   "fluentcoder==0.1.3",
   "Pillow>=12.3.0,<13",
   "tecan-common==0.1.3",
+  "tecan-project-reader==0.1.3",
   # First-class MCP surface; analyzer/isolated installs must get this without extras.
   "mcp>=1.27,<2",
 ]

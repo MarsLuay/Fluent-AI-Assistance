@@ -23,7 +23,7 @@ worklist building, simulator assets, and repository tools.
 Canonical repository layers:
 
 - `source/00-shared/`: shared helpers and command registry.
-- `source/01-project-reader/`: ZEIA, XSCR, GWL, and pattern inspection.
+- `source/01-project-reader/`: ZEIA, XSCR, GWL, and pattern inspection. Its versioned canonical project model owns structural ZEIA detection, normalization, provenance, unknown-field retention, and worklist entities; protocol-builder context ingestion consumes those records and keeps snapshot evidence separate.
 - `source/02-worklist-builder/`: structured worklist generation.
 - `source/03-protocol-builder/`: protocol pipeline, CLI, MCP, validation, and packaging.
 - `source/04-protocol-simulator/`: TypeScript/Vite simulator.

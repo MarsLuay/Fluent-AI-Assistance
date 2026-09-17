@@ -135,6 +135,18 @@ def test_full_export_workflow_completes(full_export_env: dict) -> None:
     assert full_export.get("status") == "likely_full_export", project_manifest
     assert full_export.get("accepted") is True, project_manifest
     assert project_manifest.get("workspaces"), project_manifest
+    canonical = project_manifest.get("canonical_model") or {}
+    assert canonical.get("schema_version") == "tecan.canonical_project.v1", project_manifest
+    assert canonical.get("adapter_id"), project_manifest
+    assert (canonical.get("detection") or {}).get("status") == "supported", project_manifest
+    assert all(
+        record.get("provenance", {}).get("entry_path")
+        for record in [
+            *(project_manifest.get("scripts") or []),
+            *(project_manifest.get("objects") or []),
+            *(project_manifest.get("worklists") or []),
+        ]
+    ), project_manifest
 
     manifest = _generation_manifest(env)
     stages = _stage_map(manifest)
