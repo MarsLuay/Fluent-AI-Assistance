@@ -28,7 +28,9 @@ def load_recipe(path: str | Path) -> dict[str, Any]:
 
 
 def recipe_sha256(path: str | Path) -> str:
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    """Hash the logical UTF-8 recipe so Windows checkout EOL conversion is harmless."""
+    data = Path(path).read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(data).hexdigest()
 
 
 def materialize_recipe(path: str | Path, output_dir: str | Path) -> Path:
