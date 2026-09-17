@@ -6,15 +6,16 @@ from dataclasses import dataclass
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 import dataclasses
 import hashlib
 import json
 import re
 import sqlite3
 
-from .archive import inspect_archive
 from .common import _connect, _connection_arg, to_jsonable
+from .project_model import CanonicalProjectModel
+from .zeia_adapters import ingest_zeia
 
 SCHEMA_VERSION = "1"
 SCHEMA_SQL = """
@@ -216,12 +217,12 @@ def build_project_index(
         _initialize_database(conn)
         indexed_files = []
         for zeia_path in zeia_paths:
-            report = inspect_archive(
+            model = ingest_zeia(
                 zeia_path,
                 script_limit=script_limit,
                 object_limit=object_limit,
             )
-            _index_archive(conn, zeia_path, report)
+            _index_archive(conn, zeia_path, model)
             indexed_files.append(str(zeia_path))
         conn.commit()
         summary = summarize_project_index(conn)
@@ -316,8 +317,22 @@ def _initialize_database(conn: sqlite3.Connection) -> None:
 
 
 def _index_archive(
-    conn: sqlite3.Connection, zeia_path: Path, report: dict[str, Any]
+    conn: sqlite3.Connection,
+    zeia_path: Path,
+    report: CanonicalProjectModel | Mapping[str, Any],
 ) -> None:
+    """Index canonical entities, accepting only a compatibility report fallback."""
+    model = (
+        report
+        if isinstance(report, CanonicalProjectModel)
+        else getattr(report, "canonical_model", None)
+    )
+    if not isinstance(model, CanonicalProjectModel):
+        model = CanonicalProjectModel.from_inspection(
+            report,
+            source_archive=zeia_path,
+        )
+    view = model.inspection_report()
     archive_path = str(zeia_path.resolve())
     existing = conn.execute(
         "SELECT id FROM zeia_files WHERE path = ?", (archive_path,)
@@ -340,21 +355,21 @@ def _index_archive(
             zeia_path.name,
             _sha256(zeia_path),
             datetime.now(timezone.utc).isoformat(),
-            int(report.get("entry_count") or 0),
-            int(report.get("script_count_total") or 0),
-            int(report.get("script_count_summarized") or 0),
-            int(report.get("object_count_summarized") or 0),
-            int(report.get("gwl_count_summarized") or 0),
-            _dump(report.get("extension_counts", {})),
+            int(view.get("entry_count") or 0),
+            int(view.get("script_count_total") or 0),
+            int(view.get("script_count_summarized") or 0),
+            int(view.get("object_count_summarized") or 0),
+            int(view.get("gwl_count_summarized") or 0),
+            _dump(view.get("extension_counts", {})),
         ),
     )
     zeia_id = int(cursor.lastrowid)
 
-    for script in report.get("scripts", []):
+    for script in model.scripts:
         _index_script(conn, zeia_id, script)
-    for obj in report.get("objects", []):
+    for obj in model.objects:
         _index_object(conn, zeia_id, obj)
-    for gwl in report.get("gwls", []):
+    for gwl in model.worklists:
         _index_worklist(conn, zeia_id, gwl)
 
 
@@ -395,7 +410,10 @@ def _index_script(
             script_name,
             script.get("script_version") or "",
             source_path,
-            {"checksum": script.get("checksum") or ""},
+            _record_metadata(
+                script,
+                checksum=script.get("checksum") or "",
+            ),
         ),
     )
     _index_references(conn, zeia_id, script_id, script)
@@ -716,14 +734,15 @@ def _index_object(conn: sqlite3.Connection, zeia_id: int, obj: dict[str, Any]) -
     )
     object_name = obj.get("object_name") or source_path
     object_kind = _entity_kind_for_object(obj)
-    metadata = {
-        "object_kind": obj.get("kind") or "",
-        "type_id": obj.get("type_id") or "",
-        "functional_group": obj.get("functional_group") or "",
-        "footprint": obj.get("footprint") or "",
-        "renderer": obj.get("renderer") or "",
-        "guids": obj.get("guids", []),
-    }
+    metadata = _record_metadata(
+        obj,
+        object_kind=obj.get("kind") or "",
+        type_id=obj.get("type_id") or "",
+        functional_group=obj.get("functional_group") or "",
+        footprint=obj.get("footprint") or "",
+        renderer=obj.get("renderer") or "",
+        guids=obj.get("guids", []),
+    )
     _insert_entity(
         conn,
         EntityRecord(
@@ -786,11 +805,12 @@ def _index_worklist(
             Path(source_path).name or source_path,
             source_path,
             source_path,
-            {
-                "line_count": gwl.get("line_count") or 0,
-                "transfer_pairs_estimate": gwl.get("transfer_pairs_estimate") or 0,
-                "record_counts": gwl.get("record_counts", {}),
-            },
+            _record_metadata(
+                gwl,
+                line_count=gwl.get("line_count") or 0,
+                transfer_pairs_estimate=gwl.get("transfer_pairs_estimate") or 0,
+                record_counts=gwl.get("record_counts", {}),
+            ),
         ),
     )
     for example in gwl.get("pipette_examples", []):
@@ -842,6 +862,18 @@ def _index_worklist(
                     },
                 ),
             )
+
+
+def _record_metadata(
+    record: Mapping[str, Any],
+    **fields: Any,
+) -> dict[str, Any]:
+    metadata = dict(record.get("source_metadata") or {})
+    provenance = record.get("provenance")
+    if provenance:
+        metadata["provenance"] = provenance
+    metadata.update(fields)
+    return metadata
 
 
 def _insert_entity(

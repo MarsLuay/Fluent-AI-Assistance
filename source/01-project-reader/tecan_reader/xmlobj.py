@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 import re
 
-from tecan_common.xml_helpers import first_text, texts_by_name
+from tecan_common.xml_helpers import first_text, local_name, texts_by_name
 
 from .common import parse_xml_text, read_text
 
@@ -51,6 +51,7 @@ def inspect_xml_object_text(
     return {
         "kind": _kind_from_suffix(suffix),
         "source": source_name,
+        "entry": source_name,
         "object_name": object_name,
         "type_id": first_text(root, "TypeId"),
         "functional_group": first_text(root, "FunctionalGroup"),
@@ -59,14 +60,36 @@ def inspect_xml_object_text(
         "description": first_text(root, "Description"),
         "component_guid": first_text(root, "ComponentGuid"),
         "site_guid": first_text(root, "SiteGuid"),
-        "names": grouped.get("Name", [])[:20],
-        "guids": [*grouped.get("Guid", []), *grouped.get("GUID", [])][:10],
+        "names": grouped.get("Name", [])[:50],
+        "guids": [*grouped.get("Guid", []), *grouped.get("GUID", [])][:20],
+        "workspace_guid": Path(str(source_name).replace("\\", "/")).stem
+        if suffix.lower() == ".xwsp"
+        else "",
         "pin_refs": pin_refs,
         "asset_refs": asset_refs,
         "custom_part": bool(
             pin_refs or asset_refs or "custom" in object_name.casefold()
         ),
+        "source_metadata": {"unknown_fields": _unknown_fields(root)},
     }
+
+
+def _unknown_fields(root: Any) -> dict[str, list[str]]:
+    known = {
+        "ObjectName", "TypeId", "FunctionalGroup", "FootPrint", "Renderer",
+        "Guid", "GUID", "Description", "BaseWorktableName", "BaseWorktableGuid",
+        "LiquidClassName", "Name", "ComponentGuid", "SiteGuid",
+    }
+    values: dict[str, list[str]] = {}
+    for element in root.iter():
+        name = local_name(element.tag)
+        value = (element.text or "").strip()
+        if not value or name in known:
+            continue
+        bucket = values.setdefault(name, [])
+        if value not in bucket and len(bucket) < 20:
+            bucket.append(value)
+    return {name: values[name] for name in sorted(values)}
 
 
 def _kind_from_suffix(suffix: str) -> str:

@@ -6,18 +6,16 @@ import json
 import re
 import shutil
 import zipfile
-from html import unescape
-from functools import lru_cache
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from itertools import chain
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
+
 from . import xml_compat as ET
 
 from .archive_cache import archive_reference_fingerprint
-from .command_registry import registry_command_family
 from .config import (
     ACTIVE_CONTEXT_FILE,
     COLLECTIONS_DIR,
@@ -30,6 +28,8 @@ from .project_store import ProjectStore
 from .runner import PipelineError
 from .worktable_geometry import build_worktable_geometry
 from tecan_common.zeia_limits import validate_zeia_archive_limits
+from tecan_reader.project_model import CanonicalProjectModel
+from tecan_reader.zeia_adapters import ZeiaFormatError, ingest_zeia, probe_zeia
 
 
 XML_OBJECT_EXTS = {".xcmp", ".xwsp", ".xlqc", ".xlcp", ".xsit", ".xcon", ".xml"}
@@ -51,16 +51,9 @@ SNAPSHOT_TEXT_EXTS = {
 SNAPSHOT_BINARY_EXTS = {".cab", ".dmp", ".dump", ".evtx"}
 SNAPSHOT_TEXT_MAX_BYTES = 1024 * 1024
 PROJECT_CONTEXT_XML_MAX_BYTES = 4 * 1024 * 1024
-OVERSIZED_XML_SUMMARY_BYTES = 1024 * 1024
-LARGE_XML_TEXT_SCAN_MAX_BYTES = 64 * 1024 * 1024
 DETAILED_XML_OBJECT_ENTRY_LIMIT = 2500
-SUMMARY_XML_TEXT_SUFFIXES: set[str] = set()
 PROJECT_MANIFEST_SCHEMA_VERSION = 3
 PROJECT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$")
-GUID_RE = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
-)
-ZERO_GUID = "00000000-0000-0000-0000-000000000000"
 FULL_ZEIA_ASK = (
     "Ask the user for a full FluentControl ZEIA export that includes the source "
     "scripts and their referenced worktables, liquid classes, labware/system "
@@ -217,6 +210,13 @@ def import_project(
         manifest_schema_version=PROJECT_MANIFEST_SCHEMA_VERSION,
     )
 
+    try:
+        canonical_model = _ingest_context_model(archive)
+    except ZeiaFormatError as exc:
+        raise PipelineError(str(exc)) from exc
+    except (OSError, ValueError, zipfile.BadZipFile) as exc:
+        raise PipelineError(f"ZEIA canonical ingestion failed: {exc}") from exc
+
     project_name = sanitize_project_name(name, archive.stem)
     root = project_dir(project_name)
     if root.exists():
@@ -264,6 +264,7 @@ def import_project(
         entries=entries,
         snapshot_archives=snapshot_sources,
         source_import_identity=source_import_identity,
+        canonical_model=canonical_model,
     )
     _write_manifest(root, manifest)
     _project_store().write_text(
@@ -571,6 +572,7 @@ def compact_project_summary(ctx: ProjectLike) -> dict[str, Any]:
         "script_count": len(manifest.get("scripts") or []),
         "workspace_count": len(manifest.get("workspaces") or []),
         "object_count": len(manifest.get("objects") or []),
+        "worklist_count": len(manifest.get("worklists") or []),
         "snapshot_evidence_count": len(manifest.get("snapshot_evidence") or []),
         "entry_count": manifest.get("entry_count"),
         "source_archive": manifest.get("source_archive"),
@@ -656,6 +658,8 @@ def find_in_project(
         add(script, "script")
     for obj in ctx.manifest.get("objects", []):
         add(obj, obj.get("kind") or "object")
+    for worklist in ctx.manifest.get("worklists", []):
+        add(worklist, "worklist")
     for snapshot in ctx.manifest.get("snapshot_evidence", []):
         add(snapshot, "snapshot")
     for alias in ctx.manifest.get("catalog_alias_candidates", []):
@@ -708,6 +712,47 @@ def inspection_payload(
     }
 
 
+def _ingest_context_model(archive: Path) -> CanonicalProjectModel:
+    """Ingest ZEIA through the reader, preserving snapshot-only compatibility."""
+    try:
+        return ingest_zeia(archive)
+    except ZeiaFormatError as exc:
+        if exc.result.status != "unsupported" or not _is_support_context_archive(
+            exc.result.entries
+        ):
+            raise
+        entries = list(exc.result.entries)
+        return CanonicalProjectModel(
+            source_archive=str(archive.resolve()),
+            adapter_id="support-context",
+            detection={**exc.result.to_dict(), "context_kind": "support"},
+            scripts=[],
+            objects=[],
+            worklists=[],
+            errors=[],
+            source_metadata={
+                "entry_count": len(entries),
+                "extension_counts": dict(
+                    sorted(
+                        Counter(
+                            Path(entry).suffix.lower() or "<none>"
+                            for entry in entries
+                        ).items()
+                    )
+                ),
+                "script_count_total": 0,
+                "context_kind": "support",
+            },
+        )
+
+
+def _is_support_context_archive(entries: tuple[str, ...] | list[str]) -> bool:
+    return any(
+        _snapshot_roles_for_entry(entry, Path(entry).suffix.lower(), "")
+        for entry in entries
+    )
+
+
 def build_manifest(
     *,
     project_name: str,
@@ -718,50 +763,42 @@ def build_manifest(
     entries: list[str],
     snapshot_archives: list[dict[str, Any]] | None = None,
     source_import_identity: dict[str, Any],
+    canonical_model: CanonicalProjectModel | None = None,
 ) -> dict[str, Any]:
-    scripts = []
-    objects = []
+    if canonical_model is None:
+        try:
+            canonical_model = _ingest_context_model(archive)
+        except ZeiaFormatError as exc:
+            raise PipelineError(str(exc)) from exc
+        except (OSError, ValueError, zipfile.BadZipFile) as exc:
+            raise PipelineError(f"ZEIA canonical ingestion failed: {exc}") from exc
+    else:
+        if Path(canonical_model.source_archive).resolve() != archive.resolve():
+            raise PipelineError(
+                "canonical model source archive does not match the project archive"
+            )
+
+    scripts, objects, worklists = canonical_model.context_records(root=root)
     snapshot_evidence = []
-    errors = []
+    errors = list(canonical_model.errors)
     detailed_xml_objects = len(entries) <= DETAILED_XML_OBJECT_ENTRY_LIMIT
 
+    # Snapshot/support evidence is deliberately separate from ZEIA semantics;
+    # canonical project-reader records own every script/object/worklist above.
     for entry in entries:
         suffix = Path(entry).suffix.lower()
         extracted_path = extracted_dir / _zip_entry_to_path(entry)
         relative = extracted_path.relative_to(root).as_posix()
-        if _should_inspect_snapshot_evidence(entry, suffix):
-            try:
-                snapshot = _inspect_snapshot_evidence(
-                    extracted_path, entry, relative, suffix
-                )
-                if snapshot is not None:
-                    snapshot_evidence.append(snapshot)
-            except Exception as exc:
-                errors.append({"entry": entry, "error": f"snapshot evidence: {exc}"})
-        if suffix not in {".xscr", ".gwl"} | XML_OBJECT_EXTS | ASSET_EXTS:
+        if not _should_inspect_snapshot_evidence(entry, suffix):
             continue
         try:
-            if suffix == ".xscr":
-                scripts.append(_inspect_xscr_fast(extracted_path, entry, relative))
-            elif suffix in XML_OBJECT_EXTS:
-                if detailed_xml_objects:
-                    objects.append(
-                        _inspect_xml_object_fast(
-                            extracted_path, entry, relative, suffix
-                        )
-                    )
-                else:
-                    objects.append(
-                        _inspect_xml_object_summary(
-                            extracted_path, entry, relative, suffix
-                        )
-                    )
-            elif suffix in ASSET_EXTS:
-                objects.append(
-                    _inspect_asset_object(extracted_path, entry, relative, suffix)
-                )
+            snapshot = _inspect_snapshot_evidence(
+                extracted_path, entry, relative, suffix
+            )
+            if snapshot is not None:
+                snapshot_evidence.append(snapshot)
         except Exception as exc:
-            errors.append({"entry": entry, "error": str(exc)})
+            errors.append({"entry": entry, "error": f"snapshot evidence: {exc}"})
 
     extension_counts = dict(
         sorted(
@@ -806,7 +843,11 @@ def build_manifest(
         }
     )
     worklist_paths = sorted(
-        {entry for entry in entries if Path(entry).suffix.lower() == ".gwl"}
+        {
+            str(worklist.get("source") or worklist.get("entry") or "")
+            for worklist in worklists
+            if worklist.get("source") or worklist.get("entry")
+        }
         | {
             name
             for script in scripts
@@ -819,7 +860,7 @@ def build_manifest(
     workspaces = [obj for obj in objects if obj.get("kind") == "workspace"]
     custom_part_summary = _custom_part_summary(objects, scripts)
     snapshot_summary = _snapshot_summary(snapshot_evidence)
-    archive_kind = _archive_kind(scripts, objects, snapshot_evidence)
+    archive_kind = _archive_kind(scripts, objects, worklists, snapshot_evidence)
 
     manifest = {
         "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
@@ -837,7 +878,14 @@ def build_manifest(
         "extension_counts": extension_counts,
         "scripts": scripts,
         "objects": objects,
+        "worklists": worklists,
         "workspaces": workspaces,
+        "canonical_model": {
+            "schema_version": canonical_model.schema_version,
+            "adapter_id": canonical_model.adapter_id,
+            "detection": canonical_model.detection,
+            "source_metadata": canonical_model.source_metadata,
+        },
         "snapshot_evidence": snapshot_evidence,
         "snapshot_summary": snapshot_summary,
         "custom_part_summary": custom_part_summary,
@@ -873,6 +921,7 @@ def build_collection_manifest(
 ) -> dict[str, Any]:
     scripts: list[dict[str, Any]] = []
     objects: list[dict[str, Any]] = []
+    worklists: list[dict[str, Any]] = []
     workspaces: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
     extension_counts: Counter[str] = Counter()
@@ -882,6 +931,7 @@ def build_collection_manifest(
     copied_archives: list[str] = []
     snapshot_archives: list[dict[str, Any]] = []
     snapshot_evidence: list[dict[str, Any]] = []
+    canonical_models: list[dict[str, Any]] = []
 
     object_names: set[str] = set()
     project_names: set[str] = set()
@@ -918,10 +968,16 @@ def build_collection_manifest(
                 "script_count": len(manifest.get("scripts") or []),
                 "workspace_count": len(manifest.get("workspaces") or []),
                 "object_count": len(manifest.get("objects") or []),
+                "worklist_count": len(manifest.get("worklists") or []),
                 "snapshot_evidence_count": len(manifest.get("snapshot_evidence") or []),
             }
         )
 
+        canonical = manifest.get("canonical_model")
+        if isinstance(canonical, dict):
+            canonical_models.append({"source_context": ctx.name, **canonical})
+        for worklist in manifest.get("worklists") or []:
+            worklists.append(_collection_item(ctx, worklist))
         for snapshot in manifest.get("snapshot_evidence") or []:
             snapshot_evidence.append(_collection_item(ctx, snapshot))
         for snapshot_archive in manifest.get("snapshot_archives") or []:
@@ -1070,7 +1126,9 @@ def build_collection_manifest(
         "extension_counts": dict(sorted(extension_counts.items())),
         "scripts": scripts,
         "objects": objects,
+        "worklists": worklists,
         "workspaces": workspaces,
+        "canonical_models": canonical_models,
         "snapshot_archives": snapshot_archives,
         "snapshot_evidence": snapshot_evidence,
         "snapshot_summary": _snapshot_summary(snapshot_evidence),
@@ -1797,20 +1855,28 @@ def _validate_collection_manifest(
 
     scripts = manifest.get("scripts") or []
     objects = manifest.get("objects") or []
+    worklists = manifest.get("worklists") or []
     expected_scripts = sum(
         int(item.get("script_count") or 0) for item in source_projects
     )
     expected_objects = sum(
         int(item.get("object_count") or 0) for item in source_projects
     )
-    if len(scripts) != expected_scripts or len(objects) != expected_objects:
+    expected_worklists = sum(
+        int(item.get("worklist_count") or 0) for item in source_projects
+    )
+    if (
+        len(scripts) != expected_scripts
+        or len(objects) != expected_objects
+        or len(worklists) != expected_worklists
+    ):
         raise PipelineError(
             "project collection item counts do not match the loaded source manifests"
         )
 
-    total = len(scripts) + len(objects)
+    total = len(scripts) + len(objects) + len(worklists)
     identities: set[str] = set()
-    for index, item in enumerate(chain(scripts, objects), start=1):
+    for index, item in enumerate(chain(scripts, objects, worklists), start=1):
         source_context = str(item.get("source_context") or "")
         qualified_entry = str(item.get("qualified_entry") or "")
         qualified_name = str(item.get("qualified_name") or "")
@@ -2046,15 +2112,23 @@ def _project_store() -> ProjectStore:
 
 
 def is_context_archive(path: Path) -> bool:
-    """Return true if a ZIP-like file looks useful as a project/snapshot context."""
+    """Return true if a ZIP-like file is a supported project or support context."""
     path = Path(path).expanduser()
     if not path.exists() or not zipfile.is_zipfile(path):
         return False
+    try:
+        detection = probe_zeia(path)
+    except (OSError, ValueError, zipfile.BadZipFile):
+        return False
+    if detection.status == "supported":
+        return True
     try:
         with zipfile.ZipFile(path) as zf:
             entries = zf.namelist()
     except zipfile.BadZipFile:
         return False
+    # Snapshot/support archives are intentionally outside the ZEIA semantic
+    # adapter boundary and remain discoverable for diagnostics.
     return _archive_has_importable_context(entries)
 
 
@@ -2190,217 +2264,9 @@ def _read_text(path: Path) -> str:
     return data.decode("latin-1", errors="replace")
 
 
-def _read_large_xml_text(path: Path) -> str:
-    if path.stat().st_size <= PROJECT_CONTEXT_XML_MAX_BYTES:
-        return _read_text(path)
-    with path.open("rb") as handle:
-        data = handle.read(
-            min(OVERSIZED_XML_SUMMARY_BYTES, LARGE_XML_TEXT_SCAN_MAX_BYTES)
-        )
-    for encoding in ("utf-8-sig", "utf-8", "utf-16"):
-        try:
-            return data.decode(encoding)
-        except UnicodeDecodeError:
-            continue
-    return data.decode("latin-1", errors="replace")
-
-
-def _parse_xml(path: Path) -> ET.Element:
-    return ET.fromstring(_read_text(path), max_bytes=PROJECT_CONTEXT_XML_MAX_BYTES)
-
 
 def _local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
-
-
-def _first_text(root: ET.Element, name: str) -> str:
-    for el in root.iter():
-        if _local_name(el.tag) == name and el.text and el.text.strip():
-            return el.text.strip()
-    return ""
-
-
-def _texts_by_name(root: ET.Element, names: set[str]) -> dict[str, list[str]]:
-    out = {name: [] for name in names}
-    for el in root.iter():
-        name = _local_name(el.tag)
-        if name not in names or not el.text or not el.text.strip():
-            continue
-        value = el.text.strip()
-        if value not in out[name]:
-            out[name].append(value)
-    return out
-
-
-@lru_cache(maxsize=128)
-def _compile_name_pattern(name: str) -> tuple[re.Pattern, str]:
-    open_pattern = re.compile(
-        rf"<(?:[A-Za-z_][\w.-]*:)?{re.escape(name)}(?:\s[^>]*)?>",
-        flags=re.IGNORECASE,
-    )
-    closing = f"</{name.casefold()}>"
-    return open_pattern, closing
-
-
-def _regex_texts_by_name(text: str, names: set[str]) -> dict[str, list[str]]:
-    out = {name: [] for name in names}
-    if not text:
-        return out
-    lowered = text.casefold()
-    for name in names:
-        open_pattern, closing = _compile_name_pattern(name)
-        seen: set[str] = set()
-        for match in open_pattern.finditer(text):
-            start = match.end()
-            end = lowered.find(closing, start)
-            if end < 0:
-                continue
-            value = _clean_xml_text(text[start:end])
-            if value and value not in seen:
-                seen.add(value)
-                out[name].append(value)
-    return out
-
-
-def _first_regex_text(grouped: dict[str, list[str]], name: str) -> str:
-    values = grouped.get(name) or []
-    return values[0] if values else ""
-
-
-def _clean_xml_text(value: str) -> str:
-    return re.sub(r"\s+", " ", unescape(str(value or ""))).strip()
-
-
-def _inspect_xml_object(
-    path: Path, entry: str, relative: str, suffix: str
-) -> dict[str, Any]:
-    root = _parse_xml(path)
-    grouped = _texts_by_name(
-        root,
-        {
-            "ObjectName",
-            "TypeId",
-            "FunctionalGroup",
-            "FootPrint",
-            "Renderer",
-            "Guid",
-            "GUID",
-            "Description",
-            "Name",
-            "BaseWorktableName",
-            "BaseWorktableGuid",
-            "LiquidClassName",
-            "ComponentGuid",
-            "SiteGuid",
-        },
-    )
-    object_name = _first_text(root, "ObjectName") or _first_text(root, "Name")
-    text = _read_text(path)
-    pin_refs = _pin_refs(text)
-    asset_refs = _asset_refs(text)
-    record = {
-        "kind": _kind_from_suffix(suffix),
-        "entry": entry,
-        "extracted_path": relative,
-        "object_name": object_name,
-        "type_id": _first_text(root, "TypeId"),
-        "functional_group": _first_text(root, "FunctionalGroup"),
-        "footprint": _first_text(root, "FootPrint"),
-        "renderer": _first_text(root, "Renderer"),
-        "description": _first_text(root, "Description"),
-        "component_guid": _first_text(root, "ComponentGuid"),
-        "site_guid": _first_text(root, "SiteGuid"),
-        "names": grouped.get("Name", [])[:50],
-        "guids": _dedupe_strings([*grouped.get("Guid", []), *grouped.get("GUID", [])])[
-            :20
-        ],
-        "pin_refs": pin_refs,
-        "asset_refs": asset_refs,
-        "custom_part": _looks_custom_object(
-            suffix, object_name, text, pin_refs, asset_refs
-        ),
-    }
-    if suffix.lower() == ".xwsp":
-        record["workspace_guid"] = Path(entry.replace("\\", "/")).stem
-    return record
-
-
-def _inspect_xml_object_fast(
-    path: Path, entry: str, relative: str, suffix: str
-) -> dict[str, Any]:
-    if path.stat().st_size <= PROJECT_CONTEXT_XML_MAX_BYTES:
-        return _inspect_xml_object(path, entry, relative, suffix)
-    return _inspect_xml_object_summary(path, entry, relative, suffix)
-
-
-def _inspect_xml_object_summary(
-    path: Path, entry: str, relative: str, suffix: str
-) -> dict[str, Any]:
-    should_read_text = suffix.lower() in SUMMARY_XML_TEXT_SUFFIXES
-    text = _read_large_xml_text(path) if should_read_text else ""
-    names = _regex_texts_by_name(
-        text,
-        {
-            "ObjectName",
-            "TypeId",
-            "FunctionalGroup",
-            "FootPrint",
-            "Renderer",
-            "Guid",
-            "GUID",
-            "Description",
-            "Name",
-            "ComponentGuid",
-            "SiteGuid",
-        },
-    )
-    stem_name = Path(entry.replace("\\", "/")).stem
-    object_name = _first_regex_text(names, "ObjectName") or _first_regex_text(
-        names, "Name"
-    )
-    record = {
-        "kind": _kind_from_suffix(suffix),
-        "entry": entry,
-        "extracted_path": relative,
-        "object_name": object_name or stem_name,
-        "type_id": _first_regex_text(names, "TypeId"),
-        "functional_group": _first_regex_text(names, "FunctionalGroup"),
-        "footprint": _first_regex_text(names, "FootPrint"),
-        "renderer": _first_regex_text(names, "Renderer"),
-        "description": _first_regex_text(names, "Description"),
-        "component_guid": _first_regex_text(names, "ComponentGuid"),
-        "site_guid": _first_regex_text(names, "SiteGuid"),
-        "names": names.get("Name", [])[:50],
-        "guids": _dedupe_strings([*names.get("Guid", []), *names.get("GUID", [])])[:20],
-        "pin_refs": [],
-        "asset_refs": [],
-        "custom_part": False,
-        "oversized_xml": True,
-        "size_bytes": path.stat().st_size,
-    }
-    if suffix.lower() == ".xwsp":
-        record["workspace_guid"] = Path(entry.replace("\\", "/")).stem
-    return record
-
-
-def _inspect_asset_object(
-    path: Path, entry: str, relative: str, suffix: str
-) -> dict[str, Any]:
-    return {
-        "kind": "asset",
-        "entry": entry,
-        "extracted_path": relative,
-        "object_name": path.name,
-        "type_id": suffix.lower().lstrip("."),
-        "functional_group": "asset",
-        "footprint": "",
-        "renderer": "",
-        "names": [path.name],
-        "guids": [],
-        "pin_refs": [],
-        "asset_refs": [path.name],
-        "custom_part": True,
-    }
 
 
 def _inspect_snapshot_evidence(
@@ -2467,13 +2333,6 @@ def _should_inspect_snapshot_evidence(entry: str, suffix: str) -> bool:
 
 def _should_read_snapshot_text(suffix: str, size: int) -> bool:
     return suffix.lower() in SNAPSHOT_TEXT_EXTS and size <= SNAPSHOT_TEXT_MAX_BYTES
-
-
-def _entries_have_snapshot_hints(entries: list[str]) -> bool:
-    return any(
-        _snapshot_roles_for_entry(entry, Path(entry).suffix.lower(), "")
-        for entry in entries
-    )
 
 
 def _snapshot_roles_for_entry(entry: str, suffix: str, text: str) -> list[str]:
@@ -2720,453 +2579,13 @@ def _snapshot_record_summary(
     return f"{Path(normalized).name}: " + ", ".join(bits)
 
 
-def _inspect_xscr(path: Path, entry: str, relative: str) -> dict[str, Any]:
-    root = _parse_xml(path)
-    script_guid = _entry_object_guid(entry)
-    grouped = _texts_by_name(
-        root,
-        {
-            "BaseWorkspaceName",
-            "LabwareName",
-            "LabwareLabel",
-            "LabwareLable",
-            "LabwareType",
-            "RackLabel",
-            "RackType",
-            "LiquidClassName",
-            "LiquidClassNameBySelection",
-            "DeviceAlias",
-            "AvailableID",
-            "ScriptName",
-            "MethodName",
-            "ApplicationName",
-            "FileName",
-            "Path",
-            "WorklistName",
-            "SubRoutine",
-            "Barcode",
-            "CustomDetailImageFilePath",
-            "PinNumber",
-            "Location",
-            "RUPScreenTitle",
-        },
-    )
-    text = _read_text(path)
-    commands = [
-        _command_short_name(el.attrib.get("Type", ""))
-        for el in root.iter()
-        if _local_name(el.tag) == "Object" and "Type" in el.attrib
-    ]
-    references = []
-    for el in root.iter():
-        if _local_name(el.tag) != "Reference":
-            continue
-        ref = {
-            "guid": _child_text(el, "Guid"),
-            "type_id": _child_text(el, "TypeId"),
-            "object_name": _child_text(el, "ObjectName"),
-            "object_subfolder_path": _child_text(el, "ObjectSubfolderPath"),
-            "object_path": _child_text(el, "ObjectSubfolderPath"),
-        }
-        if any(ref.values()):
-            references.append(ref)
-
-    liquid_classes = sorted(
-        set(grouped.get("LiquidClassName", []))
-        | set(grouped.get("LiquidClassNameBySelection", []))
-    )
-    startup_variables = _variable_declarations(root)
-    operator_prompts = _operator_prompts(root)
-    return {
-        "kind": "script",
-        "entry": entry,
-        "extracted_path": relative,
-        "object_name": _first_text(root, "ObjectName"),
-        "guid": script_guid,
-        "script_guid": script_guid,
-        "guids": [script_guid] if script_guid else [],
-        "folder": _first_text(root, "ObjectSubfolderPath"),
-        "object_path": _first_text(root, "ObjectSubfolderPath"),
-        "object_subfolder_path": _first_text(root, "ObjectSubfolderPath"),
-        "script_version": _script_version(root),
-        "checksum": _first_text(root, "Checksum"),
-        "command_count": len(commands),
-        "command_counts": dict(Counter(commands).most_common()),
-        "family_counts": dict(
-            Counter(_command_family(command) for command in commands).most_common()
-        ),
-        "references": references,
-        "dependencies": {
-            "workspace_guids": grouped.get("BaseWorkspaceName", []),
-            "labware_names": sorted(
-                set(grouped.get("LabwareName", []))
-                | set(grouped.get("LabwareLabel", []))
-                | set(grouped.get("LabwareLable", []))
-            ),
-            "rack_labels": sorted(set(grouped.get("RackLabel", []))),
-            "rack_types": sorted(
-                set(grouped.get("RackType", [])) | set(grouped.get("LabwareType", []))
-            ),
-            "liquid_classes": liquid_classes,
-            "device_aliases": sorted(set(grouped.get("DeviceAlias", []))),
-            "available_ids": sorted(set(grouped.get("AvailableID", []))),
-            "external_or_worklist_refs": sorted(
-                set(grouped.get("ScriptName", []))
-                | set(grouped.get("MethodName", []))
-                | set(grouped.get("ApplicationName", []))
-                | set(grouped.get("FileName", []))
-                | set(grouped.get("Path", []))
-                | set(grouped.get("WorklistName", []))
-                | set(grouped.get("SubRoutine", []))
-            ),
-            "subroutine_refs": sorted(set(grouped.get("SubRoutine", []))),
-            "barcode_refs": sorted(set(grouped.get("Barcode", []))),
-            "custom_asset_refs": sorted(
-                set(grouped.get("CustomDetailImageFilePath", []))
-                | set(_asset_refs(text))
-            ),
-            "pin_refs": sorted(
-                set(grouped.get("PinNumber", [])) | set(_pin_refs(text))
-            ),
-            "worktable_pin_locations": sorted(
-                value
-                for value in set(grouped.get("Location", []))
-                if "pin" in str(value).casefold()
-            ),
-            "touchtools_titles": sorted(set(grouped.get("RUPScreenTitle", []))),
-        },
-        "startup_variables": startup_variables,
-        "operator_prompts": operator_prompts,
-    }
-
-
-def _inspect_xscr_fast(path: Path, entry: str, relative: str) -> dict[str, Any]:
-    if path.stat().st_size <= PROJECT_CONTEXT_XML_MAX_BYTES:
-        return _inspect_xscr(path, entry, relative)
-    text = _read_large_xml_text(path)
-    grouped = _regex_texts_by_name(
-        text,
-        {
-            "BaseWorkspaceName",
-            "LabwareName",
-            "LabwareLabel",
-            "LabwareLable",
-            "LabwareType",
-            "RackLabel",
-            "RackType",
-            "LiquidClassName",
-            "LiquidClassNameBySelection",
-            "DeviceAlias",
-            "AvailableID",
-            "ScriptName",
-            "MethodName",
-            "ApplicationName",
-            "FileName",
-            "Path",
-            "WorklistName",
-            "SubRoutine",
-            "Barcode",
-            "CustomDetailImageFilePath",
-            "PinNumber",
-            "Location",
-            "RUPScreenTitle",
-            "ObjectName",
-            "ObjectSubfolderPath",
-            "Checksum",
-        },
-    )
-    commands = [
-        _command_short_name(match.group(1))
-        for match in re.finditer(r"<Object\b[^>]*\bType=['\"]([^'\"]+)['\"]", text)
-    ]
-    script_guid = _entry_object_guid(entry)
-    liquid_classes = sorted(
-        set(grouped.get("LiquidClassName", []))
-        | set(grouped.get("LiquidClassNameBySelection", []))
-    )
-    return {
-        "kind": "script",
-        "entry": entry,
-        "extracted_path": relative,
-        "object_name": _first_regex_text(grouped, "ObjectName")
-        or Path(entry.replace("\\", "/")).stem,
-        "guid": script_guid,
-        "script_guid": script_guid,
-        "guids": [script_guid] if script_guid else [],
-        "folder": _first_regex_text(grouped, "ObjectSubfolderPath"),
-        "object_path": _first_regex_text(grouped, "ObjectSubfolderPath"),
-        "object_subfolder_path": _first_regex_text(grouped, "ObjectSubfolderPath"),
-        "script_version": "",
-        "checksum": _first_regex_text(grouped, "Checksum"),
-        "command_count": len(commands),
-        "command_counts": dict(Counter(commands).most_common()),
-        "family_counts": dict(
-            Counter(_command_family(command) for command in commands).most_common()
-        ),
-        "references": [],
-        "dependencies": {
-            "workspace_guids": grouped.get("BaseWorkspaceName", []),
-            "labware_names": sorted(
-                set(grouped.get("LabwareName", []))
-                | set(grouped.get("LabwareLabel", []))
-                | set(grouped.get("LabwareLable", []))
-            ),
-            "rack_labels": sorted(set(grouped.get("RackLabel", []))),
-            "rack_types": sorted(
-                set(grouped.get("RackType", [])) | set(grouped.get("LabwareType", []))
-            ),
-            "liquid_classes": liquid_classes,
-            "device_aliases": sorted(set(grouped.get("DeviceAlias", []))),
-            "available_ids": sorted(set(grouped.get("AvailableID", []))),
-            "external_or_worklist_refs": sorted(
-                set(grouped.get("ScriptName", []))
-                | set(grouped.get("MethodName", []))
-                | set(grouped.get("ApplicationName", []))
-                | set(grouped.get("FileName", []))
-                | set(grouped.get("Path", []))
-                | set(grouped.get("WorklistName", []))
-                | set(grouped.get("SubRoutine", []))
-            ),
-            "subroutine_refs": sorted(set(grouped.get("SubRoutine", []))),
-            "barcode_refs": sorted(set(grouped.get("Barcode", []))),
-            "custom_asset_refs": sorted(
-                set(grouped.get("CustomDetailImageFilePath", []))
-            ),
-            "pin_refs": sorted(set(grouped.get("PinNumber", []))),
-            "worktable_pin_locations": sorted(
-                value
-                for value in set(grouped.get("Location", []))
-                if "pin" in str(value).casefold()
-            ),
-            "touchtools_titles": sorted(set(grouped.get("RUPScreenTitle", []))),
-        },
-        "startup_variables": [],
-        "operator_prompts": [],
-        "oversized_xml": True,
-        "size_bytes": path.stat().st_size,
-    }
-
-
-def _entry_object_guid(entry: str) -> str:
-    normalized = str(entry or "").replace("\\", "/").strip()
-    if not normalized:
-        return ""
-    stem = PurePosixPath(normalized).stem
-    if not GUID_RE.fullmatch(stem):
-        return ""
-    guid = stem.lower()
-    return "" if guid == ZERO_GUID else guid
-
-
-def _child_text(el: ET.Element, name: str) -> str:
-    for child in list(el):
-        if _local_name(child.tag) == name and child.text and child.text.strip():
-            return child.text.strip()
-    return ""
-
-
-def _child_bool(el: ET.Element, name: str) -> bool:
-    return _child_text(el, name).casefold() == "true"
-
-
-def _variable_declarations(root: ET.Element) -> list[dict[str, Any]]:
-    variables = []
-    seen: set[tuple[str, str, str]] = set()
-    for el in root.iter():
-        direct_names = {_local_name(child.tag) for child in list(el)}
-        if not {"Name", "TypeName", "QueryOnStartup"}.issubset(direct_names):
-            continue
-        name = _child_text(el, "Name")
-        if not name:
-            continue
-        values = [
-            child.text.strip()
-            for values_node in list(el)
-            if _local_name(values_node.tag) == "Values"
-            for child in list(values_node)
-            if child.text and child.text.strip()
-        ]
-        prompt = _child_text(el, "QueryOnStartupString")
-        key = (name, _child_text(el, "Scope"), _child_text(el, "TypeName"))
-        if key in seen:
-            continue
-        seen.add(key)
-        variables.append(
-            {
-                "name": name,
-                "scope": _child_text(el, "Scope"),
-                "type": _child_text(el, "TypeName"),
-                "query_on_startup": _child_bool(el, "QueryOnStartup"),
-                "prompt": prompt,
-                "read_only": _child_bool(el, "ReadOnly"),
-                "default_values": values,
-                "manual_review_required": _child_bool(el, "QueryOnStartup")
-                or bool(prompt),
-            }
-        )
-    return variables
-
-
-def _operator_prompts(root: ET.Element) -> list[dict[str, Any]]:
-    prompts = []
-    for el in root.iter():
-        statement_name = _local_name(el.tag)
-        if statement_name not in {
-            "RUPVariableStatement",
-            "RUPWorktableStatement",
-            "RUPStandardStatement",
-        }:
-            continue
-        title = _first_text(el, "RUPScreenTitle")
-        variables = _rup_variable_items(el)
-        prompt = {
-            "kind": statement_name,
-            "title": title,
-            "line_number": _first_text(el, "LineNumber"),
-            "instructions": _first_text(el, "Instructions"),
-            "display_and_wait": _first_text(el, "RUPDisplayAndWait"),
-            "auto_close": _first_text(el, "RUPAutoClose"),
-            "timeout": _first_text(el, "RUPTimeOut"),
-            "variables": variables,
-        }
-        if title or prompt["instructions"] or variables:
-            prompts.append(prompt)
-    return prompts
-
-
-def _rup_variable_items(statement: ET.Element) -> list[dict[str, str]]:
-    items = []
-    for item in statement.iter():
-        if _local_name(item.tag) != "RupVariableItem":
-            continue
-        name = _child_text(item, "VariableName")
-        display_text = _child_text(item, "DisplayText")
-        display_type = _child_text(item, "DisplayType")
-        allowed_values = _child_text(item, "AllowedValues")
-        if not any([name, display_text, display_type, allowed_values]):
-            continue
-        items.append(
-            {
-                "name": name,
-                "display_text": display_text,
-                "display_type": display_type,
-                "allowed_values": allowed_values,
-                "enabled": _child_text(item, "IsEnabled"),
-            }
-        )
-    return items
-
-
-def _script_version(root: ET.Element) -> str:
-    for el in root.iter():
-        if _local_name(el.tag) == "Script":
-            return el.attrib.get("version", "")
-    return ""
-
-
-def _kind_from_suffix(suffix: str) -> str:
-    return {
-        ".xcmp": "component",
-        ".xwsp": "workspace",
-        ".xlqc": "liquid_class",
-        ".xlcp": "liquid_class_map",
-        ".xsit": "site",
-        ".xcon": "connector",
-        ".xml": "xml",
-    }.get(suffix.lower(), suffix.lower().lstrip(".") or "xml")
-
-
-def _command_short_name(type_name: str) -> str:
-    short = type_name.split(".")[-1]
-    short = re.sub(r"DataV\d+$", "", short)
-    short = re.sub(r"CommandDataV\d+$", "Command", short)
-    short = re.sub(r"ScriptCommandDataV\d+$", "Command", short)
-    return short or "Unknown"
-
-
-def _command_family(command_name: str) -> str:
-    registry_family = registry_command_family(command_name)
-    if registry_family:
-        return registry_family
-    t = command_name.lower()
-    if "liha" in t or "fca" in t:
-        return "LiHa/FCA"
-    if "mca384" in t:
-        return "MCA384"
-    if "mca96" in t or "mca" in t:
-        return "MCA96"
-    if "gripper" in t or "rga" in t or "cga" in t:
-        return "RGA/CGA"
-    if "worklist" in t:
-        return "Worklist"
-    if "labware" in t or "worktable" in t:
-        return "Worktable"
-    if "variable" in t:
-        return "Variables"
-    if "loop" in t or "conditional" in t or "alternate" in t or "group" in t:
-        return "Control flow"
-    if "comment" in t or "prompt" in t or "delay" in t or "timer" in t or "wait" in t:
-        return "User/script flow"
-    if "subroutine" in t:
-        return "Subroutine"
-    return "Other"
-
-
 def _alias_candidates(names: list[str]) -> list[dict[str, str]]:
-    out = []
-    seen = set()
+    out: list[dict[str, str]] = []
     for name in sorted(set(names)):
         match = re.match(r"^(.+?)\[\d+\]$", name)
-        if not match:
-            continue
-        base = match.group(1).strip()
-        key = (name, base)
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append({"project_name": name, "base_name": base})
+        if match:
+            out.append({"project_name": name, "base_name": match.group(1).strip()})
     return out
-
-
-def _pin_refs(text: str) -> list[str]:
-    refs = set(
-        re.findall(
-            r"\b(?:GIO\d+_Pin\d+|Worktable_[A-Za-z0-9_]*Pin[A-Za-z0-9_]*|WorktablePin_[A-Za-z0-9_]+)\b",
-            text,
-        )
-    )
-    return sorted(refs)
-
-
-def _asset_refs(text: str) -> list[str]:
-    refs = set()
-    for match in re.findall(
-        r"[^<>\"]+\.(?:bmp|gif|jpe?g|png|tiff?)", text, flags=re.IGNORECASE
-    ):
-        value = match.strip()
-        if value:
-            refs.add(Path(value.replace("\\", "/")).name)
-    return sorted(refs)
-
-
-def _looks_custom_object(
-    suffix: str,
-    object_name: str,
-    text: str,
-    pin_refs: list[str],
-    asset_refs: list[str],
-) -> bool:
-    haystack = f"{object_name}\n{text[:4000]}".casefold()
-    if suffix.lower() == ".xcon" and pin_refs:
-        return True
-    return bool(
-        pin_refs
-        or asset_refs
-        or "customdetailimage" in haystack
-        or "custom attributes" in haystack
-        or "customattributes" in haystack
-        or "custom" in object_name.casefold()
-    )
 
 
 def _custom_part_summary(
@@ -3228,13 +2647,14 @@ def _custom_part_summary_payload(
 def _archive_kind(
     scripts: list[dict[str, Any]],
     objects: list[dict[str, Any]],
+    worklists: list[dict[str, Any]],
     snapshot_evidence: list[dict[str, Any]],
 ) -> str:
     if snapshot_evidence and scripts:
         return "project_with_snapshot"
     if snapshot_evidence and not scripts:
         return "snapshot"
-    if scripts or objects:
+    if scripts or objects or worklists:
         return "project"
     return "archive"
 
