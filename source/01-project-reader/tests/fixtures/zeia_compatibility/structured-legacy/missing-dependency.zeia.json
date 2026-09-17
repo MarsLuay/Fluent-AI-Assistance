@@ -1,0 +1,10 @@
+{
+  "schema_version": "tecan.compatibility_recipe.v1",
+  "archive_name": "structured-legacy-missing-dependency.zeia",
+  "entries": [
+    {
+      "archive_path": "Scripts/missing-reference.xscr",
+      "content": "<?xml version=\"1.0\"?><Root><ObjectName>Missing Dependency Script</ObjectName><Script /><Reference><Guid>ffffffff-ffff-4fff-8fff-ffffffffffff</Guid><TypeId>WorktableWorkspace</TypeId><ObjectName>NotInArchive</ObjectName></Reference></Root>"
+    }
+  ]
+}

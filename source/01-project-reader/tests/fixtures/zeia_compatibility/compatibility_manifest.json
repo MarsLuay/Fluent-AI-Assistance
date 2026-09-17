@@ -1,0 +1,167 @@
+{
+  "schema_version": "tecan.zeia_compatibility_manifest.v1",
+  "canonical_schema_version": "tecan.canonical_project.v1",
+  "supported_adapters": [
+    "structured-zeia",
+    "visionx-datastore",
+    "visionx-datastore-v2",
+    "visionx-datastore-v3"
+  ],
+  "last_verified_commit": "bc379111aebc97e91f7d9707a5aab35a0d6e4728",
+  "variants": [
+    {
+      "variant_id": "structured-legacy",
+      "adapter_id": "structured-zeia",
+      "format_family": "structured-zeia",
+      "supported": true,
+      "expected_detection": {"status": "supported", "selected_adapter": "structured-zeia", "format_family": "structured-zeia"},
+      "identification": "Structural script/object/worklist evidence without a VisionX namespace or datastore version.",
+      "fluentcontrol_version": null,
+      "export_version": "synthetic-structure-only",
+      "minimal_fixture": "structured-legacy/minimal.zeia.json",
+      "representative_fixture": "structured-legacy/representative.zeia.json",
+      "expected_golden": "structured-legacy/expected.canonical.json",
+      "negative_neighbor": {
+        "fixture": "visionx-v3/minimal.zeia.json",
+        "expected_adapter_id": "visionx-datastore-v3"
+      },
+      "negative_cases": [
+        {
+          "fixture": "structured-legacy/malformed-member.zeia.json",
+          "expected_status": "supported",
+          "expected_complete": false
+        },
+        {
+          "fixture": "structured-legacy/missing-dependency.zeia.json",
+          "expected_status": "supported",
+          "expected_complete": true,
+          "expected_reference_object_name": "NotInArchive"
+        }
+      ],
+      "known_limitations": [
+        "Synthetic structural evidence does not identify a real FluentControl release."
+      ],
+      "tests": [
+        "test_manifest_supported_variant_matrix",
+        "test_manifest_negative_neighbors_and_failure_fixtures",
+        "test_compatibility_matrix_representative_runs_through_full_export_e2e"
+      ]
+    },
+    {
+      "variant_id": "visionx-v2",
+      "adapter_id": "visionx-datastore-v2",
+      "format_family": "visionx-datastore",
+      "supported": true,
+      "expected_detection": {"status": "supported", "selected_adapter": "visionx-datastore-v2", "format_family": "visionx-datastore"},
+      "identification": "VisionX VxData XML with dataStoreVersion=2 evidence.",
+      "fluentcontrol_version": null,
+      "export_version": "2",
+      "minimal_fixture": "visionx-v2/minimal.zeia.json",
+      "representative_fixture": "visionx-v2/representative.zeia.json",
+      "expected_golden": "visionx-v2/expected.canonical.json",
+      "negative_neighbor": {
+        "fixture": "visionx-v3/minimal.zeia.json",
+        "expected_adapter_id": "visionx-datastore-v3"
+      },
+      "negative_cases": [],
+      "known_limitations": [
+        "The version is schema evidence in a sanitized synthetic fixture, not a FluentControl release claim."
+      ],
+      "tests": [
+        "test_manifest_supported_variant_matrix",
+        "test_manifest_negative_neighbors_and_failure_fixtures"
+      ]
+    },
+    {
+      "variant_id": "visionx-v3",
+      "adapter_id": "visionx-datastore-v3",
+      "format_family": "visionx-datastore",
+      "supported": true,
+      "expected_detection": {"status": "supported", "selected_adapter": "visionx-datastore-v3", "format_family": "visionx-datastore"},
+      "identification": "VisionX VxData XML with dataStoreVersion=3 evidence.",
+      "fluentcontrol_version": null,
+      "export_version": "3",
+      "minimal_fixture": "visionx-v3/minimal.zeia.json",
+      "representative_fixture": "visionx-v3/representative.zeia.json",
+      "expected_golden": "visionx-v3/expected.canonical.json",
+      "negative_neighbor": {
+        "fixture": "visionx-v2/minimal.zeia.json",
+        "expected_adapter_id": "visionx-datastore-v2"
+      },
+      "negative_cases": [],
+      "known_limitations": [
+        "The version is schema evidence in a sanitized synthetic fixture, not a FluentControl release claim."
+      ],
+      "tests": [
+        "test_manifest_supported_variant_matrix",
+        "test_manifest_negative_neighbors_and_failure_fixtures"
+      ]
+    },
+    {
+      "variant_id": "visionx-namespace",
+      "adapter_id": "visionx-datastore",
+      "format_family": "visionx-datastore",
+      "supported": true,
+      "expected_detection": {"status": "supported", "selected_adapter": "visionx-datastore", "format_family": "visionx-datastore"},
+      "identification": "VisionX VxData namespace evidence without a datastore version.",
+      "fluentcontrol_version": null,
+      "export_version": "namespace-only",
+      "minimal_fixture": "visionx-namespace/minimal.zeia.json",
+      "representative_fixture": "visionx-namespace/representative.zeia.json",
+      "expected_golden": "visionx-namespace/expected.canonical.json",
+      "negative_neighbor": {
+        "fixture": "visionx-v2/minimal.zeia.json",
+        "expected_adapter_id": "visionx-datastore-v2"
+      },
+      "negative_cases": [],
+      "known_limitations": [
+        "Namespace-only evidence does not identify a real FluentControl release."
+      ],
+      "tests": [
+        "test_manifest_supported_variant_matrix",
+        "test_manifest_negative_neighbors_and_failure_fixtures"
+      ]
+    },
+    {
+      "variant_id": "unknown-datastore-version",
+      "adapter_id": null,
+      "format_family": null,
+      "supported": false,
+      "expected_detection": {"status": "unsupported", "selected_adapter": null, "format_family": null},
+      "identification": "VisionX-looking XML with an unrecognized datastore version.",
+      "fluentcontrol_version": null,
+      "export_version": "99",
+      "minimal_fixture": "unknown-datastore-version/minimal.zeia.json",
+      "representative_fixture": null,
+      "expected_golden": null,
+      "negative_neighbor": null,
+      "negative_cases": [],
+      "known_limitations": [
+        "Unsupported versions must be surfaced for an explicit adapter instead of guessed as a generic export."
+      ],
+      "tests": ["test_unknown_variant_fails_safely"]
+    }
+  ],
+  "multi_archive_folder": {
+    "fixtures": [
+      "structured-legacy/minimal.zeia.json",
+      "visionx-v3/minimal.zeia.json"
+    ],
+    "expected_archive_count": 2,
+    "expected_script_count": 2,
+    "tests": ["test_multi_archive_full_export_folder"]
+  },
+  "fixture_checksums": {
+    "structured-legacy/malformed-member.zeia.json": "5c8f262e710184cc7f947a4b6a1c61a69f363b597c54c87915226cc06c2b1bf4",
+    "structured-legacy/minimal.zeia.json": "60ab117a29f50e1b3fd59f54ae82e90fe84bf76c4aed832f16187b248f1d4df3",
+    "structured-legacy/missing-dependency.zeia.json": "522a9978630f86482541cb0c912b4b691b40668939b42016a3c5cba00170164a",
+    "structured-legacy/representative.zeia.json": "9408b11bdb1cc3c2dd33045b72f4b77bbcf13ea97fbe105b166b11c62619615e",
+    "unknown-datastore-version/minimal.zeia.json": "525d01c1c718e5a9dc062c9655fe5f24fc7170ef312af463023567ffa31c89b9",
+    "visionx-namespace/minimal.zeia.json": "b11fa549ed1c7d661d488535a3df76dc2a486efc37fe458ce4eec3e4f5961423",
+    "visionx-namespace/representative.zeia.json": "27d78b5e7bdd18d5d9ba96278bb0ee7625715c054f30d06c04d297c8a1b95b98",
+    "visionx-v2/minimal.zeia.json": "16a868c4c443a15c5f4728474a06b5c3d2784c5b7e8315603d50f0f92be28844",
+    "visionx-v2/representative.zeia.json": "0023fe8838f2f40cee7f94827b2d8822ba1296e49eea650d82cf9dbd1d88929c",
+    "visionx-v3/minimal.zeia.json": "4563ee45332ad1b58be0e00d820781d1cfafad6a73a1d6511c36a62994365771",
+    "visionx-v3/representative.zeia.json": "a82fb9af091e780579e390ed29d4c304a236b7c61e96ad7101bcda99203d91e1"
+  }
+}

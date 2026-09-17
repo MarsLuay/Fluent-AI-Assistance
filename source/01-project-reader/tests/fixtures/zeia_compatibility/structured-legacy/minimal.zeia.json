@@ -1,0 +1,10 @@
+{
+  "schema_version": "tecan.compatibility_recipe.v1",
+  "archive_name": "structured-legacy-minimal.zeia",
+  "entries": [
+    {
+      "archive_path": "Scripts/minimal.xscr",
+      "content": "<?xml version=\"1.0\"?><Root><ObjectName>Minimal Legacy</ObjectName><Script version=\"1.0\" /></Root>"
+    }
+  ]
+}

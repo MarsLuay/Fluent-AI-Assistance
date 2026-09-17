@@ -1,0 +1,10 @@
+{
+  "schema_version": "tecan.compatibility_recipe.v1",
+  "archive_name": "visionx-v3-minimal.zeia",
+  "entries": [
+    {
+      "archive_path": "DataStore/UserSpecific/minimal.xscr",
+      "content": "<?xml version=\"1.0\"?><VxData dataStoreVersion=\"3\"><Payload><ObjectName>Minimal VisionX v3</ObjectName><Script version=\"3.0\" /></Payload></VxData>"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "schema_version": "tecan.compatibility_recipe.v1",
+  "archive_name": "structured-legacy-malformed.zeia",
+  "entries": [
+    {
+      "archive_path": "Scripts/truncated.xscr",
+      "content": "<?xml version=\"1.0\"?><Root><ObjectName>Truncated Script</ObjectName><Script>"
+    }
+  ]
+}

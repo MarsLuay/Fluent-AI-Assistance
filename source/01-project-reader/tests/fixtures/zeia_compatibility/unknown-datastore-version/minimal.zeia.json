@@ -1,0 +1,10 @@
+{
+  "schema_version": "tecan.compatibility_recipe.v1",
+  "archive_name": "unknown-datastore-version.zeia",
+  "entries": [
+    {
+      "archive_path": "DataStore/UserSpecific/minimal.xscr",
+      "content": "<?xml version=\"1.0\"?><VxData dataStoreVersion=\"99\"><Payload><ObjectName>Unknown Version</ObjectName><Script /></Payload></VxData>"
+    }
+  ]
+}
