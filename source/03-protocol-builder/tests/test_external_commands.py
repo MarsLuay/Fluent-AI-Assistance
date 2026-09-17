@@ -4,7 +4,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from fluent_pipeline.external_commands import inspect_external_command
+from fluent_pipeline.external_commands import (
+    build_driver_usage_contracts,
+    fingerprint_driver_usage_contract,
+    inspect_external_command,
+    select_driver_usage_contract,
+    DriverCommandContractAmbiguityError,
+)
 
 
 class ExternalCommandContractTests(unittest.TestCase):
@@ -48,6 +54,7 @@ class ExternalCommandContractTests(unittest.TestCase):
 
         self.assertEqual(report["match_count"], 1)
         match = report["matches"][0]
+        self.assertTrue(str(match["contract_id"]).startswith("dcc_"))
         self.assertEqual(match["referenced_variables"], ["a200startwell", "a200endwell"])
         self.assertEqual(
             match["dependency_variables"],
@@ -57,6 +64,84 @@ class ExternalCommandContractTests(unittest.TestCase):
         self.assertEqual(match["following_companion"]["execution_settings"], "3600")
         start = next(item for item in match["variable_declarations"] if item["name"] == "a200startwell")
         self.assertEqual(start["assignments"][0]["condition"], "NumSourceTubes < 5")
+        self.assertEqual(match["source_path"], "source.xscr")
+
+    def test_dynamic_output_path_variable_deps_and_distinct_usages(self) -> None:
+        xscr = """\
+<Script>
+  <VariableDefinitionHelper><Name>OutputDir</Name><TypeName>File</TypeName><Scope>Script</Scope><Values><string></string></Values></VariableDefinitionHelper>
+  <VariableDefinitionHelper><Name>RunStamp</Name><TypeName>String</TypeName><Scope>Script</Scope><Values><string>run</string></Values></VariableDefinitionHelper>
+  <SetVariableStatement><Name>OutputDir</Name><Value>~RunStamp~\\results</Value><LineNumber>3</LineNumber></SetVariableStatement>
+  <ApplicationDriverMacro Name="Vendor_Export" ModuleName="VendorDevice" ExecutionTime="PT2S" IsDisabledForExecution="false" LineNumber="10">
+    <ExecutionSettings>&amp;lt;ExportParams&amp;gt;&amp;lt;OutputPath&amp;gt;~OutputDir~\\plate.csv&amp;lt;/OutputPath&amp;gt;&amp;lt;/ExportParams&amp;gt;</ExecutionSettings>
+  </ApplicationDriverMacro>
+  <LegacyDriverMacro Name="Vendor_WaitFinished" ModuleName="VendorDevice" ExecutionTime="PT2S" IsDisabledForExecution="false" LineNumber="11">
+    <ExecutionSettings>120</ExecutionSettings>
+  </LegacyDriverMacro>
+  <ApplicationDriverMacro Name="Vendor_Export" ModuleName="VendorDevice" ExecutionTime="PT5S" IsDisabledForExecution="false" LineNumber="20">
+    <ExecutionSettings>&amp;lt;ExportParams&amp;gt;&amp;lt;OutputPath&amp;gt;C:\\Static\\plate.csv&amp;lt;/OutputPath&amp;gt;&amp;lt;/ExportParams&amp;gt;</ExecutionSettings>
+  </ApplicationDriverMacro>
+</Script>
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "source.xscr").write_text(xscr, encoding="utf-8")
+            manifest = {
+                "scripts": [
+                    {"object_name": "SyntheticExport", "extracted_path": "source.xscr"}
+                ]
+            }
+            contracts = build_driver_usage_contracts(
+                manifest,
+                context_root=root,
+                command_name="Vendor_Export",
+                module_name="VendorDevice",
+            )
+            again = build_driver_usage_contracts(
+                manifest,
+                context_root=root,
+                command_name="Vendor_Export",
+                module_name="VendorDevice",
+            )
+            self.assertEqual(
+                [item["contract_id"] for item in contracts],
+                [item["contract_id"] for item in again],
+            )
+
+        self.assertEqual(len(contracts), 2)
+        dynamic, static = contracts
+        self.assertIn("~OutputDir~", dynamic["execution_settings"])
+        self.assertEqual(dynamic["referenced_variables"], ["OutputDir"])
+        self.assertEqual(dynamic["dependency_variables"], ["OutputDir", "RunStamp"])
+        output_decl = next(
+            item for item in dynamic["variable_declarations"] if item["name"] == "OutputDir"
+        )
+        self.assertEqual(output_decl["type"], "File")
+        self.assertEqual(output_decl["scope"], "Script")
+        self.assertNotEqual(dynamic["contract_id"], static["contract_id"])
+        self.assertEqual(
+            fingerprint_driver_usage_contract(dynamic),
+            dynamic["contract_id"],
+        )
+        selected = select_driver_usage_contract(
+            contracts,
+            macro_name="Vendor_Export",
+            module_name="VendorDevice",
+            contract_id=dynamic["contract_id"],
+        )
+        self.assertEqual(selected["contract_id"], dynamic["contract_id"])
+        with self.assertRaises(DriverCommandContractAmbiguityError) as raised:
+            select_driver_usage_contract(
+                contracts,
+                macro_name="Vendor_Export",
+                module_name="VendorDevice",
+            )
+        self.assertEqual(
+            raised.exception.contract_ids,
+            [dynamic["contract_id"], static["contract_id"]],
+        )
+        self.assertEqual(dynamic["following_companion"]["name"], "Vendor_WaitFinished")
+        self.assertIsNone(static.get("following_companion"))
 
 
 if __name__ == "__main__":

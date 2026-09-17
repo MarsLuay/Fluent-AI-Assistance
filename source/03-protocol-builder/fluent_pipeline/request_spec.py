@@ -42,6 +42,9 @@ RECIPE_STEP_SHORTHAND_KEYS = (
     "manual_move",
     "liha_dispense",
     "a200_dispense",
+    "driver_macro",
+    "legacy_driver_macro",
+    "application_driver_macro",
 )
 RECIPE_STEP_TYPES = (
     "comment",
@@ -54,6 +57,9 @@ RECIPE_STEP_TYPES = (
     "move",
     "liha_dispense",
     "a200_dispense",
+    "driver_macro",
+    "legacy_driver_macro",
+    "application_driver_macro",
 )
 _META_GROUP_COMMENT_PATTERNS = (
     re.compile(r"^\s*verification\s+script\s+for\b", re.I),

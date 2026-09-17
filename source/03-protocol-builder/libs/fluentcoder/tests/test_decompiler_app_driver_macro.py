@@ -49,6 +49,13 @@ TRANSFER_SETTINGS = (
     "&amp;lt;/TransferLabwareCommandParameters&amp;gt;"
 )
 
+OUTPUT_DIR_SETTINGS = (
+    "&amp;lt;ExportCommandParameters "
+    'xmlns:i="http://www.w3.org/2001/XMLSchema-instance"'
+    "&amp;gt;&amp;lt;OutputPath&amp;gt;~OutputDir~\\plate.csv&amp;lt;/OutputPath&amp;gt;"
+    "&amp;lt;/ExportCommandParameters&amp;gt;"
+)
+
 
 def _minimal_xscr(*objects: str) -> str:
     body = "\n".join(objects)
@@ -82,6 +89,12 @@ EXECUTE_VECTOR_OBJECT = f"""        <Object Type="Tecan.VisionX.ApplicationDrive
 TRANSFER_OBJECT = f"""        <Object Type="Tecan.VisionX.ApplicationDriver.ApplicationDriverBase.ApplicationDriverMacro">
           <ApplicationDriverMacro Version="1" Name="RGA1_TransferLabware" ModuleName="RGA 1" ExecutionTime="PT2S" IsBreakpoint="false" IsDisabledForExecution="false" LineNumber="3">
             <ExecutionSettings>{TRANSFER_SETTINGS}</ExecutionSettings>
+          </ApplicationDriverMacro>
+        </Object>"""
+
+OUTPUT_DIR_OBJECT = f"""        <Object Type="Tecan.VisionX.ApplicationDriver.ApplicationDriverBase.ApplicationDriverMacro">
+          <ApplicationDriverMacro Version="1" Name="Vendor_Export" ModuleName="VendorDevice" ExecutionTime="PT2S" IsBreakpoint="false" IsDisabledForExecution="false" LineNumber="4">
+            <ExecutionSettings>{OUTPUT_DIR_SETTINGS}</ExecutionSettings>
           </ApplicationDriverMacro>
         </Object>"""
 
@@ -184,6 +197,34 @@ def test_renderer_reparses_transfer_macro_parameters_after_roundtrip() -> None:
 
     assert reparsed.parameters["Labware"] == "AdapterA200"
     assert reparsed.parameters["Location"] == "LocationNameA200"
+
+
+def test_output_dir_variable_token_survives_parse_codegen_and_render(tmp_path: Path) -> None:
+    src = tmp_path / "output_dir.xscr"
+    src.write_text(_minimal_xscr(OUTPUT_DIR_OBJECT), encoding="utf-8")
+    proto = parse_xscr(src)
+    step = proto.groups[0].steps[0]
+    assert isinstance(step, ApplicationDriverMacroStep)
+    assert "~OutputDir~" in step.execution_settings
+    assert step.parameters.get("OutputPath") == "~OutputDir~\\plate.csv"
+
+    py_src = emit_python(proto, source_xscr=str(src))
+    assert "wt.application_driver_macro(" in py_src
+    assert "~OutputDir~" in py_src
+
+    from fluentcoder.compiler.renderer import Renderer
+
+    step.raw_xml = None
+    rendered = Renderer()._render_application_driver_macro_step(
+        step,
+        params={
+            "LineNumber": "4",
+            "IsBreakpoint": "false",
+            "IsDisabledForExecution": "false",
+        },
+    )
+    assert "~OutputDir~" in rendered
+    assert "C:\\Users" not in rendered
 
 
 def test_renderer_raw_xml_passthrough() -> None:

@@ -467,6 +467,13 @@ def export_ready_to_import(
             exports=exports,
             copied_files=copied_files,
         )
+        driver_command_contracts_dest = _write_driver_command_contracts_artifact(
+            source_manifest,
+            source_dir=source_dir,
+            bundle_root=bundle_root,
+            exports=exports,
+            copied_files=copied_files,
+        )
         script_folder_bindings_dest = _write_script_folder_bindings_artifact(
             source_manifest,
             source_dir=source_dir,
@@ -819,6 +826,9 @@ def export_ready_to_import(
                 "connector_graph": "source/connector_graph.json" if connector_graph_dest else None,
                 "liquid_classes": "source/liquid_classes.json" if liquid_classes_dest else None,
                 "driver_macros": "source/driver_macros.json" if driver_macros_dest else None,
+                "driver_command_contracts": (
+                    "source/driver_command_contracts.json" if driver_command_contracts_dest else None
+                ),
                 "script_folder_bindings": (
                     "source/script_folder_bindings.json" if script_folder_bindings_dest else None
                 ),
@@ -6008,6 +6018,43 @@ def _write_driver_macros_artifact(
         return None
     exports.append(ExportedArtifact(written, written, "driver-macros"))
     copied_files.append(_file_record("driver-macros", written, written, bundle_root=bundle_root))
+    return written
+
+
+def _write_driver_command_contracts_artifact(
+    source_manifest: dict[str, Any] | None,
+    *,
+    source_dir: Path,
+    bundle_root: Path,
+    exports: list[ExportedArtifact],
+    copied_files: list[dict[str, str]],
+) -> Path | None:
+    """Persist per-usage driver command contracts adjacent to the shallow v1 catalog."""
+    from .driver_macros_export import (
+        DRIVER_COMMAND_CONTRACTS_FILENAME,
+        write_driver_command_contracts,
+    )
+
+    manifest = source_manifest if isinstance(source_manifest, dict) else {}
+    context_root = None
+    for key in ("root", "context_root", "extracted_dir"):
+        raw = manifest.get(key)
+        if raw:
+            context_root = Path(str(raw))
+            break
+    destination = source_dir / DRIVER_COMMAND_CONTRACTS_FILENAME
+    written = write_driver_command_contracts(
+        destination,
+        manifest=manifest,
+        context_root=context_root or source_dir.parent,
+        source="zeia_scripts",
+    )
+    if written is None:
+        return None
+    exports.append(ExportedArtifact(written, written, "driver-command-contracts"))
+    copied_files.append(
+        _file_record("driver-command-contracts", written, written, bundle_root=bundle_root)
+    )
     return written
 
 

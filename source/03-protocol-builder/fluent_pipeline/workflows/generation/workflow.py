@@ -48,6 +48,15 @@ from ...expression_provenance import (
 )
 from ...interactive_script import prepare_interactive_recipe
 from ...ir_planner import synthesize_seed_ir
+from ...external_commands import (
+    DriverCommandContractAmbiguityError,
+    DriverCommandContractNotFoundError,
+    select_driver_usage_contract,
+)
+from ...driver_macros_export import (
+    DRIVER_COMMAND_CONTRACTS_FILENAME,
+    load_driver_command_contracts,
+)
 from ...instrument_config import (
     infer_expected_host_config,
     inspect_host_instrument_configs,
@@ -4639,6 +4648,7 @@ def build_ir_from_recipe(
         )
 
     worktable_patterns = recipe_worktable_patterns(recipe)
+    driver_contracts = _driver_command_contracts_for_context(context, recipe=recipe)
     subroutine_names: list[str] = []
     prep_steps_ir: list[dict[str, Any]] = []
     for raw_step in recipe.get("prep_steps") or []:
@@ -4649,6 +4659,7 @@ def build_ir_from_recipe(
             subroutine_names,
             labware_entries=labware_entries,
             worktable_patterns=worktable_patterns,
+            driver_contracts=driver_contracts,
         )
         if built is None:
             continue
@@ -4778,6 +4789,7 @@ def build_ir_from_recipe(
                 subroutine_names,
                 labware_entries=labware_entries,
                 worktable_patterns=worktable_patterns,
+                driver_contracts=driver_contracts,
             )
             if built is None:
                 continue
@@ -5781,20 +5793,217 @@ def _legacy_driver_macro_raw_xml(
     macro_name: str,
     module_name: str,
     execution_settings: str,
+    execution_time: str | None = None,
+    disabled: bool = False,
 ) -> str:
-    execution_time = _legacy_driver_macro_execution_time(
+    resolved_time = execution_time or _legacy_driver_macro_execution_time(
         macro_name=macro_name,
         execution_settings=execution_settings,
     )
+    disabled_text = "true" if disabled else "false"
     return (
         '<Object Type="Tecan.VisionX.ApplicationDriver.LegacyDriverMacro">\n'
         f'  <LegacyDriverMacro Version="1" Name="{macro_name}" ModuleName="{module_name}" '
-        f'ExecutionTime="{execution_time}" IsBreakpoint="false" IsDisabledForExecution="false" '
+        f'ExecutionTime="{resolved_time}" IsBreakpoint="false" IsDisabledForExecution="{disabled_text}" '
         'LineNumber="0">\n'
         f"    <ExecutionSettings>{execution_settings}</ExecutionSettings>\n"
         "  </LegacyDriverMacro>\n"
         "</Object>"
     )
+
+
+def _application_driver_macro_raw_xml(
+    *,
+    macro_name: str,
+    module_name: str,
+    execution_settings: str,
+    execution_time: str | None = None,
+    disabled: bool = False,
+) -> str:
+    resolved_time = execution_time or "PT2S"
+    disabled_text = "true" if disabled else "false"
+    return (
+        '<Object Type="Tecan.VisionX.ApplicationDriver.ApplicationDriverBase.ApplicationDriverMacro">\n'
+        f'  <ApplicationDriverMacro Version="1" Name="{macro_name}" ModuleName="{module_name}" '
+        f'ExecutionTime="{resolved_time}" IsBreakpoint="false" IsDisabledForExecution="{disabled_text}" '
+        'LineNumber="0">\n'
+        f"    <ExecutionSettings>{execution_settings}</ExecutionSettings>\n"
+        "  </ApplicationDriverMacro>\n"
+        "</Object>"
+    )
+
+
+def _driver_command_contracts_for_context(
+    context: ProjectLike | None,
+    *,
+    recipe: Mapping[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    if isinstance(recipe, Mapping):
+        inline = recipe.get("driver_command_contracts") or recipe.get("driver_contracts")
+        if isinstance(inline, Mapping):
+            return dict(inline)
+        if isinstance(inline, list):
+            return {"usages": list(inline)}
+    root = _context_root_path(context)
+    if root is None:
+        return None
+    loaded = load_driver_command_contracts(Path(root) / DRIVER_COMMAND_CONTRACTS_FILENAME)
+    if loaded is not None:
+        return loaded
+    # Fall back to live mining from the imported manifest when the sidecar is absent.
+    manifest = getattr(context, "manifest", None) if context is not None else None
+    if not isinstance(manifest, Mapping):
+        return None
+    from ...driver_macros_export import build_driver_command_contracts
+
+    return build_driver_command_contracts(manifest=manifest, context_root=root)
+
+
+def _resolve_driver_usage_contract(
+    *,
+    macro_name: str,
+    module_name: str | None,
+    driver_contracts: Mapping[str, Any] | Sequence[Mapping[str, Any]] | None,
+    contract_id: str | None = None,
+    source_script: str | None = None,
+    command_kind: str | None = None,
+    required: bool = False,
+) -> dict[str, Any] | None:
+    if driver_contracts is None:
+        if required:
+            raise DriverCommandContractNotFoundError(
+                f"No driver contracts available for {macro_name!r}",
+                macro_name=macro_name,
+                module_name=module_name,
+            )
+        return None
+    try:
+        return select_driver_usage_contract(
+            driver_contracts,
+            macro_name=macro_name,
+            module_name=module_name,
+            contract_id=contract_id,
+            source_script=source_script,
+            command_kind=command_kind,
+        )
+    except DriverCommandContractNotFoundError:
+        if required:
+            raise
+        return None
+
+
+def _driver_macro_ir_steps_from_contract(
+    *,
+    contract: Mapping[str, Any],
+    group_name: str,
+    next_step,
+    include_companion: bool = True,
+    include_variable_defaults: bool = True,
+) -> list[dict[str, Any]]:
+    steps: list[dict[str, Any]] = []
+
+    def _append(
+        operation: str,
+        *,
+        command_id: str,
+        name: str,
+        parameters: dict[str, Any],
+        **extra: Any,
+    ) -> None:
+        idx, step_id = next_step()
+        step_doc: dict[str, Any] = {
+            "group": group_name,
+            "id": step_id,
+            "index": idx,
+            "safety_flags": extra.pop("safety_flags", ["source_backed_driver_contract"]),
+            "command_id": command_id,
+            "name": name,
+            "operation": operation,
+            "parameters": parameters,
+        }
+        step_doc.update(extra)
+        steps.append(step_doc)
+
+    if include_variable_defaults:
+        for declaration in contract.get("variable_declarations") or []:
+            if not isinstance(declaration, Mapping):
+                continue
+            variable = str(declaration.get("name") or "").strip()
+            if not variable:
+                continue
+            default = declaration.get("default")
+            if default in (None, ""):
+                continue
+            _append(
+                "set_variable",
+                command_id="SetVariableStatement",
+                name="Set Variable",
+                parameters={"variable": variable, "value": default},
+            )
+
+    macro_name = str(contract.get("macro_name") or contract.get("name") or "").strip()
+    module_name = str(contract.get("module_name") or "").strip()
+    execution_settings = str(contract.get("execution_settings") or "")
+    command_kind = str(contract.get("command_kind") or "LegacyDriverMacro")
+    execution_time = str(contract.get("execution_time") or "") or None
+    disabled = bool(contract.get("disabled"))
+    if command_kind.casefold() == "applicationdrivermacro":
+        raw_xml = _application_driver_macro_raw_xml(
+            macro_name=macro_name,
+            module_name=module_name,
+            execution_settings=execution_settings,
+            execution_time=execution_time,
+            disabled=disabled,
+        )
+        command_id = "ApplicationDriverMacro"
+    else:
+        raw_xml = _legacy_driver_macro_raw_xml(
+            macro_name=macro_name,
+            module_name=module_name,
+            execution_settings=execution_settings,
+            execution_time=execution_time,
+            disabled=disabled,
+        )
+        command_id = "LegacyDriverMacro"
+    _append(
+        "application_driver_macro",
+        command_id=command_id,
+        name=f"{module_name or macro_name} Run",
+        parameters={
+            "macro_name": macro_name,
+            "module_name": module_name,
+            "execution_settings": execution_settings,
+            "contract_id": contract.get("contract_id"),
+            "raw_xml": raw_xml,
+        },
+    )
+
+    companion = contract.get("following_companion") if include_companion else None
+    if isinstance(companion, Mapping) and companion.get("name"):
+        companion_settings = str(companion.get("execution_settings") or "")
+        companion_name = str(companion.get("name") or "")
+        companion_module = str(companion.get("module_name") or module_name)
+        companion_time = str(companion.get("execution_time") or "") or None
+        companion_disabled = bool(companion.get("disabled"))
+        wait_xml = _legacy_driver_macro_raw_xml(
+            macro_name=companion_name,
+            module_name=companion_module,
+            execution_settings=companion_settings,
+            execution_time=companion_time,
+            disabled=companion_disabled,
+        )
+        _append(
+            "application_driver_macro",
+            command_id="LegacyDriverMacro",
+            name=f"{companion_module or companion_name} Wait Finished",
+            parameters={
+                "macro_name": companion_name,
+                "module_name": companion_module,
+                "execution_settings": companion_settings,
+                "raw_xml": wait_xml,
+            },
+        )
+    return steps
 
 
 def _recipe_step_to_ir(
@@ -5805,6 +6014,7 @@ def _recipe_step_to_ir(
     *,
     labware_entries: list[dict[str, Any]] | None = None,
     worktable_patterns: dict[str, dict[str, Any]] | None = None,
+    driver_contracts: Mapping[str, Any] | Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any] | list[dict[str, Any]] | None:
     if not isinstance(raw_step, dict):
         return None
@@ -6126,12 +6336,33 @@ def _recipe_step_to_ir(
         ).strip()
         if not macro_name or not module_name or not wait_macro:
             return None
+        # Prefer an exact source-backed usage contract when available; never splice
+        # settings from one usage with companion/timing from another.
+        selected_contract: dict[str, Any] | None = None
+        try:
+            selected_contract = _resolve_driver_usage_contract(
+                macro_name=macro_name,
+                module_name=module_name,
+                driver_contracts=driver_contracts,
+                contract_id=str(payload.get("contract_id") or "").strip() or None,
+                source_script=str(payload.get("source_script") or "").strip() or None,
+                command_kind="LegacyDriverMacro",
+            )
+        except DriverCommandContractAmbiguityError:
+            raise
         # execution_settings / wait / wells must come from recipe or mined ZEIA —
         # never invent SPE 4,~a200startwell~,~a200endwell~,0 or wait 300.
         execution_settings = str(payload.get("execution_settings") or "").strip()
         wait_timeout = str(
             payload.get("wait_timeout") or payload.get("wait_seconds") or ""
         ).strip()
+        if selected_contract is not None:
+            if not execution_settings:
+                execution_settings = str(selected_contract.get("execution_settings") or "").strip()
+            companion = selected_contract.get("following_companion") or {}
+            if not wait_timeout and isinstance(companion, Mapping):
+                if str(companion.get("name") or "").casefold() == wait_macro.casefold():
+                    wait_timeout = str(companion.get("execution_settings") or "").strip()
         start_well = payload.get("start_well")
         end_well = payload.get("end_well")
         if not execution_settings or not wait_timeout:
@@ -6181,17 +6412,26 @@ def _recipe_step_to_ir(
             macro_name=macro_name,
             module_name=module_name,
             execution_settings=execution_settings,
+            execution_time=(
+                str(selected_contract.get("execution_time") or "") or None
+                if selected_contract is not None
+                else None
+            ),
+            disabled=bool(selected_contract.get("disabled")) if selected_contract else False,
         )
+        run_params = {
+            "macro_name": macro_name,
+            "module_name": module_name,
+            "execution_settings": execution_settings,
+            "raw_xml": run_xml,
+        }
+        if selected_contract and selected_contract.get("contract_id"):
+            run_params["contract_id"] = selected_contract.get("contract_id")
         _append_step(
             "application_driver_macro",
             command_id="LegacyDriverMacro",
             name=f"{module_name} Run",
-            parameters={
-                "macro_name": macro_name,
-                "module_name": module_name,
-                "execution_settings": execution_settings,
-                "raw_xml": run_xml,
-            },
+            parameters=run_params,
             safety_flags=["automated_verification_motion"],
         )
         wait_xml = _legacy_driver_macro_raw_xml(
@@ -6212,4 +6452,66 @@ def _recipe_step_to_ir(
             safety_flags=["automated_verification_motion"],
         )
         return steps or None
+    if step_type in {"driver_macro", "legacy_driver_macro", "application_driver_macro"}:
+        payload = data.get(step_type) if isinstance(data.get(step_type), dict) else None
+        source = payload or data
+        macro_name = str(
+            source.get("macro_name") or source.get("name") or source.get("command_name") or ""
+        ).strip()
+        module_name = str(source.get("module_name") or "").strip() or None
+        if not macro_name:
+            return None
+        command_kind = None
+        if step_type == "legacy_driver_macro":
+            command_kind = "LegacyDriverMacro"
+        elif step_type == "application_driver_macro":
+            command_kind = "ApplicationDriverMacro"
+        else:
+            kind_hint = str(source.get("command_kind") or source.get("macro_kind") or "").strip()
+            if kind_hint:
+                if kind_hint.casefold() in {"legacy", "legacydrivermacro"}:
+                    command_kind = "LegacyDriverMacro"
+                elif kind_hint.casefold() in {"application", "applicationdrivermacro"}:
+                    command_kind = "ApplicationDriverMacro"
+        contract_id = str(source.get("contract_id") or "").strip() or None
+        source_script = str(source.get("source_script") or "").strip() or None
+        explicit_settings = str(source.get("execution_settings") or "").strip()
+        try:
+            selected = _resolve_driver_usage_contract(
+                macro_name=macro_name,
+                module_name=module_name,
+                driver_contracts=driver_contracts,
+                contract_id=contract_id,
+                source_script=source_script,
+                command_kind=command_kind,
+                required=not explicit_settings,
+            )
+        except DriverCommandContractAmbiguityError:
+            raise
+        except DriverCommandContractNotFoundError:
+            if not explicit_settings:
+                return None
+            selected = None
+        if selected is None:
+            if not explicit_settings or not module_name:
+                return None
+            selected = {
+                "macro_name": macro_name,
+                "module_name": module_name,
+                "command_kind": command_kind or "LegacyDriverMacro",
+                "execution_settings": explicit_settings,
+                "execution_time": str(source.get("execution_time") or ""),
+                "disabled": bool(source.get("disabled")),
+                "variable_declarations": [],
+                "following_companion": None,
+            }
+        include_companion = bool(source.get("include_companion", True))
+        include_variable_defaults = bool(source.get("include_variable_defaults", True))
+        return _driver_macro_ir_steps_from_contract(
+            contract=selected,
+            group_name=group_name,
+            next_step=next_step,
+            include_companion=include_companion,
+            include_variable_defaults=include_variable_defaults,
+        )
     return None
