@@ -202,3 +202,16 @@ class TestSearchProjectIndex(unittest.TestCase):
         self.assertEqual(result["kind_filter"], "liquid_class")
         self.assertEqual(result["result_count"], 1)
         self.assertEqual(result["results"][0]["name"], "Water")
+
+
+class TestIndexSchemaPolicy(unittest.TestCase):
+    def test_search_rejects_stale_schema(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Path(tmp) / "index.db"
+            conn = sqlite3.connect(db)
+            conn.execute("CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            conn.execute("INSERT INTO metadata(key, value) VALUES('schema_version', '1')")
+            conn.commit()
+            conn.close()
+            with self.assertRaisesRegex(ValueError, "rebuild the index"):
+                search_project_index(db, "x")

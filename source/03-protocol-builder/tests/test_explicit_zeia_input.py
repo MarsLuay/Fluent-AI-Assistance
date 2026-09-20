@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import tempfile
 import unittest
@@ -24,6 +25,13 @@ class ExplicitZeiaInputTests(unittest.TestCase):
             self.assertNotIn("obsidian_vault_root", source, str(path))
             self.assertNotIn("discover_vault_root_zeia", source, str(path))
             self.assertNotIn(".obsidian", source, str(path))
+
+    def test_compatibility_inventory_marks_obsidian_discovery_removed(self):
+        inventory = json.loads(
+            (Path(__file__).resolve().parents[3] / "compatibility-inventory.json").read_text(encoding="utf-8")
+        )
+        by_id = {row["id"]: row for row in inventory["surfaces"]}
+        self.assertEqual(by_id["removed.obsidian_vault_auto_discovery"]["class"], "removed")
 
     def test_cli_relative_archive_does_not_search_obsidian_vault_root(self):
         with tempfile.TemporaryDirectory() as tmp:
