@@ -111,3 +111,14 @@ rebuild. There is no row-level migration.
 Collection manifests currently use `schema_version` 1 (`kind` =
 `project_collection`). That document is supported as the collection contract;
 it is not a project-context manifest.
+
+### Liquid-class catalog
+
+Current version: `tecan.liquid_classes.v3`.
+
+`liquid_classes.json` is a persisted import artifact. Version 3 adds microscript
+command payloads, fingerprints, and source-backed pressure-supervision evidence.
+The v2 summary fields (`name`, `guid`, `profiles[]` section names / command-type
+lists, flattened `aspirate`/`dispense`/`mix`) remain as compatibility views.
+Unknown catalog schema versions are marked unsupported and require re-import.
+Do not invent pressure threshold defaults such as community `±1000` values.

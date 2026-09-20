@@ -1,5 +1,6 @@
 import contextlib
 import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -536,6 +537,83 @@ class FluentLogParserTests(unittest.TestCase):
         self.assertEqual(report["file_count"], 1)
         self.assertEqual(report["record_count"], 1)
         self.assertIn("fluent_log.checksum_recalculate", {item["id"] for item in report["diagnostics"]})
+
+    def test_pressure_out_of_range_diagnostic_is_conservative(self):
+        diagnostics = diagnose_fluent_log_text(
+            "2026-07-10 10:45:00 ERROR Script 'Water Protocol' Pressure out of range "
+            "liquid class: 'Water Free Single'\n"
+        )
+        item = next(row for row in diagnostics if row["id"] == "fluent_log.pressure_out_of_range")
+        self.assertEqual(item["records"][0]["script"], "Water Protocol")
+        blob = json.dumps(item).casefold()
+        self.assertIn("do not disable pressure supervision or widen", blob)
+        self.assertNotIn("+/-1000", blob)
+        self.assertNotIn("±1000", blob)
+        self.assertNotIn("1000", blob)
+        self.assertIn("physical", item["suggested_fix"].casefold())
+        self.assertTrue(any("insufficient evidence" in str(row).casefold() for row in item["evidence"]))
+
+    def test_pressure_out_of_range_without_script_context(self):
+        diagnostics = diagnose_fluent_log_text("2026-07-10 10:45:00 ERROR Pressure out of range\n")
+        item = next(row for row in diagnostics if row["id"] == "fluent_log.pressure_out_of_range")
+        self.assertFalse(item["records"][0].get("script"))
+        self.assertTrue(any("insufficient evidence" in str(row).casefold() for row in item["evidence"]))
+
+    def test_pressure_out_of_range_channel_isolation(self):
+        isolated = diagnose_fluent_log_text(
+            '<Log MsgID="1" TimeStamp="2026-07-10 10:45:00.000" '
+            'Channel="Tecan/Fluent Control/Instrument/FCA/Channel1" Severity="Error" '
+            'Message="Pressure out of range" />\n'
+        )
+        item = next(row for row in isolated if row["id"] == "fluent_log.pressure_out_of_range")
+        self.assertTrue(any("isolated_channel_or_module" in str(row) for row in item["evidence"]))
+        multi = diagnose_fluent_log_text(
+            '<Log MsgID="1" TimeStamp="2026-07-10 10:45:00.000" '
+            'Channel="Tecan/Fluent Control/Instrument/FCA/Channel1" Severity="Error" '
+            'Message="Pressure out of range" />\n'
+            '<Log MsgID="2" TimeStamp="2026-07-10 10:45:01.000" '
+            'Channel="Tecan/Fluent Control/Instrument/FCA/Channel8" Severity="Error" '
+            'Message="Pressure out of range" />\n'
+        )
+        item = next(row for row in multi if row["id"] == "fluent_log.pressure_out_of_range")
+        self.assertTrue(any("multiple_channels_or_modules" in str(row) for row in item["evidence"]))
+
+    def test_pressure_out_of_range_correlates_source_liquid_class(self):
+        catalog = {
+            "schema_version": "tecan.liquid_classes.v3",
+            "entries": [
+                {
+                    "name": "Water Free Single",
+                    "guid": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+                    "aliases": ["Water Free Single"],
+                    "fingerprint": "abc123",
+                    "profiles": [
+                        {
+                            "head": "Fca",
+                            "tip": "Standard Fixed Tip",
+                            "fingerprint": "def456",
+                            "pressure_supervision": {
+                                "presence": "present",
+                                "by_section": {"aspirate": {"err_pressure_out_of_range": 1}},
+                                "threshold_recommendation": None,
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+        diagnostics = diagnose_fluent_log_text(
+            "2026-07-10 10:45:00 ERROR Script 'Water Protocol' Pressure out of range "
+            "liquid class: 'Water Free Single'\n",
+            liquid_classes_catalog=catalog,
+            host_environment={"fingerprint": "hostfingerprint0001", "fluentcontrol_version": "3.x"},
+        )
+        item = next(row for row in diagnostics if row["id"] == "fluent_log.pressure_out_of_range")
+        evidence = " ".join(item["evidence"])
+        self.assertIn("source_liquid_class", evidence)
+        self.assertIn("source_pressure_supervision", evidence)
+        self.assertIn("host_environment", evidence)
+        self.assertNotIn("1000", json.dumps(item))
 
 
 if __name__ == "__main__":

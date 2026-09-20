@@ -31,13 +31,30 @@
               <MoveValveMicroCommandDataV1/>
             </Object>
             <Object Type="Tecan.Core.Instrument.Devices.Pipetting.AspirateAirMicroCommandDataV2">
-              <AspirateAirMicroCommandDataV2/>
+              <AspirateAirMicroCommandDataV2>
+                <LiquidClassValueVariableNamePair>
+                  <Value></Value>
+                  <VariableName>pmpEvaluationModel</VariableName>
+                </LiquidClassValueVariableNamePair>
+                <ExtraUnparsedPayload>
+                  <NestedSourceField>1</NestedSourceField>
+                </ExtraUnparsedPayload>
+              </AspirateAirMicroCommandDataV2>
             </Object>
             <Object Type="Tecan.Core.Scripting.ConditionalGroup">
               <ConditionalGroup>
                 <Objects>
                   <Object Type="Tecan.Core.Instrument.Devices.Pipetting.AspirateLiquidMicroCommandDataV2">
-                    <AspirateLiquidMicroCommandDataV2/>
+                    <AspirateLiquidMicroCommandDataV2>
+                      <LiquidClassValueVariableNamePair>
+                        <Value>1</Value>
+                        <VariableName>submergeDepth</VariableName>
+                      </LiquidClassValueVariableNamePair>
+                      <LiquidClassValueVariableNamePair>
+                        <Value>1</Value>
+                        <VariableName>errPressureOutOfRange</VariableName>
+                      </LiquidClassValueVariableNamePair>
+                    </AspirateLiquidMicroCommandDataV2>
                   </Object>
                 </Objects>
               </ConditionalGroup>

@@ -7,6 +7,7 @@ context/build tree — never as hardcoded ``generation.yaml`` product defaults.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -16,7 +17,10 @@ from . import xml_compat as ET
 from .fluent_naming import strip_fluent_instance_suffix
 from .runner import write_json
 
-LIQUID_CLASSES_SCHEMA_VERSION = "tecan.liquid_classes.v2"
+LIQUID_CLASSES_SCHEMA_VERSION = "tecan.liquid_classes.v3"
+LIQUID_CLASSES_COMPATIBLE_SCHEMAS = frozenset(
+    {"tecan.liquid_classes.v2", "tecan.liquid_classes.v3"}
+)
 LIQUID_CLASSES_FILENAME = "liquid_classes.json"
 _LIQUID_CLASSES_REL = Path("SystemSpecific") / "LiquidClasses"
 
@@ -93,7 +97,52 @@ _DPS_FIELD_ALIASES = {
     "adpsensitivity": "adp_sensitivity",
     "adprisethreshold": "adp_rise_threshold",
     "adpdropthreshold": "adp_drop_threshold",
+    "errpressureoutofrange": "err_pressure_out_of_range",
+    "errpressureoutofrangeretry": "err_pressure_out_of_range_retry",
+    "errpmpaspiration": "err_pmp_aspiration",
+    "pmpevaluationmodel": "pmp_evaluation_model",
+    "pmpcorrectlimit": "pmp_correct_limit",
+    "pmperrorlimit": "pmp_error_limit",
+    "pmpwarninglimit": "pmp_warning_limit",
+    "errsupervisionfailed": "err_supervision_failed",
+    "retractsupervisiononoff": "retract_supervision",
+    "errliquidexitnotfound": "err_liquid_exit_not_found",
+    "errfailedclld": "err_failed_clld",
+    "safepathonblockedtiponoff": "safe_path_on_blocked_tip",
 }
+
+_PRESSURE_SUPERVISION_KEYS = frozenset(
+    {
+        "err_pressure_out_of_range",
+        "err_pressure_out_of_range_retry",
+        "err_pmp_aspiration",
+        "pmp_evaluation_model",
+        "pmp_correct_limit",
+        "pmp_error_limit",
+        "pmp_warning_limit",
+        "adp_sensitivity",
+        "adp_rise_threshold",
+        "adp_drop_threshold",
+        "aspiration_supervision_tracking",
+        "err_supervision_failed",
+    }
+)
+_FORMULA_FUNCTION_NAMES = frozenset(
+    {
+        "round",
+        "exp",
+        "log",
+        "ln",
+        "min",
+        "max",
+        "abs",
+        "adjustaccuracy",
+        "if",
+        "true",
+        "false",
+    }
+)
+_IDENT_RE = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
 
 # Legacy flat field aliases for non-typed section ancestors.
 _FIELD_ALIASES = {
@@ -161,7 +210,7 @@ def parse_xlqc(path: Path | str, *, max_xml_bytes: int = 4 * 1024 * 1024) -> dic
                 supported_heads.append(head)
     profiles = _mine_profiles(search_root)
     sections = _summary_sections(profiles) or _pipetting_sections(search_root)
-    return _clean(
+    entry = _clean(
         {
             "kind": "liquid_class",
             "guid": path.stem,
@@ -175,8 +224,13 @@ def parse_xlqc(path: Path | str, *, max_xml_bytes: int = 4 * 1024 * 1024) -> dic
             "mix": sections.get("mix") or None,
             "empty_tips": sections.get("empty_tips") or None,
             "path": str(path),
+            "source_path": str(path),
         }
     )
+    fingerprint = _entry_fingerprint(entry)
+    if fingerprint:
+        entry["fingerprint"] = fingerprint
+    return entry
 
 
 def build_liquid_classes_catalog(
@@ -279,16 +333,6 @@ def write_liquid_classes_for_context(
         context_root=context_root,
         source="zeia_xlqc",
     )
-
-
-def load_liquid_classes_catalog(path: Path | None) -> dict[str, Any] | None:
-    if path is None or not Path(path).is_file():
-        return None
-    try:
-        payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    return payload if isinstance(payload, dict) else None
 
 
 def alias_maps_from_liquid_classes_catalog(
@@ -440,7 +484,8 @@ def _catalog_entry(item: Mapping[str, Any]) -> dict[str, Any]:
             "dispense": item.get("dispense"),
             "mix": item.get("mix"),
             "empty_tips": item.get("empty_tips"),
-            "source_path": item.get("path") or item.get("extracted_path"),
+            "fingerprint": item.get("fingerprint"),
+            "source_path": item.get("path") or item.get("extracted_path") or item.get("source_path"),
         }
     )
 
@@ -559,6 +604,21 @@ def _mine_profiles(root: ET.Element | None) -> list[dict[str, Any]]:
             }
         )
         if cleaned:
+            pressure = _pressure_supervision_summary(cleaned)
+            if pressure:
+                cleaned["pressure_supervision"] = pressure
+            formulas = _formula_view(cleaned)
+            if formulas:
+                cleaned["formulas"] = formulas
+                deps = _formula_dependencies(formulas)
+                if deps:
+                    cleaned["formula_dependencies"] = deps
+            mixing = _mixing_implementation(cleaned)
+            if mixing:
+                cleaned["mixing_implementation"] = mixing
+            fingerprint = _profile_fingerprint(cleaned)
+            if fingerprint:
+                cleaned["fingerprint"] = fingerprint
             profiles.append(cleaned)
     return profiles
 
@@ -768,11 +828,7 @@ def _microscript_section_names(elem: ET.Element) -> list[str]:
 
 
 def _mine_microscript(elem: ET.Element, *, max_commands: int = 128) -> list[dict[str, Any]]:
-    """Mine MicroScriptSection bodies as ordered command-type sequences.
-
-    Stores Object ``Type`` leaf names only (not full micro-command payloads).
-    Nested ConditionalGroup / AlternateGroup Objects are walked in order.
-    """
+    """Mine MicroScriptSection bodies as ordered commands plus captured payloads."""
     sections: list[dict[str, Any]] = []
     for child in list(elem):
         if not isinstance(child.tag, str):
@@ -783,14 +839,20 @@ def _mine_microscript(elem: ET.Element, *, max_commands: int = 128) -> list[dict
         if not name:
             continue
         commands: list[str] = []
+        records: list[dict[str, Any]] = []
         truncated = False
         for objects in list(child):
             if not isinstance(objects.tag, str) or _local_name(objects.tag) != "Objects":
                 continue
-            truncated = _walk_script_objects(objects, commands, max_commands=max_commands) or truncated
+            truncated = _walk_script_objects(
+                objects, commands, records, max_commands=max_commands
+            ) or truncated
         entry: dict[str, Any] = {"name": name}
         if commands:
             entry["commands"] = commands
+        if records:
+            entry["command_records"] = records
+            entry["fingerprint"] = _stable_hash(records)
         if truncated:
             entry["commands_truncated"] = True
         sections.append(entry)
@@ -800,10 +862,11 @@ def _mine_microscript(elem: ET.Element, *, max_commands: int = 128) -> list[dict
 def _walk_script_objects(
     objects_elem: ET.Element,
     out: list[str],
+    records: list[dict[str, Any]],
     *,
     max_commands: int,
 ) -> bool:
-    """Append Object Type leaf names; return True if truncated by max_commands."""
+    """Append Object Type leaf names and nested command records."""
     truncated = False
     for obj in list(objects_elem):
         if len(out) >= max_commands:
@@ -817,17 +880,97 @@ def _walk_script_objects(
                 if isinstance(typed.tag, str):
                     short = _local_name(typed.tag)
                     break
+        fields, unknown = _micro_command_payload(obj)
         if short:
             out.append(short)
+            record: dict[str, Any] = {"type": short}
+            if type_attr and type_attr != short:
+                record.setdefault("source_metadata", {})["type_full"] = type_attr
+            if fields:
+                record["fields"] = fields
+            if unknown:
+                record.setdefault("source_metadata", {})["unknown_children"] = unknown
+            children: list[dict[str, Any]] = []
+            for typed in list(obj):
+                if not isinstance(typed.tag, str):
+                    continue
+                for maybe in list(typed):
+                    if not isinstance(maybe.tag, str) or _local_name(maybe.tag) != "Objects":
+                        continue
+                    if _walk_script_objects(maybe, out, children, max_commands=max_commands):
+                        truncated = True
+            if children:
+                record["children"] = children
+            records.append(record)
+            continue
         for typed in list(obj):
             if not isinstance(typed.tag, str):
                 continue
             for maybe in list(typed):
                 if not isinstance(maybe.tag, str) or _local_name(maybe.tag) != "Objects":
                     continue
-                if _walk_script_objects(maybe, out, max_commands=max_commands):
+                if _walk_script_objects(maybe, out, records, max_commands=max_commands):
                     truncated = True
     return truncated or len(out) >= max_commands
+
+
+def _micro_command_payload(obj: ET.Element) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Capture scalar/variable children without inventing FluentControl tags."""
+    fields: dict[str, Any] = {}
+    unknown: dict[str, Any] = {}
+    extra_attrs = {
+        key: value
+        for key, value in obj.attrib.items()
+        if key not in {"Type", "type"} and str(value).strip()
+    }
+    if extra_attrs:
+        unknown["attributes"] = extra_attrs
+    for typed in list(obj):
+        if not isinstance(typed.tag, str):
+            continue
+        for child in list(typed):
+            if not isinstance(child.tag, str):
+                continue
+            name = _local_name(child.tag)
+            if name in {"Objects"}:
+                continue
+            if name == "LiquidClassValueVariableNamePair" or any(
+                isinstance(grand.tag, str) and _local_name(grand.tag) == "VariableName"
+                for grand in list(child)
+            ):
+                variable = _child_text(child, "VariableName")
+                value = _child_text(child, "Value")
+                if not variable:
+                    continue
+                if value == "":
+                    unknown.setdefault("empty_variables", {})[variable] = ""
+                    continue
+                fields[variable] = _coerce_scalar(value)
+                continue
+            text = _text(child)
+            nested_pairs = [
+                grand
+                for grand in list(child)
+                if isinstance(grand.tag, str)
+                and _local_name(grand.tag) == "LiquidClassValueVariableNamePair"
+            ]
+            if nested_pairs:
+                for pair in nested_pairs:
+                    variable = _child_text(pair, "VariableName")
+                    value = _child_text(pair, "Value")
+                    if variable and value != "":
+                        fields[variable] = _coerce_scalar(value)
+                    elif variable:
+                        unknown.setdefault("empty_variables", {})[variable] = ""
+                continue
+            if text:
+                fields[name] = _coerce_scalar(text)
+                continue
+            if list(child):
+                unknown.setdefault("structured_children", []).append(name)
+            else:
+                unknown.setdefault("empty_tags", []).append(name)
+    return fields, unknown
 
 
 def _merge_microscript(left: list[dict[str, Any]], right: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -846,9 +989,13 @@ def _merge_microscript(left: list[dict[str, Any]], right: list[dict[str, Any]]) 
             continue
         left_cmds = list(existing.get("commands") or [])
         right_cmds = list(item.get("commands") or [])
-        if len(right_cmds) > len(left_cmds):
+        left_records = list(existing.get("command_records") or [])
+        right_records = list(item.get("command_records") or [])
+        if len(right_records) > len(left_records) or len(right_cmds) > len(left_cmds):
             by_name[name] = dict(item)
         elif not left_cmds and right_cmds:
+            by_name[name] = dict(item)
+        elif not left_records and right_records:
             by_name[name] = dict(item)
     return [by_name[name] for name in order]
 
@@ -966,3 +1113,472 @@ def _norm(value: Any) -> str:
 
 def _clean(payload: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in payload.items() if value not in (None, "", [], {})}
+
+
+def _stable_hash(payload: Any) -> str:
+    blob = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()
+
+
+def _pressure_supervision_summary(profile: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """Source-backed pressure/ADP/PMP evidence only; never invent numeric limits."""
+    if not isinstance(profile, Mapping):
+        return None
+    by_section: dict[str, dict[str, Any]] = {}
+    detection = profile.get("detection")
+    if isinstance(detection, Mapping):
+        for section, fields in detection.items():
+            if not isinstance(fields, Mapping):
+                continue
+            hit = {
+                key: value
+                for key, value in fields.items()
+                if key in _PRESSURE_SUPERVISION_KEYS
+            }
+            if hit:
+                by_section[str(section)] = hit
+    microscript_hit: dict[str, Any] = {}
+    for section in profile.get("microscript") or []:
+        if not isinstance(section, Mapping):
+            continue
+        for record in _iter_command_records(list(section.get("command_records") or [])):
+            fields = record.get("fields") or {}
+            if not isinstance(fields, Mapping):
+                continue
+            for key, value in fields.items():
+                mapped = _DPS_FIELD_ALIASES.get(str(key).casefold()) or _snake_case(str(key))
+                if mapped in _PRESSURE_SUPERVISION_KEYS:
+                    microscript_hit.setdefault(mapped, value)
+    if microscript_hit:
+        existing = dict(by_section.get("microscript") or {})
+        existing.update(microscript_hit)
+        by_section["microscript"] = existing
+    if not by_section:
+        return None
+    return {
+        "presence": "present",
+        "by_section": by_section,
+        "threshold_recommendation": None,
+    }
+
+
+def _formula_view(profile: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    formulas: dict[str, dict[str, Any]] = {}
+    for kind in ("aspirate", "dispense", "mix", "empty_tips"):
+        fields = profile.get(kind)
+        if not isinstance(fields, Mapping):
+            continue
+        section = {
+            key: value
+            for key, value in fields.items()
+            if "formula" in str(key).casefold() or isinstance(value, str) and any(
+                token in str(value) for token in ("volume", "round(", "AdjustAccuracy")
+            )
+        }
+        if section:
+            formulas[kind] = section
+    return formulas
+
+
+def _formula_dependencies(formulas: Mapping[str, Mapping[str, Any]]) -> list[str]:
+    names: set[str] = set()
+    for section in formulas.values():
+        for value in section.values():
+            text = str(value or "")
+            for match in _IDENT_RE.finditer(text):
+                token = match.group(0)
+                if token.casefold() in _FORMULA_FUNCTION_NAMES:
+                    continue
+                if token.isdecimal():
+                    continue
+                names.add(token)
+    return sorted(names, key=str.casefold)
+
+
+def _mixing_implementation(profile: Mapping[str, Any]) -> str | None:
+    sections = [str(item) for item in (profile.get("microscript_sections") or [])]
+    if any(item.casefold() == "mix" for item in sections):
+        return "liquid_class_microscript"
+    script = profile.get("microscript") or []
+    for item in script:
+        if not isinstance(item, Mapping):
+            continue
+        commands = [str(cmd) for cmd in (item.get("commands") or [])]
+        if any("mix" in cmd.casefold() for cmd in commands):
+            return "liquid_class_microscript"
+    if profile.get("mix"):
+        return "equation_set"
+    return None
+
+
+def _profile_fingerprint(profile: Mapping[str, Any]) -> str:
+    payload = {
+        "head": profile.get("head"),
+        "tip": profile.get("tip"),
+        "aspirate": profile.get("aspirate"),
+        "dispense": profile.get("dispense"),
+        "mix": profile.get("mix"),
+        "detection": profile.get("detection"),
+        "pressure_supervision": profile.get("pressure_supervision"),
+        "microscript": [
+            {
+                "name": item.get("name"),
+                "commands": item.get("commands"),
+                "command_records": item.get("command_records"),
+                "fingerprint": item.get("fingerprint"),
+            }
+            for item in (profile.get("microscript") or [])
+            if isinstance(item, Mapping)
+        ],
+    }
+    return _stable_hash(payload)
+
+
+def _entry_fingerprint(entry: Mapping[str, Any]) -> str:
+    payload = {
+        "guid": entry.get("guid"),
+        "name": entry.get("name"),
+        "profiles": [
+            {
+                "head": item.get("head"),
+                "tip": item.get("tip"),
+                "fingerprint": item.get("fingerprint"),
+            }
+            for item in (entry.get("profiles") or [])
+            if isinstance(item, Mapping)
+        ],
+    }
+    return _stable_hash(payload)
+
+
+def load_liquid_classes_catalog(source: Mapping[str, Any] | Path | str | None) -> dict[str, Any] | None:
+    """Load a v2/v3 liquid-class catalog from a mapping, path, or context root."""
+    if source is None:
+        return None
+    if isinstance(source, Mapping):
+        if isinstance(source.get("entries"), list) and source.get("schema_version"):
+            return _normalize_loaded_catalog(dict(source))
+        nested = source.get("liquid_classes_catalog")
+        if nested is not None:
+            loaded = load_liquid_classes_catalog(nested)  # type: ignore[arg-type]
+            if loaded:
+                return loaded
+        for key in ("context_root", "root", "extracted_dir"):
+            raw = source.get(key)
+            if not raw:
+                continue
+            path = Path(str(raw))
+            candidate = path / LIQUID_CLASSES_FILENAME if path.is_dir() else path
+            loaded = load_liquid_classes_catalog(candidate)
+            if loaded:
+                return loaded
+        return None
+    path = Path(source)
+    if path.is_dir():
+        path = path / LIQUID_CLASSES_FILENAME
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return _normalize_loaded_catalog(payload)
+
+
+def _normalize_loaded_catalog(payload: dict[str, Any]) -> dict[str, Any] | None:
+    version = str(payload.get("schema_version") or "").strip()
+    if version and version not in LIQUID_CLASSES_COMPATIBLE_SCHEMAS:
+        payload = dict(payload)
+        payload["schema_unsupported"] = True
+        return payload
+    if not isinstance(payload.get("entries"), list):
+        return None
+    return payload
+
+
+def find_liquid_class_entry(catalog: Mapping[str, Any] | None, name: str) -> dict[str, Any] | None:
+    wanted = _norm(name)
+    if not wanted or not isinstance(catalog, Mapping):
+        return None
+    for entry in catalog.get("entries") or []:
+        if not isinstance(entry, Mapping):
+            continue
+        aliases = [entry.get("name"), entry.get("guid"), *(entry.get("aliases") or [])]
+        if any(_norm(item) == wanted for item in aliases):
+            return dict(entry)
+    return None
+
+
+def matching_liquid_class_profiles(
+    entry: Mapping[str, Any] | None,
+    *,
+    head: str | None = None,
+    tip: str | None = None,
+    operation: str | None = None,
+) -> list[dict[str, Any]]:
+    if not isinstance(entry, Mapping):
+        return []
+    profiles = [item for item in (entry.get("profiles") or []) if isinstance(item, Mapping)]
+    if head:
+        wanted_head = _norm(head)
+        profiles = [item for item in profiles if _norm(item.get("head")) == wanted_head]
+    if tip:
+        wanted_tip = _norm(tip)
+        profiles = [item for item in profiles if _norm(item.get("tip")) == wanted_tip]
+    if operation:
+        wanted_op = _operation_section(operation)
+        if wanted_op:
+            profiles = [
+                item
+                for item in profiles
+                if item.get(wanted_op)
+                or (item.get("detection") or {}).get(wanted_op)
+                or wanted_op.title() in [str(section) for section in (item.get("microscript_sections") or [])]
+            ]
+    return [dict(item) for item in profiles]
+
+
+def _operation_section(operation: str | None) -> str:
+    text = str(operation or "").strip().casefold()
+    if text in {"aspirate", "dispense", "mix", "empty_tips"}:
+        return text
+    if "aspirat" in text:
+        return "aspirate"
+    if "dispens" in text:
+        return "dispense"
+    if text.startswith("mix"):
+        return "mix"
+    return ""
+
+
+def diff_liquid_class_entries(
+    source: Mapping[str, Any] | None,
+    edited: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Deterministic semantic diff of two liquid-class catalog entries."""
+    if source is None and edited is None:
+        return {"changed": False, "changes": []}
+    left = source or {}
+    right = edited or {}
+    changes: list[dict[str, Any]] = []
+    if (left.get("fingerprint") or "") != (right.get("fingerprint") or ""):
+        changes.append(
+            {
+                "path": "fingerprint",
+                "source": left.get("fingerprint"),
+                "edited": right.get("fingerprint"),
+            }
+        )
+    left_profiles = {
+        (str(item.get("head") or ""), str(item.get("tip") or "")): item
+        for item in (left.get("profiles") or [])
+        if isinstance(item, Mapping)
+    }
+    right_profiles = {
+        (str(item.get("head") or ""), str(item.get("tip") or "")): item
+        for item in (right.get("profiles") or [])
+        if isinstance(item, Mapping)
+    }
+    for key in sorted(set(left_profiles) | set(right_profiles)):
+        src = left_profiles.get(key)
+        dst = right_profiles.get(key)
+        label = f"profiles[{key[0] or '_'} x {key[1] or '_'}]"
+        if src is None:
+            changes.append({"path": label, "source": None, "edited": dst.get("fingerprint") if dst else None})
+            continue
+        if dst is None:
+            changes.append({"path": label, "source": src.get("fingerprint"), "edited": None})
+            continue
+        for field in (
+            "aspirate",
+            "dispense",
+            "mix",
+            "detection",
+            "pressure_supervision",
+            "formulas",
+            "microscript",
+            "fingerprint",
+        ):
+            if json.dumps(src.get(field), sort_keys=True, default=str) != json.dumps(
+                dst.get(field), sort_keys=True, default=str
+            ):
+                changes.append(
+                    {
+                        "path": f"{label}.{field}",
+                        "source": src.get("fingerprint") if field == "fingerprint" else src.get(field),
+                        "edited": dst.get("fingerprint") if field == "fingerprint" else dst.get(field),
+                    }
+                )
+    return {"changed": bool(changes), "changes": changes[:50]}
+
+
+def diff_liquid_class_catalogs(
+    source: Mapping[str, Any] | None,
+    edited: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    if not source and not edited:
+        return {
+            "requested_liquid_class_modification": False,
+            "changed": False,
+            "entries": [],
+        }
+    if edited is None:
+        return {
+            "requested_liquid_class_modification": False,
+            "changed": False,
+            "entries": [],
+        }
+    src_entries = {
+        _norm(item.get("guid") or item.get("name")): item
+        for item in ((source or {}).get("entries") or [])
+        if isinstance(item, Mapping)
+    }
+    dst_entries = {
+        _norm(item.get("guid") or item.get("name")): item
+        for item in ((edited or {}).get("entries") or [])
+        if isinstance(item, Mapping)
+    }
+    rows = []
+    for key in sorted(set(src_entries) | set(dst_entries)):
+        row = diff_liquid_class_entries(src_entries.get(key), dst_entries.get(key))
+        row["key"] = key
+        rows.append(row)
+    changed = any(item.get("changed") for item in rows)
+    return {
+        "requested_liquid_class_modification": True,
+        "changed": changed,
+        "entries": rows,
+    }
+
+
+def analyze_liquid_class_use(
+    *,
+    name: str,
+    operation: str | None,
+    catalog: Mapping[str, Any] | None,
+    head: str | None = None,
+    tip: str | None = None,
+    faithful_generation: bool = False,
+) -> dict[str, Any]:
+    """Return failures/reviews for one liquid-class use against a mined catalog."""
+    failures: list[dict[str, Any]] = []
+    reviews: list[dict[str, Any]] = []
+    if catalog is None:
+        return {"failures": failures, "reviews": reviews, "matched_profiles": []}
+    if catalog.get("schema_unsupported"):
+        reviews.append(
+            {
+                "reason": "unsupported_liquid_class_schema",
+                "message": (
+                    f"liquid_classes catalog schema {catalog.get('schema_version')!r} is not "
+                    "v2/v3; re-import the ZEIA with current protocol-builder."
+                ),
+            }
+        )
+        return {"failures": failures, "reviews": reviews, "matched_profiles": []}
+    entry = find_liquid_class_entry(catalog, name)
+    if entry is None:
+        return {"failures": failures, "reviews": reviews, "matched_profiles": []}
+    profiles = matching_liquid_class_profiles(entry, head=head, tip=tip, operation=operation)
+    unconstrained = matching_liquid_class_profiles(entry, operation=operation)
+    if head and not matching_liquid_class_profiles(entry, head=head):
+        failures.append(
+            {
+                "reason": "liquid_class_head_missing",
+                "message": f"{name!r} has no mined profile for head {head!r}.",
+            }
+        )
+    elif operation and unconstrained and not profiles and (head or tip):
+        failures.append(
+            {
+                "reason": "liquid_class_profile_mismatch",
+                "message": (
+                    f"{name!r} has no {operation} profile matching head={head!r} tip={tip!r}."
+                ),
+            }
+        )
+    elif not head and not tip and len(unconstrained) > 1:
+        reviews.append(
+            {
+                "reason": "ambiguous_liquid_class_profile",
+                "message": (
+                    f"{name!r} has {len(unconstrained)} head×tip profiles for {operation or 'this operation'}; "
+                    "the first profile was not selected automatically."
+                ),
+                "profile_count": len(unconstrained),
+            }
+        )
+    for profile in profiles:
+        for section in profile.get("microscript") or []:
+            if not isinstance(section, Mapping):
+                continue
+            if section.get("commands_truncated"):
+                item = {
+                    "reason": "microscript_truncated",
+                    "message": f"{name!r} microscript section {section.get('name')!r} was truncated.",
+                }
+                if faithful_generation:
+                    failures.append(item)
+                else:
+                    reviews.append(item)
+            for record in _iter_command_records(section.get("command_records") or []):
+                unknown = (record.get("source_metadata") or {}).get("unknown_children") or {}
+                if unknown.get("structured_children") or unknown.get("attributes"):
+                    item = {
+                        "reason": "unknown_micro_command_payload",
+                        "message": (
+                            f"{name!r} command {record.get('type')!r} preserved unknown source fields."
+                        ),
+                        "unknown_children": unknown,
+                    }
+                    if faithful_generation:
+                        failures.append(item)
+                    else:
+                        reviews.append(item)
+        deps = [str(item) for item in (profile.get("formula_dependencies") or [])]
+        mined_vars = set(_mined_variable_names(profile))
+        missing = [
+            item
+            for item in deps
+            if item.casefold() not in {"volume", "vol"}
+            and item not in mined_vars
+            and item.casefold() not in {name.casefold() for name in mined_vars}
+        ]
+        if missing:
+            reviews.append(
+                {
+                    "reason": "unresolved_formula_dependency",
+                    "message": f"{name!r} formulas reference {missing} without a mined variable.",
+                    "identifiers": missing,
+                }
+            )
+    return {"failures": failures, "reviews": reviews, "matched_profiles": profiles}
+
+
+def _iter_command_records(records: list[Any]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for item in records:
+        if not isinstance(item, Mapping):
+            continue
+        out.append(dict(item))
+        out.extend(_iter_command_records(list(item.get("children") or [])))
+    return out
+
+
+def _mined_variable_names(profile: Mapping[str, Any]) -> set[str]:
+    names: set[str] = set()
+    detection = profile.get("detection") or {}
+    if isinstance(detection, Mapping):
+        for fields in detection.values():
+            if isinstance(fields, Mapping):
+                names.update(str(key) for key in fields)
+    for section in profile.get("microscript") or []:
+        if not isinstance(section, Mapping):
+            continue
+        for record in _iter_command_records(list(section.get("command_records") or [])):
+            fields = record.get("fields") or {}
+            if isinstance(fields, Mapping):
+                names.update(str(key) for key in fields)
+    return names

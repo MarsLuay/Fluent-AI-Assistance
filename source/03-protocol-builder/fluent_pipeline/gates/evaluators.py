@@ -30,6 +30,11 @@ from ..api_v2.generic_command_validate import validate_passthrough_commands_from
 from ..api_v2.xml_compare import NON_EXECUTABLE_OBJECT_TYPES
 from ..checksums import checksum_bridge_available, entry_checksum_state
 from ..command_registry import registry_command_operation, registry_command_support_status
+from ..liquid_classes_export import (
+    analyze_liquid_class_use,
+    diff_liquid_class_catalogs,
+    load_liquid_classes_catalog,
+)
 from ..liquid_state import validate_liquid_state
 from ..protocol_ir import (
     load_protocol_ir,
@@ -536,7 +541,20 @@ def evaluate_liquid_class_compatibility(context: ValidationContext) -> GateRecor
         if name
     }
     compatibility = _liquid_class_compatibility_map(source_manifest, alias_maps)
+    catalog = load_liquid_classes_catalog(
+        (context.validation_options or {}).get("liquid_classes_catalog")
+        if isinstance(context.validation_options, Mapping)
+        else None
+    ) or load_liquid_classes_catalog(source_manifest)
+    edited_catalog = None
+    if isinstance(context.validation_options, Mapping):
+        edited_catalog = load_liquid_classes_catalog(context.validation_options.get("edited_liquid_classes_catalog"))
+    faithful = bool(
+        isinstance(context.validation_options, Mapping)
+        and context.validation_options.get("faithful_liquid_class_generation")
+    )
     failures = []
+    reviews = []
     checked = 0
     for step in ir.get("steps") or []:
         if not isinstance(step, dict) or step.get("operation") not in LIQUID_CLASS_OPERATIONS:
@@ -561,16 +579,47 @@ def evaluate_liquid_class_compatibility(context: ValidationContext) -> GateRecor
                     {"allowed_operations": sorted(allowed_operations)},
                 )
             )
+        analysis = analyze_liquid_class_use(
+            name=liquid_class or raw_liquid_class,
+            operation=str(step.get("operation") or ""),
+            catalog=catalog,
+            head=str(step.get("head") or step.get("pipetting_device") or "") or None,
+            tip=str(step.get("tip") or step.get("diti_type") or "") or None,
+            faithful_generation=faithful,
+        )
+        for item in analysis.get("failures") or []:
+            failures.append(_step_failure(step, str(item.get("reason") or "liquid_class_profile"), str(item.get("message") or "Liquid class profile failed."), item))
+        for item in analysis.get("reviews") or []:
+            reviews.append(_step_failure(step, str(item.get("reason") or "liquid_class_review"), str(item.get("message") or "Liquid class needs review."), item))
+    source_diff = diff_liquid_class_catalogs(catalog, edited_catalog) if catalog or edited_catalog else None
+    details: dict[str, Any] = {}
+    if reviews:
+        details["reviews"] = reviews
+    if source_diff:
+        details["liquid_class_diff"] = {
+            "changed": source_diff.get("changed"),
+            "requested_liquid_class_modification": source_diff.get("requested_liquid_class_modification"),
+            "entry_count": len(source_diff.get("entries") or []),
+        }
     if failures:
-        return context.make_gate("liquid_class_compatible", "failed", "Some liquid classes are incompatible with their operations.", {"failures": failures})
-    if checked == 0:
+        details["failures"] = failures
+        status = "failed"
+        summary = "Some liquid classes are incompatible with their operations."
+    elif reviews:
+        status = "needs_review"
+        summary = "Liquid classes resolved, but source-backed profile semantics need review."
+        details["needs_review"] = True
+    elif checked == 0:
         return context.make_gate(
             "liquid_class_compatible",
             "passed",
             "No liquid-class operations were present in the IR.",
             {"trivial": True},
         )
-    return context.make_gate("liquid_class_compatible", "passed", f"Liquid classes are compatible for {checked} liquid handling step(s).")
+    else:
+        status = "passed"
+        summary = f"Liquid classes are compatible for {checked} liquid handling step(s)."
+    return context.make_gate("liquid_class_compatible", status, summary, details or None)
 
 def evaluate_no_unapproved_raw_xml(context: ValidationContext) -> GateRecord:
     draft_path = context.draft_path

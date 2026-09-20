@@ -100,6 +100,15 @@
       "replacement": null
     },
     {
+      "id": "persist.liquid_classes",
+      "class": "supported",
+      "kind": "persisted-artifact",
+      "path": "source/03-protocol-builder/fluent_pipeline/liquid_classes_export.py",
+      "reason": "Imported ZEIA liquid-class catalog; v2 summaries remain in v3.",
+      "supportedVersion": "tecan.liquid_classes.v3",
+      "replacement": null
+    },
+    {
       "id": "compact.project_query",
       "class": "supported",
       "kind": "output-contract",
