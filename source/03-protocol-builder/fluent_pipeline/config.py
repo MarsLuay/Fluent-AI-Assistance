@@ -38,6 +38,23 @@ SHARED_BUILD_DIR = SHARED_TEMP_DIR / "build"
 # prior build across re-imports and differently named contexts instead of
 # triggering the multi-minute rebuild.
 CATALOG_CACHE_DIR = CACHE_DIR / "catalog"
+
+
+def portable_repo_path(path: Path | str, *, repo_root: Path | None = None) -> str:
+    """Render a filesystem path as a repo-relative portable string when possible."""
+    resolved = Path(path).expanduser()
+    try:
+        resolved = resolved.resolve()
+    except OSError:
+        resolved = Path(path)
+    root = (repo_root or REPO_ROOT).resolve()
+    try:
+        relative = resolved.relative_to(root)
+    except ValueError:
+        return str(resolved)
+    return f"<repo>/{relative.as_posix()}"
+
+
 # Shared, content-addressed cache for per-source-ZEIA reference-resolution
 # records (datastore node descriptions and script metadata). Keyed on the base
 # ZEIA's content fingerprint so repeated `generate` runs against the same

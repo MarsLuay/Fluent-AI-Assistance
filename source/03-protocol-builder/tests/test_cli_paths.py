@@ -1286,5 +1286,29 @@ class MapMediaCommandTests(unittest.TestCase):
             self.assertFalse((out_dir / "media_path_map.json").exists())
 
 
+class PortableImportRenderingTests(unittest.TestCase):
+    def test_print_project_import_result_uses_repo_relative_paths(self) -> None:
+        from fluent_pipeline.application_services import ProjectImportRequest, ProjectImportResult
+        from fluent_pipeline.config import REPO_ROOT
+        from fluent_pipeline.cli.rendering import print_project_import_result
+        from fluent_pipeline.project_context import ProjectContext
+
+        buf = io.StringIO()
+        ctx = ProjectContext(
+            name="e2e-full-export-july",
+            root=REPO_ROOT / "ready-to-import" / "e2e-full-export-july" / "temp_files",
+            manifest={"scripts": [1], "objects": [], "workspaces": [], "snapshot_evidence": []},
+        )
+        result = ProjectImportResult(
+            request=ProjectImportRequest(archive=Path("demo.zeia"), activate=True),
+            context=ctx,
+            active_context_name="e2e-full-export-july",
+        )
+        print_project_import_result(result, stream=buf)
+        rendered = buf.getvalue()
+        self.assertIn("<repo>/ready-to-import/e2e-full-export-july/temp_files", rendered)
+        self.assertNotIn("/Users/", rendered)
+
+
 if __name__ == "__main__":
     unittest.main()

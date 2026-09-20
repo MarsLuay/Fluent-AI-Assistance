@@ -14,3 +14,14 @@ def test_default_fluentcoder_python_uses_repo_level_venv() -> None:
     assert config.fluentcoder_python() == expected_python
     assert config.DEFAULT_FLUENTCODER_PYTHON.parent.parent == expected
     assert config.DEFAULT_FLUENTCODER_PYTHON.parent.parent != config.PROJECT_DIR / ".venv"
+
+
+def test_portable_repo_path_uses_repo_relative_placeholder() -> None:
+    inner = config.REPO_ROOT / "source" / "03-protocol-builder" / "AGENTS.md"
+    assert config.portable_repo_path(inner) == "<repo>/source/03-protocol-builder/AGENTS.md"
+
+
+def test_portable_repo_path_keeps_paths_outside_the_repo() -> None:
+    outside = Path("/tmp/fluent-hygiene-outside")
+    rendered = config.portable_repo_path(outside)
+    assert not rendered.startswith("<repo>/")
