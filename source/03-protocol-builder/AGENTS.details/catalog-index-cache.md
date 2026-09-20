@@ -13,12 +13,14 @@
   let import/package populate them. `ready-to-import/` stays gitignored.
 - The same import writes `liquid_classes.json` (packaged as
   `source/liquid_classes.json`) from ZEIA `SystemSpecific/LiquidClasses/*.xlqc`
-  (and manifest `.xlqc` objects): schema `tecan.liquid_classes.v2` with name,
+  (and manifest `.xlqc` objects): schema `tecan.liquid_classes.v3` with name,
   filename GUID, supported heads, head×tip `profiles[]` (EquationSet /
-  DetectionAndPositioningSet scalars + Microscript section names and ordered
-  Object ``Type`` command sequences — not full micro-command payloads), plus
-  flattened aspirate/dispense/mix summaries for older consumers. Never invent
-  liquid-class name/GUID in shipped `generation.yaml`.
+  DetectionAndPositioningSet scalars, pressure-supervision evidence when present
+  in source XML, Microscript section names, ordered Object ``Type`` command
+  sequences, and source-backed micro-command fields/fingerprints), plus
+  flattened aspirate/dispense/mix summaries for older consumers. v2 catalogs
+  remain readable. Never invent liquid-class name/GUID or pressure thresholds
+  in shipped `generation.yaml`.
 - The same import writes `driver_macros.json` (macro_name/module_name mined from
   script `LegacyDriverMacro` / `ApplicationDriverMacro` usages) and
   `script_folder_bindings.json` (Scripts-folder tree + script↔worktable

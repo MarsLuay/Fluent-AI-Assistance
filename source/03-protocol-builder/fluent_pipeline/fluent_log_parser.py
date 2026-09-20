@@ -8,7 +8,7 @@ import re
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from .audit_import_context import import_for_error, read_audit_import_events
 
@@ -614,6 +614,29 @@ DIAGNOSTIC_RULES: tuple[DiagnosticRule, ...] = (
             re.IGNORECASE | re.DOTALL,
         ),
     ),
+    DiagnosticRule(
+        id="fluent_log.pressure_out_of_range",
+        severity="high",
+        category="runtime",
+        title="FluentControl reported a pressure-out-of-range supervision event",
+        likely_workflow_defect=(
+            "Pressure supervision fired during pipetting. Evidence-backed possibilities include "
+            "source liquid-class supervision/ADP/PMP settings, changed aspirate/dispense speed or "
+            "delay, Z/submerge/contact geometry, or a physical obstruction/clot that cannot be "
+            "proven from the log alone. This mapping does not declare a single root cause."
+        ),
+        suggested_fix=(
+            "Inspect the physical channel (obstruction, clot, empty well, unexpected labware height), "
+            "LLD/Z/submerge results, and the imported liquid-class pressure-supervision, ADP/PMP, "
+            "and speed/delay settings before changing anything. Do not disable pressure supervision "
+            "or widen pressure thresholds just to hide this error. If source XML does not contain "
+            "verified threshold fields, treat numeric community defaults as insufficient evidence."
+        ),
+        pattern=re.compile(
+            r"(pressure\s+out\s+of\s+range|errpressureoutofrange|pressure[- ]supervision)",
+            re.IGNORECASE,
+        ),
+    ),
 )
 
 
@@ -812,8 +835,21 @@ def build_script_command_index(xscr_paths: Sequence[Path]) -> list[dict[str, Any
     return entries
 
 
-def diagnose_fluent_log_text(text: str, *, source: str = "") -> list[dict[str, Any]]:
-    return [item.as_dict() for item in diagnose_fluent_log_records(parse_fluent_log_text(text, source=source))]
+def diagnose_fluent_log_text(
+    text: str,
+    *,
+    source: str = "",
+    liquid_classes_catalog: Mapping[str, Any] | None = None,
+    host_environment: Mapping[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    return [
+        item.as_dict()
+        for item in diagnose_fluent_log_records(
+            parse_fluent_log_text(text, source=source),
+            liquid_classes_catalog=liquid_classes_catalog,
+            host_environment=host_environment,
+        )
+    ]
 
 
 def diagnose_fluent_messages(messages: Iterable[str]) -> list[dict[str, Any]]:
@@ -825,6 +861,8 @@ def diagnose_fluent_log_records(
     records: Sequence[FluentLogRecord],
     *,
     command_index: Sequence[dict[str, Any]] | None = None,
+    liquid_classes_catalog: Mapping[str, Any] | None = None,
+    host_environment: Mapping[str, Any] | None = None,
 ) -> list[FluentLogDiagnostic]:
     """Map parsed log records to known protocol-builder workflow defects."""
     if not records:
@@ -847,6 +885,14 @@ def diagnose_fluent_log_records(
                 matched_records=matched_records,
                 command_index=command_index,
             )
+        if rule.id == "fluent_log.pressure_out_of_range":
+            suggested_fix, extra_evidence = _enrich_pressure_out_of_range(
+                suggested_fix,
+                matched_records=matched_records,
+                liquid_classes_catalog=liquid_classes_catalog,
+                host_environment=host_environment,
+            )
+            evidence = _compact([*extra_evidence, *evidence])[:24]
         diagnostics.append(
             FluentLogDiagnostic(
                 id=rule.id,
@@ -898,6 +944,94 @@ def _enrich_move_axis_suggested_fix(
         f"{base_fix.rstrip()} MoveAxis-related scripts from this import/log: "
         f"{listed}{suffix}."
     )
+
+
+_LIQUID_CLASS_HINT_RE = re.compile(
+    r"liquid\s*class\s*[=:]\s*['\"]?(?P<name>[^'\";\r\n]+)"
+    r"|liquid class\s+['\"](?P<quoted>[^'\"]+)['\"]",
+    re.IGNORECASE,
+)
+
+
+def _enrich_pressure_out_of_range(
+    base_fix: str,
+    *,
+    matched_records: Sequence[FluentLogRecord],
+    liquid_classes_catalog: Mapping[str, Any] | None,
+    host_environment: Mapping[str, Any] | None,
+) -> tuple[str, list[str]]:
+    evidence = [
+        "hypothesis: source liquid-class supervision/ADP/PMP settings need review",
+        "hypothesis: speed or delay may differ from the selected source pattern",
+        "hypothesis: possible Z/submerge/contact geometry issue",
+        "hypothesis: possible obstruction/clotting/physical channel issue (unproven offline)",
+        "insufficient evidence for a single root cause",
+        "do not disable pressure supervision or widen thresholds to hide this error",
+    ]
+    modules = sorted({record.module for record in matched_records if record.module})
+    if len(modules) == 1:
+        evidence.append(f"isolated_channel_or_module: {modules[0]}")
+    elif len(modules) > 1:
+        evidence.append("multiple_channels_or_modules: " + ", ".join(modules))
+    names: list[str] = []
+    for record in matched_records:
+        text = _record_text(record)
+        for match in _LIQUID_CLASS_HINT_RE.finditer(text):
+            hinted = (match.group("name") or match.group("quoted") or "").strip()
+            if hinted:
+                names.append(hinted)
+    unique_names = list(dict.fromkeys(names))
+    if unique_names:
+        evidence.append("log_liquid_class_hint: " + ", ".join(unique_names[:6]))
+    if liquid_classes_catalog:
+        try:
+            from .liquid_classes_export import find_liquid_class_entry
+        except Exception:  # pragma: no cover - import cycle guard
+            find_liquid_class_entry = None  # type: ignore[assignment]
+        for hinted in unique_names[:4]:
+            entry = find_liquid_class_entry(liquid_classes_catalog, hinted) if find_liquid_class_entry else None
+            if not entry:
+                evidence.append(f"source_liquid_class_not_in_catalog: {hinted}")
+                continue
+            profiles = [item for item in (entry.get("profiles") or []) if isinstance(item, dict)]
+            if not profiles:
+                evidence.append(f"source_liquid_class_has_no_profiles: {hinted}")
+                continue
+            pressure = [item.get("pressure_supervision") for item in profiles if item.get("pressure_supervision")]
+            fingerprints = [str(item.get("fingerprint") or "") for item in profiles if item.get("fingerprint")]
+            evidence.append(
+                f"source_liquid_class: {entry.get('name')} guid={entry.get('guid')} "
+                f"profiles={len(profiles)}"
+            )
+            if pressure:
+                evidence.append(
+                    "source_pressure_supervision: "
+                    + json.dumps(pressure[:2], sort_keys=True, default=str)[:400]
+                )
+            if fingerprints:
+                evidence.append("source_profile_fingerprints: " + ", ".join(fingerprints[:4]))
+    if host_environment:
+        product = host_environment.get("fluentcontrol") if isinstance(host_environment.get("fluentcontrol"), Mapping) else host_environment
+        version = ""
+        if isinstance(product, Mapping):
+            version = str(product.get("version") or product.get("fluentcontrol_version") or "")
+        fingerprint = str(host_environment.get("fingerprint") or "")
+        if version or fingerprint:
+            evidence.append(
+                "host_environment: "
+                + " ".join(part for part in (version, fingerprint[:16]) if part)
+            )
+            evidence.append(
+                "cross_version_reuse: review source liquid-class provenance against this host; "
+                "do not treat community upgrade reports as a universal compatibility rule"
+            )
+    scripts = sorted({record.script for record in matched_records if record.script})
+    if scripts:
+        evidence.append("script_context: " + ", ".join(scripts[:6]))
+    lines = sorted({str(record.script_line) for record in matched_records if record.script_line})
+    if lines:
+        evidence.append("script_line: " + ", ".join(lines[:6]))
+    return base_fix, evidence
 
 
 def _move_axis_script_names(

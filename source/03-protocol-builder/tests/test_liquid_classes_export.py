@@ -8,8 +8,11 @@ import unittest
 from pathlib import Path
 
 from fluent_pipeline.liquid_classes_export import (
+    LIQUID_CLASSES_SCHEMA_VERSION,
     alias_maps_from_liquid_classes_catalog,
+    analyze_liquid_class_use,
     build_liquid_classes_catalog,
+    diff_liquid_class_entries,
     parse_xlqc,
     resolve_liquid_class_guid,
     write_liquid_classes_catalog,
@@ -51,7 +54,8 @@ class LiquidClassesExportTests(unittest.TestCase):
             guid = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
             (liquid_dir / f"{guid}.xlqc").write_text(SAMPLE_XLQC, encoding="utf-8")
             catalog = build_liquid_classes_catalog(datastore_root=root)
-            self.assertEqual(catalog["schema_version"], "tecan.liquid_classes.v2")
+            self.assertEqual(catalog["schema_version"], LIQUID_CLASSES_SCHEMA_VERSION)
+            self.assertEqual(catalog["schema_version"], "tecan.liquid_classes.v3")
             self.assertEqual(catalog["entry_count"], 1)
             entry = catalog["entries"][0]
             self.assertEqual(entry["guid"], guid)
@@ -172,8 +176,156 @@ class LiquidClassesExportTests(unittest.TestCase):
             (by_name.get("Dispense") or {}).get("commands"),
             ["DispenseLiquidMicroCommandDataV2"],
         )
-        # No full payload invent — commands are Type leaf names only.
+        # No invented Volume payloads — only source-backed fields.
         self.assertNotIn("Volume", str(script))
+        aspirate_section = by_name["Aspirate"]
+        self.assertTrue(aspirate_section.get("fingerprint"))
+        records = aspirate_section.get("command_records") or []
+        by_type = {item.get("type"): item for item in records}
+        self.assertIn("ConditionalGroup", by_type)
+        children = (by_type["ConditionalGroup"].get("children") or [])
+        self.assertEqual(children[0].get("type"), "AspirateLiquidMicroCommandDataV2")
+        fields = children[0].get("fields") or {}
+        self.assertEqual(fields.get("submergeDepth"), 1)
+        self.assertEqual(fields.get("errPressureOutOfRange"), 1)
+        air = by_type["AspirateAirMicroCommandDataV2"]
+        unknown = (air.get("source_metadata") or {}).get("unknown_children") or {}
+        empty = unknown.get("empty_variables") or {}
+        self.assertIn("pmpEvaluationModel", empty)
+        self.assertIn("ExtraUnparsedPayload", unknown.get("structured_children") or [])
+        self.assertTrue(fca.get("fingerprint"))
+        pressure = fca.get("pressure_supervision") or {}
+        self.assertEqual(pressure.get("presence"), "present")
+        self.assertEqual((pressure.get("by_section") or {}).get("microscript", {}).get("err_pressure_out_of_range"), 1)
+
+    def test_water_free_single_preserves_pressure_supervision_and_formulas(self) -> None:
+        fixture = RICH_XLQC
+        self.assertTrue(fixture.is_file(), f"missing fixture {fixture}")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "dddddddd-dddd-4ddd-8ddd-dddddddddddd.xlqc"
+            path.write_bytes(fixture.read_bytes())
+            parsed = parse_xlqc(path)
+        fca = next((item for item in (parsed.get("profiles") or []) if item.get("head") == "Fca"), None)
+        self.assertIsNotNone(fca)
+        assert fca is not None
+        detection = (fca.get("detection") or {}).get("aspirate") or {}
+        self.assertEqual(detection.get("err_pressure_out_of_range"), 1)
+        self.assertEqual(detection.get("err_pressure_out_of_range_retry"), 1)
+        self.assertEqual(detection.get("adp_sensitivity"), 0.4)
+        self.assertEqual(detection.get("adp_rise_threshold"), 20)
+        self.assertEqual(detection.get("adp_drop_threshold"), -30)
+        pressure = fca.get("pressure_supervision") or {}
+        self.assertEqual(pressure.get("presence"), "present")
+        self.assertIsNone(pressure.get("threshold_recommendation"))
+        self.assertNotIn("1000", json.dumps(pressure))
+        self.assertIn("volume", fca.get("formula_dependencies") or [])
+        self.assertTrue(parsed.get("fingerprint"))
+        cloned = json.loads(json.dumps(parsed))
+        cloned["profiles"][0]["aspirate"]["delay_ms"] = 999
+        cloned["fingerprint"] = "changed"
+        diff = diff_liquid_class_entries(parsed, cloned)
+        self.assertTrue(diff["changed"])
+        self.assertTrue(any("aspirate" in str(item.get("path")) for item in diff["changes"]))
+        unchanged = diff_liquid_class_entries(parsed, parsed)
+        self.assertFalse(unchanged["changed"])
+
+    def test_profile_analysis_surfaces_ambiguity_and_unknown_payload(self) -> None:
+        fixture = FIXTURES / "microscript_body_slice.xlqc"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.xlqc"
+            path.write_bytes(fixture.read_bytes())
+            parsed = parse_xlqc(path)
+        catalog = {
+            "schema_version": LIQUID_CLASSES_SCHEMA_VERSION,
+            "entries": [
+                {
+                    "name": parsed["name"],
+                    "guid": parsed["guid"],
+                    "aliases": [parsed["name"]],
+                    "profiles": parsed["profiles"],
+                    "fingerprint": parsed.get("fingerprint"),
+                }
+            ],
+        }
+        unknown = analyze_liquid_class_use(
+            name=parsed["name"],
+            operation="aspirate",
+            catalog=catalog,
+        )
+        self.assertTrue(
+            any(item.get("reason") == "unknown_micro_command_payload" for item in unknown["reviews"])
+        )
+        faithful = analyze_liquid_class_use(
+            name=parsed["name"],
+            operation="aspirate",
+            catalog=catalog,
+            faithful_generation=True,
+        )
+        self.assertTrue(
+            any(item.get("reason") == "unknown_micro_command_payload" for item in faithful["failures"])
+        )
+        missing_head = analyze_liquid_class_use(
+            name=parsed["name"],
+            operation="aspirate",
+            catalog=catalog,
+            head="LiHa",
+        )
+        self.assertTrue(
+            any(item.get("reason") == "liquid_class_head_missing" for item in missing_head["failures"])
+        )
+        two_profiles = json.loads(json.dumps(catalog))
+        extra = json.loads(json.dumps(parsed["profiles"][0]))
+        extra["tip"] = "DiTi 200ul"
+        two_profiles["entries"][0]["profiles"].append(extra)
+        ambiguous = analyze_liquid_class_use(
+            name=parsed["name"],
+            operation="aspirate",
+            catalog=two_profiles,
+        )
+        self.assertTrue(
+            any(item.get("reason") == "ambiguous_liquid_class_profile" for item in ambiguous["reviews"])
+        )
+        from fluent_pipeline.gates.evaluators import evaluate_liquid_class_compatibility
+        from fluent_pipeline.gates.models import ValidationContext
+
+        def make_gate(gid, status, summary, details=None):
+            return {"id": gid, "status": status, "summary": summary, "details": details or {}}
+
+        ir = {
+            "liquid_classes": [{"name": parsed["name"]}],
+            "steps": [
+                {
+                    "id": "s1",
+                    "operation": "aspirate",
+                    "liquid_class": parsed["name"],
+                }
+            ],
+        }
+        gate = evaluate_liquid_class_compatibility(
+            ValidationContext(
+                make_gate=make_gate,
+                domain_ir=ir,
+                source_manifest={"liquid_classes": [parsed["name"]]},
+                validation_options={"liquid_classes_catalog": catalog},
+            )
+        )
+        self.assertEqual(gate["status"], "needs_review")
+        clean_catalog = json.loads(json.dumps(catalog))
+        for profile in clean_catalog["entries"][0]["profiles"]:
+            for section in profile.get("microscript") or []:
+                for record in section.get("command_records") or []:
+                    record.pop("source_metadata", None)
+                    for child in record.get("children") or []:
+                        child.pop("source_metadata", None)
+        passed = evaluate_liquid_class_compatibility(
+            ValidationContext(
+                make_gate=make_gate,
+                domain_ir=ir,
+                source_manifest={"liquid_classes": [parsed["name"]]},
+                validation_options={"liquid_classes_catalog": clean_catalog},
+            )
+        )
+        self.assertEqual(passed["status"], "passed")
 
 
 if __name__ == "__main__":

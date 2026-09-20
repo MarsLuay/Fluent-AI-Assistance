@@ -107,3 +107,6 @@ def test_removed_surfaces_stay_removed() -> None:
     assert orig_hits == []
     assert by_id["persist.project_manifest"]["supportedVersion"] == str(PROJECT_MANIFEST_SCHEMA_VERSION)
     assert by_id["persist.project_index"]["supportedVersion"] == str(INDEX_SCHEMA_VERSION)
+    from fluent_pipeline.liquid_classes_export import LIQUID_CLASSES_SCHEMA_VERSION
+
+    assert by_id["persist.liquid_classes"]["supportedVersion"] == LIQUID_CLASSES_SCHEMA_VERSION
