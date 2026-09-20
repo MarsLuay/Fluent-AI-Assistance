@@ -8,7 +8,19 @@ from pathlib import Path
 from typing import Any
 
 
-DEFAULT_INSTRUMENT_CONFIG_DIR = Path(r"C:\ProgramData\Tecan\VisionX\InstrumentConfigurations")
+from .host_environment import expand_inventory_path, load_state_inventory, programdata_tecan_root
+
+
+def _inventory_instrument_config_dir() -> Path:
+    for item in load_state_inventory().get("categories") or []:
+        if item.get("id") == "instrument_configurations":
+            relatives = item.get("relative_paths") or []
+            if relatives:
+                return expand_inventory_path(str(relatives[0]), root=programdata_tecan_root())
+    return Path(r"C:\ProgramData\Tecan\VisionX\InstrumentConfigurations")
+
+
+DEFAULT_INSTRUMENT_CONFIG_DIR = _inventory_instrument_config_dir()
 INSTRUMENT_CONFIG_DIR_ENV = "TECAN_VISIONX_INSTRUMENT_CONFIG_DIR"
 HOST_CONFIG_REPORT_VERSION = "tecan.host_instrument_config.v1"
 

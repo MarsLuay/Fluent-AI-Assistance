@@ -1,0 +1,114 @@
+{
+  "schema_version": "tecan.host_state_inventory.v1",
+  "programdata_root": "%ProgramData%\\Tecan",
+  "categories": [
+    {
+      "id": "visionx_config",
+      "purpose": "VisionX application configuration",
+      "relative_paths": ["VisionX\\Config"],
+      "sensitivity": "configuration",
+      "copy_into_diagnostics": true,
+      "capture": "files",
+      "uses": ["diagnostics", "restore", "provenance"]
+    },
+    {
+      "id": "instrument_configurations",
+      "purpose": "Installed FluentControl/VisionX instrument configuration files",
+      "relative_paths": ["VisionX\\InstrumentConfigurations"],
+      "sensitivity": "configuration",
+      "copy_into_diagnostics": true,
+      "capture": "files",
+      "uses": ["generation", "diagnostics", "provenance"]
+    },
+    {
+      "id": "instrument_information",
+      "purpose": "VisionX instrument information",
+      "relative_paths": ["VisionX\\InstrumentInformation"],
+      "sensitivity": "configuration",
+      "copy_into_diagnostics": true,
+      "capture": "files",
+      "uses": ["diagnostics", "provenance"]
+    },
+    {
+      "id": "map_database",
+      "purpose": "VisionX map database",
+      "relative_paths": ["VisionX\\MapDataBase"],
+      "sensitivity": "application-state",
+      "copy_into_diagnostics": true,
+      "capture": "files",
+      "uses": ["diagnostics", "restore"]
+    },
+    {
+      "id": "fluentcontrol_drivers",
+      "purpose": "Installed FluentControl driver inventory",
+      "relative_paths": ["FluentControl\\Drivers", "VisionX\\Drivers"],
+      "sensitivity": "configuration",
+      "copy_into_diagnostics": false,
+      "capture": "fingerprint",
+      "uses": ["diagnostics", "provenance"]
+    },
+    {
+      "id": "legacy_drivers",
+      "purpose": "Legacy driver inventory when present",
+      "relative_paths": ["VisionX\\LegacyDrivers", "FluentControl\\LegacyDrivers"],
+      "sensitivity": "configuration",
+      "copy_into_diagnostics": false,
+      "capture": "fingerprint",
+      "uses": ["diagnostics", "provenance"]
+    },
+    {
+      "id": "database_user_specific",
+      "purpose": "VisionX user-specific method/database content",
+      "relative_paths": ["VisionX\\DataBase\\UserSpecific"],
+      "sensitivity": "application-state",
+      "copy_into_diagnostics": true,
+      "capture": "files",
+      "uses": ["diagnostics", "restore"]
+    },
+    {
+      "id": "database_system_specific",
+      "purpose": "VisionX system-specific database content",
+      "relative_paths": ["VisionX\\DataBase\\SystemSpecific"],
+      "sensitivity": "application-state",
+      "copy_into_diagnostics": true,
+      "capture": "files",
+      "uses": ["diagnostics", "restore"]
+    },
+    {
+      "id": "worklists",
+      "purpose": "VisionX worklists",
+      "relative_paths": ["VisionX\\Worklists"],
+      "sensitivity": "application-state",
+      "copy_into_diagnostics": true,
+      "capture": "files",
+      "uses": ["diagnostics"]
+    },
+    {
+      "id": "external_links",
+      "purpose": "VisionX external links",
+      "relative_paths": ["VisionX\\ExternalLinks"],
+      "sensitivity": "application-state",
+      "copy_into_diagnostics": true,
+      "capture": "files",
+      "uses": ["diagnostics"]
+    },
+    {
+      "id": "user_management",
+      "purpose": "User-management/security state",
+      "relative_paths": ["VisionX\\UserManagement", "FluentControl\\UserManagement"],
+      "sensitivity": "secret",
+      "copy_into_diagnostics": false,
+      "capture": "metadata-only",
+      "uses": ["provenance"]
+    },
+    {
+      "id": "license_material",
+      "purpose": "License/dongle material",
+      "relative_paths": ["VisionX\\License", "FluentControl\\License"],
+      "sensitivity": "secret",
+      "copy_into_diagnostics": false,
+      "capture": "metadata-only",
+      "uses": ["provenance"]
+    }
+  ]
+}

@@ -407,6 +407,23 @@ def collect_doctor_checks(*, install_missing: bool = False) -> list[dict[str, An
             ),
         }
     )
+    from ...host_environment import collect_host_environment
+
+    host = collect_host_environment()
+    fluent = next((item for item in host.get("products") or [] if item.get("family") == "FluentControl"), {})
+    version = fluent.get("version") or "unknown"
+    source = fluent.get("version_source") or "absent"
+    checks.append(
+        {
+            "name": "host environment",
+            "ok": True,
+            "detail": (
+                f"FluentControl detected={bool(fluent.get('detected'))} "
+                f"version={version} source={source} host_kind={host.get('host_kind')}"
+            ),
+            "host_environment": host,
+        }
+    )
     return checks
 
 

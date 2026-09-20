@@ -714,11 +714,15 @@ def _tecan_sample_evidence(
 
 
 def _local_host() -> dict[str, Any]:
-    is_windows = os.name == "nt"
+    from .host_environment import collect_host_environment
+
+    environment = collect_host_environment()
+    is_windows = environment["os_name"] == "nt"
     return {
-        "platform": platform.platform(),
+        "platform": environment["platform"],
         "python": platform.python_version(),
         "is_windows": is_windows,
+        "host_environment": environment,
         "connector_runtime_note": (
             "Windows host; connector COM runtime may be checkable if FluentControl is installed."
             if is_windows

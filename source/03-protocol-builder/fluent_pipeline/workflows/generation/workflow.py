@@ -27,6 +27,7 @@ from ...bundle_lifecycle import (
     source_export_kind,
     verification_state_from_readiness,
 )
+from ...host_environment import unverified_offline_host_environment
 from ...compiled_xscr_finalizer import (
     finalize_compiled_xscr,
     render_compiled_xscr_finalization_markdown,
@@ -1539,6 +1540,7 @@ def run_generation_workflow(
         "full_zeia_export": full_zeia_export,
         "partial_zeia_export_approved": approve_partial_zeia,
         "host_instrument_configuration": host_config_report,
+        "host_environment": unverified_offline_host_environment(),
         "host_instrument_config_report": str(host_config_report_path),
         "host_instrument_config_json": str(host_config_json_path),
         "out_dir": str(out_dir),
@@ -3058,6 +3060,7 @@ def _write_blocked_full_zeia_manifest(
         "generation_options": generation_options.as_dict(),
         "ready_to_import": False,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "host_environment": unverified_offline_host_environment(),
         "bundle_role": lifecycle["bundle_role"],
         "source_export_kind": lifecycle["source_export_kind"],
         "verification_state": lifecycle["verification_state"],

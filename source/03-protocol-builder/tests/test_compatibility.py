@@ -87,6 +87,16 @@ class CompatibilityMatrixTests(unittest.TestCase):
         self.assertIn("Confidence", markdown)
         self.assertIn("## Extracted Metadata", markdown)
 
+    def test_local_host_exposes_host_environment_without_overriding_manual_build(self):
+        report = build_compatibility_report(connector="unitelabs")
+        host = report["local_host"]["host_environment"]
+        self.assertEqual(host["schema_version"], "tecan.host_environment.v1")
+        self.assertIn("fingerprint", host)
+        self.assertEqual(report["manual"]["fluentcontrol_version"], "3.8 SP1")
+        fluent = next(item for item in host["products"] if item["family"] == "FluentControl")
+        if not fluent.get("detected"):
+            self.assertNotEqual(fluent.get("version_source"), "manual")
+
 
 if __name__ == "__main__":
     unittest.main()
