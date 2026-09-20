@@ -1009,6 +1009,24 @@
       "replacement": null
     },
     {
+      "id": "python.tecan_reader.FullExportReadiness",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export FullExportReadiness.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.IdentifierConflict",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export IdentifierConflict.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
       "id": "python.tecan_reader.InspectionReport",
       "class": "supported",
       "kind": "python-export",
@@ -1018,11 +1036,29 @@
       "replacement": null
     },
     {
+      "id": "python.tecan_reader.ReadinessStatus",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export ReadinessStatus.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
       "id": "python.tecan_reader.SourceProvenance",
       "class": "supported",
       "kind": "python-export",
       "path": "source/01-project-reader/tecan_reader/__init__.py",
       "reason": "Public tecan_reader export SourceProvenance.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.UnresolvedReference",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export UnresolvedReference.",
       "supportedVersion": "current",
       "replacement": null
     },
@@ -1135,6 +1171,15 @@
       "replacement": null
     },
     {
+      "id": "python.tecan_reader.find_entity_candidates",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export find_entity_candidates.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
       "id": "python.tecan_reader.mine_script_patterns",
       "class": "supported",
       "kind": "python-export",
@@ -1158,6 +1203,24 @@
       "kind": "python-export",
       "path": "source/01-project-reader/tecan_reader/__init__.py",
       "reason": "Public tecan_reader export resolve_adapter.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.resolve_full_export_readiness",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export resolve_full_export_readiness.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.resolve_manifest_readiness",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export resolve_manifest_readiness.",
       "supportedVersion": "current",
       "replacement": null
     },

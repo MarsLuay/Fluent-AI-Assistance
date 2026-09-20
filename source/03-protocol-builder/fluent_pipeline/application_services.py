@@ -36,6 +36,9 @@ from .request_spec import build_request_spec, write_request_spec
 from .runner import ensure_parent, write_json
 from .spec_lint import LintResult, lint_request_spec_file
 from .validation import render_validation_markdown, validate_ready_to_import
+from tecan_reader.full_export_readiness import (
+    resolve_full_export_readiness as resolve_reader_readiness,
+)
 
 
 @dataclass(frozen=True)
@@ -98,6 +101,24 @@ class ProjectInspectionResult:
 
     def to_dict(self) -> dict[str, Any]:
         return inspection_payload(self.context, report_path=self.report_path)
+
+
+@dataclass(frozen=True)
+class FullExportReadinessRequest:
+    """Inputs for the shared full-export readiness service."""
+
+    archives: tuple[Path, ...] = ()
+    context_name: str | None = None
+    approve_partial_zeia: bool = False
+
+
+@dataclass(frozen=True)
+class FullExportReadinessResult:
+    request: FullExportReadinessRequest
+    readiness: dict[str, Any]
+
+    def to_dict(self) -> dict[str, Any]:
+        return dict(self.readiness)
 
 
 @dataclass(frozen=True)
@@ -345,6 +366,27 @@ def inspect_project(request: ProjectInspectionRequest) -> ProjectInspectionResul
         context=context,
         report_path=report_path if report_path.exists() else None,
     )
+
+
+def resolve_full_export_readiness(
+    request: FullExportReadinessRequest,
+) -> FullExportReadinessResult:
+    """Resolve readiness once for CLI, MCP, and direct Python callers."""
+    if request.context_name:
+        context = load_project(request.context_name)
+        from tecan_reader.full_export_readiness import resolve_manifest_readiness
+
+        readiness = resolve_manifest_readiness(
+            context.manifest,
+            approve_partial_zeia=request.approve_partial_zeia,
+        )
+    else:
+        result = resolve_reader_readiness(
+            request.archives,
+            approve_partial_zeia=request.approve_partial_zeia,
+        )
+        readiness = result.to_dict()
+    return FullExportReadinessResult(request=request, readiness=readiness)
 
 
 def create_request_spec(request: RequestSpecCreateRequest) -> RequestSpecCreateResult:

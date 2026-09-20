@@ -29,6 +29,7 @@ from .runner import PipelineError
 from .worktable_geometry import build_worktable_geometry
 from tecan_common.zeia_limits import validate_zeia_archive_limits
 from tecan_reader.project_model import CanonicalProjectModel, build_completeness_metadata
+from tecan_reader.full_export_readiness import resolve_manifest_readiness
 from tecan_reader.zeia_adapters import ZeiaFormatError, ingest_zeia, probe_zeia
 
 
@@ -63,17 +64,6 @@ FULL_ZEIA_ASK = (
     "objects, and other dependencies. Wait for that export, or get explicit "
     "permission before continuing with the current partial/non-full export."
 )
-FULL_ZEIA_WARNING_ONLY_FINDING_IDS = {
-    "missing_liquid_class_objects",
-    "missing_referenced_worktables",
-    "unresolved_script_references",
-}
-FULL_ZEIA_WARNING_SUMMARY_SUFFIX = (
-    "This appears to be stale dependency metadata from unrelated scripts in an "
-    "otherwise dependency-rich full-system export."
-)
-
-
 @dataclass(frozen=True)
 class ProjectContext:
     name: str
@@ -591,7 +581,7 @@ def compact_full_zeia_export(payload: Any) -> dict[str, Any] | None:
     if not isinstance(payload, dict):
         return None
     out: dict[str, Any] = {}
-    for key in ("required", "status", "accepted", "summary"):
+    for key in ("required", "status", "readiness_status", "accepted", "summary"):
         if key in payload:
             out[key] = payload.get(key)
     warnings = payload.get("warnings")
@@ -981,7 +971,7 @@ def build_manifest(
         "xml_inspection_mode": "complete" if completeness.get("complete") else "preview",
         "errors": errors,
     }
-    manifest["full_zeia_export"] = assess_full_zeia_export(manifest)
+    manifest["full_zeia_export"] = resolve_manifest_readiness(manifest)
     if detailed_geometry:
         manifest["worktable_geometry"] = build_worktable_geometry(
             manifest,
@@ -1434,345 +1424,59 @@ def _geometry_item_key(item: dict[str, Any], *, fallback: str) -> str:
 
 
 def assess_full_zeia_export(manifest: dict[str, Any]) -> dict[str, Any]:
-    """Conservatively assess whether an imported project looks like a full ZEIA export."""
-    scripts = [item for item in manifest.get("scripts") or [] if isinstance(item, dict)]
-    objects = [item for item in manifest.get("objects") or [] if isinstance(item, dict)]
-    workspaces = [
-        item for item in manifest.get("workspaces") or [] if isinstance(item, dict)
-    ]
-    liquid_class_objects = [
-        str(item.get("object_name") or "")
-        for item in objects
-        if item.get("kind") == "liquid_class" and item.get("object_name")
-    ]
-    findings: list[dict[str, Any]] = []
-    warnings: list[dict[str, Any]] = []
-
-    if not scripts:
-        findings.append(
-            {
-                "id": "no_scripts",
-                "summary": "No source scripts were found in this ZEIA/archive.",
-            }
-        )
-
-    object_names = {
-        str(item.get("object_name") or "").casefold()
-        for item in [*scripts, *objects]
-        if item.get("object_name")
-    }
-    object_guids = {
-        str(guid).casefold()
-        for item in [*scripts, *objects]
-        for guid in (item.get("guids") or [])
-        if guid
-    }
-    workspace_names = {
-        str(item.get("object_name") or "").casefold()
-        for item in workspaces
-        if item.get("object_name")
-    }
-    workspace_guids = {
-        str(guid).casefold()
-        for item in workspaces
-        for guid in (item.get("guids") or [])
-        if guid
-    }
-    liquid_class_names = {name.casefold() for name in liquid_class_objects}
-
-    unresolved_refs = []
-    missing_worktables = []
-    missing_liquid_classes = []
-    for script in scripts:
-        script_name = (
-            script.get("object_name") or script.get("entry") or "unknown script"
-        )
-        for ref in script.get("references") or []:
-            if not isinstance(ref, dict):
-                continue
-            ref_name = str(ref.get("object_name") or "").strip()
-            ref_guid = str(ref.get("guid") or "").strip()
-            ref_type = str(ref.get("type_id") or "").strip()
-            if ref_type == "WorktableWorkspace":
-                if not _ref_resolves(
-                    ref_name, ref_guid, workspace_names, workspace_guids
-                ):
-                    missing_worktables.append(
-                        {
-                            "script": script_name,
-                            "object_name": ref_name,
-                            "guid": ref_guid,
-                            "type_id": ref_type,
-                        }
-                    )
-                continue
-            if ref_name or ref_guid:
-                if not _ref_resolves(ref_name, ref_guid, object_names, object_guids):
-                    unresolved_refs.append(
-                        {
-                            "script": script_name,
-                            "object_name": ref_name,
-                            "guid": ref_guid,
-                            "type_id": ref_type,
-                        }
-                    )
-        deps = script.get("dependencies") or {}
-        for liquid_class in deps.get("liquid_classes") or []:
-            name = str(liquid_class or "").strip()
-            if name and name.casefold() not in liquid_class_names:
-                missing_liquid_classes.append({"script": script_name, "name": name})
-
-    if missing_worktables:
-        findings.append(
-            {
-                "id": "missing_referenced_worktables",
-                "summary": "One or more script WorktableWorkspace references are absent from the archive.",
-                "items": missing_worktables[:50],
-            }
-        )
-    if missing_liquid_classes:
-        findings.append(
-            {
-                "id": "missing_liquid_class_objects",
-                "summary": "One or more liquid classes used by scripts are absent as liquid-class objects.",
-                "items": missing_liquid_classes[:50],
-            }
-        )
-    if unresolved_refs:
-        findings.append(
-            {
-                "id": "unresolved_script_references",
-                "summary": "One or more script references do not resolve to an object in the archive.",
-                "items": unresolved_refs[:50],
-            }
-        )
-    if scripts and len(objects) < 2:
-        findings.append(
-            {
-                "id": "low_supporting_object_count",
-                "summary": "The archive contains scripts but very few supporting objects, which is typical of a non-full export.",
-                "details": {
-                    "object_count": len(objects),
-                    "entry_count": manifest.get("entry_count", 0),
-                },
-            }
-        )
-    if scripts and not workspaces:
-        findings.append(
-            {
-                "id": "no_worktable_objects",
-                "summary": "No worktable/workspace objects were found beside the source scripts.",
-            }
-        )
-    if scripts and not liquid_class_objects:
-        findings.append(
-            {
-                "id": "no_liquid_class_objects",
-                "summary": "No liquid-class objects were found beside the source scripts.",
-            }
-        )
-
-    completeness = manifest.get("inspection_completeness")
-    if isinstance(completeness, dict) and not completeness.get("complete", False):
-        findings.append(
-            {
-                "id": "incomplete_canonical_ingestion",
-                "summary": (
-                    "Canonical ZEIA inspection is incomplete; full-export readiness "
-                    "cannot be established from a bounded preview or failed member parse."
-                ),
-                "details": {
-                    "mode": completeness.get("mode"),
-                    "configured_limits": completeness.get("configured_limits") or {},
-                    "truncated_scripts": completeness.get("truncated_scripts", 0),
-                    "truncated_objects": completeness.get("truncated_objects", 0),
-                    "blocking_error_count": completeness.get("blocking_error_count", 0),
-                    "oversized_member_count": completeness.get("oversized_member_count", 0),
-                    "oversized_members": completeness.get("oversized_members", [])[:50],
-                },
-            }
-        )
-
-    warning_eligible_findings = [
-        finding
-        for finding in findings
-        if str(finding.get("id") or "") in FULL_ZEIA_WARNING_ONLY_FINDING_IDS
-    ]
-    blocking_findings = [
-        finding
-        for finding in findings
-        if str(finding.get("id") or "") not in FULL_ZEIA_WARNING_ONLY_FINDING_IDS
-    ]
-    if warning_eligible_findings and _has_dependency_rich_full_export_evidence(
-        manifest,
-        scripts=scripts,
-        objects=objects,
-        workspaces=workspaces,
-        liquid_class_objects=liquid_class_objects,
-    ):
-        warnings.extend(
-            _full_zeia_warning_record(finding) for finding in warning_eligible_findings
-        )
-    else:
-        blocking_findings.extend(warning_eligible_findings)
-
-    for error in manifest.get("errors") or []:
-        if not isinstance(error, dict) or error.get("severity") != "warning":
-            continue
-        warnings.append(
-            {
-                "id": "non_semantic_member_diagnostic",
-                "summary": (
-                    "A known non-semantic archive member was not fully interpreted; "
-                    "it was retained as an explicit warning."
-                ),
-                "items": [error],
-            }
-        )
-
-    if not blocking_findings:
-        status = "likely_full_export"
-        summary = (
-            "The ZEIA has full-system export evidence; stale references in unrelated scripts "
-            "were retained as warnings."
-            if warnings
-            else "The ZEIA includes scripts plus the referenced worktable and liquid-class dependencies detected in the manifest."
-        )
-    else:
-        status = "needs_user"
-        summary = "The ZEIA looks partial/non-full or lacks enough dependency evidence for protocol generation."
-
-    signals = {
-        "entry_count": manifest.get("entry_count", 0),
-        "script_count": len(scripts),
-        "object_count": len(objects),
-        "workspace_count": len(workspaces),
-        "liquid_class_object_count": len(liquid_class_objects),
-    }
-    if isinstance(completeness, dict):
-        signals.update(
-            {
-                "inspection_complete": bool(completeness.get("complete")),
-                "truncated_scripts": int(completeness.get("truncated_scripts") or 0),
-                "truncated_objects": int(completeness.get("truncated_objects") or 0),
-                "oversized_member_count": int(
-                    completeness.get("oversized_member_count") or 0
-                ),
-            }
-        )
-
-    return {
-        "required": True,
-        "status": status,
-        "accepted": status == "likely_full_export",
-        "summary": summary,
-        "ask_user": FULL_ZEIA_ASK,
-        "signals": signals,
-        "blocking_findings": blocking_findings,
-        "warnings": warnings,
-    }
+    """Compatibility entrypoint backed by the canonical reader resolver."""
+    return resolve_manifest_readiness(manifest)
 
 
 def _collection_full_zeia_assessment(contexts: list[ProjectContext]) -> dict[str, Any]:
+    """Resolve collection dependencies across all canonical source contexts."""
     source_assessments = []
-    blocking = []
-    accepted = []
     for ctx in contexts:
-        assessment = ctx.manifest.get("full_zeia_export") or assess_full_zeia_export(
-            ctx.manifest
-        )
-        source_record = {
-            "source_context": ctx.name,
-            "status": assessment.get("status"),
-            "accepted": bool(assessment.get("accepted")),
-            "summary": assessment.get("summary"),
-            "blocking_findings": assessment.get("blocking_findings") or [],
-        }
-        source_assessments.append(source_record)
-        if source_record["accepted"]:
-            accepted.append(source_record)
-        else:
-            blocking.append(source_record)
-    if blocking:
-        if accepted:
-            return {
-                "required": True,
-                "status": "likely_full_export",
-                "accepted": True,
-                "summary": (
-                    "At least one source context looks like a full ZEIA export; "
-                    "partial companion contexts were retained as source-specific structure."
-                ),
-                "ask_user": FULL_ZEIA_ASK,
-                "source_assessments": source_assessments,
-                "blocking_findings": [],
-                "warnings": [
-                    {
-                        "id": "partial_companion_contexts",
-                        "summary": (
-                            "One or more companion contexts do not look like full ZEIA exports, "
-                            "but the collection includes a full export for dependency resolution."
-                        ),
-                        "items": blocking,
-                    }
-                ],
+        assessment = ctx.manifest.get("full_zeia_export") or resolve_manifest_readiness(ctx.manifest)
+        source_assessments.append(
+            {
+                "source_context": ctx.name,
+                "status": assessment.get("status"),
+                "accepted": bool(assessment.get("accepted")),
+                "summary": assessment.get("summary"),
+                "blocking_findings": assessment.get("blocking_findings") or [],
             }
-        return {
-            "required": True,
-            "status": "needs_user",
-            "accepted": False,
-            "summary": "One or more source contexts do not look like full ZEIA exports.",
-            "ask_user": FULL_ZEIA_ASK,
-            "source_assessments": source_assessments,
-            "blocking_findings": blocking,
-            "warnings": [],
-        }
-    return {
-        "required": True,
-        "status": "likely_full_export",
-        "accepted": True,
-        "summary": "All source contexts look like full ZEIA exports based on available manifests.",
-        "ask_user": FULL_ZEIA_ASK,
-        "source_assessments": source_assessments,
-        "blocking_findings": [],
-        "warnings": [],
+        )
+    combined = {
+        "source_archive": "",
+        "scripts": [item for ctx in contexts for item in (ctx.manifest.get("scripts") or [])],
+        "objects": [item for ctx in contexts for item in (ctx.manifest.get("objects") or [])],
+        "worklists": [item for ctx in contexts for item in (ctx.manifest.get("worklists") or [])],
+        "errors": [item for ctx in contexts for item in (ctx.manifest.get("errors") or [])],
+        "inspection_completeness": {
+            "complete": all(
+                bool((ctx.manifest.get("inspection_completeness") or {}).get("complete", False))
+                for ctx in contexts
+            ),
+            "mode": "complete"
+            if all(
+                (ctx.manifest.get("inspection_completeness") or {}).get("mode") == "complete"
+                for ctx in contexts
+            )
+            else "preview",
+        },
     }
-
-
-def _ref_resolves(
-    name: str,
-    guid: str,
-    object_names: set[str],
-    object_guids: set[str],
-) -> bool:
-    return bool(
-        (name and name.casefold() in object_names)
-        or (guid and guid.casefold() in object_guids)
-    )
-
-
-def _has_dependency_rich_full_export_evidence(
-    manifest: dict[str, Any],
-    *,
-    scripts: list[dict[str, Any]],
-    objects: list[dict[str, Any]],
-    workspaces: list[dict[str, Any]],
-    liquid_class_objects: list[str],
-) -> bool:
-    if not scripts or not workspaces or not liquid_class_objects:
-        return False
-    supporting_object_floor = max(5, len(scripts))
-    return (
-        len(objects) >= supporting_object_floor
-        and int(manifest.get("entry_count") or 0) >= supporting_object_floor
-    )
-
-
-def _full_zeia_warning_record(finding: dict[str, Any]) -> dict[str, Any]:
-    summary = str(finding.get("summary") or "").strip()
-    if FULL_ZEIA_WARNING_SUMMARY_SUFFIX not in summary:
-        summary = f"{summary} {FULL_ZEIA_WARNING_SUMMARY_SUFFIX}".strip()
-    return {**finding, "summary": summary}
+    resolved = resolve_manifest_readiness(combined)
+    partial_sources = [item for item in source_assessments if not item["accepted"]]
+    if resolved.get("accepted") and partial_sources:
+        resolved.setdefault("warnings", []).insert(
+            0,
+            {
+                "id": "partial_companion_contexts",
+                "summary": (
+                    "One or more companion contexts are partial, but the collection includes "
+                    "a complete source for dependency resolution."
+                ),
+                "items": partial_sources,
+            },
+        )
+    resolved["source_assessments"] = source_assessments
+    return resolved
 
 
 def _append_full_zeia_export_report(

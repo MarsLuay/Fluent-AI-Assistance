@@ -187,21 +187,14 @@ class ProjectContextTests(unittest.TestCase):
                 warning_ctx = pc.import_project(warning_archive, name="warning-context")
 
                 warning_assessment = warning_ctx.manifest["full_zeia_export"]
-                self.assertEqual(warning_assessment["status"], "likely_full_export")
-                self.assertTrue(warning_assessment["accepted"])
-                self.assertEqual(warning_assessment["blocking_findings"], [])
-                warning_ids = {warning["id"] for warning in warning_assessment["warnings"]}
-                self.assertEqual(
-                    warning_ids,
-                    {
-                        "missing_liquid_class_objects",
-                        "missing_referenced_worktables",
-                        "unresolved_script_references",
-                    },
-                )
-                self.assertIn("stale references in unrelated scripts", warning_assessment["summary"])
+                self.assertEqual(warning_assessment["status"], "needs_user")
+                self.assertFalse(warning_assessment["accepted"])
+                warning_ids = {finding["id"] for finding in warning_assessment["blocking_findings"]}
+                self.assertIn("unresolved_script_references", warning_ids)
+                self.assertIn("missing_referenced_worktables", warning_ids)
+                self.assertIn("missing_liquid_class_objects", warning_ids)
                 warning_report = (warning_ctx.root / "project_report.md").read_text(encoding="utf-8")
-                self.assertIn("Warning signal `missing_liquid_class_objects`", warning_report)
+                self.assertIn("Full ZEIA export check: `needs_user`", warning_report)
 
                 partial_archive = tmp_path / "partial.zeia"
                 _write_script_archive(partial_archive, "Scripts/demo.xscr", "PartialScript", "SourcePlate")

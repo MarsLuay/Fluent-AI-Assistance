@@ -329,6 +329,59 @@ def search_project_index(
         conn.close()
 
 
+def find_entity_candidates(
+    db_path: str | Path,
+    identifier: str,
+    *,
+    kind: str | None = None,
+) -> dict[str, Any]:
+    """Return every exact entity match without silently selecting one.
+
+    Readiness uses the canonical model directly, but indexed callers need the
+    same ambiguity-safe lookup when resolving a previously built database.
+    """
+    database = Path(db_path)
+    conn = _connect(database)
+    try:
+        needle = str(identifier).casefold()
+        normalized_kind = kind.strip().lower().replace("-", "_").replace(" ", "_") if kind else None
+        rows = conn.execute(
+            """
+            SELECT e.kind, e.name, e.value, e.source_path, e.command_index,
+                   e.metadata_json, z.path AS zeia_file, s.object_name AS script_name
+            FROM entities e
+            JOIN zeia_files z ON z.id = e.zeia_file_id
+            LEFT JOIN scripts s ON s.id = e.script_id
+            WHERE (lower(e.name) = ? OR lower(e.value) = ? OR lower(e.metadata_json) LIKE ?)
+              AND (? IS NULL OR e.kind = ?)
+            ORDER BY e.kind, e.name, z.path, e.source_path
+            """,
+            (needle, needle, f'%"guid": "{needle}"%', normalized_kind, normalized_kind),
+        ).fetchall()
+        candidates = [
+            {
+                "kind": row["kind"],
+                "name": row["name"],
+                "value": row["value"],
+                "zeia_file": row["zeia_file"],
+                "script": row["script_name"] or "",
+                "source_path": row["source_path"],
+                "command_index": row["command_index"],
+                "metadata": _loads(row["metadata_json"]),
+            }
+            for row in rows
+        ]
+        return {
+            "identifier": identifier,
+            "kind": normalized_kind or "",
+            "status": "missing" if not candidates else "unique" if len(candidates) == 1 else "ambiguous",
+            "count": len(candidates),
+            "candidates": candidates,
+        }
+    finally:
+        conn.close()
+
+
 def _initialize_database(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA_SQL)
     columns = {
