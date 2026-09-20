@@ -6,6 +6,7 @@ from pathlib import Path
 from tecan_reader.project_index import (
     _initialize_database,
     discover_zeia_paths,
+    find_entity_candidates,
     search_project_index,
 )
 
@@ -203,6 +204,23 @@ class TestSearchProjectIndex(unittest.TestCase):
         self.assertEqual(result["result_count"], 1)
         self.assertEqual(result["results"][0]["name"], "Water")
 
+    def test_exact_entity_lookup_reports_ambiguity(self):
+        conn = sqlite3.connect(self.db_path)
+        conn.execute(
+            """INSERT INTO entities(id, zeia_file_id, script_id, kind, name, value, source_path)
+               VALUES (3, 1, 1, 'worktable', 'Shared', 'WorktableWorkspace', 'one.xscr')"""
+        )
+        conn.execute(
+            """INSERT INTO entities(id, zeia_file_id, script_id, kind, name, value, source_path)
+               VALUES (4, 1, 2, 'worktable', 'Shared', 'WorktableWorkspace', 'two.xscr')"""
+        )
+        conn.commit()
+        conn.close()
+
+        result = find_entity_candidates(self.db_path, "Shared", kind="worktable")
+
+        self.assertEqual(result["status"], "ambiguous")
+        self.assertEqual(result["count"], 2)
 
 class TestIndexSchemaPolicy(unittest.TestCase):
     def test_search_rejects_stale_schema(self):

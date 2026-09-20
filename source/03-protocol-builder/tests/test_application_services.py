@@ -7,6 +7,7 @@ from unittest import mock
 from fluent_pipeline.application_services import (
     BundleVerificationRequest,
     GenerationResult,
+    FullExportReadinessRequest,
     LogAnalysisRequest,
     ProjectImportRequest,
     ProjectInspectionRequest,
@@ -21,6 +22,7 @@ from fluent_pipeline.application_services import (
     import_project,
     inspect_project,
     plan_repair,
+    resolve_full_export_readiness,
     validate_request_spec,
     verify_bundle,
 )
@@ -31,6 +33,24 @@ from fluent_pipeline.spec_lint import LintResult
 
 
 class ApplicationServicesTests(unittest.TestCase):
+    def test_full_export_readiness_routes_through_one_reader_service(self):
+        reader_result = SimpleNamespace(to_dict=lambda: {"status": "complete"})
+        with mock.patch(
+            "fluent_pipeline.application_services.resolve_reader_readiness",
+            return_value=reader_result,
+        ) as resolver:
+            result = resolve_full_export_readiness(
+                FullExportReadinessRequest(
+                    archives=(Path("one.zeia"), Path("two.zeia")),
+                    approve_partial_zeia=True,
+                )
+            )
+
+        resolver.assert_called_once_with(
+            (Path("one.zeia"), Path("two.zeia")), approve_partial_zeia=True
+        )
+        self.assertEqual(result.to_dict(), {"status": "complete"})
+
     def test_generate_protocol_wraps_workflow_request(self):
         request = GenerationRequest(
             intent="Generate a script",

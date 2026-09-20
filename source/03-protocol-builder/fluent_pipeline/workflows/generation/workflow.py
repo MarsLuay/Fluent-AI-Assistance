@@ -160,6 +160,7 @@ from ...variable_reconciliation import (
 )
 from ...spec_lint import lint_request_spec, render_lint_report
 from ...subroutine_dependencies import resolve_subroutine_dependencies
+from tecan_reader.full_export_readiness import resolve_manifest_readiness
 from ...subroutine_deck_locations import (
     CAPBC_PREP_GROUP_NAME,
     apply_subroutine_deck_location_bindings,
@@ -2973,7 +2974,10 @@ def _verify_full_zeia_export(
             "warnings": [],
         }
     else:
-        assessment = dict(context.manifest.get("full_zeia_export") or {})
+        # Recompute from the canonical manifest at the generation boundary.
+        # Persisted compatibility views are reports, not a second readiness
+        # authority and may be stale after source ingestion changes.
+        assessment = resolve_manifest_readiness(context.manifest)
         if not assessment:
             assessment = {
                 "required": True,

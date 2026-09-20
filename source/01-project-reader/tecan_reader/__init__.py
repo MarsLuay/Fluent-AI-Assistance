@@ -4,13 +4,26 @@ from .archive import inspect_archive
 from .compare import compare_archives
 from .gwl import inspect_gwl
 from .pattern_library import mine_script_patterns, search_script_patterns, summarize_script_patterns
-from .project_index import build_project_index, search_project_index, summarize_project_index
+from .project_index import (
+    build_project_index,
+    find_entity_candidates,
+    search_project_index,
+    summarize_project_index,
+)
 from .project_model import (
     CANONICAL_PROJECT_MODEL_SCHEMA_VERSION,
     CanonicalProjectModel,
     build_completeness_metadata,
     InspectionReport,
     SourceProvenance,
+)
+from .full_export_readiness import (
+    FullExportReadiness,
+    IdentifierConflict,
+    ReadinessStatus,
+    UnresolvedReference,
+    resolve_full_export_readiness,
+    resolve_manifest_readiness,
 )
 from .script import inspect_xscr
 from .xmlobj import inspect_xml_object
@@ -32,13 +45,18 @@ __all__ = [
     "AdapterMatch",
     "ArchiveProbe",
     "CanonicalProjectModel",
+    "FullExportReadiness",
+    "IdentifierConflict",
     "DetectionResult",
     "build_completeness_metadata",
     "InspectionReport",
+    "ReadinessStatus",
     "SourceProvenance",
+    "UnresolvedReference",
     "ZeiaAdapter",
     "ZeiaFormatError",
     "build_project_index",
+    "find_entity_candidates",
     "compare_archives",
     "detect_zeia_format",
     "ingest_zeia",
@@ -50,6 +68,8 @@ __all__ = [
     "mine_script_patterns",
     "probe_zeia",
     "resolve_adapter",
+    "resolve_full_export_readiness",
+    "resolve_manifest_readiness",
     "search_project_index",
     "search_script_patterns",
     "summarize_project_index",
