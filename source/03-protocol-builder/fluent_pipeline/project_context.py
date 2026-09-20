@@ -55,6 +55,7 @@ PROJECT_CONTEXT_XML_MAX_BYTES = 4 * 1024 * 1024
 # project completeness or full-export readiness.
 WORKTABLE_GEOMETRY_ENTRY_LIMIT = 2500
 PROJECT_MANIFEST_SCHEMA_VERSION = 3
+SUPPORTED_PROJECT_MANIFEST_SCHEMA_VERSIONS = frozenset({1, 2, 3})
 PROJECT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$")
 FULL_ZEIA_ASK = (
     "Ask the user for a full FluentControl ZEIA export that includes the source "
@@ -276,6 +277,40 @@ def import_project(
     return ProjectContext(project_name, root, manifest)
 
 
+def normalize_project_manifest(
+    manifest: Mapping[str, Any] | dict[str, Any],
+    *,
+    persist_path: Path | None = None,
+) -> dict[str, Any]:
+    """Migrate a supported project manifest or reject an unknown schema."""
+    payload = dict(manifest)
+    raw = payload.get("schema_version", 1)
+    try:
+        version = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise PipelineError(
+            "unsupported project manifest schema_version "
+            f"{raw!r}; re-import the ZEIA with current protocol-builder "
+            f"(supported versions: {sorted(SUPPORTED_PROJECT_MANIFEST_SCHEMA_VERSIONS)})"
+        ) from exc
+    if version not in SUPPORTED_PROJECT_MANIFEST_SCHEMA_VERSIONS:
+        raise PipelineError(
+            "unsupported project manifest schema_version "
+            f"{version}; re-import the ZEIA with current protocol-builder "
+            f"(supported versions: {sorted(SUPPORTED_PROJECT_MANIFEST_SCHEMA_VERSIONS)}, "
+            f"current {PROJECT_MANIFEST_SCHEMA_VERSION})"
+        )
+    if version == PROJECT_MANIFEST_SCHEMA_VERSION:
+        return payload
+    payload["schema_version"] = PROJECT_MANIFEST_SCHEMA_VERSION
+    if persist_path is not None:
+        persist_path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    return payload
+
+
 def load_project(name: str | None = None) -> ProjectContext:
     resolved_name = name or active_project_name()
     if not resolved_name:
@@ -286,6 +321,7 @@ def load_project(name: str | None = None) -> ProjectContext:
     if not path.exists():
         raise PipelineError(f"project context not found: {resolved_name}")
     manifest = json.loads(path.read_text(encoding="utf-8"))
+    manifest = normalize_project_manifest(manifest, persist_path=path)
     return ProjectContext(resolved_name, project_dir(resolved_name), manifest)
 
 

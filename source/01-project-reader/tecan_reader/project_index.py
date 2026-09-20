@@ -18,6 +18,18 @@ from .project_model import CanonicalProjectModel
 from .zeia_adapters import ingest_zeia
 
 SCHEMA_VERSION = "2"
+
+
+def require_current_index_schema(conn: sqlite3.Connection) -> None:
+    """Refuse to read an index that was not rebuilt for this schema."""
+    value = _metadata_value(conn, "schema_version")
+    if value != SCHEMA_VERSION:
+        raise ValueError(
+            f"project index schema_version {value!r} is not {SCHEMA_VERSION!r}; "
+            "rebuild the index with build_project_index (indexes are disposable caches)"
+        )
+
+
 SCHEMA_SQL = """
         CREATE TABLE IF NOT EXISTS metadata (
             key TEXT PRIMARY KEY,
@@ -244,6 +256,7 @@ def summarize_project_index(
     """Return project-level counts and file summaries from an index."""
     conn, should_close, database = _connection_arg(db_path_or_conn)
     try:
+        require_current_index_schema(conn)
         entity_counts = {
             row["kind"]: row["count"]
             for row in conn.execute(
@@ -299,6 +312,7 @@ def search_project_index(
     database = Path(db_path)
     conn = _connect(database)
     try:
+        require_current_index_schema(conn)
         normalized_kind = (
             kind.strip().lower().replace("-", "_").replace(" ", "_") if kind else None
         )

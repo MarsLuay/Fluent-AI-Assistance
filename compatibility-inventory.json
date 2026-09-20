@@ -1,0 +1,1201 @@
+{
+  "schemaVersion": 1,
+  "policyVersion": "fluent.compatibility.v1",
+  "policyPath": "COMPATIBILITY.md",
+  "allowedClasses": [
+    "supported",
+    "deprecated",
+    "internal",
+    "removed"
+  ],
+  "surfaces": [
+    {
+      "id": "installed.protocol-builder",
+      "class": "supported",
+      "kind": "installed-command",
+      "path": "source/03-protocol-builder/pyproject.toml",
+      "reason": "Installed protocol-builder console entry.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "installed.tecan-ai-mcp",
+      "class": "supported",
+      "kind": "installed-command",
+      "path": "source/03-protocol-builder/pyproject.toml",
+      "reason": "Installed local MCP stdio adapter.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "installed.project-reader",
+      "class": "supported",
+      "kind": "installed-command",
+      "path": "source/01-project-reader/pyproject.toml",
+      "reason": "Installed project-reader console entry.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "installed.tecan-reader",
+      "class": "supported",
+      "kind": "installed-command",
+      "path": "source/01-project-reader/pyproject.toml",
+      "reason": "Alias for project-reader.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "installed.worklist-builder",
+      "class": "supported",
+      "kind": "installed-command",
+      "path": "source/02-worklist-builder/pyproject.toml",
+      "reason": "Installed worklist-builder console entry.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "installed.tecan-worklist",
+      "class": "supported",
+      "kind": "installed-command",
+      "path": "source/02-worklist-builder/pyproject.toml",
+      "reason": "Alias for worklist-builder.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.application_services",
+      "class": "supported",
+      "kind": "python-api",
+      "path": "source/03-protocol-builder/fluent_pipeline/application_services.py",
+      "reason": "Canonical shared services for CLI, MCP, and Python callers.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "persist.project_manifest",
+      "class": "supported",
+      "kind": "persisted-artifact",
+      "path": "source/03-protocol-builder/fluent_pipeline/project_context.py",
+      "reason": "Imported project-context manifests; schema 1-2 migrate to 3.",
+      "supportedVersion": "3",
+      "replacement": null
+    },
+    {
+      "id": "persist.project_collection",
+      "class": "supported",
+      "kind": "persisted-artifact",
+      "path": "source/03-protocol-builder/fluent_pipeline/project_context.py",
+      "reason": "Persisted project collections.",
+      "supportedVersion": "1",
+      "replacement": null
+    },
+    {
+      "id": "persist.project_index",
+      "class": "supported",
+      "kind": "rebuild-cache",
+      "path": "source/01-project-reader/tecan_reader/project_index.py",
+      "reason": "Derived ZEIA search index; rebuild on schema mismatch.",
+      "supportedVersion": "2",
+      "replacement": null
+    },
+    {
+      "id": "compact.project_query",
+      "class": "supported",
+      "kind": "output-contract",
+      "path": "source/03-protocol-builder/fluent_pipeline/project_context.py",
+      "reason": "Token-capped inspect/query output used by project-info and fluent_project_query.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "internal.cli.commands",
+      "class": "internal",
+      "kind": "implementation",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/commands",
+      "reason": "Private CLI handlers; compatibility is the command contract.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "internal.cli.runtime",
+      "class": "internal",
+      "kind": "implementation",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/runtime.py",
+      "reason": "Dispatch internals.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "internal.mcp_gateway",
+      "class": "internal",
+      "kind": "implementation",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_gateway.py",
+      "reason": "Gateway internals; public surface is MCP tool names.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "internal.mcp_requests",
+      "class": "internal",
+      "kind": "implementation",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_requests.py",
+      "reason": "Request builders, not a public API.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "internal.preview_truncation",
+      "class": "internal",
+      "kind": "implementation",
+      "path": "source/01-project-reader/tecan_reader",
+      "reason": "50-script / 200-object preview limits are not a caller contract.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "internal.silent_xml_skip",
+      "class": "internal",
+      "kind": "implementation",
+      "path": "source/01-project-reader/tecan_reader",
+      "reason": "Silent XML parser skips are not a caller contract.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "removed.obsidian_vault_auto_discovery",
+      "class": "removed",
+      "kind": "removed-behavior",
+      "path": "source/03-protocol-builder/tests/test_explicit_zeia_input.py",
+      "reason": "Removed by #144; do not revive production Obsidian/newest-ZEIA discovery.",
+      "supportedVersion": "current",
+      "replacement": "explicit ZEIA / --archive input"
+    },
+    {
+      "id": "removed.agents_md_orig",
+      "class": "removed",
+      "kind": "removed-behavior",
+      "path": "source/03-protocol-builder/AGENTS.md",
+      "reason": "Removed by #146; do not revive .orig/shadow instruction copies.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "removed.developer_home_paths",
+      "class": "removed",
+      "kind": "removed-behavior",
+      "path": "source/03-protocol-builder/tests/test_repository_hygiene.py",
+      "reason": "Tracked developer-home paths were cleaned in #145 and are not compatibility data.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.alias-list",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder alias-list subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.alias-normalize-ir",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder alias-normalize-ir subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.alias-resolve",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder alias-resolve subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.analyze",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder analyze subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.bootstrap-status",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder bootstrap-status subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.bundle-lifecycle",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder bundle-lifecycle subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.catalog-find",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder catalog-find subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.catalog-info",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder catalog-info subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.clear-project",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder clear-project subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.collection-info",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder collection-info subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.compatibility-matrix",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder compatibility-matrix subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.compile",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder compile subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.create-collection",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder create-collection subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.current-project",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder current-project subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.decompile",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder decompile subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.determinism-check",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder determinism-check subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.diagnose",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder diagnose subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.doctor",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder doctor subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.fluent-prepare-check",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder fluent-prepare-check subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.generate",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder generate subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.import-project",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder import-project subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.inspect-external-command",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder inspect-external-command subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.ir-build",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder ir-build subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.ir-export",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder ir-export subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.ir-schema",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder ir-schema subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.ir-validate",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder ir-validate subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.launch-simulator",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder launch-simulator subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.list-collections",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder list-collections subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.list-projects",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder list-projects subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.map-media",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder map-media subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.parse-fluent-log",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder parse-fluent-log subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.process-media",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder process-media subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.project-find",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder project-find subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.project-info",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder project-info subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.repair-draft",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder repair-draft subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.repair-plan",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder repair-plan subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.request-spec",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder request-spec subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.resolve-spec",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder resolve-spec subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.roundtrip",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder roundtrip subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.script-report",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder script-report subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.setup",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder setup subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.simulate",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder simulate subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.template-info",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder template-info subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.template-list",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder template-list subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.use-project",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder use-project subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.validate-delivery-bundle",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder validate-delivery-bundle subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.validate-spec",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder validate-spec subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.verify-bundle",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder verify-bundle subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.worktable-diff",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder worktable-diff subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_agent_brief",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_agent_brief.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_apply_repair",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_apply_repair.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_bootstrap_status",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_bootstrap_status.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_create_request_spec",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_create_request_spec.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_diagnose",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_diagnose.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_find_external_command",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_find_external_command.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_generate_protocol",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_generate_protocol.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_import_project",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_import_project.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_inspect_project",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_inspect_project.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_inspect_script",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_inspect_script.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_list_capabilities",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_list_capabilities.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_list_projects",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_list_projects.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_parse_fluent_log",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_parse_fluent_log.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_plan_repair",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_plan_repair.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_process_media",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_process_media.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_project_query",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_project_query.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_resolve_brief_mode",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_resolve_brief_mode.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_run_opt_in_cli",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_run_opt_in_cli.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_run_safe_cli",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_run_safe_cli.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_status",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_status.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_summarize_simulation",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_summarize_simulation.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_validate_request_spec",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_validate_request_spec.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_verify_archive",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_verify_archive.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_verify_bundle",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_verify_bundle.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_worktable_diff",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_worktable_diff.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "reader.compare",
+      "class": "supported",
+      "kind": "reader-command",
+      "path": "source/01-project-reader/tecan_reader/cli.py",
+      "reason": "project-reader compare command.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "reader.index.build",
+      "class": "supported",
+      "kind": "reader-command",
+      "path": "source/01-project-reader/tecan_reader/cli.py",
+      "reason": "project-reader index.build command.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "reader.index.search",
+      "class": "supported",
+      "kind": "reader-command",
+      "path": "source/01-project-reader/tecan_reader/cli.py",
+      "reason": "project-reader index.search command.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "reader.index.summary",
+      "class": "supported",
+      "kind": "reader-command",
+      "path": "source/01-project-reader/tecan_reader/cli.py",
+      "reason": "project-reader index.summary command.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "reader.inspect",
+      "class": "supported",
+      "kind": "reader-command",
+      "path": "source/01-project-reader/tecan_reader/cli.py",
+      "reason": "project-reader inspect command.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "reader.patterns.mine",
+      "class": "supported",
+      "kind": "reader-command",
+      "path": "source/01-project-reader/tecan_reader/cli.py",
+      "reason": "project-reader patterns.mine command.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "reader.patterns.search",
+      "class": "supported",
+      "kind": "reader-command",
+      "path": "source/01-project-reader/tecan_reader/cli.py",
+      "reason": "project-reader patterns.search command.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "reader.patterns.summary",
+      "class": "supported",
+      "kind": "reader-command",
+      "path": "source/01-project-reader/tecan_reader/cli.py",
+      "reason": "project-reader patterns.summary command.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "reader.patterns.types",
+      "class": "supported",
+      "kind": "reader-command",
+      "path": "source/01-project-reader/tecan_reader/cli.py",
+      "reason": "project-reader patterns.types command.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "worklist.convert",
+      "class": "supported",
+      "kind": "worklist-command",
+      "path": "source/02-worklist-builder/tecan_worklist/cli.py",
+      "reason": "worklist-builder convert command.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "worklist.summarize",
+      "class": "supported",
+      "kind": "worklist-command",
+      "path": "source/02-worklist-builder/tecan_worklist/cli.py",
+      "reason": "worklist-builder summarize command.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "worklist.validate",
+      "class": "supported",
+      "kind": "worklist-command",
+      "path": "source/02-worklist-builder/tecan_worklist/cli.py",
+      "reason": "worklist-builder validate command.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.AdapterMatch",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export AdapterMatch.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.ArchiveProbe",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export ArchiveProbe.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.CANONICAL_PROJECT_MODEL_SCHEMA_VERSION",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export CANONICAL_PROJECT_MODEL_SCHEMA_VERSION.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.CanonicalProjectModel",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export CanonicalProjectModel.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.DetectionResult",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export DetectionResult.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.InspectionReport",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export InspectionReport.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.SourceProvenance",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export SourceProvenance.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.ZeiaAdapter",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export ZeiaAdapter.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.ZeiaFormatError",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export ZeiaFormatError.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.build_completeness_metadata",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export build_completeness_metadata.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.build_project_index",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export build_project_index.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.compare_archives",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export compare_archives.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.detect_zeia_format",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export detect_zeia_format.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.ingest_zeia",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export ingest_zeia.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.inspect_archive",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export inspect_archive.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.inspect_canonical_archive",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export inspect_canonical_archive.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.inspect_gwl",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export inspect_gwl.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.inspect_xml_object",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export inspect_xml_object.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.inspect_xscr",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export inspect_xscr.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.mine_script_patterns",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export mine_script_patterns.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.probe_zeia",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export probe_zeia.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.resolve_adapter",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export resolve_adapter.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.search_project_index",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export search_project_index.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.search_script_patterns",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export search_script_patterns.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.summarize_project_index",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export summarize_project_index.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.summarize_script_patterns",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export summarize_script_patterns.",
+      "supportedVersion": "current",
+      "replacement": null
+    }
+  ]
+}

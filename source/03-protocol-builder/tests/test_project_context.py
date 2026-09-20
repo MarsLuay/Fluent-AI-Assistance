@@ -1,4 +1,5 @@
 import os
+import json
 import tempfile
 import unittest
 import zipfile
@@ -1235,6 +1236,54 @@ class CanonicalScriptGuidTests(unittest.TestCase):
         self.assertEqual(named["guids"], [])
         self.assertEqual(zero["guid"], "")
         self.assertNotIn("guid", zero["provenance"]["original_identifiers"])
+
+
+class ProjectManifestSchemaTests(unittest.TestCase):
+    def test_missing_and_older_schema_versions_migrate_to_current(self) -> None:
+        from fluent_pipeline.project_context import (
+            PROJECT_MANIFEST_SCHEMA_VERSION,
+            normalize_project_manifest,
+        )
+
+        for raw in (None, 1, 2):
+            payload = {"name": "demo", "scripts": [], "objects": []}
+            if raw is not None:
+                payload["schema_version"] = raw
+            upgraded = normalize_project_manifest(payload)
+            self.assertEqual(upgraded["schema_version"], PROJECT_MANIFEST_SCHEMA_VERSION)
+
+    def test_unknown_schema_version_is_rejected(self) -> None:
+        from fluent_pipeline.project_context import normalize_project_manifest
+        from fluent_pipeline.runner import PipelineError
+
+        with self.assertRaisesRegex(PipelineError, "unsupported project manifest schema_version 99"):
+            normalize_project_manifest({"schema_version": 99, "name": "demo"})
+
+    def test_load_project_persists_migrated_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            old_projects = pc.PROJECTS_DIR
+            old_collections = pc.COLLECTIONS_DIR
+            old_active = pc.ACTIVE_CONTEXT_FILE
+            pc.PROJECTS_DIR = tmp_path / "projects"
+            pc.COLLECTIONS_DIR = pc.PROJECTS_DIR / ".collections"
+            pc.ACTIVE_CONTEXT_FILE = pc.PROJECTS_DIR / ".active_context"
+            try:
+                root = pc.project_dir("legacy")
+                root.mkdir(parents=True)
+                manifest_file = root / "manifest.json"
+                manifest_file.write_text(
+                    json.dumps({"schema_version": 1, "name": "legacy", "scripts": [], "objects": []}),
+                    encoding="utf-8",
+                )
+                ctx = pc.load_project("legacy")
+                self.assertEqual(ctx.manifest["schema_version"], pc.PROJECT_MANIFEST_SCHEMA_VERSION)
+                persisted = json.loads(manifest_file.read_text(encoding="utf-8"))
+                self.assertEqual(persisted["schema_version"], pc.PROJECT_MANIFEST_SCHEMA_VERSION)
+            finally:
+                pc.PROJECTS_DIR = old_projects
+                pc.COLLECTIONS_DIR = old_collections
+                pc.ACTIVE_CONTEXT_FILE = old_active
 
 
 if __name__ == "__main__":

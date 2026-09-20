@@ -122,6 +122,15 @@ class ProjectQueryCompactTests(unittest.TestCase):
         self.assertTrue(compact["summary"].endswith("..."))
         self.assertLessEqual(len(compact["summary"]), 240)
 
+    def test_compact_inspect_is_a_supported_compatibility_surface(self) -> None:
+        inventory = json.loads(
+            (Path(__file__).resolve().parents[3] / "compatibility-inventory.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        by_id = {row["id"]: row for row in inventory["surfaces"]}
+        self.assertEqual(by_id["compact.project_query"]["class"], "supported")
+
 
 if __name__ == "__main__":
     unittest.main()

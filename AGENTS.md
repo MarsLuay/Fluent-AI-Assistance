@@ -31,6 +31,7 @@ rules live in the nested contract below. Do not duplicate them here.
 |------|------|
 | [`source/03-protocol-builder/AGENTS.md`](source/03-protocol-builder/AGENTS.md) | New script / ZEIA / `request.spec` / IR / generate / validate / ready-to-import |
 | [`source/04-protocol-simulator/AGENTS.md`](source/04-protocol-simulator/AGENTS.md) | Simulator UI/assets (if present) |
+| [`COMPATIBILITY.md`](COMPATIBILITY.md) | Caller-facing compatibility vs implementation quirks |
 
 Default ZEIA → new script work: open **`source/03-protocol-builder/AGENTS.md`** and work from that folder.
 

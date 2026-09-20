@@ -241,6 +241,17 @@ class ApplicationServicesTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "latest=True or log_path"):
             analyze_logs(LogAnalysisRequest())
 
+    def test_cli_and_mcp_import_adapters_delegate_to_application_services(self):
+        root = Path(__file__).resolve().parents[1] / "fluent_pipeline"
+        projects = (root / "cli" / "commands" / "projects.py").read_text(encoding="utf-8")
+        gateway = (root / "mcp_gateway.py").read_text(encoding="utf-8")
+        requests = (root / "mcp_requests.py").read_text(encoding="utf-8")
+        self.assertIn("from ...application_services import", projects)
+        self.assertIn("import_project as import_project_service", projects)
+        self.assertIn("from .application_services import", gateway)
+        self.assertIn("import_project as import_project_service", gateway)
+        self.assertIn("from .application_services import", requests)
+
 
 if __name__ == "__main__":
     unittest.main()
