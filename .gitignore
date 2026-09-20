@@ -40,3 +40,6 @@ source/04-protocol-simulator/dist/models/fluent/*.glb
 source/04-protocol-simulator/dist/models/fluent/manifest.json
 venv/
 mock_install/
+
+# Ephemeral local diagnostic reports; they embed machine-specific absolute paths.
+.agent-state/diagnostics/

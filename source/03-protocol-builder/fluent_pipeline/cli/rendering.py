@@ -21,6 +21,7 @@ from ..application_services import (
     RequestSpecCreateResult,
     RequestSpecValidationResult,
 )
+from ..config import portable_repo_path
 from ..delivery_bundle import validate_v2_delivery_bundle
 from ..progress import ProgressCallback, ProgressEvent, render_plain_progress_event
 from ..spec_lint import render_lint_report
@@ -171,9 +172,9 @@ def print_project_import_result(result: ProjectImportResult, *, stream: TextIO =
     ctx = result.context
     manifest = ctx.manifest
     print(f"Imported project: {ctx.name}", file=stream)
-    print(f"  Root:       {ctx.root}", file=stream)
-    print(f"  Manifest:   {ctx.root / 'manifest.json'}", file=stream)
-    print(f"  Report:     {ctx.root / 'project_report.md'}", file=stream)
+    print(f"  Root:       {portable_repo_path(ctx.root)}", file=stream)
+    print(f"  Manifest:   {portable_repo_path(ctx.root / 'manifest.json')}", file=stream)
+    print(f"  Report:     {portable_repo_path(ctx.root / 'project_report.md')}", file=stream)
     print(f"  Scripts:    {len(manifest.get('scripts', []))}", file=stream)
     print(f"  Objects:    {len(manifest.get('objects', []))}", file=stream)
     print(f"  Workspaces: {len(manifest.get('workspaces', []))}", file=stream)
@@ -196,7 +197,7 @@ def print_project_inspection_result(
         return
     manifest = result.context.manifest
     print(f"Project: {result.context.name}", file=stream)
-    print(f"  Root:       {result.context.root}", file=stream)
+    print(f"  Root:       {portable_repo_path(result.context.root)}", file=stream)
     print(f"  Scripts:    {len(manifest.get('scripts', []))}", file=stream)
     print(f"  Objects:    {len(manifest.get('objects', []))}", file=stream)
     print(f"  Workspaces: {len(manifest.get('workspaces', []))}", file=stream)

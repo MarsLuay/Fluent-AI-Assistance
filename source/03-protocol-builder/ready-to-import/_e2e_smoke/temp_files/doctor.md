@@ -5,12 +5,12 @@
 ## fluentcoder root
 
 - Status: `passed`
-- Detail: `/Users/mars/ObsidianNotes/.Projects/Fluent-AI-Assistance/source/03-protocol-builder/libs/fluentcoder`
+- Detail: `<repo>/source/03-protocol-builder/libs/fluentcoder`
 
 ## shared repo venv python
 
 - Status: `failed`
-- Detail: `/Users/mars/ObsidianNotes/.Projects/Fluent-AI-Assistance/.venv/bin/python`
+- Detail: `<repo>/.venv/bin/python`
 
 ## API key usage
 

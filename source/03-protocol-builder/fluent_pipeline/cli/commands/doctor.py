@@ -29,6 +29,7 @@ from ...config import (
     TECAN_AI_DIR,
     fluentcoder_python,
     fluentcoder_root,
+    portable_repo_path,
     resolve_user_path,
     workflow_event_log_path,
 )
@@ -269,9 +270,9 @@ def ensure_global_catalog_index(*, force_refresh: bool = False) -> dict[str, Any
             return {
                 "ok": True,
                 "action": "copied_project_catalog",
-                "detail": f"copied project catalog from `{name}` into `{global_db}`",
+                "detail": f"copied project catalog from `{name}` into `{portable_repo_path(global_db)}`",
                 "source": name,
-                "db": str(global_db),
+                "db": portable_repo_path(global_db),
             }
 
     install = _fc_install_with_components()
@@ -329,14 +330,14 @@ def collect_doctor_checks(*, install_missing: bool = False) -> list[dict[str, An
         {
             "name": "fluentcoder root",
             "ok": root.exists(),
-            "detail": f"`{root}`",
+            "detail": f"`{portable_repo_path(root)}`",
         }
     )
     checks.append(
         {
             "name": "shared repo venv python",
             "ok": python.exists(),
-            "detail": f"`{python}`",
+            "detail": f"`{portable_repo_path(python)}`",
         }
     )
 
@@ -460,7 +461,7 @@ def _catalog_workspace_files_check() -> dict[str, Any]:
         return {
             "name": "catalog workspace files",
             "ok": False,
-            "detail": f"catalog index DB not found: `{db_path}`",
+            "detail": f"catalog index DB not found: `{portable_repo_path(db_path)}`",
         }
     try:
         with sqlite3.connect(db_path) as conn:
@@ -469,7 +470,7 @@ def _catalog_workspace_files_check() -> dict[str, Any]:
         return {
             "name": "catalog workspace files",
             "ok": False,
-            "detail": f"could not inspect workspace paths in `{db_path}`: {exc}",
+            "detail": f"could not inspect workspace paths in `{portable_repo_path(db_path)}`: {exc}",
         }
 
     if not rows:
@@ -486,7 +487,7 @@ def _catalog_workspace_files_check() -> dict[str, Any]:
     ]
     if missing:
         examples = "; ".join(
-            f"{item['name']} ({item['guid']}): `{item['file_path']}`"
+            f"{item['name']} ({item['guid']}): `{portable_repo_path(item['file_path'])}`"
             for item in missing[:3]
         )
         more = "" if len(missing) <= 3 else f"; plus {len(missing) - 3} more"
@@ -520,7 +521,7 @@ def _active_project_catalog_check() -> dict[str, Any] | None:
     return _workspace_files_check_from_db(
         db_path,
         name="active project catalog files",
-        prefix=f"active project `{active}` catalog `{db_path}`",
+        prefix=f"active project `{active}` catalog `{portable_repo_path(db_path)}`",
     )
 
 def _workspace_files_check_from_db(db_path: Path, *, name: str, prefix: str) -> dict[str, Any]:
@@ -531,7 +532,7 @@ def _workspace_files_check_from_db(db_path: Path, *, name: str, prefix: str) -> 
         return {
             "name": name,
             "ok": False,
-            "detail": f"could not inspect workspace paths in `{db_path}`: {exc}",
+            "detail": f"could not inspect workspace paths in `{portable_repo_path(db_path)}`: {exc}",
         }
 
     if not rows:
@@ -548,7 +549,7 @@ def _workspace_files_check_from_db(db_path: Path, *, name: str, prefix: str) -> 
     ]
     if missing:
         examples = "; ".join(
-            f"{item['name']} ({item['guid']}): `{item['file_path']}`"
+            f"{item['name']} ({item['guid']}): `{portable_repo_path(item['file_path'])}`"
             for item in missing[:3]
         )
         more = "" if len(missing) <= 3 else f"; plus {len(missing) - 3} more"

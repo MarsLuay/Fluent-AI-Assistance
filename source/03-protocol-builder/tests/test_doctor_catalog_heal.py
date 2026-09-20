@@ -117,6 +117,34 @@ class EnsureGlobalCatalogTests(unittest.TestCase):
         self.assertEqual(result["action"], "unavailable")
         self.assertIn("DataStore", result["detail"])
 
+    def test_fluentcoder_path_details_are_portable(self) -> None:
+        with (
+            mock.patch.object(
+                doctor_cmd,
+                "ensure_global_catalog_index",
+                return_value={"ok": False, "action": "unavailable", "detail": "no catalog"},
+            ),
+            mock.patch.object(doctor_cmd, "fluentcoder_root", return_value=Path(__file__).resolve().parents[1] / "libs" / "fluentcoder"),
+            mock.patch.object(doctor_cmd, "fluentcoder_python", return_value=Path(__file__).resolve().parents[3] / ".venv" / "bin" / "python"),
+            mock.patch.object(
+                doctor_cmd,
+                "_catalog_info_check",
+                return_value={"name": "catalog info", "ok": False, "detail": "empty"},
+            ),
+            mock.patch.object(
+                doctor_cmd,
+                "_catalog_workspace_files_check",
+                return_value={"name": "catalog workspace files", "ok": False, "detail": "empty"},
+            ),
+        ):
+            checks = doctor_cmd.collect_doctor_checks()
+        by_name = {check["name"]: check for check in checks}
+        for name in ("fluentcoder root", "shared repo venv python"):
+            detail = by_name[name]["detail"]
+            self.assertIn("<repo>/", detail)
+            self.assertNotIn("/Users/", detail)
+            self.assertNotRegex(detail, r"(?i)[A-Za-z]:[\\/]Users[\\/]")
+
 
 if __name__ == "__main__":
     unittest.main()
