@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable, Mapping
 
 from .aliases import load_alias_maps, resolve_alias
 from .command_registry import (
@@ -1175,6 +1175,51 @@ def _severity_rank(value: Any) -> int:
         return SEVERITIES.index(str(value))
     except ValueError:
         return len(SEVERITIES)
+
+
+def ingestion_diagnostic_to_finding(diagnostic: Mapping[str, Any]) -> dict[str, Any]:
+    """Adapt one project-reader diagnostic into this report's finding shape.
+
+    The reader owns ingestion codes and provenance.  This adapter only maps
+    them into the existing protocol-builder report vocabulary; it does not
+    reinterpret or replace the reader diagnostic.
+    """
+    severity = str(diagnostic.get("severity") or "error").casefold()
+    report_severity = {
+        "error": "blocking",
+        "warning": "medium",
+        "info": "info",
+    }.get(severity, "medium")
+    code = str(diagnostic.get("code") or "PARSER_FAILED")
+    evidence = [
+        value
+        for value in (
+            diagnostic.get("archive_path"),
+            diagnostic.get("entry_path"),
+            diagnostic.get("adapter_id"),
+            diagnostic.get("source_entity"),
+            diagnostic.get("reference"),
+        )
+        if value not in (None, "")
+    ]
+    details = dict(diagnostic)
+    return _finding(
+        f"ingestion.{code.lower()}",
+        report_severity,
+        "ingestion",
+        str(diagnostic.get("message") or code),
+        evidence=[str(value) for value in evidence],
+        next_steps=[str(diagnostic["next_action"])] if diagnostic.get("next_action") else [],
+        details=details,
+    )
+
+
+def ingestion_diagnostics_to_findings(
+    diagnostics: Iterable[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Adapt and deterministically order project-reader diagnostics."""
+    findings = [ingestion_diagnostic_to_finding(item) for item in diagnostics]
+    return sorted(findings, key=lambda item: (str(item.get("id") or ""), str(item.get("title") or "")))
 
 
 def _labware_evidence(item: dict[str, Any]) -> str:

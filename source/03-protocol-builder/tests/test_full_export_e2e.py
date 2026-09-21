@@ -281,6 +281,8 @@ def test_cli_entry_points_against_full_export(full_export_env: dict) -> None:
     invoke("current-project", ["current-project"])
     invoke("use-project", ["use-project", CONTEXT_NAME])
     invoke("project-info", ["project-info", CONTEXT_NAME, "--json"])
+    invoke("inspect", ["inspect", "--input", str(env["archive"]), "--json"])
+    invoke("validate", ["validate", "--input", str(env["archive"]), "--json"])
     invoke("project-find", ["project-find", "Demo", "--context", CONTEXT_NAME, "--json"])
     invoke("script-report", ["script-report", "DemoScript", "--context", CONTEXT_NAME, "--json"])
     invoke(
@@ -607,6 +609,7 @@ def test_malformed_referenced_dependency_blocks_full_export_readiness(tmp_path: 
         for finding in assessment["blocking_findings"]
     ), manifest
     assert manifest["errors"][0]["classification"] == "malformed", manifest
+    assert manifest["errors"][0]["code"] == "ZEIA_SCHEMA_MALFORMED", manifest
 
 
 def test_cli_project_lifecycle(tmp_path: Path) -> None:

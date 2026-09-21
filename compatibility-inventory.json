@@ -397,6 +397,15 @@
       "replacement": null
     },
     {
+      "id": "cli.inspect",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder inspect subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
       "id": "cli.inspect-external-command",
       "class": "supported",
       "kind": "cli-command",
@@ -609,6 +618,15 @@
       "kind": "cli-command",
       "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
       "reason": "protocol-builder use-project subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "cli.validate",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder validate full-export readiness subcommand.",
       "supportedVersion": "current",
       "replacement": null
     },
@@ -1027,11 +1045,47 @@
       "replacement": null
     },
     {
+      "id": "python.tecan_reader.DIAGNOSTIC_SCHEMA_VERSION",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export DIAGNOSTIC_SCHEMA_VERSION.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.DiagnosticCode",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export DiagnosticCode.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
       "id": "python.tecan_reader.FullExportReadiness",
       "class": "supported",
       "kind": "python-export",
       "path": "source/01-project-reader/tecan_reader/__init__.py",
       "reason": "Public tecan_reader export FullExportReadiness.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.IngestionArchiveError",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export IngestionArchiveError.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.IngestionDiagnostic",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export IngestionDiagnostic.",
       "supportedVersion": "current",
       "replacement": null
     },
@@ -1198,6 +1252,15 @@
       "replacement": null
     },
     {
+      "id": "python.tecan_reader.make_diagnostic",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export make_diagnostic.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
       "id": "python.tecan_reader.mine_script_patterns",
       "class": "supported",
       "kind": "python-export",
@@ -1257,6 +1320,15 @@
       "kind": "python-export",
       "path": "source/01-project-reader/tecan_reader/__init__.py",
       "reason": "Public tecan_reader export search_script_patterns.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.sort_diagnostics",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export sort_diagnostics.",
       "supportedVersion": "current",
       "replacement": null
     },

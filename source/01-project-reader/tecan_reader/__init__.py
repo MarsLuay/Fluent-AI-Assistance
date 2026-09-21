@@ -25,6 +25,14 @@ from .full_export_readiness import (
     resolve_full_export_readiness,
     resolve_manifest_readiness,
 )
+from .diagnostics import (
+    DIAGNOSTIC_SCHEMA_VERSION,
+    DiagnosticCode,
+    IngestionArchiveError,
+    IngestionDiagnostic,
+    make_diagnostic,
+    sort_diagnostics,
+)
 from .script import inspect_xscr
 from .xmlobj import inspect_xml_object
 from .zeia_adapters import (
@@ -42,10 +50,14 @@ from .zeia_adapters import (
 
 __all__ = [
     "CANONICAL_PROJECT_MODEL_SCHEMA_VERSION",
+    "DIAGNOSTIC_SCHEMA_VERSION",
+    "DiagnosticCode",
     "AdapterMatch",
     "ArchiveProbe",
     "CanonicalProjectModel",
     "FullExportReadiness",
+    "IngestionArchiveError",
+    "IngestionDiagnostic",
     "IdentifierConflict",
     "DetectionResult",
     "build_completeness_metadata",
@@ -66,10 +78,12 @@ __all__ = [
     "inspect_xml_object",
     "inspect_xscr",
     "mine_script_patterns",
+    "make_diagnostic",
     "probe_zeia",
     "resolve_adapter",
     "resolve_full_export_readiness",
     "resolve_manifest_readiness",
+    "sort_diagnostics",
     "search_project_index",
     "search_script_patterns",
     "summarize_project_index",

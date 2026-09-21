@@ -6,6 +6,7 @@ import zipfile
 from pathlib import Path
 
 from tecan_reader.archive import inspect_archive
+from tecan_reader.diagnostics import DiagnosticCode
 from tecan_reader.project_index import build_project_index
 from tecan_reader.zeia_adapters import ingest_zeia
 
@@ -81,6 +82,9 @@ class ArchiveCompletenessTests(unittest.TestCase):
         self.assertEqual(error["parser"], "xml:xwsp")
         self.assertEqual(error["classification"], "malformed")
         self.assertEqual(error["severity"], "error")
+        self.assertEqual(error["code"], DiagnosticCode.ZEIA_SCHEMA_MALFORMED)
+        self.assertEqual(error["archive_path"], str(archive.resolve()))
+        self.assertEqual(error["entry_path"], error["entry"])
 
     def test_known_irrelevant_metadata_failure_is_retained_as_warning(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -98,6 +102,7 @@ class ArchiveCompletenessTests(unittest.TestCase):
         self.assertEqual(len(model.errors), 1)
         self.assertEqual(model.errors[0]["classification"], "known_irrelevant_metadata")
         self.assertEqual(model.errors[0]["severity"], "warning")
+        self.assertEqual(model.errors[0]["code"], DiagnosticCode.PARSER_FAILED)
 
     def test_encoding_failure_is_retained_as_a_blocking_diagnostic(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -114,6 +119,8 @@ class ArchiveCompletenessTests(unittest.TestCase):
         self.assertFalse(model.completeness["complete"])
         self.assertEqual(model.errors[0]["classification"], "unreadable_or_encoding_failure")
         self.assertEqual(model.errors[0]["severity"], "error")
+        self.assertEqual(model.errors[0]["code"], DiagnosticCode.ENCODING_DECODE_FAILED)
+        self.assertEqual(model.errors[0]["entry_path"], "DataStore/SystemSpecific/object.xcmp")
 
     def test_unknown_xml_subtype_is_preserved_with_explicit_diagnostic(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -137,6 +144,7 @@ class ArchiveCompletenessTests(unittest.TestCase):
             ["value"],
         )
         self.assertEqual(model.errors[0]["classification"], "unsupported_xml_subtype")
+        self.assertEqual(model.errors[0]["code"], DiagnosticCode.ZEIA_SCHEMA_MALFORMED)
         self.assertFalse(model.completeness["complete"])
 
 

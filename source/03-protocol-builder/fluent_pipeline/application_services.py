@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, Mapping
+import zipfile
 
 from .authoring_status import (
     AuthoringStatus,
@@ -37,12 +38,20 @@ from .project_context import (
 from .repair import RepairAction, RepairPlan, apply_repair_plan, build_repair_plan, render_repair_markdown
 from .request_spec import build_request_spec, write_request_spec
 from .runner import ensure_parent, write_json
+from .readiness import full_export_readiness_to_offline_validation
 from .spec_lint import LintResult, lint_request_spec_file
 from .validation import render_validation_markdown, validate_ready_to_import
+from tecan_reader.diagnostics import (
+    DiagnosticCode,
+    IngestionArchiveError,
+    make_diagnostic,
+    sort_diagnostics,
+)
 from tecan_reader.full_export_readiness import (
     resolve_full_export_readiness as resolve_reader_readiness,
 )
 from tecan_reader.project_index import discover_zeia_paths
+from tecan_reader.zeia_adapters import probe_zeia
 
 
 @dataclass(frozen=True)
@@ -123,6 +132,90 @@ class FullExportReadinessResult:
 
     def to_dict(self) -> dict[str, Any]:
         return dict(self.readiness)
+
+
+@dataclass(frozen=True)
+class InputInspectionRequest:
+    """Inputs for one-shot, generation-free ZEIA inspection."""
+
+    input_path: Path
+
+
+@dataclass(frozen=True)
+class InputInspectionResult:
+    request: InputInspectionRequest
+    archives: tuple[dict[str, Any], ...] = ()
+    diagnostics: tuple[dict[str, Any], ...] = ()
+    classification: str = "unsupported"
+
+    @property
+    def ok(self) -> bool:
+        return self.classification == "supported"
+
+    @property
+    def exit_code(self) -> int:
+        if self.ok:
+            return 0
+        return {
+            "supported": 0,
+            "missing": 2,
+            "unsupported": 3,
+            "ambiguous": 4,
+            "corrupt": 5,
+        }.get(self.classification, 1)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": "tecan.input_inspection.v1",
+            "input": str(self.request.input_path.expanduser().resolve()),
+            "classification": self.classification,
+            "ok": self.ok,
+            "exit_code": self.exit_code,
+            "archives": [dict(item) for item in self.archives],
+            "diagnostics": sort_diagnostics(self.diagnostics),
+        }
+
+
+@dataclass(frozen=True)
+class FullExportValidationRequest:
+    """Inputs for generation-free authoritative full-export validation."""
+
+    input_path: Path | None = None
+    archives: tuple[Path, ...] = ()
+    context_name: str | None = None
+    approve_partial_zeia: bool = False
+
+
+@dataclass(frozen=True)
+class FullExportValidationResult:
+    request: FullExportValidationRequest
+    readiness: dict[str, Any]
+
+    @property
+    def ok(self) -> bool:
+        return bool(self.readiness.get("accepted"))
+
+    @property
+    def exit_code(self) -> int:
+        if self.ok:
+            return 0
+        return {
+            "complete": 0,
+            "complete_with_warnings": 0,
+            "partial": 5,
+            "unsupported": 3,
+            "ambiguous": 4,
+            "corrupt": 5,
+        }.get(str(self.readiness.get("readiness_status") or self.readiness.get("status") or ""), 1)
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = dict(self.readiness)
+        payload["schema_version"] = "tecan.full_export_validation.v1"
+        payload["input"] = str(self.request.input_path.expanduser().resolve()) if self.request.input_path else None
+        payload["ok"] = self.ok
+        payload["exit_code"] = self.exit_code
+        payload["offline_validation"] = full_export_readiness_to_offline_validation(self.readiness)
+        return payload
 
 
 @dataclass(frozen=True)
@@ -462,6 +555,143 @@ def resolve_full_export_readiness(
         )
         readiness = result.to_dict()
     return FullExportReadinessResult(request=request, readiness=readiness)
+
+
+def inspect_input(request: InputInspectionRequest) -> InputInspectionResult:
+    """Inspect ZEIA input structure without importing or running generation."""
+    source = request.input_path.expanduser()
+    try:
+        paths = tuple(discover_zeia_paths((source,)))
+    except FileNotFoundError as exc:
+        diagnostic = make_diagnostic(
+            DiagnosticCode.INPUT_NOT_FOUND,
+            str(exc),
+            archive_path=str(source.resolve()),
+            next_action="Provide an existing .zeia archive or a directory containing .zeia archives.",
+            exception=exc,
+        )
+        return InputInspectionResult(request, diagnostics=(diagnostic,), classification="missing")
+    except (OSError, ValueError) as exc:
+        diagnostic = make_diagnostic(
+            DiagnosticCode.INPUT_UNREADABLE,
+            str(exc),
+            archive_path=str(source.resolve()),
+            next_action="Provide a readable .zeia archive or export directory.",
+            exception=exc,
+        )
+        return InputInspectionResult(request, diagnostics=(diagnostic,), classification="corrupt")
+
+    archives: list[dict[str, Any]] = []
+    diagnostics: list[dict[str, Any]] = []
+    for path in paths:
+        try:
+            detection = probe_zeia(path)
+            records = list(detection.diagnostic_records)
+            archive_status = _inspection_classification(detection.status, records)
+            archives.append(
+                {
+                    "path": str(path.resolve()),
+                    "status": detection.status,
+                    "classification": archive_status,
+                    "detection": detection.to_dict(),
+                }
+            )
+            diagnostics.extend(records)
+        except IngestionArchiveError as exc:
+            record = dict(exc.diagnostic)
+            archives.append(
+                {
+                    "path": str(path.resolve()),
+                    "status": "corrupt",
+                    "classification": "corrupt",
+                    "detection": {"status": "corrupt", "diagnostic_records": [record]},
+                }
+            )
+            diagnostics.append(record)
+        except (OSError, ValueError, zipfile.BadZipFile) as exc:
+            record = make_diagnostic(
+                DiagnosticCode.ARCHIVE_INVALID,
+                f"{type(exc).__name__}: {exc}",
+                archive_path=str(path.resolve()),
+                next_action="Provide an uncorrupted FluentControl ZEIA ZIP export.",
+                exception=exc,
+            )
+            archives.append(
+                {
+                    "path": str(path.resolve()),
+                    "status": "corrupt",
+                    "classification": "corrupt",
+                    "detection": {"status": "corrupt", "diagnostic_records": [record]},
+                }
+            )
+            diagnostics.append(record)
+
+    classification = _aggregate_inspection_classification(archives, diagnostics)
+    return InputInspectionResult(
+        request,
+        archives=tuple(sorted(archives, key=lambda item: str(item.get("path") or ""))),
+        diagnostics=tuple(sort_diagnostics(diagnostics)),
+        classification=classification,
+    )
+
+
+def validate_full_export(request: FullExportValidationRequest) -> FullExportValidationResult:
+    """Run the project-reader-owned full-export readiness evaluation."""
+    archives = request.archives
+    if request.input_path is not None:
+        archives = (request.input_path,)
+    readiness = resolve_full_export_readiness(
+        FullExportReadinessRequest(
+            archives=tuple(archives),
+            context_name=request.context_name,
+            approve_partial_zeia=request.approve_partial_zeia,
+        )
+    ).to_dict()
+    return FullExportValidationResult(request=request, readiness=readiness)
+
+
+# Descriptive aliases for adapters/tests that use the command terminology.
+InspectRequest = InputInspectionRequest
+InspectResult = InputInspectionResult
+ValidateRequest = FullExportValidationRequest
+ValidateResult = FullExportValidationResult
+
+
+def _inspection_classification(status: str, records: list[Mapping[str, Any]]) -> str:
+    codes = {str(item.get("code") or "").upper() for item in records}
+    if "AMBIGUOUS" in status.casefold() or any("AMBIGUOUS" in code for code in codes):
+        return "ambiguous"
+    if any(
+        code in {
+            DiagnosticCode.ARCHIVE_INVALID,
+            DiagnosticCode.INPUT_UNREADABLE,
+            DiagnosticCode.ENCODING_DECODE_FAILED,
+            DiagnosticCode.PARSER_FAILED,
+            DiagnosticCode.ZEIA_SCHEMA_MALFORMED,
+            DiagnosticCode.LIMIT_ENTRY_COUNT,
+            DiagnosticCode.LIMIT_UNCOMPRESSED_BYTES,
+        }
+        for code in codes
+    ):
+        return "corrupt"
+    if status.casefold() == "supported":
+        return "supported"
+    return "unsupported"
+
+
+def _aggregate_inspection_classification(
+    archives: list[Mapping[str, Any]], diagnostics: list[Mapping[str, Any]]
+) -> str:
+    if not archives:
+        return "missing"
+    classifications = {str(item.get("classification") or "unsupported") for item in archives}
+    if "corrupt" in classifications:
+        return "corrupt"
+    if "ambiguous" in classifications:
+        return "ambiguous"
+    if classifications == {"supported"}:
+        return "supported"
+    return "unsupported"
 
 
 def run_one_shot(request: OneShotRunRequest) -> OneShotRunResult:

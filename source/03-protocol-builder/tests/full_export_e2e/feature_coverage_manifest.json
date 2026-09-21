@@ -37,6 +37,12 @@
     "cli.import-project": {
       "tests": ["test_full_export_workflow_completes", "test_cli_entry_points_against_full_export"]
     },
+    "cli.inspect": {
+      "tests": ["test_cli_entry_points_against_full_export", "test_full_export_negative_paths"]
+    },
+    "cli.validate": {
+      "tests": ["test_cli_entry_points_against_full_export", "test_malformed_referenced_dependency_blocks_full_export_readiness"]
+    },
     "cli.clear-project": {
       "tests": ["test_cli_project_lifecycle"]
     },

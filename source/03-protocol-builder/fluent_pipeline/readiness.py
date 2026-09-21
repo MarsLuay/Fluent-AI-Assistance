@@ -43,6 +43,53 @@ CANONICAL_READINESS_KEYS = (
 )
 
 
+def full_export_readiness_to_offline_validation(
+    readiness: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Adapt reader-owned full-export facts to the existing offline gate shape.
+
+    This keeps the project-reader status and diagnostic codes authoritative. The
+    protocol-builder surface only supplies the established gate status and
+    presentation fields used by generated readiness reports.
+    """
+    value = dict(readiness) if isinstance(readiness, Mapping) else {}
+    status = str(value.get("status") or "unsupported")
+    accepted = bool(value.get("accepted"))
+    gate_status = (
+        "passed"
+        if accepted and status == "complete"
+        else "needs_review"
+        if accepted
+        else "failed"
+    )
+    diagnostics = [
+        dict(item)
+        for item in (value.get("diagnostics") or [])
+        if isinstance(item, Mapping)
+    ]
+    return {
+        "status": gate_status,
+        "source_status": status,
+        "accepted": accepted,
+        "summary": _full_export_summary(status, accepted),
+        "diagnostics": diagnostics,
+        "blocking_count": len(
+            [item for item in diagnostics if str(item.get("severity") or "error") != "warning"]
+        ),
+        "source": "tecan_reader.full_export_readiness",
+    }
+
+
+def _full_export_summary(status: str, accepted: bool) -> str:
+    if status == "complete":
+        return "The source export contains the required scripts and dependencies."
+    if status == "complete_with_warnings":
+        return "The source export is complete but contains reviewable warnings."
+    if status == "partial" and accepted:
+        return "The source export is partial and was explicitly approved."
+    return f"The source export is not ready for generation ({status})."
+
+
 def normalize_readiness_gate_status(value: Any) -> ReadinessGateStatus | None:
     """Return the canonical readiness status for a gate value, if known."""
     if isinstance(value, ReadinessGateStatus):

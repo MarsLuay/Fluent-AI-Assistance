@@ -9,6 +9,7 @@ from tecan_reader.full_export_readiness import (
     ReadinessStatus,
     resolve_full_export_readiness,
 )
+from tecan_reader.diagnostics import DiagnosticCode
 from tecan_reader.project_model import CanonicalProjectModel
 
 
@@ -104,6 +105,10 @@ class FullExportReadinessTests(unittest.TestCase):
         self.assertEqual(result.status, ReadinessStatus.PARTIAL)
         self.assertEqual(result.unresolved_references[0].source_archive, "source.zeia")
         self.assertEqual(result.unresolved_references[0].source_entry, "Scripts/Source.xscr")
+        self.assertIn(
+            DiagnosticCode.DEPENDENCY_UNRESOLVED,
+            {item["code"] for item in result.to_dict()["diagnostics"]},
+        )
 
     def test_required_dependency_stays_partial_in_dependency_rich_export(self) -> None:
         result = resolve_full_export_readiness(
