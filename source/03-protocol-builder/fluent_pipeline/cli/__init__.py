@@ -10,9 +10,11 @@ from ..application_services import (
     import_project,
     inspect_project,
     plan_repair,
+    run_one_shot,
     validate_request_spec,
     verify_bundle,
 )
+from ..application_services import OneShotRunRequest, OneShotRunResult
 from ..diagnostics import diagnose_input
 from ..generation_workflow import run_generation_workflow
 from ..script_analysis import analyze_script
@@ -89,6 +91,7 @@ from .commands.projects import (
     _cmd_script_report,
     _cmd_use_project,
 )
+from .commands.run import _cmd_run
 from .commands.simulator import _cmd_launch_simulator, _cmd_simulate
 from .commands.validation import (
     _cmd_fluent_prepare_check,
@@ -119,6 +122,8 @@ __all__ = [
     "log_analysis_exit_code",
     "log_analysis_request_from_cli",
     "main",
+    "OneShotRunRequest",
+    "OneShotRunResult",
     "plan_repair",
     "print_bundle_verification_result",
     "print_generation_result",
@@ -178,6 +183,7 @@ __all__ = [
     "_cmd_request_spec",
     "_cmd_resolve_spec",
     "_cmd_roundtrip",
+    "_cmd_run",
     "_cmd_script_report",
     "_cmd_setup",
     "_cmd_simulate",

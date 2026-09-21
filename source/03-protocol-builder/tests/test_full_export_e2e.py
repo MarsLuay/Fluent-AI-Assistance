@@ -317,6 +317,22 @@ def test_cli_entry_points_against_full_export(full_export_env: dict) -> None:
             str(spec_out),
         ],
     )
+    invoke(
+        "run",
+        [
+            "run",
+            "--input",
+            str(env["archive"]),
+            "--request",
+            WORKFLOW_INTENT,
+            "--project-name",
+            "full-export-one-shot",
+            "--out-dir",
+            str(env["paths"]["ready"] / CONTEXT_NAME / "temp_files" / "one-shot-e2e"),
+            "--progress",
+            "none",
+        ],
+    )
     invoke("validate-spec", ["validate-spec", str(spec_out if spec_out.exists() else FIXTURE_DIR / "request.valid.spec.yaml")])
     invoke(
         "resolve-spec",

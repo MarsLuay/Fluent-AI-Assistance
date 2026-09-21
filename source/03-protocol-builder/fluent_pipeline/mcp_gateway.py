@@ -123,6 +123,11 @@ _CLI_COMMAND_COVERAGE: dict[str, dict[str, str]] = {
     "repair-plan": {"mode": "native", "tool": "fluent_plan_repair"},
     "request-spec": {"mode": "native", "tool": "fluent_create_request_spec"},
     "resolve-spec": {"mode": "bridge"},
+    "run": {
+        "mode": "opt_in",
+        "environment_flag": "TECAN_MCP_ENABLE_DRAFT_EXECUTION",
+        "reason": "one-shot execution runs the import, generation, simulation, and packaging workflow",
+    },
     "roundtrip": {
         "mode": "opt_in",
         "environment_flag": "TECAN_MCP_ENABLE_DRAFT_EXECUTION",

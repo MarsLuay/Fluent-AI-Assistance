@@ -379,6 +379,15 @@
       "replacement": null
     },
     {
+      "id": "cli.run",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder run one-shot full-export subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
       "id": "cli.import-project",
       "class": "supported",
       "kind": "cli-command",
