@@ -4,11 +4,13 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 import zipfile
+from unittest.mock import patch
 
 import pytest
 
 from fluent_pipeline.project_archive_inspection import inspect_zeia_archive
 from fluent_pipeline.runner import PipelineError
+from tecan_common.zeia_limits import build_zeia_archive_inventory
 
 
 def test_preview_rejects_archive_limit_failures_with_clear_message() -> None:
@@ -18,7 +20,7 @@ def test_preview_rejects_archive_limit_failures_with_clear_message() -> None:
             zf.writestr("safe.txt", "content")
 
         with patch(
-            "fluent_pipeline.project_archive_inspection.validate_zeia_archive_limits",
+            "fluent_pipeline.project_archive_inspection.build_zeia_archive_inventory",
             side_effect=zipfile.BadZipFile("ZEIA archive exceeds safe entry count limit"),
         ), pytest.raises(PipelineError, match="failed safety or format validation"):
             inspect_zeia_archive(archive)
@@ -50,3 +52,18 @@ def test_preview_uses_only_a_temporary_project_root() -> None:
         assert manifest["preview_only"] is True
         assert root.parent.name.startswith("tecan-zeia-preview-")
         assert not root.exists()
+
+
+def test_preview_reuses_one_validated_inventory_for_extraction() -> None:
+    with tempfile.TemporaryDirectory() as temp:
+        archive = Path(temp) / "preview-once.zeia"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("Scripts/demo.xscr", "<Script />")
+
+        with patch(
+            "fluent_pipeline.project_archive_inspection.build_zeia_archive_inventory",
+            wraps=build_zeia_archive_inventory,
+        ) as build_inventory:
+            inspect_zeia_archive(archive)
+
+    assert build_inventory.call_count == 1

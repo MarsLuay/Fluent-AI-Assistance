@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from dataclasses import dataclass
 import re
 from pathlib import Path, PurePosixPath
@@ -10,9 +11,14 @@ import zipfile
 
 from tecan_common.xml_compat import MAX_XML_BYTES
 from tecan_common.zeia_limits import (
+    MAX_ZEIA_COMPRESSION_RATIO,
     MAX_ZEIA_ENTRY_COUNT,
+    MAX_ZEIA_MEMBER_UNCOMPRESSED_BYTES,
     MAX_ZEIA_TOTAL_UNCOMPRESSED_BYTES,
-    validate_zeia_archive_limits,
+    ZeiaArchiveInventory,
+    ZeiaArchiveValidationError,
+    build_zeia_archive_inventory,
+    normalize_zeia_member_name,
 )
 
 from .common import extension_counts
@@ -191,6 +197,8 @@ def probe_zeia(
     *,
     max_entry_count: int = MAX_ZEIA_ENTRY_COUNT,
     max_total_uncompressed_bytes: int = MAX_ZEIA_TOTAL_UNCOMPRESSED_BYTES,
+    max_member_uncompressed_bytes: int | None = MAX_ZEIA_MEMBER_UNCOMPRESSED_BYTES,
+    max_compression_ratio: float | None = MAX_ZEIA_COMPRESSION_RATIO,
 ) -> DetectionResult:
     """Probe archive structure without guessing from the filename/extension."""
 
@@ -217,18 +225,23 @@ def probe_zeia(
         )
     try:
         with zipfile.ZipFile(archive_path) as zf:
-            infos = validate_zeia_archive_limits(
+            inventory = build_zeia_archive_inventory(
                 zf,
                 max_entry_count=max_entry_count,
                 max_total_uncompressed_bytes=max_total_uncompressed_bytes,
+                max_member_uncompressed_bytes=max_member_uncompressed_bytes,
+                max_compression_ratio=max_compression_ratio,
             )
-            archive = _build_probe(zf, infos)
+            archive = _build_probe(zf, inventory)
+    except ZeiaArchiveValidationError as exc:
+        raise IngestionArchiveError(
+            str(exc), _archive_validation_diagnostic(archive_path, exc)
+        ) from exc
     except zipfile.BadZipFile as exc:
         # Preserve the legacy exception contract while making safety failures
         # machine-readable for readiness and CLI callers.
         text = str(exc)
-        is_count = "entry count" in text.casefold()
-        code = DiagnosticCode.LIMIT_ENTRY_COUNT if is_count else DiagnosticCode.LIMIT_UNCOMPRESSED_BYTES
+        code = DiagnosticCode.ARCHIVE_INVALID
         diagnostic = make_diagnostic(
             code,
             text or "ZEIA archive exceeded a configured safety limit.",
@@ -253,6 +266,11 @@ def probe_zeia(
             ),),
         )
 
+    return _detection_from_probe(archive, archive_path)
+
+
+def _detection_from_probe(archive: ArchiveProbe, archive_path: Path) -> DetectionResult:
+    """Resolve adapter matches from one already validated probe."""
     matches = tuple(match for adapter in ADAPTERS if (match := adapter.probe(archive)) is not None)
     strong = tuple(match for match in matches if match.strong)
     if len(strong) > 1:
@@ -302,49 +320,70 @@ def ingest_zeia(
     object_limit: int | None = None,
     max_entry_count: int = MAX_ZEIA_ENTRY_COUNT,
     max_total_uncompressed_bytes: int = MAX_ZEIA_TOTAL_UNCOMPRESSED_BYTES,
+    max_member_uncompressed_bytes: int | None = MAX_ZEIA_MEMBER_UNCOMPRESSED_BYTES,
+    max_compression_ratio: float | None = MAX_ZEIA_COMPRESSION_RATIO,
+    _archive: zipfile.ZipFile | None = None,
+    _inventory: ZeiaArchiveInventory | None = None,
 ) -> CanonicalProjectModel:
     """Normalize one complete export through the selected adapter."""
 
     archive_path = Path(path).expanduser().resolve()
-    detection = probe_zeia(
-        archive_path,
-        max_entry_count=max_entry_count,
-        max_total_uncompressed_bytes=max_total_uncompressed_bytes,
-    )
-    if detection.status != "supported":
+    if _archive is None and (not archive_path.exists() or not zipfile.is_zipfile(archive_path)):
+        detection = probe_zeia(
+            archive_path,
+            max_entry_count=max_entry_count,
+            max_total_uncompressed_bytes=max_total_uncompressed_bytes,
+            max_member_uncompressed_bytes=max_member_uncompressed_bytes,
+            max_compression_ratio=max_compression_ratio,
+        )
         raise ZeiaFormatError(detection)
-    selected = detection.selected
-    if selected is None:  # pragma: no cover - guarded by DetectionResult
-        raise ZeiaFormatError(DetectionResult("unsupported", detection.entries, (), ("no adapter selected",)))
-
     errors: list[dict[str, Any]] = []
     scripts: list[dict[str, Any]] = []
     objects: list[dict[str, Any]] = []
     worklists: list[dict[str, Any]] = []
-    eligible_member_counts = _eligible_member_counts(detection.entries)
+    eligible_member_counts = {"scripts": 0, "objects": 0, "worklists": 0}
     oversized_members: list[str] = []
     try:
-        with zipfile.ZipFile(archive_path) as zf:
-            infos = validate_zeia_archive_limits(
+        archive_context = (
+            nullcontext(_archive)
+            if _archive is not None
+            else zipfile.ZipFile(archive_path)
+        )
+        with archive_context as zf:
+            inventory = _inventory or build_zeia_archive_inventory(
                 zf,
                 max_entry_count=max_entry_count,
                 max_total_uncompressed_bytes=max_total_uncompressed_bytes,
+                max_member_uncompressed_bytes=max_member_uncompressed_bytes,
+                max_compression_ratio=max_compression_ratio,
             )
+            detection = _detection_from_probe(
+                _build_probe(zf, inventory), archive_path
+            )
+            if detection.status != "supported":
+                raise ZeiaFormatError(detection)
+            selected = detection.selected
+            if selected is None:  # pragma: no cover - guarded by DetectionResult
+                raise ZeiaFormatError(
+                    DetectionResult("unsupported", detection.entries, (), ("no adapter selected",))
+                )
             eligible_member_counts = _eligible_member_counts(
-                [info.filename for info in infos]
+                inventory.names
             )
             oversized_members = [
-                _normal_entry(info.filename)
-                for info in infos
+                member.name
+                for member in inventory.members
+                for info in (member.info,)
                 if not info.is_dir()
                 and info.file_size > MAX_XML_BYTES
-                and Path(info.filename).suffix.casefold() in {".xscr", *XML_OBJECT_EXTS}
-                and not _is_known_irrelevant_metadata(_normal_entry(info.filename))
+                and Path(member.name).suffix.casefold() in {".xscr", *XML_OBJECT_EXTS}
+                and not _is_known_irrelevant_metadata(member.name)
             ]
-            for info in infos:
+            for member in inventory.members:
+                info = member.info
                 if info.is_dir():
                     continue
-                entry = _normal_entry(info.filename)
+                entry = member.name
                 suffix = Path(entry).suffix.casefold()
                 if suffix == ".xscr":
                     if script_limit is not None and len(scripts) >= script_limit:
@@ -361,13 +400,18 @@ def ingest_zeia(
                                 source_archive=archive_path,
                             )
                         )
+                    except (OSError, zipfile.BadZipFile):
+                        raise
                     except Exception as exc:
                         errors.append(
                             _parse_error(entry, exc, suffix=suffix, parser="xscr", archive_path=archive_path)
                         )
                 elif suffix == ".gwl":
                     try:
-                        text = zf.read(info).decode("utf-8-sig")
+                        data = _read_member_data(zf, info)
+                        if info.file_size > MAX_XML_BYTES:
+                            oversized_members.append(entry)
+                        text = data.decode("utf-8-sig")
                         worklists.append(
                             normalize_record(
                                 inspect_gwl_lines(text.splitlines(), source_name=entry),
@@ -375,6 +419,8 @@ def ingest_zeia(
                                 source_archive=archive_path,
                             )
                         )
+                    except (OSError, zipfile.BadZipFile):
+                        raise
                     except Exception as exc:
                         errors.append(
                             _parse_error(entry, exc, suffix=suffix, parser="gwl", archive_path=archive_path)
@@ -397,6 +443,8 @@ def ingest_zeia(
                         diagnostic = _object_subtype_diagnostic(record, entry, suffix)
                         if diagnostic is not None:
                             errors.append(diagnostic)
+                    except (OSError, zipfile.BadZipFile):
+                        raise
                     except Exception as exc:
                         # Preserve every failed member as a classified diagnostic;
                         # completeness and readiness decide whether it is blocking.
@@ -434,8 +482,19 @@ def ingest_zeia(
                             source_archive=archive_path,
                         )
                     )
+    except ZeiaArchiveValidationError as exc:
+        raise IngestionArchiveError(
+            str(exc), _archive_validation_diagnostic(archive_path, exc)
+        ) from exc
     except (OSError, zipfile.BadZipFile) as exc:
-        errors.append(_parse_error("<archive>", exc, suffix=".zeia", parser="archive", archive_path=archive_path))
+        diagnostic = make_diagnostic(
+            DiagnosticCode.ARCHIVE_INVALID,
+            str(exc) or "ZEIA archive could not be read.",
+            archive_path=str(archive_path),
+            next_action="Provide a readable ZIP archive with intact members.",
+            exception=exc,
+        )
+        raise IngestionArchiveError(str(exc), diagnostic) from exc
 
     summarized_counts = {
         "scripts": len(scripts),
@@ -476,15 +535,49 @@ def ingest_zeia(
     )
 
 
+def ingest_zeia_from_open_archive(
+    path: str | Path,
+    archive: zipfile.ZipFile,
+    *,
+    inventory: ZeiaArchiveInventory | None = None,
+    script_limit: int | None = None,
+    object_limit: int | None = None,
+    max_entry_count: int = MAX_ZEIA_ENTRY_COUNT,
+    max_total_uncompressed_bytes: int = MAX_ZEIA_TOTAL_UNCOMPRESSED_BYTES,
+    max_member_uncompressed_bytes: int | None = MAX_ZEIA_MEMBER_UNCOMPRESSED_BYTES,
+    max_compression_ratio: float | None = MAX_ZEIA_COMPRESSION_RATIO,
+) -> CanonicalProjectModel:
+    """Ingest one already-open archive without rebuilding its inventory.
+
+    Project-context import uses this seam to share one validated inventory with
+    extraction. The caller owns the open archive and must not close it until the
+    returned model and any associated materialization work are complete.
+    """
+    return ingest_zeia(
+        path,
+        script_limit=script_limit,
+        object_limit=object_limit,
+        max_entry_count=max_entry_count,
+        max_total_uncompressed_bytes=max_total_uncompressed_bytes,
+        max_member_uncompressed_bytes=max_member_uncompressed_bytes,
+        max_compression_ratio=max_compression_ratio,
+        _archive=archive,
+        _inventory=inventory,
+    )
+
+
 def inspect_canonical_archive(path: str | Path, **kwargs: Any) -> InspectionReport:
     """Return the legacy report view while retaining its canonical model."""
     return InspectionReport(ingest_zeia(path, **kwargs))
 
 
-def _build_probe(zf: zipfile.ZipFile, infos: list[zipfile.ZipInfo]) -> ArchiveProbe:
-    entries = tuple(_normal_entry(info.filename) for info in infos)
+def _build_probe(
+    zf: zipfile.ZipFile, inventory: ZeiaArchiveInventory
+) -> ArchiveProbe:
+    entries = inventory.names
     samples: list[tuple[str, str]] = []
-    for info in infos:
+    for member in inventory.members:
+        info = member.info
         if info.is_dir() or Path(info.filename).suffix.casefold() not in {
             ".xscr", ".xcmp", ".xwsp", ".xlqc", ".xlcp", ".xsit", ".xcon", ".xml"
         }:
@@ -494,9 +587,9 @@ def _build_probe(zf: zipfile.ZipFile, infos: list[zipfile.ZipInfo]) -> ArchivePr
         try:
             data = _read_prefix(zf, info, 128 * 1024)
             samples.append(
-                (_normal_entry(info.filename), data.decode("utf-8-sig", errors="replace"))
+                (member.name, data.decode("utf-8-sig", errors="replace"))
             )
-        except (OSError, RuntimeError, zipfile.BadZipFile):
+        except (OSError, RuntimeError):
             continue
     combined = "\n".join(text for _name, text in samples)
     versions = tuple(sorted(set(re.findall(r"dataStoreVersion\s*=\s*[\"']([^\"']+)", combined, re.IGNORECASE))))
@@ -520,7 +613,8 @@ def _build_probe(zf: zipfile.ZipFile, infos: list[zipfile.ZipInfo]) -> ArchivePr
     )
     has_worklist_structure = False
     worklist_samples = 0
-    for info in infos:
+    for member in inventory.members:
+        info = member.info
         if info.is_dir() or Path(info.filename).suffix.casefold() != ".gwl":
             continue
         if worklist_samples >= 32:
@@ -556,11 +650,7 @@ def _unsupported_diagnostics(archive: ArchiveProbe) -> tuple[str, ...]:
 
 
 def _normal_entry(value: str) -> str:
-    normalized = str(value or "").replace("\\", "/")
-    pure = PurePosixPath(normalized)
-    if pure.is_absolute() or ".." in pure.parts:
-        raise ValueError(f"unsafe archive entry path: {value}")
-    return pure.as_posix()
+    return normalize_zeia_member_name(value)
 
 
 def _read_prefix(zf: zipfile.ZipFile, info: zipfile.ZipInfo, limit: int) -> bytes:
@@ -572,6 +662,60 @@ def _read_member_data(zf: zipfile.ZipFile, info: zipfile.ZipInfo) -> bytes:
     if info.file_size <= MAX_XML_BYTES:
         return zf.read(info)
     return _read_prefix(zf, info, MAX_XML_BYTES + 1)
+
+
+def _archive_validation_diagnostic(
+    archive_path: Path, exc: ZeiaArchiveValidationError
+) -> dict[str, Any]:
+    reason = exc.reason
+    if reason == "entry_count":
+        code = DiagnosticCode.LIMIT_ENTRY_COUNT
+        violated_limit = "max_entry_count"
+    elif reason == "total_uncompressed_bytes":
+        code = DiagnosticCode.LIMIT_UNCOMPRESSED_BYTES
+        violated_limit = "max_total_uncompressed_bytes"
+    elif reason == "member_uncompressed_bytes":
+        code = DiagnosticCode.LIMIT_MEMBER_BYTES
+        violated_limit = "max_member_uncompressed_bytes"
+    elif reason == "compression_ratio":
+        code = DiagnosticCode.LIMIT_COMPRESSION_RATIO
+        violated_limit = "max_compression_ratio"
+    elif reason == "duplicate_member":
+        code = DiagnosticCode.ARCHIVE_DUPLICATE_MEMBER
+        violated_limit = "unique_normalized_member_names"
+    else:
+        code = DiagnosticCode.ARCHIVE_UNSAFE_PATH
+        violated_limit = "safe_member_path"
+    return make_diagnostic(
+        code,
+        str(exc),
+        archive_path=str(archive_path),
+        entry_path=exc.normalized_name or exc.entry_name,
+        source_entity=exc.entry_name,
+        limit=exc.limit,
+        value=(
+            exc.uncompressed_size
+            if reason not in {"entry_count", "compression_ratio"}
+            else (
+                exc.uncompressed_size
+                if reason == "entry_count"
+                else (
+                    exc.uncompressed_size / max(exc.compressed_size or 1, 1)
+                    if exc.uncompressed_size is not None
+                    else None
+                )
+            )
+        ),
+        compressed_size=exc.compressed_size,
+        uncompressed_size=exc.uncompressed_size,
+        violated_limit=violated_limit,
+        next_action=(
+            "Remove the duplicate or unsafe member path and re-export the archive."
+            if reason in {"duplicate_member", "unsafe_path"}
+            else "Reduce the export or raise the configured reader limit after review."
+        ),
+        exception=exc,
+    )
 
 
 def _inspect_script_member(

@@ -27,10 +27,21 @@ from .progress import ProgressCallback, ProgressEmitter, ProgressStage
 from .project_store import ProjectStore
 from .runner import PipelineError
 from .worktable_geometry import build_worktable_geometry
-from tecan_common.zeia_limits import validate_zeia_archive_limits
+from tecan_common.zeia_limits import (
+    MAX_ZEIA_COMPRESSION_RATIO,
+    MAX_ZEIA_MEMBER_UNCOMPRESSED_BYTES,
+    ZeiaArchiveInventory,
+    build_zeia_archive_inventory,
+    normalize_zeia_member_name,
+)
 from tecan_reader.project_model import CanonicalProjectModel, build_completeness_metadata
 from tecan_reader.full_export_readiness import resolve_manifest_readiness
-from tecan_reader.zeia_adapters import ZeiaFormatError, ingest_zeia, probe_zeia
+from tecan_reader.zeia_adapters import (
+    ZeiaFormatError,
+    ingest_zeia,
+    ingest_zeia_from_open_archive,
+    probe_zeia,
+)
 
 
 XML_OBJECT_EXTS = {".xcmp", ".xwsp", ".xlqc", ".xlcp", ".xsit", ".xcon", ".xml"}
@@ -181,6 +192,8 @@ def import_project(
     name: str | None = None,
     force: bool = False,
     snapshot_archives: list[Path] | None = None,
+    max_member_uncompressed_bytes: int | None = MAX_ZEIA_MEMBER_UNCOMPRESSED_BYTES,
+    max_compression_ratio: float | None = MAX_ZEIA_COMPRESSION_RATIO,
 ) -> ProjectContext:
     archive = archive.resolve()
     if not archive.exists():
@@ -203,13 +216,6 @@ def import_project(
         manifest_schema_version=PROJECT_MANIFEST_SCHEMA_VERSION,
     )
 
-    try:
-        canonical_model = _ingest_context_model(archive)
-    except ZeiaFormatError as exc:
-        raise PipelineError(str(exc)) from exc
-    except (OSError, ValueError, zipfile.BadZipFile) as exc:
-        raise PipelineError(f"ZEIA canonical ingestion failed: {exc}") from exc
-
     project_name = sanitize_project_name(name, archive.stem)
     root = project_dir(project_name)
     if root.exists():
@@ -222,23 +228,35 @@ def import_project(
                 f"project context already exists: {project_name}. "
                 "Use --force to replace it."
             )
-        _remove_project_dir(root)
 
     source_dir = root / "source"
     extracted_dir = root / "extracted"
-    source_dir.mkdir(parents=True, exist_ok=True)
-    extracted_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(archive, source_dir / archive.name)
 
     try:
         with zipfile.ZipFile(archive) as zf:
-            infos = validate_zeia_archive_limits(zf)
-            names = [info.filename for info in infos]
-            _safe_extract(zf, extracted_dir)
-    except zipfile.BadZipFile as exc:
-        raise PipelineError(
-            f"not a readable .zeia/zip archive: {archive} ({exc})"
-        ) from exc
+            inventory = build_zeia_archive_inventory(
+                zf,
+                max_member_uncompressed_bytes=max_member_uncompressed_bytes,
+                max_compression_ratio=max_compression_ratio,
+            )
+            canonical_model = _ingest_context_model(
+                archive,
+                archive_handle=zf,
+                archive_inventory=inventory,
+                max_member_uncompressed_bytes=max_member_uncompressed_bytes,
+                max_compression_ratio=max_compression_ratio,
+            )
+            if root.exists():
+                _remove_project_dir(root)
+            source_dir.mkdir(parents=True, exist_ok=True)
+            extracted_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(archive, source_dir / archive.name)
+            names = list(inventory.names)
+            _safe_extract(zf, extracted_dir, inventory=inventory)
+    except ZeiaFormatError as exc:
+        raise PipelineError(str(exc)) from exc
+    except (OSError, ValueError, zipfile.BadZipFile) as exc:
+        raise PipelineError(f"ZEIA canonical ingestion or extraction failed: {exc}") from exc
 
     entries = list(names)
     snapshot_sources = _import_snapshot_archives(
@@ -246,6 +264,8 @@ def import_project(
         source_dir=source_dir,
         extracted_dir=extracted_dir,
         entries=entries,
+        max_member_uncompressed_bytes=max_member_uncompressed_bytes,
+        max_compression_ratio=max_compression_ratio,
     )
 
     manifest = build_manifest(
@@ -747,10 +767,29 @@ def inspection_payload(
     }
 
 
-def _ingest_context_model(archive: Path) -> CanonicalProjectModel:
+def _ingest_context_model(
+    archive: Path,
+    *,
+    archive_handle: zipfile.ZipFile | None = None,
+    archive_inventory: ZeiaArchiveInventory | None = None,
+    max_member_uncompressed_bytes: int | None = MAX_ZEIA_MEMBER_UNCOMPRESSED_BYTES,
+    max_compression_ratio: float | None = MAX_ZEIA_COMPRESSION_RATIO,
+) -> CanonicalProjectModel:
     """Ingest ZEIA through the reader, preserving snapshot-only compatibility."""
     try:
-        return ingest_zeia(archive)
+        if archive_handle is not None:
+            return ingest_zeia_from_open_archive(
+                archive,
+                archive_handle,
+                inventory=archive_inventory,
+                max_member_uncompressed_bytes=max_member_uncompressed_bytes,
+                max_compression_ratio=max_compression_ratio,
+            )
+        return ingest_zeia(
+            archive,
+            max_member_uncompressed_bytes=max_member_uncompressed_bytes,
+            max_compression_ratio=max_compression_ratio,
+        )
     except ZeiaFormatError as exc:
         if exc.result.status != "unsupported" or not _is_support_context_archive(
             exc.result.entries
@@ -2020,7 +2059,7 @@ def is_context_archive(path: Path) -> bool:
         return True
     try:
         with zipfile.ZipFile(path) as zf:
-            entries = zf.namelist()
+            entries = list(build_zeia_archive_inventory(zf).names)
     except zipfile.BadZipFile:
         return False
     # Snapshot/support archives are intentionally outside the ZEIA semantic
@@ -2038,13 +2077,26 @@ def _archive_has_importable_context(entries: list[str]) -> bool:
     return False
 
 
-def safe_extract_archive(zf: zipfile.ZipFile, destination: Path) -> None:
+def safe_extract_archive(
+    zf: zipfile.ZipFile,
+    destination: Path,
+    *,
+    inventory: ZeiaArchiveInventory | None = None,
+    max_member_uncompressed_bytes: int | None = MAX_ZEIA_MEMBER_UNCOMPRESSED_BYTES,
+    max_compression_ratio: float | None = MAX_ZEIA_COMPRESSION_RATIO,
+) -> None:
     """Extract a validated ZIP archive while rejecting path traversal entries."""
     root = destination.resolve()
-    for info in zf.infolist():
+    inventory = inventory or build_zeia_archive_inventory(
+        zf,
+        max_member_uncompressed_bytes=max_member_uncompressed_bytes,
+        max_compression_ratio=max_compression_ratio,
+    )
+    for member in inventory.members:
+        info = member.info
         if info.is_dir():
             continue
-        relative = _zip_entry_to_path(info.filename)
+        relative = _zip_entry_to_path(member.name)
         target = (root / relative).resolve()
         if root not in target.parents and target != root:
             raise PipelineError(f"unsafe archive entry path: {info.filename}")
@@ -2053,9 +2105,22 @@ def safe_extract_archive(zf: zipfile.ZipFile, destination: Path) -> None:
             shutil.copyfileobj(source, dest)
 
 
-def _safe_extract(zf: zipfile.ZipFile, destination: Path) -> None:
+def _safe_extract(
+    zf: zipfile.ZipFile,
+    destination: Path,
+    *,
+    inventory: ZeiaArchiveInventory | None = None,
+    max_member_uncompressed_bytes: int | None = MAX_ZEIA_MEMBER_UNCOMPRESSED_BYTES,
+    max_compression_ratio: float | None = MAX_ZEIA_COMPRESSION_RATIO,
+) -> None:
     """Compatibility wrapper for older internal import call sites."""
-    safe_extract_archive(zf, destination)
+    safe_extract_archive(
+        zf,
+        destination,
+        inventory=inventory,
+        max_member_uncompressed_bytes=max_member_uncompressed_bytes,
+        max_compression_ratio=max_compression_ratio,
+    )
 
 
 def _import_snapshot_archives(
@@ -2064,6 +2129,8 @@ def _import_snapshot_archives(
     source_dir: Path,
     extracted_dir: Path,
     entries: list[str],
+    max_member_uncompressed_bytes: int | None = MAX_ZEIA_MEMBER_UNCOMPRESSED_BYTES,
+    max_compression_ratio: float | None = MAX_ZEIA_COMPRESSION_RATIO,
 ) -> list[dict[str, Any]]:
     if not snapshots:
         return []
@@ -2085,8 +2152,13 @@ def _import_snapshot_archives(
         target_dir = extracted_snapshots_dir / prefix_name
         target_dir.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(snapshot) as zf:
-            snapshot_entries = zf.namelist()
-            _safe_extract(zf, target_dir)
+            inventory = build_zeia_archive_inventory(
+                zf,
+                max_member_uncompressed_bytes=max_member_uncompressed_bytes,
+                max_compression_ratio=max_compression_ratio,
+            )
+            snapshot_entries = list(inventory.names)
+            _safe_extract(zf, target_dir, inventory=inventory)
         prefix = f"snapshots/{prefix_name}"
         entries.extend(f"{prefix}/{entry}" for entry in snapshot_entries)
         records.append(
@@ -2123,11 +2195,11 @@ def _unique_snapshot_prefix(snapshot: Path, index: int, used: set[str]) -> str:
 
 
 def _zip_entry_to_path(entry: str) -> Path:
-    normalized = entry.replace("\\", "/")
-    parts = [part for part in PurePosixPath(normalized).parts if part not in {"", "."}]
-    if any(part == ".." for part in parts):
-        raise PipelineError(f"unsafe archive entry path: {entry}")
-    return Path(*parts)
+    try:
+        normalized = normalize_zeia_member_name(entry)
+    except ValueError as exc:
+        raise PipelineError(str(exc)) from exc
+    return Path(*normalized.split("/")) if normalized else Path()
 
 
 def _remove_project_dir(root: Path) -> None:

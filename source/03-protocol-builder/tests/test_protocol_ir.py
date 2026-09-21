@@ -2,6 +2,7 @@ import copy
 import tempfile
 import unittest
 import zipfile
+from unittest.mock import patch
 from pathlib import Path
 
 import fluent_pipeline.protocol_ir as protocol_ir_module
@@ -1428,6 +1429,17 @@ def build_worktable() -> Worktable:
             self.assertEqual(bundle["ir_version"], CANONICAL_IR_BUNDLE_VERSION)
             self.assertEqual(bundle["protocol_count"], 1)
             self.assertEqual(bundle["protocols"][0]["source"]["archive_entry"], "Scripts/simple_transfer.xscr")
+
+    def test_zeia_ir_bundle_uses_bounded_open_member_reads(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = Path(tmp) / "project.zeia"
+            with zipfile.ZipFile(archive, "w") as zf:
+                zf.writestr("Scripts/simple_transfer.xscr", XSCR)
+
+            with patch.object(zipfile.ZipFile, "read", side_effect=AssertionError("whole-member read")):
+                bundle = protocol_ir_bundle_from_zeia(archive)
+
+        self.assertEqual(bundle["protocol_count"], 1)
 
     def test_xscr_reads_direct_root_script_group_commands_in_order(self):
         xscr_text = """<?xml version="1.0" encoding="utf-8"?>

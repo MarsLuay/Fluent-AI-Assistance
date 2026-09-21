@@ -163,6 +163,8 @@ ENTITY_KINDS = {
     "catalog_object",
 }
 
+_UNSET = object()
+
 
 @dataclasses.dataclass
 class IndexContext:
@@ -217,6 +219,8 @@ def build_project_index(
     force: bool = False,
     script_limit: int | None = None,
     object_limit: int | None = None,
+    max_member_uncompressed_bytes: int | None | object = _UNSET,
+    max_compression_ratio: float | None | object = _UNSET,
 ) -> dict[str, Any]:
     """Build or refresh a searchable SQLite index for one or more ZEIA files."""
     zeia_paths = discover_zeia_paths(paths)
@@ -230,11 +234,15 @@ def build_project_index(
         _initialize_database(conn)
         indexed_files = []
         for zeia_path in zeia_paths:
-            model = ingest_zeia(
-                zeia_path,
-                script_limit=script_limit,
-                object_limit=object_limit,
-            )
+            ingest_kwargs: dict[str, Any] = {
+                "script_limit": script_limit,
+                "object_limit": object_limit,
+            }
+            if max_member_uncompressed_bytes is not _UNSET:
+                ingest_kwargs["max_member_uncompressed_bytes"] = max_member_uncompressed_bytes
+            if max_compression_ratio is not _UNSET:
+                ingest_kwargs["max_compression_ratio"] = max_compression_ratio
+            model = ingest_zeia(zeia_path, **ingest_kwargs)
             _index_archive(conn, zeia_path, model)
             indexed_files.append(str(zeia_path))
         conn.commit()
