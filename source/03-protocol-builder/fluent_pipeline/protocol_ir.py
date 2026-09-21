@@ -23,11 +23,21 @@ from tecan_common.zeia_limits import build_zeia_archive_inventory
 from tecan_common.gwl import (
     Break,
     Comment,
+    Flush,
     Pipette,
+    RawRecord,
+    SetDiTiType,
     Wash,
     Worklist,
     parse_gwl_line,
     serialize_gwl,
+)
+from tecan_common.worklist_contract import (
+    LOAD_COMMAND_IDS,
+    ExecuteWorklistContract,
+    LoadWorklistContract,
+    build_execution_contract,
+    normalize_load_worklist,
 )
 from fluentcoder.expressions import (
     canonical_expression_key,
@@ -421,6 +431,7 @@ def protocol_ir_from_xscr(path: Path, *, source_name: str | None = None) -> dict
             embedded_in_raw_command=_enclosing_raw_command_id(group_object, parent_by_child),
         )
 
+    _attach_worklist_execution_contracts(ir)
     _finalize_ir(ir)
     return ir
 
@@ -496,6 +507,7 @@ def protocol_ir_from_gwl(path: Path) -> dict[str, Any]:
                 "volume_ul": _number_or_text(record.volume),
                 "liquid_class": record.liquid_class,
                 "tip_mask": record.tip_mask,
+                "tip_selection": record.tip_selection.to_dict(),
                 "forced_rack_type": record.forced_rack_type,
                 "line_number": line_number,
             }
@@ -537,7 +549,46 @@ def protocol_ir_from_gwl(path: Path) -> dict[str, Any]:
         if isinstance(record, Break):
             records.append({"operation": "break", "line_number": line_number})
             continue
-    ir["worklists"].append({"name": path.stem, "source": str(path), "records": records})
+        if isinstance(record, Flush):
+            records.append(
+                {
+                    "operation": "flush",
+                    "record_type": record.type_character,
+                    "parameters": list(record.parameters),
+                    "raw_line": record.to_line(),
+                    "line_number": line_number,
+                }
+            )
+            continue
+        if isinstance(record, SetDiTiType):
+            records.append(
+                {
+                    "operation": "set_diti_type",
+                    "record_type": record.type_character,
+                    "parameters": list(record.parameters),
+                    "raw_line": record.to_line(),
+                    "line_number": line_number,
+                }
+            )
+            continue
+        if isinstance(record, RawRecord):
+            records.append(
+                {
+                    "operation": "raw_record",
+                    "record_type": record.type_character,
+                    "raw_line": record.raw_line,
+                    "line_number": line_number,
+                }
+            )
+    ir["worklists"].append(
+        {
+            "name": path.stem,
+            "source": str(path),
+            "record_semantics_schema": "tecan.worklist.semantics.v1",
+            "source_order_preserved": True,
+            "records": records,
+        }
+    )
     _finalize_ir(ir)
     return ir
 
@@ -1167,6 +1218,14 @@ def render_gwl(ir: dict[str, Any]) -> str:
             dest_type = str(_labware_by_label(labware, dest_label).get("catalog") or "")
             volume = step.get("volume_ul") or pending_aspirate.get("volume_ul") or ""
             liquid_class = step.get("liquid_class") or pending_aspirate.get("liquid_class") or ""
+            aspirate_parameters = pending_aspirate.get("parameters") or {}
+            dispense_parameters = step.get("parameters") or {}
+            aspirate_tip_mask = pending_aspirate.get("tip_mask")
+            if aspirate_tip_mask in (None, "") and isinstance(aspirate_parameters, dict):
+                aspirate_tip_mask = aspirate_parameters.get("tip_mask", "")
+            dispense_tip_mask = step.get("tip_mask")
+            if dispense_tip_mask in (None, "") and isinstance(dispense_parameters, dict):
+                dispense_tip_mask = dispense_parameters.get("tip_mask", "")
             worklist.add(
                 Pipette(
                     operation="A",
@@ -1175,6 +1234,7 @@ def render_gwl(ir: dict[str, Any]) -> str:
                     position=1,
                     volume=volume,
                     liquid_class=liquid_class,
+                    tip_mask="" if aspirate_tip_mask is None else str(aspirate_tip_mask),
                 )
             )
             worklist.add(
@@ -1185,6 +1245,7 @@ def render_gwl(ir: dict[str, Any]) -> str:
                     position=1,
                     volume=volume,
                     liquid_class=liquid_class,
+                    tip_mask="" if dispense_tip_mask is None else str(dispense_tip_mask),
                 )
             )
             pending_aspirate = None
@@ -1373,6 +1434,34 @@ def _empty_ir(name: str, *, source_format: str, source_path: str) -> dict[str, A
         ],
         "steps": [],
     }
+
+
+def _attach_worklist_execution_contracts(ir: dict[str, Any]) -> None:
+    """Annotate typed Load/Execute Worklist steps without changing source order."""
+
+    steps = ir.get("steps") or []
+    worklist_steps = [
+        step
+        for step in steps
+        if isinstance(step, dict) and step.get("operation") == "read_worklist"
+    ]
+    if not worklist_steps:
+        return
+    commands = [
+        {
+            "command_id": step.get("command_id"),
+            "parameters": step.get("parameters") if isinstance(step.get("parameters"), dict) else {},
+            "provenance": {"step_index": step.get("index"), "source_path": step.get("compiled_path")},
+        }
+        for step in worklist_steps
+    ]
+    contracts = build_execution_contract(commands)
+    for step, contract in zip(worklist_steps, contracts):
+        parameters = step.setdefault("parameters", {})
+        if isinstance(contract, LoadWorklistContract):
+            parameters.setdefault("worklist_contract", contract.to_dict())
+        elif isinstance(contract, ExecuteWorklistContract):
+            parameters["worklist_execution_contract"] = contract.to_dict()
 
 
 def _finalize_ir(ir: dict[str, Any]) -> None:
@@ -1932,6 +2021,21 @@ def _xscr_step(
         "head_position": _first_text(command_object, "HeadPositions"),
         "back_position": _first_text(command_object, "Backs"),
     }
+    if operation == "read_worklist":
+        if command_id in LOAD_COMMAND_IDS:
+            selected_tip_indexes = _xscr_selected_tip_channels(command_object)
+            if selected_tip_indexes is not None and not any(
+                fields.get(name) not in (None, "") for name in ("SelectedTipsIndexes", "SerializedTipsIndexes", "TipMask")
+            ):
+                fields = dict(fields)
+                fields["selected_tip_indexes"] = selected_tip_indexes
+            contract = normalize_load_worklist(
+                fields,
+                command_id=command_id,
+                provenance={"source_entry": source_entry, "compiled_path": compiled_path},
+            )
+            parameters["worklist"] = contract.worklist
+            parameters["worklist_contract"] = contract.to_dict()
     parameters.update(
         _registered_xscr_expression_parameters(
             command_object,
@@ -1971,7 +2075,7 @@ def _xscr_step(
         "operation": operation,
         "name": _operation_name(operation),
         "command_id": command_id,
-        "target_labware": labware,
+        "target_labware": labware or (parameters.get("worklist") if operation == "read_worklist" else ""),
         "source_labware": labware if operation in {"aspirate", "liha_aspirate"} else None,
         "destination_labware": labware if operation in {"dispense", "liha_dispense"} else None,
         "volume_ul": volume,
@@ -2918,6 +3022,7 @@ def _operation_name(operation: str) -> str:
         "move_plate": "Move Plate",
         "execute_application": "Execute Application",
         "call_subroutine": "Call Subroutine",
+        "read_worklist": "Read Worklist",
     }
     return names.get(operation, operation.replace("_", " ").title())
 

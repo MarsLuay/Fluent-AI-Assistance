@@ -1466,34 +1466,48 @@
       "confidence": "high"
     },
     "LoadWorklistStatementDataV4": {
-      "support_status": "approved_passthrough",
+      "operation": "read_worklist",
       "fluentcontrol_name": "Load Worklist",
       "pattern_type": "read_worklist",
       "family": "Worklist",
       "requires": [],
-      "passthrough_reason": "Worklist load statement observed in the full export; preserve XML until this Worklist v4 schema is modeled.",
+      "contract_schema": "tecan.worklist.contract.v2",
+      "field_aliases": {
+        "worklist": ["WorklistName", "FileName", "Path"],
+        "selected_tip_mask": ["SelectedTipsIndexes", "SerializedTipsIndexes", "TipMask"],
+        "selected_arm": ["DeviceAlias", "Arm", "ArmName"],
+        "default_liquid_class": ["LiquidClass", "DefaultLiquidClass"],
+        "tip_system": ["TipSystem"]
+      },
       "manual_step": "Load worklist",
       "fluentcontrol_name_source": "source_script_observed",
       "confidence": "high"
     },
     "WorklistImportStatementDataV2": {
-      "support_status": "approved_passthrough",
+      "operation": "read_worklist",
       "fluentcontrol_name": "Import Worklist",
       "pattern_type": "read_worklist",
       "family": "Worklist",
       "requires": [],
-      "passthrough_reason": "Worklist import statement observed in the full export; preserve XML until this Worklist v2 schema is modeled.",
+      "contract_schema": "tecan.worklist.contract.v2",
+      "field_aliases": {
+        "worklist": ["WorklistName", "FileName", "Path"],
+        "selected_tip_mask": ["SelectedTipsIndexes", "SerializedTipsIndexes", "TipMask"],
+        "selected_arm": ["DeviceAlias", "Arm", "ArmName"],
+        "default_liquid_class": ["LiquidClass", "DefaultLiquidClass"],
+        "tip_system": ["TipSystem"]
+      },
       "manual_step": "Import worklist",
       "fluentcontrol_name_source": "source_script_observed",
       "confidence": "high"
     },
     "ExecuteWorklistStatementDataV1": {
-      "support_status": "approved_passthrough",
+      "operation": "read_worklist",
       "fluentcontrol_name": "Execute Worklist",
       "pattern_type": "read_worklist",
       "family": "Worklist",
       "requires": [],
-      "passthrough_reason": "Worklist execution statement observed in the full export; preserve XML until this Worklist v1 schema is modeled.",
+      "contract_schema": "tecan.worklist.contract.v2",
       "manual_step": "Execute worklist",
       "fluentcontrol_name_source": "source_script_observed",
       "confidence": "high"

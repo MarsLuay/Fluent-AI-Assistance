@@ -528,6 +528,10 @@ def test_worklist_builder_against_full_export(tmp_path: Path) -> None:
     assert worklist_cli.main(["convert", str(valid), "-o", str(out), "--json"]) == 0
     assert out.is_file()
     assert worklist_cli.main(["summarize", str(gwl), "--json"]) == 0
+    assert worklist_cli.main(["analyze", str(gwl), "--json"]) == 0
+    optimized = tmp_path / "optimized.gwl"
+    assert worklist_cli.main(["optimize", str(gwl), "-o", str(optimized), "--json"]) == 0
+    assert optimized.is_file()
 
 
 def test_full_export_negative_paths(tmp_path: Path) -> None:

@@ -60,6 +60,16 @@
       "coverage": "declared_gap",
       "gap_reason": "setup creates a local venv and installs packages; it is not an offline full-export pipeline stage."
     },
+    "worklist.analyze": {
+      "tests": [
+        "test_worklist_builder_against_full_export"
+      ]
+    },
+    "worklist.optimize": {
+      "tests": [
+        "test_worklist_builder_against_full_export"
+      ]
+    },
     "cli.launch-simulator": {
       "tests": ["test_launch_simulator_rejects_missing_bundle"],
       "coverage": "full_export_fail_closed",

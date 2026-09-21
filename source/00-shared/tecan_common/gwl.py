@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, Protocol
+from typing import Iterable, Literal, Protocol
 
 
 class Record(Protocol):
@@ -26,6 +26,66 @@ def _clean(value: object) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+
+SUPPORTED_SIMPLE_TIP_CHANNELS = 8
+
+
+@dataclass(frozen=True)
+class TipSelection:
+    """Evidence-preserving interpretation of a simple A/D ``TipMask``.
+
+    FluentControl worklist records use a one-hot value for a single selected
+    channel.  Command-level masks are deliberately handled separately by the
+    worklist analyzer because their multi-bit meaning depends on the enclosing
+    Load Worklist configuration.
+    """
+
+    raw: str
+    mode: Literal["automatic", "explicit"]
+    value: int | None
+    channel: int | None
+    status: Literal["valid", "malformed", "invalid", "non_one_hot", "out_of_range"]
+    diagnostic_code: str | None = None
+
+    @property
+    def valid(self) -> bool:
+        return self.status == "valid"
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "mode": self.mode,
+            "value": self.value,
+            "channel": self.channel,
+            "raw": self.raw,
+            "status": self.status,
+            "diagnostic_code": self.diagnostic_code,
+        }
+
+
+def parse_tip_selection(
+    raw: object,
+    *,
+    supported_channels: int | None = SUPPORTED_SIMPLE_TIP_CHANNELS,
+) -> TipSelection:
+    """Parse a record-level one-hot tip selection without changing its raw text."""
+
+    raw_text = "" if raw is None else str(raw)
+    text = raw_text.strip()
+    if not text:
+        return TipSelection(raw_text, "automatic", None, None, "valid")
+    try:
+        value = int(text, 10)
+    except (TypeError, ValueError):
+        return TipSelection(raw_text, "explicit", None, None, "malformed", "tip_mask_not_integer")
+    if value <= 0:
+        return TipSelection(raw_text, "explicit", value, None, "invalid", "tip_mask_non_positive")
+    if value & (value - 1):
+        return TipSelection(raw_text, "explicit", value, None, "non_one_hot", "tip_mask_not_one_hot")
+    channel = value.bit_length()
+    if supported_channels is not None and channel > supported_channels:
+        return TipSelection(raw_text, "explicit", value, channel, "out_of_range", "tip_mask_channel_out_of_range")
+    return TipSelection(raw_text, "explicit", value, channel, "valid")
 
 
 @dataclass(frozen=True)
@@ -71,7 +131,16 @@ class Pipette:
             self.tip_mask,
             self.forced_rack_type,
         ]
-        return ";".join(_clean(value) for value in values)
+        serialized = [_clean(value) for value in values]
+        # TipMask is an evidence-bearing source field.  Keep its spelling
+        # (including intentional surrounding whitespace) while normalizing the
+        # other structured fields as before.
+        serialized[9] = "" if self.tip_mask is None else str(self.tip_mask)
+        return ";".join(serialized)
+
+    @property
+    def tip_selection(self) -> TipSelection:
+        return parse_tip_selection(self.tip_mask)
 
 
 @dataclass(frozen=True)
@@ -106,6 +175,34 @@ class Comment:
 
     def to_line(self) -> str:
         return "C;" + self.text.replace("\n", "\\n")
+
+
+@dataclass(frozen=True)
+class Flush:
+    """Typed ``F`` record with opaque parameters preserved verbatim."""
+
+    parameters: tuple[str, ...] = ()
+    type_character: str = "F"
+    raw_line: str | None = None
+
+    def to_line(self) -> str:
+        if self.raw_line is not None:
+            return self.raw_line
+        return ";".join((self.type_character, *(_clean(value) for value in self.parameters)))
+
+
+@dataclass(frozen=True)
+class SetDiTiType:
+    """Typed ``S`` record; its source-defined fields remain opaque."""
+
+    parameters: tuple[str, ...] = ()
+    type_character: str = "S"
+    raw_line: str | None = None
+
+    def to_line(self) -> str:
+        if self.raw_line is not None:
+            return self.raw_line
+        return ";".join((self.type_character, *(_clean(value) for value in self.parameters)))
 
 
 @dataclass
@@ -199,6 +296,10 @@ def parse_gwl_line(raw_line: str, *, line_no: int | None = None, permissive: boo
         if not permissive and len(parts) < 2:
             raise ValueError(f"{prefix}comment record has {len(parts)} fields, expected at least 2.")
         return Comment(";".join(parts[1:]))
+    if op == "F":
+        return Flush(tuple(parts[1:]), raw_line=line)
+    if op == "S":
+        return SetDiTiType(tuple(parts[1:]), raw_line=line)
     if permissive:
         return RawRecord(type_character=op, raw_line=line)
     raise ValueError(f"{prefix}unsupported record type {op!r}.")
@@ -221,11 +322,16 @@ def _format_volume(value: float | int | str) -> str:
 __all__ = [
     "Break",
     "Comment",
+    "Flush",
     "Pipette",
     "RawRecord",
     "Record",
+    "SetDiTiType",
+    "TipSelection",
     "Worklist",
     "Wash",
+    "SUPPORTED_SIMPLE_TIP_CHANNELS",
+    "parse_tip_selection",
     "parse_gwl",
     "parse_gwl_line",
     "parse_gwl_lines",

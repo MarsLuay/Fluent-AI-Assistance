@@ -177,7 +177,7 @@ export const PROTOCOL_IR_OPERATION_REQUIREMENTS = {
     "requiresLiquidClass": false
   },
   "read_worklist": {
-    "requiresLabwareTarget": true,
+    "requiresLabwareTarget": false,
     "requiresVolume": false,
     "requiresLiquidClass": false
   },

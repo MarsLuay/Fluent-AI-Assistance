@@ -7,7 +7,8 @@ import json
 import sys
 from pathlib import Path
 
-from .gwl import parse_gwl
+from .gwl import parse_gwl, parse_gwl_text
+from .optimizer import analyze_worklist, optimize_worklist, semantic_equivalent
 from .transfer import build_worklist, load_transfers, validate_transfers
 
 
@@ -36,6 +37,21 @@ def main(argv: list[str] | None = None) -> int:
     summarize.add_argument("gwl", type=Path)
     summarize.add_argument("--json", action="store_true", dest="as_json")
     summarize.set_defaults(func=_cmd_summarize)
+
+    analyze = sub.add_parser("analyze", help="analyze worklist tip selection and scheduling semantics")
+    analyze.add_argument("gwl", type=Path)
+    analyze.add_argument("--enabled-tip-mask")
+    analyze.add_argument("--supported-channels", type=int, default=8)
+    analyze.add_argument("--json", action="store_true", dest="as_json")
+    analyze.set_defaults(func=_cmd_analyze)
+
+    optimize = sub.add_parser("optimize", help="write an opt-in dependency-safe worklist ordering")
+    optimize.add_argument("gwl", type=Path)
+    optimize.add_argument("--output", "-o", type=Path, required=True)
+    optimize.add_argument("--enabled-tip-mask")
+    optimize.add_argument("--supported-channels", type=int, default=8)
+    optimize.add_argument("--json", action="store_true", dest="as_json")
+    optimize.set_defaults(func=_cmd_optimize)
 
     args = parser.parse_args(argv)
     return args.func(args)
@@ -97,6 +113,48 @@ def _cmd_summarize(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_analyze(args: argparse.Namespace) -> int:
+    try:
+        worklist = parse_gwl(args.gwl, permissive=True)
+        analysis = analyze_worklist(
+            worklist,
+            enabled_tip_mask=args.enabled_tip_mask,
+            supported_channels=args.supported_channels,
+        )
+    except (OSError, ValueError) as exc:
+        return _emit_semantic_failure(str(exc), as_json=args.as_json)
+    payload = {"ok": not analysis.has_errors, "gwl": str(args.gwl), **analysis.to_dict()}
+    _emit(payload, as_json=args.as_json)
+    return 0 if payload["ok"] else 1
+
+
+def _cmd_optimize(args: argparse.Namespace) -> int:
+    try:
+        worklist = parse_gwl(args.gwl, permissive=True)
+        result = optimize_worklist(
+            worklist,
+            enabled_tip_mask=args.enabled_tip_mask,
+            supported_channels=args.supported_channels,
+        )
+    except (OSError, ValueError) as exc:
+        return _emit_semantic_failure(str(exc), as_json=args.as_json)
+    payload = {"ok": not result.analysis.has_errors, "gwl": str(args.gwl), "output_gwl": str(args.output), **result.to_dict()}
+    if payload["ok"]:
+        reparsed = parse_gwl_text(result.worklist.to_text(), name=result.worklist.name, permissive=True)
+        if not semantic_equivalent(
+            worklist,
+            reparsed,
+            enabled_tip_mask=args.enabled_tip_mask,
+            supported_channels=args.supported_channels,
+        ):
+            payload["ok"] = False
+            payload.setdefault("reasons", []).append("optimized output failed semantic-equivalence verification")
+        else:
+            result.worklist.write(args.output)
+    _emit(payload, as_json=args.as_json)
+    return 0 if payload["ok"] else 1
+
+
 def _emit_validation_failure(result, *, as_json: bool) -> int:
     payload = {
         "ok": False,
@@ -104,6 +162,11 @@ def _emit_validation_failure(result, *, as_json: bool) -> int:
         "warnings": list(result.warnings),
     }
     _emit(payload, as_json=as_json, stream=sys.stderr)
+    return 1
+
+
+def _emit_semantic_failure(message: str, *, as_json: bool) -> int:
+    _emit({"ok": False, "errors": [message]}, as_json=as_json, stream=sys.stderr)
     return 1
 
 
