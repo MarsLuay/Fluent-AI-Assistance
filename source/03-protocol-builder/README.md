@@ -11,6 +11,21 @@ but the workspace layer is now called `03-protocol-builder`.
 Preferred installed command: `protocol-builder`. Module usage stays
 `python -m fluent_pipeline.cli`.
 
+For the normal happy path, use the one-shot command. It discovers one archive
+or a directory of related archives, imports and validates the full export, then
+runs the complete generation, simulation, compile, validation, and packaging
+workflow:
+
+```powershell
+protocol-builder run `
+  --input .\FullExport `
+  --request "Create the requested Fluent protocol"
+```
+
+Use `--request-file` for a longer request. Partial exports remain blocked
+unless `--approve-partial-zeia` is supplied explicitly; individual commands
+remain available for debugging and specialized workflows.
+
 ## Quick Start
 
 ```powershell

@@ -8,6 +8,7 @@ from pathlib import Path
 from .commands.diagnostics import _cmd_analyze, _cmd_diagnose, _cmd_map_media, _cmd_parse_fluent_log, _cmd_process_media, _cmd_template_info, _cmd_template_list
 from .commands.doctor import _cmd_bootstrap_status, _cmd_compatibility_matrix, _cmd_doctor, _cmd_setup
 from .commands.generation import _cmd_bundle_lifecycle, _cmd_compile, _cmd_decompile, _cmd_determinism_check, _cmd_generate, _cmd_ir_build, _cmd_ir_export, _cmd_ir_schema, _cmd_repair_draft, _cmd_repair_plan, _cmd_roundtrip
+from .commands.run import _cmd_run
 from .commands.projects import _cmd_alias_list, _cmd_alias_normalize_ir, _cmd_alias_resolve, _cmd_catalog_find, _cmd_catalog_info, _cmd_clear_project, _cmd_collection_info, _cmd_create_collection, _cmd_current_project, _cmd_import_project, _cmd_inspect_external_command, _cmd_list_collections, _cmd_list_projects, _cmd_project_find, _cmd_project_info, _cmd_script_report, _cmd_use_project
 from .commands.simulator import _cmd_launch_simulator, _cmd_simulate
 from .commands.validation import _cmd_fluent_prepare_check, _cmd_ir_validate, _cmd_request_spec, _cmd_resolve_spec, _cmd_validate_delivery_bundle, _cmd_validate_spec, _cmd_verify_bundle, _cmd_worktable_diff
@@ -601,6 +602,37 @@ def _build_parser() -> argparse.ArgumentParser:
     p_verify_bundle.add_argument("--json-out", type=Path, default=None, help="write ready-validation JSON")
     p_verify_bundle.add_argument("--json", dest="as_json", action="store_true", help="print JSON instead of summary text")
     p_verify_bundle.set_defaults(func=_cmd_verify_bundle)
+
+    p_run = sub.add_parser(
+        "run",
+        help="run a full ZEIA export and request through the complete workflow",
+        description=(
+            "Discover, import, validate, generate, simulate, compile, and package a "
+            "supported full ZEIA export in one deterministic operation."
+        ),
+    )
+    p_run.add_argument("--input", required=True, type=Path, help="a .zeia file or directory containing related .zeia files")
+    request_group = p_run.add_mutually_exclusive_group(required=True)
+    request_group.add_argument("--request", help="the protocol request text")
+    request_group.add_argument("--request-file", type=Path, help="file containing the protocol request text")
+    p_run.add_argument("--out-dir", type=Path, default=None, help="generated workflow output directory")
+    p_run.add_argument("--protocol-name", default=None, help="protocol name used for the generated bundle")
+    p_run.add_argument("--project-name", default=None, help="imported project or collection name")
+    p_run.add_argument("--force-import", action="store_true", help="replace matching imported context(s)")
+    p_run.add_argument(
+        "--approve-partial-zeia",
+        action="store_true",
+        help="explicitly allow a factual partial-export result to proceed",
+    )
+    p_run.add_argument(
+        "--progress",
+        nargs="?",
+        const="plain",
+        default="auto",
+        choices=["auto", "plain", "json", "none"],
+        help="progress display mode; progress is written to stderr",
+    )
+    p_run.set_defaults(func=_cmd_run)
 
     p_generate = sub.add_parser(
         "generate",

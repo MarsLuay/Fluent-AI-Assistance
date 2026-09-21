@@ -22,3 +22,8 @@
   consumers use its deterministic result rather than maintaining independent
   completeness heuristics; partial-export approval remains an explicit policy
   decision separate from the factual readiness classification.
+- Keep the normal full-export-plus-request path owned by the shared
+  `application_services.run_one_shot()` service. CLI adapters only normalize
+  paths, render progress/results, and return its stage-specific status; import,
+  readiness, request-spec validation, generation, simulation, compilation, and
+  packaging remain the existing workflow's responsibility.

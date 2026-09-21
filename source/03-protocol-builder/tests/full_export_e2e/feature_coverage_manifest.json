@@ -31,6 +31,9 @@
     "cli.generate": {
       "tests": ["test_full_export_workflow_completes", "test_cli_entry_points_against_full_export"]
     },
+    "cli.run": {
+      "tests": ["test_cli_entry_points_against_full_export", "test_full_export_negative_paths"]
+    },
     "cli.import-project": {
       "tests": ["test_full_export_workflow_completes", "test_cli_entry_points_against_full_export"]
     },
