@@ -11,6 +11,7 @@ from enum import Enum
 
 from ..expressions import (
     Expression,
+    IndexExpression,
     coerce_literal_expression,
     coerce_source_expression,
     loop_count_expression_error,
@@ -132,7 +133,7 @@ def _looks_like_source_expression(text: str) -> bool:
 class SetVariableStep(BaseStep):
     """Step to set a variable value."""
     step_type: Literal[StepType.SET_VARIABLE] = StepType.SET_VARIABLE
-    variable_name: str = Field(..., description="Name of the variable")
+    variable_name: IndexExpression | str = Field(..., description="Scalar variable name or typed array-element target")
     value: Expression = Field(..., description="Typed FluentControl expression value to set")
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -141,6 +142,23 @@ class SetVariableStep(BaseStep):
     @classmethod
     def _coerce_value_expression(cls, value: Any) -> Expression:
         return coerce_literal_expression(value)
+
+    @field_validator("variable_name", mode="before")
+    @classmethod
+    def _coerce_assignment_target(cls, value: Any) -> IndexExpression | str:
+        if isinstance(value, IndexExpression):
+            return value
+        if isinstance(value, str):
+            text = value.strip()
+            if text:
+                try:
+                    parsed = parse_expression(text)
+                except Exception:
+                    parsed = None
+                if isinstance(parsed, IndexExpression):
+                    return parsed
+            return value
+        return str(value)
 
 
 class CalculateVariableStep(BaseStep):

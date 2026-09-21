@@ -10,9 +10,12 @@ from fluentcoder.compiler import render_protocol
 from fluentcoder.decompiler import emit_python, parse_xscr
 from fluentcoder.expressions import (
     EXPRESSION_FIELDS,
+    attribute_conflict_diagnostics,
+    attribute_references_in_expression,
     BinaryExpression,
     BooleanLiteral,
     FunctionCall,
+    IndexExpression,
     NumberLiteral,
     SourcePreservedExpression,
     StringLiteral,
@@ -143,7 +146,7 @@ def test_expression_inventory_covers_every_registered_command_field(
         (FunctionCall(name="GetCoverSiteName", arguments=(StringLiteral(value="Magnet"),)), 'GetCoverSiteName("Magnet")'),
         (NumberLiteral(value=-1), "-1"),
         (NumberLiteral(value=-1.5), "-1.5"),
-        (VariableReference(name="WaterVol[0]"), "WaterVol[0]"),
+        (IndexExpression(base=VariableReference(name="WaterVol"), index=NumberLiteral(value=0)), "WaterVol[0]"),
         (UnaryExpression(operator="-", operand=VariableReference(name="A")), "(-A)"),
         (
             UnaryExpression(
@@ -292,6 +295,25 @@ def test_set_variable_step_value_is_typed_expression() -> None:
     assert step.value == "50ml Falcon"
 
 
+def test_set_variable_step_indexed_target_is_typed_expression() -> None:
+    step = SetVariableStep(variable_name="barcodes[cycle]", value='GetAttribute(current_tube, "Barcode")')
+
+    assert isinstance(step.variable_name, IndexExpression)
+    assert render_expression(step.variable_name) == "barcodes[cycle]"
+
+
+def test_legacy_indexed_mapping_migrates_without_changing_source_text() -> None:
+    expression = expression_from_mapping({"kind": "variable_reference", "name": "WaterVol[0]"})
+
+    assert isinstance(expression, IndexExpression)
+    assert render_expression(expression) == "WaterVol[0]"
+    assert expression_to_mapping(expression) == {
+        "kind": "index_expression",
+        "base": {"name": "WaterVol", "kind": "variable_reference"},
+        "index": {"value": 0, "kind": "number_literal"},
+    }
+
+
 def test_renderer_uses_expression_ast_for_set_variable() -> None:
     protocol = Protocol(
         name="Expression Protocol",
@@ -319,6 +341,36 @@ def test_renderer_uses_expression_ast_for_set_variable() -> None:
 
     assert '<Value>"50ml Falcon"</Value>' in xml
     assert "<Value>(CurrentPosition + 1)</Value>" in xml
+
+
+def test_renderer_emits_typed_indexed_assignment_target() -> None:
+    protocol = Protocol(
+        name="Indexed assignment",
+        variables=["barcodes[]", "cycle"],
+        variable_defaults={"barcodes[]": "", "cycle": 0},
+        variable_metadata={
+            "barcodes[]": {"type_name": "String"},
+            "cycle": {"type_name": "Integer"},
+        },
+        groups=[
+            Group(
+                name="Steps",
+                steps=[
+                    SetVariableStep(
+                        variable_name="barcodes[cycle]",
+                        value=parse_expression('GetAttribute(current_tube, "Barcode")'),
+                    )
+                ],
+            )
+        ],
+        worktable_guid="291ba293-6361-4f8f-aa8d-7c2643d3f096",
+        worktable_name="SAT_Fluent_780_Rev3",
+    )
+
+    xml = render_protocol(protocol, deterministic=True)
+
+    assert "<Name>barcodes[cycle]</Name>" in xml
+    assert '<Value>GetAttribute(current_tube, "Barcode")</Value>' in xml
 
 
 def test_simulator_evaluates_sequential_set_variable_expressions() -> None:
@@ -457,9 +509,9 @@ def test_every_expression_bearing_step_field_coerces_to_ast() -> None:
 
     assert isinstance(add_labware.position, BinaryExpression)
     assert isinstance(aspirate.volume, VariableReference)
-    assert isinstance(liha_aspirate.volume, VariableReference)
+    assert isinstance(liha_aspirate.volume, IndexExpression)
     assert isinstance(liha_aspirate.well_offset, BinaryExpression)
-    assert all(isinstance(volume, VariableReference) for volume in liha_aspirate.volumes or [])
+    assert all(isinstance(volume, IndexExpression) for volume in liha_aspirate.volumes or [])
     assert isinstance(liha_mix.volume, VariableReference)
     assert isinstance(liha_mix.cycles, VariableReference)
     assert isinstance(rga.destination_site, FunctionCall)
@@ -647,12 +699,69 @@ def test_expression_inventory_allows_explicit_permitted_host_variable_without_de
 
 
 def test_expression_semantics_resolves_indexed_variable_from_base_declaration() -> None:
-    context = semantic_context_from_variables({"WaterVol": "Double"})
+    context = semantic_context_from_variables({"WaterVol[]": "Double"})
 
     result = check_expression_semantics(parse_expression("WaterVol[0] + 1"), context)
 
     assert result.valid
     assert result.type_name == "number"
+
+
+def test_expression_semantics_rejects_indexed_scalar_and_bad_index() -> None:
+    scalar = check_expression_semantics(
+        parse_expression("WaterVol[0]"),
+        semantic_context_from_variables({"WaterVol": "Double"}),
+    )
+    bad_index = check_expression_semantics(
+        parse_expression("WaterVol[cycle]"),
+        semantic_context_from_variables({"WaterVol[]": "Double", "cycle": "String"}),
+    )
+
+    assert not scalar.valid
+    assert {issue.code for issue in scalar.issues} == {"indexed_scalar_variable"}
+    assert not bad_index.valid
+    assert "array_index_type_mismatch" in {issue.code for issue in bad_index.issues}
+
+
+def test_expression_semantics_checks_known_array_bounds_and_literal_dynamic_labware() -> None:
+    out_of_bounds = check_expression_semantics(
+        parse_expression("WaterVol[2]"),
+        semantic_context_from_variables({"WaterVol[2]": "Double"}),
+    )
+    literal = check_expression_semantics(
+        parse_expression('GetAttribute("pool_tube[cycle]", "Barcode")')
+    )
+
+    assert not out_of_bounds.valid
+    assert "array_index_out_of_bounds" in {issue.code for issue in out_of_bounds.issues}
+    assert literal.valid
+    assert literal.issues[0].code == "literal_dynamic_labware_reference"
+    assert literal.issues[0].severity == "warning"
+
+
+def test_attribute_references_preserve_custom_keys_and_detect_ambiguous_writes() -> None:
+    writes = [
+        *attribute_references_in_expression(
+            parse_expression('SetAttribute("Plate1", "zOffset", 2.5)'),
+            source_step="line:10",
+            provenance="method.xscr",
+        ),
+        *attribute_references_in_expression(
+            parse_expression('SetAttribute("Plate1", "zOffset", 3.0)'),
+            source_step="line:20",
+            provenance="method.xscr",
+        ),
+    ]
+    diagnostics = attribute_conflict_diagnostics(writes)
+
+    assert writes[0].scope == "labware"
+    assert writes[0].identity_key() == ("Plate1", "", "zOffset")
+    assert writes[0].value_type == "unknown"
+    assert diagnostics[0]["code"] == "ambiguous_attribute_write"
+    assert diagnostics[0]["target"]["attribute"] == "zOffset"
+
+    result = check_expression_semantics(parse_expression('SetAttribute("Plate1", "zOffset", 2.5)'))
+    assert result.attribute_references[0].value_type == "number"
 
 
 def test_expression_semantics_detect_assignment_type_mismatch() -> None:

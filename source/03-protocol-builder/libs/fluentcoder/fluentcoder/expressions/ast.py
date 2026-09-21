@@ -89,6 +89,29 @@ class VariableReference:
         return False
 
 
+@dataclass(frozen=True, eq=False)
+class IndexExpression:
+    """Runtime array-element reference such as ``barcodes[cycle]``."""
+
+    base: Expression | None = None
+    index: Expression | None = None
+    kind: Literal["index_expression"] = field(default="index_expression", init=False)
+
+    def __post_init__(self) -> None:
+        _require_expression(self.base, "index_expression base")
+        _require_expression(self.index, "index_expression index")
+
+    def __str__(self) -> str:
+        return _legacy_expression_text(self)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, IndexExpression):
+            return self.base == other.base and self.index == other.index
+        if isinstance(other, str):
+            return _legacy_expression_text(self) == other
+        return False
+
+
 @dataclass(frozen=True)
 class FunctionCall:
     name: str = ""
@@ -187,6 +210,7 @@ Expression: TypeAlias = Union[
     NumberLiteral,
     BooleanLiteral,
     VariableReference,
+    IndexExpression,
     FunctionCall,
     UnaryExpression,
     BinaryExpression,
@@ -200,6 +224,7 @@ _EXPRESSION_TYPES = (
     NumberLiteral,
     BooleanLiteral,
     VariableReference,
+    IndexExpression,
     FunctionCall,
     UnaryExpression,
     BinaryExpression,
@@ -222,6 +247,12 @@ def expression_to_mapping(expression: Expression) -> dict[str, Any]:
             "kind": expression.kind,
             "name": expression.name,
             "arguments": [expression_to_mapping(arg) for arg in expression.arguments],
+        }
+    if isinstance(expression, IndexExpression):
+        return {
+            "kind": expression.kind,
+            "base": expression_to_mapping(expression.base),
+            "index": expression_to_mapping(expression.index),
         }
     if isinstance(expression, UnaryExpression):
         return {
@@ -293,7 +324,29 @@ def expression_from_mapping(value: dict[str, Any]) -> Expression:
             return BooleanLiteral(value=False)
         raise ValueError(f"invalid boolean_literal value: {raw!r}")
     if kind == "variable_reference":
-        return VariableReference(name=str(value.get("name") or ""))
+        name = str(value.get("name") or "")
+        # Legacy serialized IR encoded array elements in the variable name.
+        # Parse that spelling once at the migration boundary while retaining
+        # the same source text when rendered.
+        if "[" in name and name.endswith("]"):
+            try:
+                from .parser import parse_expression
+
+                migrated = parse_expression(name)
+                if isinstance(migrated, IndexExpression):
+                    return migrated
+            except Exception:
+                pass
+        return VariableReference(name=name)
+    if kind == "index_expression":
+        base = value.get("base")
+        index = value.get("index")
+        if not isinstance(base, dict) or not isinstance(index, dict):
+            raise ValueError("index_expression requires base and index expressions")
+        return IndexExpression(
+            base=expression_from_mapping(base),
+            index=expression_from_mapping(index),
+        )
     if kind == "function_call":
         raw_arguments = value.get("arguments") or []
         if not isinstance(raw_arguments, (list, tuple)):
@@ -365,6 +418,8 @@ def _legacy_expression_text(value: Expression) -> str:
     if isinstance(value, FunctionCall):
         rendered_arguments = ", ".join(_legacy_expression_text(arg) for arg in value.arguments)
         return f"{value.name}({rendered_arguments})"
+    if isinstance(value, IndexExpression):
+        return f"{_legacy_expression_text(value.base)}[{_legacy_expression_text(value.index)}]"
     if isinstance(value, UnaryExpression):
         return f"({value.operator}{_legacy_expression_text(value.operand)})"
     if isinstance(value, BinaryExpression):

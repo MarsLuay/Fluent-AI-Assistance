@@ -5,6 +5,7 @@ from .ast import (
     BooleanLiteral,
     Expression,
     FunctionCall,
+    IndexExpression,
     NumberLiteral,
     ReviewedRawExpression,
     SourcePreservedExpression,
@@ -16,6 +17,12 @@ from .ast import (
     expression_to_mapping,
     is_expression,
 )
+from .attributes import (
+    AttributeReference,
+    attribute_conflict_diagnostics,
+    attribute_reference_from_call,
+    attribute_references_in_expression,
+)
 from .migration import (
     LegacyMigrationError,
     coerce_literal_expression,
@@ -24,6 +31,8 @@ from .migration import (
     expression_python_value,
     extract_opaque_expression_references,
     migrate_legacy_set_variable_value,
+    dynamic_labware_name,
+    build_dynamic_labware_name,
     parse_or_preserve_source_expression,
 )
 from .parser import ExpressionParseError, parse_expression, try_parse_expression
@@ -71,6 +80,10 @@ from .fields import (
 )
 
 __all__ = [
+    "AttributeReference",
+    "attribute_conflict_diagnostics",
+    "attribute_reference_from_call",
+    "attribute_references_in_expression",
     "BinaryExpression",
     "BINARY_OPERATOR_DEFINITIONS",
     "BinaryOperatorDefinition",
@@ -81,6 +94,7 @@ __all__ = [
     "ExpressionRenderError",
     "ExpressionSemanticContext",
     "FunctionCall",
+    "IndexExpression",
     "FunctionSignature",
     "LegacyMigrationError",
     "NumberLiteral",
@@ -122,6 +136,8 @@ __all__ = [
     "is_expression_mapping",
     "infer_binary_operator_type",
     "migrate_legacy_set_variable_value",
+    "dynamic_labware_name",
+    "build_dynamic_labware_name",
     "normalize_fluent_type_name",
     "parse_expression",
     "parse_or_preserve_source_expression",

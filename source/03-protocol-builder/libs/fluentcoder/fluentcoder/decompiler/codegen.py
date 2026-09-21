@@ -870,12 +870,13 @@ def _emit_dispense(step: DispenseStep, label_to_var: dict[str, str], classes_use
 
 def _emit_set_variable(step: SetVariableStep, classes_used: set[str]) -> str:
     value = step.value
+    target = _emit_assignment_target(step.variable_name, classes_used)
     if isinstance(value, (StringLiteral, NumberLiteral, BooleanLiteral)):
-        return f"wt.set_variable({step.variable_name!r}, {expression_python_value(value)!r})"
+        return f"wt.set_variable({target}, {expression_python_value(value)!r})"
     if isinstance(value, ReviewedRawExpression):
         classes_used.add("ReviewedRawExpression")
         return (
-            f"wt.set_variable({step.variable_name!r}, "
+            f"wt.set_variable({target}, "
             f"ReviewedRawExpression(source={value.source!r}, approval_id={value.approval_id!r}, "
             f"reviewer={value.reviewer!r}, reference_metadata_origin={value.reference_metadata_origin!r}, "
             f"referenced_variables={value.referenced_variables!r}, "
@@ -884,14 +885,23 @@ def _emit_set_variable(step: SetVariableStep, classes_used: set[str]) -> str:
     if isinstance(value, SourcePreservedExpression):
         classes_used.add("SourcePreservedExpression")
         return (
-            f"wt.set_variable({step.variable_name!r}, "
+            f"wt.set_variable({target}, "
             f"SourcePreservedExpression(source={value.source!r}, source_hash={value.source_hash!r}, "
             f"source_entry={value.source_entry!r}, provenance_id={value.provenance_id!r}, "
             f"byte_stable={value.byte_stable!r}, reference_metadata_origin={value.reference_metadata_origin!r}, "
             f"referenced_variables={value.referenced_variables!r}, referenced_functions={value.referenced_functions!r}))"
         )
     classes_used.add("parse_expression")
-    return f"wt.set_variable({step.variable_name!r}, parse_expression({render_expression(value)!r}))"
+    return f"wt.set_variable({target}, parse_expression({render_expression(value)!r}))"
+
+
+def _emit_assignment_target(value, classes_used: set[str]) -> str:
+    if isinstance(value, str):
+        return repr(value)
+    if is_expression(value):
+        classes_used.add("parse_expression")
+        return f"parse_expression({render_expression(value)!r})"
+    return repr(value)
 
 
 def _label_arg(label: Optional[str], label_to_var: dict[str, str]) -> Optional[str]:

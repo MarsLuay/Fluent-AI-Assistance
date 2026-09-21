@@ -7,6 +7,7 @@ from typing import Any
 
 from .ast import (
     BooleanLiteral,
+    FunctionCall,
     Expression,
     NumberLiteral,
     SourcePreservedExpression,
@@ -20,6 +21,29 @@ from .renderer import render_expression
 
 class LegacyMigrationError(ValueError):
     pass
+
+
+def dynamic_labware_name(
+    prefix: str | StringLiteral,
+    index: Any,
+    *,
+    separator: str = "",
+) -> FunctionCall:
+    """Build a runtime labware label without quoted pseudo-interpolation.
+
+    ``GetAttribute(dynamic_labware_name("pool_tube", cycle), "Barcode")``
+    renders as a real FluentControl string expression; it never embeds
+    ``[cycle]`` inside a literal argument.
+    """
+    prefix_literal = prefix if isinstance(prefix, StringLiteral) else StringLiteral(value=str(prefix))
+    index_expression = index if is_expression(index) else coerce_source_expression(index)
+    arguments: tuple[Expression, ...] = (prefix_literal, index_expression)
+    if separator:
+        arguments = (prefix_literal, StringLiteral(value=separator), index_expression)
+    return FunctionCall(name="concat", arguments=arguments)
+
+
+build_dynamic_labware_name = dynamic_labware_name
 
 
 def coerce_literal_expression(value: Any) -> Expression:

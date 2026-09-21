@@ -94,6 +94,7 @@ class SimulationReport:
     final_mca_tips: list[dict[str, Any]] = field(default_factory=list)
     final_liha_tips: list[dict[str, Any] | None] = field(default_factory=list)
     state_summary: dict[str, Any] = field(default_factory=dict)
+    attribute_lineage: list[dict[str, Any]] = field(default_factory=list)
 
     def add_step(self, coverage: StepCoverage) -> None:
         self.steps.append(coverage)
@@ -181,4 +182,5 @@ class SimulationReport:
             "final_mca_tips": self.final_mca_tips,
             "final_liha_tips": self.final_liha_tips,
             "state_summary": self.state_summary,
+            "attribute_lineage": list(self.attribute_lineage),
         }

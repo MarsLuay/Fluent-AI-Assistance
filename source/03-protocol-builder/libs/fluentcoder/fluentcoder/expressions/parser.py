@@ -9,6 +9,7 @@ from .ast import (
     BooleanLiteral,
     Expression,
     FunctionCall,
+    IndexExpression,
     NumberLiteral,
     StringLiteral,
     UnaryExpression,
@@ -144,15 +145,16 @@ class _Parser:
         token = self.current
         if token.kind == "STRING":
             self.advance()
-            return StringLiteral(value=token.value)
+            return self.parse_postfix(StringLiteral(value=token.value))
         if token.kind == "NUMBER":
             self.advance()
             value = float(token.value)
-            return NumberLiteral(value=int(value) if value.is_integer() else value)
+            return self.parse_postfix(NumberLiteral(value=int(value) if value.is_integer() else value))
         if token.kind == "IDENT":
             self.advance()
             if token.value.casefold() in {"true", "false"}:
-                return BooleanLiteral(value=token.value.casefold() == "true")
+                return self.parse_postfix(BooleanLiteral(value=token.value.casefold() == "true"))
+            expression: Expression
             if self.current.kind == "LPAREN":
                 self.advance()
                 args: list[Expression] = []
@@ -166,13 +168,25 @@ class _Parser:
                 if self.current.kind != "RPAREN":
                     raise ExpressionParseError("expected_closing_parenthesis", self.current.offset, self.source)
                 self.advance()
-                return FunctionCall(name=token.value, arguments=tuple(args))
-            return VariableReference(name=token.value)
+                expression = FunctionCall(name=token.value, arguments=tuple(args))
+            else:
+                expression = VariableReference(name=token.value)
+            return self.parse_postfix(expression)
         if token.kind == "LPAREN":
             self.advance()
             expression = self.parse_or()
             if self.current.kind != "RPAREN":
                 raise ExpressionParseError("expected_closing_parenthesis", self.current.offset, self.source)
             self.advance()
-            return expression
+            return self.parse_postfix(expression)
         raise ExpressionParseError("expected_expression", token.offset, self.source)
+
+    def parse_postfix(self, expression: Expression) -> Expression:
+        while self.current.kind == "LBRACKET":
+            self.advance()
+            index = self.parse_or()
+            if self.current.kind != "RBRACKET":
+                raise ExpressionParseError("expected_closing_bracket", self.current.offset, self.source)
+            self.advance()
+            expression = IndexExpression(base=expression, index=index)
+        return expression

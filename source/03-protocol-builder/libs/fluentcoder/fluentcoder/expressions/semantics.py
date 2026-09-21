@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from dataclasses import replace
 from typing import Any, Literal, Mapping
 
 from .ast import (
@@ -10,6 +11,7 @@ from .ast import (
     BooleanLiteral,
     Expression,
     FunctionCall,
+    IndexExpression,
     NumberLiteral,
     ReviewedRawExpression,
     SourcePreservedExpression,
@@ -18,6 +20,7 @@ from .ast import (
     VariableReference,
     expression_kind,
 )
+from .attributes import attribute_references_in_expression, AttributeReference
 from .operators import (
     ExpectedTypeName as ExpectedType,
     ExpressionTypeName as ExpressionType,
@@ -32,10 +35,43 @@ from .operators import (
 class VariableSymbol:
     name: str
     type_name: str = "unknown"
+    is_array: bool | None = None
+    array_size: int | None = None
+    scope: str = "Script"
+    original_name: str = ""
+
+    def __post_init__(self) -> None:
+        declared_name = str(self.name or "").strip()
+        base_name, declared_size = _split_array_declaration(declared_name)
+        type_text = str(self.type_name or "").strip()
+        type_is_array = type_text.endswith("[]")
+        if type_is_array:
+            type_text = type_text[:-2].strip()
+        explicit_array = self.is_array
+        declared_array = "[" in declared_name and declared_name.endswith("]")
+        array = bool(explicit_array) if explicit_array is not None else bool(declared_array or type_is_array)
+        size = self.array_size if self.array_size is not None else declared_size
+        if size is not None and size < 0:
+            raise ValueError("array_size must be non-negative")
+        object.__setattr__(self, "name", base_name)
+        object.__setattr__(self, "type_name", type_text or "unknown")
+        object.__setattr__(self, "is_array", array)
+        object.__setattr__(self, "array_size", size)
+        object.__setattr__(self, "original_name", self.original_name or declared_name)
+
+    @property
+    def element_type_name(self) -> str:
+        return self.type_name
 
     @property
     def expression_type(self) -> ExpressionType:
-        return normalize_fluent_type_name(self.type_name)
+        return normalize_fluent_type_name(self.element_type_name)
+
+    @property
+    def bounds(self) -> tuple[int, int] | None:
+        if self.array_size is None:
+            return None
+        return (0, self.array_size - 1)
 
 
 @dataclass(frozen=True)
@@ -95,6 +131,7 @@ class SemanticIssue:
 class SemanticResult:
     type_name: ExpressionType
     issues: tuple[SemanticIssue, ...] = ()
+    attribute_references: tuple[AttributeReference, ...] = ()
 
     @property
     def valid(self) -> bool:
@@ -129,7 +166,7 @@ class ExpressionSemanticContext:
         symbol = variables.get(name)
         if symbol is not None:
             return symbol
-        base_name = str(name or "").split("[", 1)[0]
+        base_name = str(name or "").split("[", 1)[0].strip()
         if base_name != name:
             return variables.get(base_name)
         return None
@@ -178,7 +215,23 @@ def check_expression_semantics(
                 actual_type=inferred_type,
             )
         )
-    return SemanticResult(type_name=inferred_type, issues=tuple(issues))
+    references = []
+    for reference in attribute_references_in_expression(expression):
+        if reference.value is not None:
+            value_issues: list[SemanticIssue] = []
+            references.append(
+                replace(
+                    reference,
+                    value_type=_infer_expression_type(reference.value, ctx, "$.attribute_value", value_issues),
+                )
+            )
+        else:
+            references.append(reference)
+    return SemanticResult(
+        type_name=inferred_type,
+        issues=tuple(issues),
+        attribute_references=tuple(references),
+    )
 
 
 def normalize_fluent_type_name(type_name: str | None) -> ExpressionType:
@@ -275,6 +328,8 @@ def _infer_expression_type(
                 )
             return "unknown"
         return symbol.expression_type
+    if isinstance(expression, IndexExpression):
+        return _infer_index_expression_type(expression, context, path, issues)
     if isinstance(expression, FunctionCall):
         return _infer_function_call_type(expression, context, path, issues)
     if isinstance(expression, UnaryExpression):
@@ -310,6 +365,103 @@ def _infer_expression_type(
         )
     )
     return "unknown"
+
+
+def _infer_index_expression_type(
+    expression: IndexExpression,
+    context: ExpressionSemanticContext,
+    path: str,
+    issues: list[SemanticIssue],
+) -> ExpressionType:
+    base = expression.base
+    symbol = context.variable(base.name) if isinstance(base, VariableReference) else None
+    if isinstance(base, VariableReference) and symbol is None:
+        if context.enforce_declared_variables:
+            issues.append(
+                SemanticIssue(
+                    code="undefined_variable",
+                    message=f"Variable {base.name!r} is not declared.",
+                    path=f"{path}.base",
+                )
+            )
+    elif symbol is not None and not symbol.is_array:
+        issues.append(
+            SemanticIssue(
+                code="indexed_scalar_variable",
+                message=f"Variable {base.name!r} is scalar and cannot be indexed.",
+                path=f"{path}.base",
+            )
+        )
+    elif not isinstance(base, VariableReference):
+        _infer_expression_type(base, context, f"{path}.base", issues)
+
+    index_type = _infer_expression_type(expression.index, context, f"{path}.index", issues)
+    if not is_type_compatible(index_type, "number"):
+        issues.append(
+            SemanticIssue(
+                code="array_index_type_mismatch",
+                message=f"Array index must be integer-compatible, got {index_type}.",
+                path=f"{path}.index",
+                expected_type="integer-compatible number",
+                actual_type=index_type,
+            )
+        )
+    elif isinstance(expression.index, NumberLiteral) and not float(expression.index.value).is_integer():
+        issues.append(
+            SemanticIssue(
+                code="array_index_type_mismatch",
+                message=f"Array index {expression.index.value!r} is not an integer.",
+                path=f"{path}.index",
+                expected_type="integer-compatible number",
+                actual_type="number",
+            )
+        )
+    elif isinstance(expression.index, VariableReference):
+        index_symbol = context.variable(expression.index.name)
+        if index_symbol is not None and not _is_integer_type(index_symbol.type_name):
+            issues.append(
+                SemanticIssue(
+                    code="array_index_type_mismatch",
+                    message=f"Array index variable {expression.index.name!r} must be integer-compatible.",
+                    path=f"{path}.index",
+                    expected_type="integer-compatible number",
+                    actual_type=index_symbol.type_name,
+                )
+            )
+
+    if symbol is not None and symbol.is_array and symbol.array_size is not None:
+        if isinstance(expression.index, NumberLiteral) and float(expression.index.value).is_integer():
+            index = int(expression.index.value)
+            if index < 0 or index >= symbol.array_size:
+                issues.append(
+                    SemanticIssue(
+                        code="array_index_out_of_bounds",
+                        message=(
+                            f"Array index {index} is outside {base.name!r} bounds "
+                            f"0..{symbol.array_size - 1}."
+                        ),
+                        path=f"{path}.index",
+                    )
+                )
+        # Unknown/dynamic indexes intentionally remain unchecked at compile time.
+    return symbol.expression_type if symbol is not None and symbol.is_array else "unknown"
+
+
+def _split_array_declaration(name: str) -> tuple[str, int | None]:
+    text = str(name or "").strip()
+    if text.endswith("[]"):
+        return text[:-2].strip(), None
+    if text.endswith("]") and "[" in text:
+        base, raw_size = text.rsplit("[", 1)
+        raw_size = raw_size[:-1].strip()
+        if raw_size.isdigit():
+            return base.strip(), int(raw_size)
+    return text, None
+
+
+def _is_integer_type(type_name: str) -> bool:
+    text = str(type_name or "").casefold().replace("system.", "").strip()
+    return text in {"integer", "int", "int16", "int32", "int64", "short", "long"}
 
 
 def _infer_function_call_type(
@@ -369,7 +521,28 @@ def _infer_function_call_type(
                 actual_type=actual_type,
             )
         )
+    if expression.name.casefold() in {"getattribute", "setattribute"} and expression.arguments:
+        labware_argument = expression.arguments[0]
+        if isinstance(labware_argument, StringLiteral) and _looks_like_dynamic_labware_literal(labware_argument.value):
+            issues.append(
+                SemanticIssue(
+                    code="literal_dynamic_labware_reference",
+                    message=(
+                        f"{expression.name} receives literal labware name {labware_argument.value!r}; "
+                        "bracketed variable syntax inside a quoted string is not interpolated by FluentControl. "
+                        "Construct a runtime string expression instead."
+                    ),
+                    path=f"{path}.arguments[0]",
+                    severity="warning",
+                )
+            )
     return signature.return_type
+
+
+def _looks_like_dynamic_labware_literal(value: str) -> bool:
+    import re
+
+    return bool(re.search(r"\[[A-Za-z_][A-Za-z0-9_]*(?:\s*[+\-*/^]\s*[^\]]+)?\]", str(value or "")))
 
 
 def _infer_binary_expression_type(

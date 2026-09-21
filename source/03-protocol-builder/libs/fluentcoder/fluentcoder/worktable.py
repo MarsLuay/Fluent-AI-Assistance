@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, Collection, Iterator, Optional, Union
 if TYPE_CHECKING:
     from .simulator.options import SimulationOptions
 
-from .expressions import Expression, coerce_source_expression, expression_python_value, render_expression
+from .expressions import Expression, IndexExpression, coerce_source_expression, expression_python_value, render_expression
 from .fc_variables import (
     FCVariableToken, as_labware_type, is_valid_fc_variable_name,
 )
@@ -100,6 +100,11 @@ class Worktable:
         # Sim-time values — required for any runtime variable the simulator
         # must resolve (loop counts, conditional predicates, imports).
         self.sim_values: dict[str, Any] = {}
+        # Explicit offline labware-attribute inputs. These are synthetic
+        # reference data, not a claim that a physical scanner was simulated.
+        self.sim_labware_attributes: dict[str, dict[str, Any]] = {}
+        self.sim_labware_well_attributes: dict[str, dict[str, dict[str, Any]]] = {}
+        self.sim_attribute_lineage: list[dict[str, Any]] = []
 
         # Stack of step-list targets. While a `with wt.loop(...)` / `with
         # wt.conditional(...)` block is active, _emit() appends to the
@@ -348,7 +353,7 @@ class Worktable:
     def declare_variable(
         self,
         name: str,
-        default: Union[float, int, str],
+        default: Any,
         *,
         scope: str = "Script",
         type_name: str = "",
@@ -401,6 +406,85 @@ class Worktable:
         references (loop counts, conditional predicates, imports)."""
         self.sim_values[name] = value
 
+    def set_sim_labware_attribute(
+        self,
+        labware_name: str,
+        attribute: str,
+        value: Any,
+        *,
+        well: str | None = None,
+    ) -> None:
+        """Inject deterministic labware/well attributes for offline simulation.
+
+        This registers the named synthetic labware as an available attribute
+        source. It does not model scanner/device behavior.
+        """
+        label = str(labware_name or "").strip()
+        attr = str(attribute or "").strip()
+        if not label or not attr:
+            raise ValueError("labware_name and attribute are required")
+        if well is None:
+            self.sim_labware_attributes.setdefault(label, {})[attr] = value
+            return
+        well_name = str(well).strip()
+        if not well_name:
+            raise ValueError("well must be non-empty when provided")
+        self.sim_labware_well_attributes.setdefault(label, {}).setdefault(well_name, {})[attr] = value
+
+    inject_sim_attribute = set_sim_labware_attribute
+
+    def set_sim_attribute(
+        self,
+        labware_name: str,
+        attribute: str,
+        value: Any,
+        *,
+        well: str | None = None,
+    ) -> None:
+        """Compatibility alias for :meth:`set_sim_labware_attribute`."""
+        self.set_sim_labware_attribute(labware_name, attribute, value, well=well)
+
+    def resolve_sim_attribute(
+        self,
+        labware_name: str,
+        attribute: str,
+        *,
+        well: str | None = None,
+        consumer: str = "script_expression",
+        source_step: str | None = None,
+        provenance: str | None = None,
+    ) -> Any:
+        """Resolve an injected attribute for a later simulator consumer.
+
+        This is the shared read boundary for script expressions and future
+        liquid-class microscript consumers. It reads only the synthetic
+        offline store and records the consumer in lineage.
+        """
+        label = str(labware_name or "").strip()
+        attr = str(attribute or "").strip()
+        if well is None:
+            values = self.sim_labware_attributes.get(label, {})
+        else:
+            values = self.sim_labware_well_attributes.get(label, {}).get(str(well).strip(), {})
+        if attr not in values:
+            raise KeyError(f"No simulated attribute {attr!r} for {label!r}.")
+        value = values[attr]
+        self.sim_attribute_lineage.append(
+            {
+                "kind": "attribute_consumer",
+                "consumer": consumer,
+                "labware": label,
+                "well": str(well).strip() if well is not None else None,
+                "attribute": attr,
+                "value": value,
+                "source_step": source_step,
+                "provenance": provenance,
+            }
+        )
+        return value
+
+    read_sim_attribute = resolve_sim_attribute
+
     def seed_simulation_labware(self, labware: Labware, location: str, position: int) -> None:
         """Seed known pre-run workspace occupancy without emitting a command.
 
@@ -416,7 +500,11 @@ class Worktable:
         labware.stack_below = []
         self._simulation_seed_labware.append(labware)
 
-    def set_variable(self, name: str, value: Union[float, int, str, Expression]) -> None:
+    def set_variable(
+        self,
+        name: str | IndexExpression,
+        value: Union[float, int, str, Expression],
+    ) -> None:
         self._emit(SetVariableStep(variable_name=name, value=value))
 
     def wait(self, duration_seconds: Union[int, float, str, Expression]) -> None:

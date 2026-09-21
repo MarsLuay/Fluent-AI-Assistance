@@ -10,6 +10,7 @@ from typing import Any, Iterable, Mapping
 
 from .. import xml_compat as ET
 from .ast import expression_kind
+from .attributes import attribute_conflict_diagnostics, attribute_references_in_expression
 from .fields import (
     canonical_expression_command_id,
     expression_fields_for_command,
@@ -46,6 +47,7 @@ def expression_inventory_from_xscr_text(
 ) -> dict[str, Any]:
     records: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
+    attribute_references = []
     try:
         root = _parse_xscr_text(text)
     except Exception as exc:
@@ -134,6 +136,20 @@ def expression_inventory_from_xscr_text(
                     seed_issues=issues,
                     source_preserved_allowlist=source_preserved_records,
                 )
+                try:
+                    parsed = parse_expression(raw_expression)
+                except ExpressionParseError:
+                    parsed = None
+                if parsed is not None:
+                    attribute_references.extend(
+                        attribute_references_in_expression(
+                            parsed,
+                            source_step=f"{script_name}:{_int_or_text(line) or command_index}",
+                            provenance=entry or script_name,
+                            value_type="unknown",
+                        )
+                    )
+    attribute_diagnostics = attribute_conflict_diagnostics(attribute_references)
     return {
         "valid": not failures,
         "record_count": len(records),
@@ -141,6 +157,8 @@ def expression_inventory_from_xscr_text(
         "declaration_count": len(variables),
         "records": records,
         "failures": failures,
+        "attribute_references": [reference.to_dict() for reference in attribute_references],
+        "attribute_diagnostics": list(attribute_diagnostics),
     }
 
 
