@@ -129,7 +129,6 @@ LABWARE_TARGET_OPERATIONS = {
     Operation.LIHA_DISPENSE.value,
     Operation.LIHA_MIX.value,
     Operation.MOVE_PLATE.value,
-    Operation.READ_WORKLIST.value,
 }
 
 VOLUME_OPERATIONS = {

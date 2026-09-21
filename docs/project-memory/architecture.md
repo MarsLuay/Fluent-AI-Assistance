@@ -30,6 +30,14 @@ Canonical repository layers:
 - `source/tools/`: simulator, API, connector, registry, prompt, and common tooling.
 - `ready-to-import/`: generated local handoff bundles and scratch outputs.
 
+Worklist semantics are shared across the worklist builder and protocol IR. The
+typed GWL layer preserves raw TipMask spelling while exposing conservative
+one-hot record-tip validation; the Load/Execute Worklist contract retains
+source-backed fields and additive values; and the opt-in analyzer/optimizer
+refuses to cross barriers or reorder units whose liquid/state dependencies are
+not proven. Offline grouping is an inspectable scheduling opportunity, not a
+FluentControl timing or hardware-readiness guarantee.
+
 The generation flow is evidence-first: imported project data and shared
 registries supply contracts, then request specs and protocol IR feed rendering,
 validation, and packaging. Generated outputs and host-derived assets are not

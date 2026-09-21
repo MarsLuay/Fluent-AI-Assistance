@@ -982,6 +982,24 @@
       "replacement": null
     },
     {
+      "id": "worklist.analyze",
+      "class": "supported",
+      "kind": "worklist-command",
+      "path": "source/02-worklist-builder/tecan_worklist/cli.py",
+      "reason": "worklist-builder analyze command.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "worklist.optimize",
+      "class": "supported",
+      "kind": "worklist-command",
+      "path": "source/02-worklist-builder/tecan_worklist/cli.py",
+      "reason": "worklist-builder optimize command.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
       "id": "worklist.summarize",
       "class": "supported",
       "kind": "worklist-command",

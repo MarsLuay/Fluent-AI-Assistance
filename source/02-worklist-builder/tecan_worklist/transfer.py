@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Literal
 
-from .gwl import Break, Comment, Pipette, Wash, Worklist
+from .gwl import Break, Comment, Pipette, Wash, Worklist, parse_tip_selection
 
 WashPolicy = Literal["each", "none"]
 
@@ -168,6 +168,11 @@ def validate_transfers(transfers: Iterable[Transfer], *, strict: bool = False) -
                 warnings.append(f"{prefix}: {attr} is longer than 32 characters: {value!r}.")
         if transfer.volume_ul > 1000:
             warnings.append(f"{prefix}: volume_ul is high for a single transfer: {transfer.volume_ul:g}.")
+        selection = parse_tip_selection(transfer.tip_mask)
+        if not selection.valid:
+            errors.append(
+                f"{prefix}: [{selection.diagnostic_code}] invalid record-level tip_mask {transfer.tip_mask!r}."
+            )
 
     if strict and warnings:
         errors.extend(f"Strict warning: {warning}" for warning in warnings)

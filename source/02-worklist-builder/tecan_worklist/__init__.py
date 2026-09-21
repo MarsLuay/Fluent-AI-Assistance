@@ -3,10 +3,15 @@
 from .gwl import (
     Break,
     Comment,
+    Flush,
     Pipette,
     RawRecord,
+    SetDiTiType,
+    SUPPORTED_SIMPLE_TIP_CHANNELS,
+    TipSelection,
     Wash,
     Worklist,
+    parse_tip_selection,
     parse_gwl,
     parse_gwl_line,
     parse_gwl_lines,
@@ -14,12 +19,26 @@ from .gwl import (
     serialize_gwl,
 )
 from .transfer import Transfer, build_worklist, load_transfers
+from .optimizer import (
+    OptimizationResult,
+    ParallelWindow,
+    TransferUnit,
+    WorklistAnalysis,
+    WorklistDiagnostic,
+    analyze_worklist,
+    optimize_worklist,
+    semantic_equivalent,
+)
 
 __all__ = [
     "Break",
     "Comment",
+    "Flush",
     "Pipette",
     "RawRecord",
+    "SetDiTiType",
+    "SUPPORTED_SIMPLE_TIP_CHANNELS",
+    "TipSelection",
     "Transfer",
     "Wash",
     "Worklist",
@@ -30,4 +49,13 @@ __all__ = [
     "parse_gwl_lines",
     "parse_gwl_text",
     "serialize_gwl",
+    "parse_tip_selection",
+    "OptimizationResult",
+    "ParallelWindow",
+    "TransferUnit",
+    "WorklistAnalysis",
+    "WorklistDiagnostic",
+    "analyze_worklist",
+    "optimize_worklist",
+    "semantic_equivalent",
 ]
