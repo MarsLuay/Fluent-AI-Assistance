@@ -107,7 +107,7 @@ _384_COMBO_CONFIG = {
     "last_tip_y": 16,
 }
 
-_VARIABLE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\[\])?$")
+_VARIABLE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\[\])?(?:\[[^\[\]]+\])?$")
 
 
 def _is_valid_variable_name(name: str) -> bool:
@@ -432,7 +432,8 @@ class Renderer:
         for group in protocol.groups:
             for step in group.steps:
                 if self._step_type_name(step) == "set_variable":
-                    self._variable_values[step.variable_name] = expression_initial_value_text(step.value)
+                    target_name = self._expression_text(step.variable_name)
+                    self._variable_values[target_name] = expression_initial_value_text(step.value)
 
         # Assign line numbers if not already done
         protocol.assign_line_numbers()
@@ -566,8 +567,9 @@ class Renderer:
             for group in protocol.groups:
                 for step in group.steps:
                     if self._step_type_name(step) == "set_variable":
-                        if step.variable_name not in var_info:
-                            var_info[step.variable_name] = _infer_var_info(step.variable_name, step.value)
+                        target_name = self._expression_text(step.variable_name)
+                        if target_name not in var_info:
+                            var_info[target_name] = _infer_var_info(target_name, step.value)
 
             ns = "http://schemas.datacontract.org/2004/07/Tecan.VisionX.VariableHandling.Shared"
             vars_list = []
@@ -674,7 +676,7 @@ class Renderer:
             return "\n".join("                        " + line for line in lines)
 
         if stype == "set_variable":
-            var_name = (step.variable_name or "").strip()
+            var_name = self._expression_text(step.variable_name).strip()
             if not _is_valid_variable_name(var_name):
                 return ""
         elif stype == "calculate_variable":
@@ -1746,7 +1748,7 @@ class Renderer:
 
             case StepType.SET_VARIABLE:
                 params.update({
-                    "Name": (step.variable_name or "").strip(),
+                    "Name": self._expression_text(step.variable_name).strip(),
                     "Value": self._xml_escape(render_expression(coerce_literal_expression(step.value))),
                 })
 
@@ -2250,7 +2252,7 @@ class Renderer:
                     expr_value = coerce_literal_expression(step.value)
                     if not isinstance(expr_value, StringLiteral):
                         continue
-                    var_name = (step.variable_name or "").lower()
+                    var_name = self._expression_text(step.variable_name).lower()
                     if any(tok in var_name for tok in ("type", "labware", "plate", "tip", "reservoir", "trough")):
                         step.value = StringLiteral(value=_exact_only(expr_value.value))
 

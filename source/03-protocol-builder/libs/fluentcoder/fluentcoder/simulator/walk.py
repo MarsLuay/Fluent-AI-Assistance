@@ -14,6 +14,7 @@ from ..expressions import (
     BinaryExpression,
     BooleanLiteral,
     FunctionCall,
+    IndexExpression,
     NumberLiteral,
     ReviewedRawExpression,
     SourcePreservedExpression,
@@ -21,6 +22,7 @@ from ..expressions import (
     UnaryExpression,
     VariableReference,
     coerce_source_expression,
+    attribute_reference_from_call,
     evaluate_binary_operator,
     expression_python_value,
     render_expression,
@@ -94,6 +96,7 @@ class Simulator:
         self._subroutine_call_stack: list[str] = []
         # Per-subroutine sim variable scopes (innermost last).
         self._sim_scope_stack: list[dict[str, Any]] = []
+        self._wt.sim_attribute_lineage.clear()
         # Twin state — fresh slot map keyed on (loc, pos), bottom→top.
         self._slot_map: dict[tuple[str, int], list[Labware]] = {}
         # Maps catalog label → twin Labware copy.
@@ -364,6 +367,7 @@ class Simulator:
             for i, tip in enumerate(self._liha_tips)
         ]
         self._report.state_summary = self._state_summary()
+        self._report.attribute_lineage = list(self._wt.sim_attribute_lineage)
 
     def _record_failure(self, exc: Exception) -> None:
         if self._report.failure is not None:
@@ -846,8 +850,7 @@ class Simulator:
 
     def _on_set_variable(self, step: SetVariableStep) -> None:
         value = self._evaluate_sim_expression(step.value)
-        self._wt.protocol_variables[step.variable_name] = value
-        self._wt.sim_values[step.variable_name] = value
+        self._assign_sim_target(step.variable_name, value)
 
     def _on_set_location(self, step: SetLocationStep) -> None:
         labware = self._twin.get(step.labware)
@@ -1805,6 +1808,8 @@ class Simulator:
             return expression.value
         if isinstance(expression, VariableReference):
             return self._resolve_sim_value(expression.name)
+        if isinstance(expression, IndexExpression):
+            return self._evaluate_index_expression(expression)
         if isinstance(expression, UnaryExpression):
             operand = self._resolve_sim_number(expression.operand)
             return operand if expression.operator == "+" else -operand
@@ -1812,6 +1817,8 @@ class Simulator:
             return self._evaluate_sim_binary_expression(expression)
         if isinstance(expression, FunctionCall):
             function_name = expression.name.casefold()
+            if function_name == "concat" and expression.arguments:
+                return "".join(str(self._evaluate_sim_expression(argument)) for argument in expression.arguments)
             if function_name in {"if", "iif"} and len(expression.arguments) == 3:
                 condition, when_true, when_false = expression.arguments
                 return self._evaluate_sim_expression(
@@ -1828,6 +1835,8 @@ class Simulator:
                         "the cover labware has no simulated deck slot."
                     )
                 return cover.slot[0] if function_name == "getcoversitename" else cover.slot[1]
+            if function_name in {"getattribute", "setattribute"}:
+                return self._evaluate_labware_attribute_call(expression, function_name)
             raise MissingSimValueError(
                 f"Simulator cannot evaluate function expression {render_expression(expression)!r}."
             )
@@ -1869,16 +1878,235 @@ class Simulator:
             return self._wt.sim_values[name]
         if name in self._wt.protocol_variables:
             return self._wt.protocol_variables[name]
+        # Fluent declarations preserve array spelling (for example
+        # ``barcodes[]``) in the protocol metadata while runtime expressions
+        # address the base name. Resolve that boundary without rewriting the
+        # source declaration.
+        array_key = f"{name}[]"
+        if array_key in self._wt.sim_values:
+            return self._wt.sim_values[array_key]
+        if array_key in self._wt.protocol_variables:
+            return self._wt.protocol_variables[array_key]
         raise MissingSimValueError(
             f"No sim-time value for runtime variable {name!r}. "
             f"Call `wt.set_sim_value({name!r}, <value>)` before simulating."
         )
+
+    def _evaluate_index_expression(self, expression: IndexExpression) -> Any:
+        base = self._evaluate_sim_expression(expression.base)
+        raw_index = self._evaluate_sim_expression(expression.index)
+        try:
+            numeric_index = float(raw_index)
+        except (TypeError, ValueError) as exc:
+            raise _with_sim_details(
+                MissingSimValueError(
+                    f"Array index {render_expression(expression.index)!r} is not numeric: {raw_index!r}."
+                ),
+                category="array_index",
+                expression=render_expression(expression),
+            ) from exc
+        if not numeric_index.is_integer():
+            raise _with_sim_details(
+                MissingSimValueError(
+                    f"Array index {render_expression(expression.index)!r} is not an integer: {raw_index!r}."
+                ),
+                category="array_index",
+                expression=render_expression(expression),
+            )
+        index = int(numeric_index)
+        if isinstance(base, (list, tuple, str)):
+            try:
+                return base[index]
+            except IndexError as exc:
+                raise _with_sim_details(
+                    MissingSimValueError(
+                        f"Array index {index} is outside the runtime value bounds for {render_expression(expression.base)!r}."
+                    ),
+                    category="array_index",
+                    expression=render_expression(expression),
+                    index=index,
+                ) from exc
+        if isinstance(base, dict):
+            if index not in base and str(index) not in base:
+                raise _with_sim_details(
+                    MissingSimValueError(
+                        f"Array index {index} is missing from {render_expression(expression.base)!r}."
+                    ),
+                    category="array_index",
+                    expression=render_expression(expression),
+                    index=index,
+                )
+            return base[index] if index in base else base[str(index)]
+        raise _with_sim_details(
+            MissingSimValueError(
+                f"Runtime value for {render_expression(expression.base)!r} is not indexable: {type(base).__name__}."
+            ),
+            category="array_index",
+            expression=render_expression(expression),
+        )
+
+    def _assign_sim_target(self, target: Any, value: Any) -> None:
+        expression = coerce_source_expression(target)
+        if isinstance(expression, VariableReference):
+            self._wt.protocol_variables[expression.name] = value
+            self._wt.sim_values[expression.name] = value
+            return
+        if not isinstance(expression, IndexExpression):
+            raise _with_sim_details(
+                MissingSimValueError(
+                    f"Simulator cannot assign to non-variable target {render_expression(expression)!r}."
+                ),
+                category="array_assignment",
+            )
+        if not isinstance(expression.base, VariableReference):
+            raise _with_sim_details(
+                MissingSimValueError(
+                    f"Simulator requires a variable base for indexed assignment {render_expression(expression)!r}."
+                ),
+                category="array_assignment",
+            )
+        base_name = expression.base.name
+        container = self._resolve_sim_value(base_name)
+        raw_index = self._evaluate_sim_expression(expression.index)
+        try:
+            index_number = float(raw_index)
+        except (TypeError, ValueError) as exc:
+            raise _with_sim_details(
+                MissingSimValueError(f"Array assignment index is not numeric: {raw_index!r}."),
+                category="array_index",
+            ) from exc
+        if not index_number.is_integer():
+            raise _with_sim_details(
+                MissingSimValueError(f"Array assignment index is not an integer: {raw_index!r}."),
+                category="array_index",
+            )
+        index = int(index_number)
+        if isinstance(container, list):
+            if index < 0 or index >= len(container):
+                raise _with_sim_details(
+                    MissingSimValueError(
+                        f"Array assignment index {index} is outside {base_name!r} bounds 0..{len(container) - 1}."
+                    ),
+                    category="array_index",
+                    index=index,
+                )
+            container[index] = value
+        elif isinstance(container, dict):
+            container[index] = value
+        else:
+            raise _with_sim_details(
+                MissingSimValueError(f"Runtime value for {base_name!r} is not assignable as an array."),
+                category="array_assignment",
+            )
+        self._wt.sim_values[base_name] = container
+        self._wt.protocol_variables[base_name] = container
+        self._wt.sim_attribute_lineage.append({
+            "kind": "array_assignment",
+            "target": render_expression(expression),
+            "value": value,
+            "scope": {key: scope[key] for scope in self._sim_scope_stack for key in scope},
+        })
+
+    def _evaluate_labware_attribute_call(self, expression: FunctionCall, function_name: str) -> Any:
+        expected = 2 if function_name == "getattribute" else 3
+        if len(expression.arguments) != expected:
+            raise _with_sim_details(
+                MissingSimValueError(
+                    f"{expression.name} requires {expected} arguments for simulation."
+                ),
+                category="labware_attribute",
+            )
+        labware_name = str(self._evaluate_sim_expression(expression.arguments[0]))
+        attribute = str(self._evaluate_sim_expression(expression.arguments[1]))
+        source_step = self._attribute_source_step()
+        if function_name == "setattribute":
+            value = self._evaluate_sim_expression(expression.arguments[2])
+            self._wt.sim_labware_attributes.setdefault(labware_name, {})[attribute] = value
+            reference = attribute_reference_from_call(
+                expression,
+                source_step=source_step,
+                provenance="simulator",
+                value_type=_sim_value_type(value),
+            )
+            self._wt.sim_attribute_lineage.append({
+                "kind": "attribute_write",
+                "labware": labware_name,
+                "attribute": attribute,
+                "value": value,
+                "source_step": source_step,
+                "reference": reference.to_dict() if reference is not None else None,
+                "scope": {key: scope[key] for scope in self._sim_scope_stack for key in scope},
+            })
+            return value
+        labware_exists = (
+            labware_name in self._twin
+            or labware_name in self._wt.sim_labware_attributes
+            or labware_name in self._wt.sim_labware_well_attributes
+        )
+        if not labware_exists:
+            raise _with_sim_details(
+                MissingSimValueError(
+                    f"GetAttribute references missing simulated labware {labware_name!r}."
+                ),
+                category="labware_attribute",
+                labware=labware_name,
+                attribute=attribute,
+            )
+        try:
+            result = self._wt.resolve_sim_attribute(
+                labware_name,
+                attribute,
+                consumer="script_expression",
+                source_step=source_step,
+                provenance="simulator",
+            )
+        except KeyError as exc:
+            raise _with_sim_details(
+                MissingSimValueError(
+                    f"Simulated labware {labware_name!r} has no attribute {attribute!r}."
+                ),
+                category="labware_attribute",
+                labware=labware_name,
+                attribute=attribute,
+            ) from exc
+        reference = attribute_reference_from_call(
+            expression,
+            source_step=source_step,
+            provenance="simulator",
+            value_type="string",
+        )
+        self._wt.sim_attribute_lineage.append({
+            "kind": "attribute_read",
+            "labware": labware_name,
+            "attribute": attribute,
+            "value": result,
+            "source_step": source_step,
+            "reference": reference.to_dict() if reference is not None else None,
+            "scope": {key: scope[key] for scope in self._sim_scope_stack for key in scope},
+        })
+        return result
+
+    def _attribute_source_step(self) -> str:
+        line = getattr(self._current_step, "line_number", None)
+        if line not in (None, ""):
+            return f"line:{line}"
+        return f"simulation-step:{self._step_index}"
 
 
 def _with_sim_details(exc: Exception, *, category: str, **details):
     setattr(exc, "sim_category", category)
     setattr(exc, "sim_details", {key: value for key, value in details.items() if value is not None})
     return exc
+
+
+def _sim_value_type(value: Any) -> str:
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, (int, float)):
+        return "number"
+    if isinstance(value, str):
+        return "string"
+    return "any"
 
 
 def _failure_operation(command_id: str | None) -> str | None:

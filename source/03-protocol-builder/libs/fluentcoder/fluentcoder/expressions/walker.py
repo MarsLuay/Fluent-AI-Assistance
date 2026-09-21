@@ -15,6 +15,7 @@ EXPRESSION_KINDS = frozenset(
         "number_literal",
         "boolean_literal",
         "variable_reference",
+        "index_expression",
         "function_call",
         "unary_expression",
         "binary_expression",

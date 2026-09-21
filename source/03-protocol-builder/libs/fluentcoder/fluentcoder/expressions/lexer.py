@@ -23,6 +23,8 @@ class Token:
 _SINGLE_CHAR_TOKENS = {
     "(": "LPAREN",
     ")": "RPAREN",
+    "[": "LBRACKET",
+    "]": "RBRACKET",
     ",": "COMMA",
     "+": "OP",
     "-": "OP",
@@ -55,8 +57,6 @@ def lex_expression(source: str) -> list[Token]:
             i += 1
             while i < length and (source[i].isalnum() or source[i] == "_"):
                 i += 1
-            if i < length and source[i] == "[":
-                i = _consume_index_suffix(source, i)
             tokens.append(Token("IDENT", source[start:i], start))
             continue
         if char in "<>":
@@ -83,23 +83,6 @@ def lex_expression(source: str) -> list[Token]:
         raise ExpressionLexError("unexpected_character", i, source)
     tokens.append(Token("EOF", "", length))
     return tokens
-
-
-def _consume_index_suffix(source: str, start: int) -> int:
-    depth = 0
-    i = start
-    while i < len(source):
-        char = source[i]
-        if char == "[":
-            depth += 1
-        elif char == "]":
-            depth -= 1
-            if depth == 0:
-                return i + 1
-        elif char in "\r\n":
-            raise ExpressionLexError("newline_in_index_reference", i, source)
-        i += 1
-    raise ExpressionLexError("unterminated_index_reference", start, source)
 
 
 def _lex_string(source: str, start: int) -> tuple[Token, int]:

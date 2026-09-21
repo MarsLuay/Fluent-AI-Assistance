@@ -10,7 +10,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 from fluentcoder import FCA1000Box, InvalidSlotError, Plate96, Reagent, SimulationError, Worktable  # noqa: E402
-from fluentcoder.expressions import parse_expression  # noqa: E402
+from fluentcoder.expressions import dynamic_labware_name, parse_expression  # noqa: E402
 from fluentcoder.simulator.walk import Simulator  # noqa: E402
 
 
@@ -32,6 +32,79 @@ def test_simulator_evaluates_ceil_function_expression() -> None:
 
     assert wt.sim_values["NumCycles"] == 5
     assert wt.sim_values["LowerNumCycles"] == 5
+
+
+def test_simulator_collects_dynamic_labware_attributes_into_indexed_array() -> None:
+    wt = Worktable(name="indexed barcode collection")
+    wt.set_sim_value("cycles", 3)
+    wt.set_sim_value("barcodes", ["", "", ""])
+    for index in range(1, 4):
+        wt.set_sim_labware_attribute(f"pool_tube_{index}", "Barcode", f"BC-{index}")
+
+    wt.group("Barcode collection")
+    with wt.loop(times="cycles", loop_variable="cycle"):
+        current_tube = dynamic_labware_name("pool_tube_", parse_expression("cycle"))
+        wt.set_variable(
+            "barcodes[cycle - 1]",
+            parse_expression('GetAttribute(concat("pool_tube_", cycle), "Barcode")'),
+        )
+        wt.set_variable("current_tube", current_tube)
+
+    wt.simulate()
+
+    assert wt.sim_values["barcodes"] == ["BC-1", "BC-2", "BC-3"]
+    assert wt.simulation_report is not None
+    reads = [event for event in wt.simulation_report.attribute_lineage if event["kind"] == "attribute_read"]
+    assert [event["value"] for event in reads] == ["BC-1", "BC-2", "BC-3"]
+    assert [event["scope"]["cycle"] for event in reads] == [1, 2, 3]
+
+
+def test_simulator_reports_missing_labware_attribute() -> None:
+    wt = Worktable(name="missing dynamic attribute")
+    wt.group("Attributes")
+    wt.set_variable("barcode", parse_expression('GetAttribute("missing_tube", "Barcode")'))
+
+    with pytest.raises(Exception, match="missing simulated labware"):
+        wt.simulate()
+
+    assert wt.simulation_report is not None
+    assert wt.simulation_report.failure is not None
+    assert wt.simulation_report.failure.category == "labware_attribute"
+    assert "missing simulated labware" in wt.simulation_report.failure.message
+
+
+def test_simulator_shares_custom_attribute_writes_with_later_consumers() -> None:
+    wt = Worktable(name="custom attribute lineage")
+    wt.group("Attributes")
+    wt.set_variable(
+        "write_result",
+        parse_expression('SetAttribute("Plate1", "zOffset", 2.5)'),
+    )
+    wt.set_variable(
+        "read_result",
+        parse_expression('GetAttribute("Plate1", "zOffset")'),
+    )
+
+    wt.simulate()
+
+    assert wt.sim_values["write_result"] == 2.5
+    assert wt.sim_values["read_result"] == 2.5
+    writes = [event for event in wt.simulation_report.attribute_lineage if event["kind"] == "attribute_write"]
+    reads = [event for event in wt.simulation_report.attribute_lineage if event["kind"] == "attribute_read"]
+    consumers = [event for event in wt.simulation_report.attribute_lineage if event["kind"] == "attribute_consumer"]
+    assert writes[0]["reference"]["attribute"] == "zOffset"
+    assert writes[0]["reference"]["value_type"] == "number"
+    assert reads[0]["reference"]["scope"] == "labware"
+    assert consumers[0]["consumer"] == "script_expression"
+
+    wt.set_sim_labware_attribute("Plate1", "height", 4.25, well="A1")
+    assert wt.resolve_sim_attribute(
+        "Plate1",
+        "height",
+        well="A1",
+        consumer="liquid_class_microscript",
+    ) == 4.25
+    assert wt.sim_attribute_lineage[-1]["consumer"] == "liquid_class_microscript"
 
 
 def test_simulator_evaluates_fluentcontrol_exponentiation() -> None:
@@ -492,4 +565,3 @@ def test_failed_report_to_dict_includes_failure_and_effect_counts() -> None:
     assert payload["failure"]["category"] == "opaque_policy"
     assert payload["failure"]["exception_type"] == "SimulationError"
     assert payload["effect_counts"]["opaque"] == 1
-

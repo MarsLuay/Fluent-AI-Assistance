@@ -11,6 +11,7 @@ from .ast import (
     BooleanLiteral,
     Expression,
     FunctionCall,
+    IndexExpression,
     NumberLiteral,
     ReviewedRawExpression,
     SourcePreservedExpression,
@@ -39,6 +40,8 @@ def render_expression(expression: Expression) -> str:
     if isinstance(expression, VariableReference):
         validate_variable_name(expression.name)
         return expression.name
+    if isinstance(expression, IndexExpression):
+        return f"{render_expression(expression.base)}[{render_expression(expression.index)}]"
     if isinstance(expression, FunctionCall):
         validate_function_name(expression.name)
         rendered = ", ".join(render_expression(arg) for arg in expression.arguments)
