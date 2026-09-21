@@ -16,6 +16,12 @@ from tecan_common.zeia_limits import (
 )
 
 from .common import extension_counts
+from .diagnostics import (
+    DiagnosticCode,
+    IngestionArchiveError,
+    make_diagnostic,
+    sort_diagnostics,
+)
 from .gwl import inspect_gwl_lines
 from .project_model import (
     CanonicalProjectModel,
@@ -65,6 +71,7 @@ class DetectionResult:
     entries: tuple[str, ...]
     matches: tuple[AdapterMatch, ...]
     diagnostics: tuple[str, ...] = ()
+    diagnostic_records: tuple[dict[str, Any], ...] = ()
 
     @property
     def selected(self) -> AdapterMatch | None:
@@ -81,6 +88,7 @@ class DetectionResult:
             "selected_adapter": selected.adapter_id if selected else None,
             "format_family": selected.format_family if selected else None,
             "diagnostics": list(self.diagnostics),
+            "diagnostic_records": sort_diagnostics(self.diagnostic_records),
         }
 
 
@@ -188,9 +196,25 @@ def probe_zeia(
 
     archive_path = Path(path).expanduser().resolve()
     if not archive_path.exists():
-        return DetectionResult("unsupported", (), (), (f"archive not found: {archive_path}",))
+        message = f"archive not found: {archive_path}"
+        return DetectionResult(
+            "unsupported", (), (), (message,),
+            (make_diagnostic(
+                DiagnosticCode.INPUT_NOT_FOUND, message,
+                archive_path=str(archive_path),
+                next_action="Provide an existing .zeia archive or export directory.",
+            ),),
+        )
     if not zipfile.is_zipfile(archive_path):
-        return DetectionResult("unsupported", (), (), (f"not a readable ZIP archive: {archive_path}",))
+        message = f"not a readable ZIP archive: {archive_path}"
+        return DetectionResult(
+            "unsupported", (), (), (message,),
+            (make_diagnostic(
+                DiagnosticCode.ARCHIVE_INVALID, message,
+                archive_path=str(archive_path),
+                next_action="Provide an uncorrupted FluentControl .zeia ZIP export.",
+            ),),
+        )
     try:
         with zipfile.ZipFile(archive_path) as zf:
             infos = validate_zeia_archive_limits(
@@ -199,16 +223,34 @@ def probe_zeia(
                 max_total_uncompressed_bytes=max_total_uncompressed_bytes,
             )
             archive = _build_probe(zf, infos)
-    except zipfile.BadZipFile:
-        # Safety-limit failures are part of the established reader contract and
-        # must remain distinguishable from an unsupported export structure.
-        raise
+    except zipfile.BadZipFile as exc:
+        # Preserve the legacy exception contract while making safety failures
+        # machine-readable for readiness and CLI callers.
+        text = str(exc)
+        is_count = "entry count" in text.casefold()
+        code = DiagnosticCode.LIMIT_ENTRY_COUNT if is_count else DiagnosticCode.LIMIT_UNCOMPRESSED_BYTES
+        diagnostic = make_diagnostic(
+            code,
+            text or "ZEIA archive exceeded a configured safety limit.",
+            archive_path=str(archive_path),
+            next_action="Reduce the export or raise the configured reader limit after review.",
+            exception=exc,
+        )
+        raise IngestionArchiveError(text, diagnostic) from exc
     except (OSError, ValueError) as exc:
+        message = f"archive safety/format validation failed: {exc}"
         return DetectionResult(
             "unsupported",
             (),
             (),
-            (f"archive safety/format validation failed: {exc}",),
+            (message,),
+            (make_diagnostic(
+                DiagnosticCode.ARCHIVE_INVALID,
+                message,
+                archive_path=str(archive_path),
+                next_action="Provide a readable ZIP archive with safe member paths.",
+                exception=exc,
+            ),),
         )
 
     matches = tuple(match for adapter in ADAPTERS if (match := adapter.probe(archive)) is not None)
@@ -218,10 +260,28 @@ def probe_zeia(
             f"{match.adapter_id} matched: {', '.join(match.evidence)}"
             for match in strong
         )
-        return DetectionResult("ambiguous", archive.entries, matches, diagnostics)
+        records = tuple(
+            make_diagnostic(
+                DiagnosticCode.ZEIA_AMBIGUOUS_FORMAT,
+                message,
+                archive_path=str(archive_path),
+                adapter_id=match.adapter_id,
+                next_action="Provide one supported export variant or remove conflicting structural evidence.",
+            )
+            for match, message in zip(strong, diagnostics)
+        )
+        return DetectionResult("ambiguous", archive.entries, matches, diagnostics, records)
     if not matches:
         diagnostics = _unsupported_diagnostics(archive)
-        return DetectionResult("unsupported", archive.entries, (), diagnostics)
+        return DetectionResult(
+            "unsupported", archive.entries, (), diagnostics,
+            tuple(make_diagnostic(
+                DiagnosticCode.ZEIA_UNKNOWN_FORMAT,
+                message,
+                archive_path=str(archive_path),
+                next_action="Provide a supported FluentControl ZEIA export variant.",
+            ) for message in diagnostics),
+        )
     return DetectionResult("supported", archive.entries, matches)
 
 
@@ -303,7 +363,7 @@ def ingest_zeia(
                         )
                     except Exception as exc:
                         errors.append(
-                            _parse_error(entry, exc, suffix=suffix, parser="xscr")
+                            _parse_error(entry, exc, suffix=suffix, parser="xscr", archive_path=archive_path)
                         )
                 elif suffix == ".gwl":
                     try:
@@ -317,7 +377,7 @@ def ingest_zeia(
                         )
                     except Exception as exc:
                         errors.append(
-                            _parse_error(entry, exc, suffix=suffix, parser="gwl")
+                            _parse_error(entry, exc, suffix=suffix, parser="gwl", archive_path=archive_path)
                         )
                 elif suffix in XML_OBJECT_EXTS:
                     if object_limit is not None and len(objects) >= object_limit:
@@ -346,6 +406,7 @@ def ingest_zeia(
                                 exc,
                                 suffix=suffix,
                                 parser=f"xml:{suffix.lstrip('.')}",
+                                archive_path=archive_path,
                             )
                         )
                 elif suffix in ASSET_EXTS:
@@ -374,7 +435,7 @@ def ingest_zeia(
                         )
                     )
     except (OSError, zipfile.BadZipFile) as exc:
-        errors.append(_parse_error("<archive>", exc, suffix=".zeia", parser="archive"))
+        errors.append(_parse_error("<archive>", exc, suffix=".zeia", parser="archive", archive_path=archive_path))
 
     summarized_counts = {
         "scripts": len(scripts),
@@ -664,29 +725,56 @@ def _parse_error(
     *,
     suffix: str,
     parser: str,
-) -> dict[str, str]:
+    archive_path: str | Path | None = None,
+) -> dict[str, Any]:
     if _is_known_irrelevant_metadata(entry):
         classification = "known_irrelevant_metadata"
         severity = "warning"
+        code = DiagnosticCode.PARSER_FAILED
     elif isinstance(exc, (OSError, EOFError, RuntimeError, zipfile.BadZipFile)):
         classification = "unreadable_or_encoding_failure"
         severity = "error"
+        code = DiagnosticCode.ARCHIVE_INVALID if parser == "archive" else DiagnosticCode.INPUT_UNREADABLE
     elif isinstance(exc, UnicodeDecodeError):
         classification = "unreadable_or_encoding_failure"
         severity = "error"
+        code = DiagnosticCode.ENCODING_DECODE_FAILED
     elif type(exc).__name__.lower().endswith("parseerror"):
         classification = "malformed"
         severity = "error"
+        code = DiagnosticCode.ZEIA_SCHEMA_MALFORMED
     else:
         classification = "parser_failure"
         severity = "error"
+        code = DiagnosticCode.PARSER_FAILED
+    message = (
+        "known metadata could not be parsed and was retained as a warning"
+        if classification == "known_irrelevant_metadata"
+        else f"{type(exc).__name__}: {exc}"
+    )
+    diagnostic = make_diagnostic(
+        code,
+        message,
+        severity=severity,
+        archive_path=str(Path(archive_path).resolve()) if archive_path else None,
+        entry_path=entry,
+        source_entity=entry,
+        next_action=(
+            "Re-export the archive or repair the member before relying on this input."
+            if severity != "warning"
+            else "Review only if this metadata is expected to carry required project content."
+        ),
+        exception=exc,
+    )
     return {
+        **diagnostic,
+        # Compatibility fields retained for existing project-reader callers.
         "entry": entry,
         "kind": _object_kind(suffix) if suffix in XML_OBJECT_EXTS else suffix.lstrip("."),
         "parser": parser,
         "classification": classification,
         "severity": severity,
-        "error": f"{type(exc).__name__}: {exc}",
+        "error": message,
     }
 
 
@@ -698,7 +786,7 @@ def _is_known_irrelevant_metadata(entry: str) -> bool:
 
 def _object_subtype_diagnostic(
     record: dict[str, Any], entry: str, suffix: str
-) -> dict[str, str] | None:
+) -> dict[str, Any] | None:
     if suffix != ".xml":
         return None
     if any(
@@ -712,9 +800,27 @@ def _object_subtype_diagnostic(
     else:
         classification = "unsupported_xml_subtype"
         severity = "error"
+    code = (
+        DiagnosticCode.PARSER_FAILED
+        if classification == "known_irrelevant_metadata"
+        else DiagnosticCode.ZEIA_SCHEMA_MALFORMED
+    )
     record["inspection_status"] = "unsupported_subtype"
     record.setdefault("source_metadata", {})["classification"] = classification
+    diagnostic = make_diagnostic(
+        code,
+        "unsupported XML object subtype preserved as a generic record",
+        severity=severity,
+        entry_path=entry,
+        source_entity=entry,
+        next_action=(
+            "Review the object subtype if it is required by a source script."
+            if severity != "warning"
+            else "Review only if this metadata is expected to carry required project content."
+        ),
+    )
     return {
+        **diagnostic,
         "entry": entry,
         "kind": _object_kind(suffix),
         "parser": "xml:generic",

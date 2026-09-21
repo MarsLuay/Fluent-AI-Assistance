@@ -12,6 +12,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
+from .diagnostics import DiagnosticCode, IngestionArchiveError, make_diagnostic, sort_diagnostics
 from .project_index import discover_zeia_paths
 from .project_model import CanonicalProjectModel
 from .zeia_adapters import ZeiaFormatError, ingest_zeia
@@ -41,6 +42,11 @@ class UnresolvedReference:
     diagnostic_code: str = "unresolved_reference"
 
     def to_dict(self) -> dict[str, Any]:
+        code = (
+            DiagnosticCode.REFERENCE_AMBIGUOUS
+            if "ambiguous" in self.diagnostic_code
+            else DiagnosticCode.REFERENCE_UNRESOLVED
+        )
         return {
             "source_archive": self.source_archive,
             "source_entry": self.source_entry,
@@ -49,6 +55,7 @@ class UnresolvedReference:
             "target_type": self.target_type,
             "candidates": [dict(item) for item in self.candidates],
             "diagnostic_code": self.diagnostic_code,
+            "code": code,
         }
 
 
@@ -62,6 +69,7 @@ class IdentifierConflict:
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            "code": DiagnosticCode.REFERENCE_AMBIGUOUS,
             "identifier": self.identifier,
             "identifier_type": self.identifier_type,
             "candidates": [dict(item) for item in self.candidates],
@@ -92,7 +100,7 @@ class FullExportReadiness:
         unresolved = [item.to_dict() for item in self.unresolved_references]
         conflicts = [item.to_dict() for item in self.conflicts]
         warnings = [dict(item) for item in self.warnings]
-        diagnostics = [dict(item) for item in self.diagnostics]
+        diagnostics = sort_diagnostics(self.diagnostics)
         return {
             "schema_version": "tecan.full_export_readiness.v1",
             "status": self.status.value,
@@ -182,27 +190,62 @@ def _models_from_inputs(
     if paths:
         try:
             discovered = discover_zeia_paths(paths)
-        except (FileNotFoundError, OSError, ValueError) as exc:
-            return [], [{"code": "unsupported_export", "message": str(exc)}]
+        except FileNotFoundError as exc:
+            return [], [
+                make_diagnostic(
+                    DiagnosticCode.INPUT_NOT_FOUND,
+                    str(exc),
+                    next_action="Provide an existing .zeia archive or a directory containing .zeia archives.",
+                    exception=exc,
+                )
+            ]
+        except (OSError, ValueError) as exc:
+            return [], [
+                make_diagnostic(
+                    DiagnosticCode.INPUT_UNREADABLE,
+                    str(exc),
+                    next_action="Provide a readable .zeia archive or export directory.",
+                    exception=exc,
+                )
+            ]
         for path in discovered:
             try:
                 models.append(ingest_zeia(path))
             except ZeiaFormatError as exc:
-                diagnostics.append(
+                records = list(exc.result.diagnostic_records)
+                if not records:
+                    fallback_code = {
+                        "ambiguous": DiagnosticCode.ZEIA_AMBIGUOUS_FORMAT,
+                        "unsupported": DiagnosticCode.ZEIA_UNKNOWN_FORMAT,
+                    }.get(exc.result.status, DiagnosticCode.PARSER_FAILED)
+                    records = [
+                        make_diagnostic(
+                            fallback_code,
+                            str(exc),
+                            archive_path=str(path.resolve()),
+                            next_action="Provide a supported, structurally complete FluentControl ZEIA export.",
+                            exception=exc,
+                        )
+                    ]
+                diagnostics.extend(
                     {
-                        "code": f"{exc.result.status}_export",
+                        **dict(record),
                         "archive": str(path.resolve()),
-                        "message": str(exc),
                         "detection": exc.result.to_dict(),
                     }
+                    for record in records
                 )
+            except IngestionArchiveError as exc:
+                diagnostics.append(dict(exc.diagnostic))
             except Exception as exc:  # parser errors are factual corruption
                 diagnostics.append(
-                    {
-                        "code": "corrupt_export",
-                        "archive": str(path.resolve()),
-                        "message": f"{type(exc).__name__}: {exc}",
-                    }
+                    make_diagnostic(
+                        DiagnosticCode.PARSER_FAILED,
+                        f"{type(exc).__name__}: {exc}",
+                        archive_path=str(path.resolve()),
+                        next_action="Re-export the archive or inspect the failing member before retrying.",
+                        exception=exc,
+                    )
                 )
     return models, diagnostics
 
@@ -244,7 +287,11 @@ def _resolve_models(
         return FullExportReadiness(
             status=ReadinessStatus.PARTIAL,
             diagnostics=(
-                {"code": "no_scripts", "message": "No source scripts were found."},
+                {
+                    "code": "no_scripts",
+                    "diagnostic_code": DiagnosticCode.ZEIA_SCHEMA_MALFORMED,
+                    "message": "No source scripts were found.",
+                },
             ),
             approved_partial=approve_partial_zeia,
         )
@@ -298,22 +345,35 @@ def _resolve_records(
     liquid_classes = [item for item in objects if str(item.get("kind") or "").casefold() == "liquid_class"]
     structural: list[dict[str, Any]] = []
     if not scripts:
-        structural.append({"code": "no_scripts", "message": "No source scripts were found."})
+        structural.append({
+            "code": "no_scripts",
+            "diagnostic_code": DiagnosticCode.ZEIA_SCHEMA_MALFORMED,
+            "message": "No source scripts were found.",
+        })
     if scripts and len(objects) < 2:
         structural.append(
             {
                 "code": "low_supporting_object_count",
+                "diagnostic_code": DiagnosticCode.DEPENDENCY_UNRESOLVED,
                 "message": "The archive contains scripts but too few supporting objects.",
                 "object_count": len(objects),
             }
         )
     if scripts and not workspaces:
         structural.append(
-            {"code": "no_worktable_objects", "message": "No worktable/workspace objects were found."}
+            {
+                "code": "no_worktable_objects",
+                "diagnostic_code": DiagnosticCode.DEPENDENCY_UNRESOLVED,
+                "message": "No worktable/workspace objects were found.",
+            }
         )
     if scripts and not liquid_classes:
         structural.append(
-            {"code": "no_liquid_class_objects", "message": "No liquid-class objects were found."}
+            {
+                "code": "no_liquid_class_objects",
+                "diagnostic_code": DiagnosticCode.DEPENDENCY_UNRESOLVED,
+                "message": "No liquid-class objects were found.",
+            }
         )
     incomplete = not bool(completeness.get("complete", True))
     if incomplete:
@@ -321,6 +381,7 @@ def _resolve_records(
             {
                 "id": "incomplete_canonical_ingestion",
                 "code": "incomplete_canonical_ingestion",
+                "diagnostic_code": DiagnosticCode.ZEIA_SCHEMA_MALFORMED,
                 "message": "Canonical ZEIA ingestion did not inspect every required member.",
                 "details": {
                     "mode": completeness.get("mode"),
@@ -346,15 +407,23 @@ def _resolve_records(
         status = ReadinessStatus.PARTIAL
     else:
         status = ReadinessStatus.COMPLETE
-    diagnostics = tuple(
+    ingestion_diagnostics = tuple(
         {
-            "code": "parse_error",
-            "message": str(error.get("error") or error.get("message") or "member parse failed"),
-            "entry": error.get("entry"),
-            "classification": error.get("classification"),
+            **dict(error),
+            "code": str(error.get("code") or DiagnosticCode.PARSER_FAILED),
+            "message": str(error.get("message") or error.get("error") or "member parse failed"),
+            "entry_path": error.get("entry_path") or error.get("entry"),
         }
-        for error in blocking_errors
-    ) + tuple(structural)
+        for error in errors
+    )
+    dependency_diagnostics = tuple(
+        _unresolved_diagnostic(item)
+        for item in unresolved
+    ) + tuple(
+        _conflict_diagnostic(item, archives=all_archives)
+        for item in conflicts
+    )
+    diagnostics = ingestion_diagnostics + dependency_diagnostics + tuple(structural)
     return FullExportReadiness(
         status=status,
         archives=all_archives,
@@ -530,11 +599,55 @@ def _candidate(record: Mapping[str, Any]) -> dict[str, Any]:
 
 def _diagnostic_status(diagnostics: Sequence[Mapping[str, Any]]) -> ReadinessStatus:
     codes = {str(item.get("code") or "") for item in diagnostics}
-    if any("ambiguous" in code for code in codes):
+    if any("AMBIGUOUS" in code.upper() for code in codes):
         return ReadinessStatus.AMBIGUOUS
-    if any("corrupt" in code for code in codes):
+    if any(
+        code.upper() in {
+            DiagnosticCode.ARCHIVE_INVALID,
+            DiagnosticCode.INPUT_UNREADABLE,
+            DiagnosticCode.ENCODING_DECODE_FAILED,
+            DiagnosticCode.PARSER_FAILED,
+            DiagnosticCode.ZEIA_SCHEMA_MALFORMED,
+            DiagnosticCode.LIMIT_ENTRY_COUNT,
+            DiagnosticCode.LIMIT_UNCOMPRESSED_BYTES,
+            DiagnosticCode.LIMIT_MEMBER_BYTES,
+        }
+        for code in codes
+    ):
         return ReadinessStatus.CORRUPT
     return ReadinessStatus.UNSUPPORTED
+
+
+def _unresolved_diagnostic(item: UnresolvedReference) -> dict[str, Any]:
+    ambiguous = "ambiguous" in item.diagnostic_code.casefold()
+    code = DiagnosticCode.DEPENDENCY_AMBIGUOUS if ambiguous else DiagnosticCode.DEPENDENCY_UNRESOLVED
+    return make_diagnostic(
+        code,
+        "Required dependency could not be resolved unambiguously.",
+        archive_path=item.source_archive or None,
+        entry_path=item.source_entry or None,
+        source_entity=item.source_entity or None,
+        reference=item.referenced_target,
+        next_action="Include the referenced object in the export or remove the unresolved dependency.",
+    ) | {
+        "target_type": item.target_type,
+        "candidates": [dict(candidate) for candidate in item.candidates],
+        "diagnostic_code": item.diagnostic_code,
+    }
+
+
+def _conflict_diagnostic(item: IdentifierConflict, *, archives: Sequence[str]) -> dict[str, Any]:
+    return make_diagnostic(
+        DiagnosticCode.REFERENCE_AMBIGUOUS,
+        "An identifier resolves to multiple conflicting archive entities.",
+        archive_path=archives[0] if len(archives) == 1 else None,
+        reference=item.identifier,
+        next_action="Export one authoritative definition for the conflicting identifier.",
+    ) | {
+        "identifier": item.identifier,
+        "identifier_type": item.identifier_type,
+        "candidates": [dict(candidate) for candidate in item.candidates],
+    }
 
 
 def _compatibility_view(result: FullExportReadiness) -> dict[str, Any]:
@@ -560,6 +673,10 @@ def _compatibility_view(result: FullExportReadiness) -> dict[str, Any]:
     for item in result.conflicts:
         blocking.append({"id": "ambiguous_identifier", "summary": "Identifier resolves to multiple archive entities.", "items": [item.to_dict()]})
     for diagnostic in result.diagnostics:
+        if str(diagnostic.get("severity") or "error").casefold() == "warning":
+            continue
+        if str(diagnostic.get("code") or "").startswith(("DEPENDENCY_", "REFERENCE_")):
+            continue
         blocking.append(
             diagnostic
             if diagnostic.get("id")

@@ -56,6 +56,10 @@ from ...fluent_log_parser import (
     report_to_json,
 )
 from ...generation_workflow import run_generation_workflow
+from ...application_services import (
+    FullExportValidationRequest,
+    validate_full_export as validate_full_export_service,
+)
 from ...project_catalog import ensure_project_catalog
 from ...request_spec_resolver import resolve_request_spec_path
 from ...protocol_ir import (
@@ -147,6 +151,29 @@ ANALYSIS_REPORT_VERSION = "tecan.analysis_report.v1"
 
 
 from ..runtime import _command_context, cli_module
+
+
+def _cmd_validate(args: argparse.Namespace) -> int:
+    """Run authoritative full-export readiness checks without generation."""
+    result = validate_full_export_service(
+        FullExportValidationRequest(
+            input_path=resolve_user_path(args.input),
+            approve_partial_zeia=bool(args.approve_partial_zeia),
+        )
+    )
+    payload = result.to_dict()
+    if args.as_json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print(f"Input: {payload.get('input')}")
+        print(f"Readiness: {payload.get('status')}")
+        print(f"Accepted: {'yes' if payload.get('accepted') else 'no'}")
+        for diagnostic in payload.get("diagnostics") or []:
+            print(
+                f"- [{diagnostic.get('code')}] {diagnostic.get('message')}",
+                file=sys.stderr,
+            )
+    return result.exit_code
 
 def _cmd_fluent_prepare_check(args: argparse.Namespace) -> int:
     xscr = resolve_user_path(args.xscr) if args.xscr else None

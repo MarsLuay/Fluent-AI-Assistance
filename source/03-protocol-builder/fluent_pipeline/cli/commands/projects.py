@@ -46,7 +46,12 @@ from ...external_commands import (
     render_external_command_contract_markdown,
     write_external_command_contract,
 )
-from ...application_services import ProjectImportRequest, import_project as import_project_service
+from ...application_services import (
+    InputInspectionRequest,
+    ProjectImportRequest,
+    import_project as import_project_service,
+    inspect_input as inspect_input_service,
+)
 from ...exports import export_ready_to_import
 from ...fluent_library import resolve_local_fluent_script, stage_local_fluent_script
 from ...mcp_gateway import resolve_process_media_ir_path
@@ -153,6 +158,24 @@ def _cmd_import_project(args: argparse.Namespace) -> int:
     result = cli.import_project(request)
     cli.print_project_import_result(result)
     return 0
+
+
+def _cmd_inspect(args: argparse.Namespace) -> int:
+    """Inspect ZEIA input structure without importing or generating."""
+    result = inspect_input_service(
+        InputInspectionRequest(input_path=resolve_user_path(args.input))
+    )
+    payload = result.to_dict()
+    if args.as_json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print(f"Input: {payload['input']}")
+        print(f"Classification: {payload['classification']}")
+        for archive in payload["archives"]:
+            print(f"- {archive['path']}: {archive['classification']} ({archive['status']})")
+        for diagnostic in payload["diagnostics"]:
+            print(f"  [{diagnostic.get('code')}] {diagnostic.get('message')}", file=sys.stderr)
+    return result.exit_code
 
 def _cmd_list_projects(args: argparse.Namespace) -> int:
     projects = list_projects()
