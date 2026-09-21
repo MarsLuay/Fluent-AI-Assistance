@@ -36,8 +36,28 @@ class FCAHead:
     ) -> None:
         self._liha.get_tips(labware, tip_channels=tip_channels, tip_index=tip_index)
 
-    def drop_tips(self, labware: Optional[Union[Labware, str]] = None) -> None:
-        self._liha.drop_tips(labware)
+    def drop_tips(
+        self,
+        labware: Optional[Union[Labware, str]] = None,
+        *,
+        tip_channels: Optional[Sequence[int]] = None,
+        skip_if_nothing_mounted: bool = False,
+        tip_mask: Optional[str] = None,
+        tip_offset: Optional[int] = None,
+        tip_spacing: Optional[float] = None,
+        device_alias: Optional[str] = None,
+        available_id: Optional[str] = None,
+    ) -> None:
+        self._liha.drop_tips(
+            labware,
+            tip_channels=tip_channels,
+            skip_if_nothing_mounted=skip_if_nothing_mounted,
+            tip_mask=tip_mask,
+            tip_offset=tip_offset,
+            tip_spacing=tip_spacing,
+            device_alias=device_alias,
+            available_id=available_id,
+        )
 
     def aspirate(
         self,

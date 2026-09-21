@@ -47,8 +47,30 @@ class LiHa:
             )
         )
 
-    def drop_tips(self, labware: Optional[Union[Labware, str]] = None) -> None:
-        self.worktable._emit(LihaDropTipsStep(labware_name=self._label(labware)))
+    def drop_tips(
+        self,
+        labware: Optional[Union[Labware, str]] = None,
+        *,
+        tip_channels: Optional[Sequence[int]] = None,
+        skip_if_nothing_mounted: bool = False,
+        tip_mask: Optional[str] = None,
+        tip_offset: Optional[int] = None,
+        tip_spacing: Optional[float] = None,
+        device_alias: Optional[str] = None,
+        available_id: Optional[str] = None,
+    ) -> None:
+        self.worktable._emit(
+            LihaDropTipsStep(
+                labware_name=self._label(labware),
+                tip_channels=list(tip_channels) if tip_channels is not None else None,
+                skip_if_nothing_mounted=skip_if_nothing_mounted,
+                tip_mask=tip_mask,
+                tip_offset=tip_offset,
+                tip_spacing=tip_spacing,
+                device_alias=device_alias,
+                available_id=available_id,
+            )
+        )
 
     def aspirate(
         self,

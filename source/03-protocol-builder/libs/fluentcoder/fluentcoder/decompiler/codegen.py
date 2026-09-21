@@ -475,9 +475,28 @@ class _StepEmitter:
             return True
 
         if isinstance(step, LihaDropTipsStep):
+            if step.raw_xml:
+                self.out.append(self.indent + f"wt.raw_xml_step('LihaDropTips', raw_xml={step.raw_xml!r})")
+                self.i += 1
+                return True
             self.out.append(self.indent + "liha = wt.liha")
             arg = _label_arg(step.labware_name, self.label_to_var)
-            self.out.append(self.indent + f"liha.drop_tips({arg})" if arg else self.indent + "liha.drop_tips()")
+            parts = [arg] if arg else []
+            if step.tip_channels is not None:
+                parts.append(f"tip_channels={step.tip_channels!r}")
+            if step.skip_if_nothing_mounted:
+                parts.append("skip_if_nothing_mounted=True")
+            if step.tip_mask is not None:
+                parts.append(f"tip_mask={step.tip_mask!r}")
+            if step.tip_offset is not None:
+                parts.append(f"tip_offset={step.tip_offset!r}")
+            if step.tip_spacing is not None:
+                parts.append(f"tip_spacing={step.tip_spacing!r}")
+            if step.device_alias is not None:
+                parts.append(f"device_alias={step.device_alias!r}")
+            if step.available_id is not None:
+                parts.append(f"available_id={step.available_id!r}")
+            self.out.append(self.indent + f"liha.drop_tips({', '.join(parts)})")
             self.i += 1
             return True
 

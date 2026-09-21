@@ -445,8 +445,25 @@ def _parse_set_location(command_id: str, obj: ET.Element) -> Step:
     )
 
 def _parse_liha_drop_tips(command_id: str, obj: ET.Element) -> Step:
+    raw_xml = ET.tostring(obj, encoding="unicode") if _liha_drop_tips_preserves_raw_xml(obj) else None
     return LihaDropTipsStep(
         labware_name=_extract_field(obj, "LabwareName") or None,
+        tip_channels=_parse_int_list(obj, "SelectedTipsIndexes") or None,
+        skip_if_nothing_mounted=_parse_bool(_extract_field(obj, "SkipIfNothingMounted")),
+        tip_mask=_extract_field(obj, "TipMask") or None,
+        tip_offset=(
+            _parse_int(_extract_field(obj, "TipOffset"), default=0)
+            if _extract_field(obj, "TipOffset") not in (None, "")
+            else None
+        ),
+        tip_spacing=(
+            _parse_optional_float(_extract_field(obj, "TipSpacing"))
+            if _extract_field(obj, "TipSpacing") not in (None, "")
+            else None
+        ),
+        device_alias=_extract_field(obj, "DeviceAlias"),
+        available_id=_extract_available_id(obj),
+        raw_xml=raw_xml,
     )
 
 def _parse_liha_empty_tips(command_id: str, obj: ET.Element) -> Step:
@@ -756,6 +773,58 @@ def _raw_step(command_id: str, type_attr: str, obj: ET.Element) -> GenericStep:
 def _liha_get_tips_requires_raw(obj: ET.Element) -> bool:
     diti_type = _extract_diti_type_available_id(obj)
     if diti_type and diti_type != "TOOLTYPE:LiHa.TecanDiTi/TOOLNAME:FCA, 1000ul SBS":
+        return True
+    return False
+
+
+_LIHA_DROP_TIPS_KNOWN_XML_FIELDS = {
+    "Object",
+    "int",
+    "Data",
+    "SkipIfNothingMounted",
+    "SerializedTipsIndexes",
+    "SelectedTipsIndexes",
+    "TipMask",
+    "TipOffset",
+    "TipSpacing",
+    "LiHaScriptCommandUsingTipSelectionBaseDataV1",
+    "LihaScriptCommandDataV1",
+    "ScriptCommandCommonDataV2",
+    "LabwareName",
+    "LiquidClassVariablesNames",
+    "LiquidClassVariablesValues",
+    "DeviceAliasStatementBaseDataV1",
+    "Alias",
+    "DeviceAlias",
+    "ID",
+    "AvailableID",
+    "ScriptStatementBaseDataV1",
+    "IsBreakpoint",
+    "IsDisabledForExecution",
+    "GroupLineNumber",
+    "LineNumber",
+}
+
+
+def _liha_drop_tips_preserves_raw_xml(obj: ET.Element) -> bool:
+    """Retain source XML when a Drop Tips command adds unmodeled fields.
+
+    The V2 template is source-backed and all of its execution fields are
+    modeled above. Future/vendor variants may add eject or head-selection
+    fields; retaining those commands as raw XML prevents a typed round-trip
+    from silently broadening or changing the physical action.
+    """
+    serialized = _extract_field(obj, "SerializedTipsIndexes")
+    if serialized not in (None, ""):
+        return True
+    for element in obj.iter():
+        if not isinstance(element.tag, str):
+            continue
+        local_name = _local(element.tag)
+        if local_name in _LIHA_DROP_TIPS_KNOWN_XML_FIELDS:
+            continue
+        if local_name.startswith("LihaDropTipsScriptCommandData"):
+            continue
         return True
     return False
 

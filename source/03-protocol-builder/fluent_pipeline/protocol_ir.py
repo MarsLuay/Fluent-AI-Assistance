@@ -174,6 +174,7 @@ def protocol_ir_from_python(path: Path) -> dict[str, Any]:
     ir = _empty_ir(path.stem, source_format="python", source_path=str(path))
     labware_by_var: dict[str, str] = {}
     reagent_by_var: dict[str, str] = {}
+    head_by_var: dict[str, str] = {}
     current_group = "Ungrouped"
 
     for statement in build.body:
@@ -183,7 +184,7 @@ def protocol_ir_from_python(path: Path) -> dict[str, Any]:
 
         if isinstance(statement, ast.Assign) and isinstance(statement.value, ast.Attribute):
             attr = statement.value.attr.lower()
-            if attr in {"mca96", "liha", "fca"}:
+            if attr in {"mca96", "mca384", "liha", "fca"}:
                 _add_dependency(
                     ir,
                     kind="device",
@@ -191,6 +192,8 @@ def protocol_ir_from_python(path: Path) -> dict[str, Any]:
                     required=True,
                     source_path=_source_path(path.name, current_group, source, statement.value),
                 )
+                if target:
+                    head_by_var[target] = attr
             continue
 
         if call is None:
@@ -262,7 +265,15 @@ def protocol_ir_from_python(path: Path) -> dict[str, Any]:
                 _append_step(ir, **prompt_step)
             continue
 
-        step = _python_runtime_step(call, path.name, current_group, source, reagent_by_var, labware_by_var)
+        step = _python_runtime_step(
+            call,
+            path.name,
+            current_group,
+            source,
+            reagent_by_var,
+            labware_by_var,
+            head_by_var,
+        )
         if step:
             _append_step(ir, **step)
             liquid_class = step.get("liquid_class")
@@ -1688,15 +1699,29 @@ def _python_runtime_step(
     source: str,
     reagent_by_var: dict[str, str],
     labware_by_var: dict[str, str],
+    head_by_var: dict[str, str],
 ) -> dict[str, Any] | None:
     if not isinstance(call.func, ast.Attribute):
         return None
-    operation = _PYTHON_OPERATION_BY_METHOD.get(call.func.attr)
+    operation = _python_operation_for_call(call, head_by_var)
     if not operation:
         return None
     target = _value_label(call.args[0], reagent_by_var, labware_by_var) if call.args else None
     volume = _literal_text(call.args[1]) if len(call.args) > 1 else None
     liquid_class = _keyword_value(call, "liquid_class")
+    tip_channels = _keyword_value(call, "tip_channels")
+    if isinstance(tip_channels, tuple):
+        tip_channels = list(tip_channels)
+    if tip_channels is not None and not isinstance(tip_channels, list):
+        tip_channels = None
+    parameters = {
+        "method": call.func.attr,
+        "target": target,
+        "volume_ul": volume,
+        "liquid_class": liquid_class,
+    }
+    if operation == "liha_drop_tips":
+        parameters["tip_channels"] = tip_channels
     return {
         "group": current_group,
         "operation": operation,
@@ -1707,14 +1732,36 @@ def _python_runtime_step(
         "destination_labware": target if operation == "dispense" else None,
         "volume_ul": volume,
         "liquid_class": liquid_class,
-        "parameters": {
-            "method": call.func.attr,
-            "target": target,
-            "volume_ul": volume,
-            "liquid_class": liquid_class,
-        },
+        "parameters": parameters,
         "source_path": _source_path(draft_name, current_group, source, call),
     }
+
+
+def _python_operation_for_call(call: ast.Call, head_by_var: dict[str, str]) -> str | None:
+    """Resolve head-specific Python methods to canonical operations.
+
+    ``drop_tips`` is shared by MCA384 and LiHa/FCA authoring surfaces.  The
+    receiver is therefore part of the operation identity; looking only at the
+    method name would silently turn selected LiHa drops into MCA384 drops.
+    """
+    if not isinstance(call.func, ast.Attribute):
+        return None
+    method = call.func.attr
+    if method not in {"drop_tips", "get_tips"}:
+        return _PYTHON_OPERATION_BY_METHOD.get(method)
+
+    receiver = call.func.value
+    if isinstance(receiver, ast.Attribute):
+        head = receiver.attr.lower()
+    elif isinstance(receiver, ast.Name):
+        head = head_by_var.get(receiver.id, "")
+    else:
+        head = ""
+    if head in {"liha", "fca"}:
+        return "liha_drop_tips" if method == "drop_tips" else "liha_get_tips"
+    if head == "mca384":
+        return "mca384_drop_tips" if method == "drop_tips" else "mca384_get_tips"
+    return _PYTHON_OPERATION_BY_METHOD.get(method)
 
 
 def _xscr_step(
@@ -1831,6 +1878,13 @@ def _xscr_step(
         return _xscr_execute_vb_script_step(command_object, group_name, command_id, fields, compiled_path)
     if operation == "move_plate" and macro_name == "RGA1_TransferLabware":
         return _xscr_rga_transfer_step(command_object, group_name, command_id, compiled_path)
+    if operation == "liha_drop_tips":
+        return _xscr_liha_drop_tips_step(
+            command_object,
+            group_name,
+            command_id,
+            compiled_path,
+        )
 
     labware = registry_field_value(command_id, "labware", fields) or _first_text(command_object, "LabwareName")
     volume = _number_or_text(registry_field_value(command_id, "volume_ul", fields) or _first_text(command_object, "Volume") or "")
@@ -1925,6 +1979,110 @@ def _xscr_step(
         "parameters": parameters,
         "compiled_path": compiled_path,
     }
+
+
+_LIHA_DROP_TIPS_KNOWN_XML_FIELDS = frozenset(
+    {
+        "Object",
+        "int",
+        "Data",
+        "SkipIfNothingMounted",
+        "SerializedTipsIndexes",
+        "SelectedTipsIndexes",
+        "TipMask",
+        "TipOffset",
+        "TipSpacing",
+        "LiHaScriptCommandUsingTipSelectionBaseDataV1",
+        "LihaScriptCommandDataV1",
+        "ScriptCommandCommonDataV2",
+        "LabwareName",
+        "LiquidClassVariablesNames",
+        "LiquidClassVariablesValues",
+        "DeviceAliasStatementBaseDataV1",
+        "Alias",
+        "DeviceAlias",
+        "ID",
+        "AvailableID",
+        "ScriptStatementBaseDataV1",
+        "IsBreakpoint",
+        "IsDisabledForExecution",
+        "GroupLineNumber",
+        "LineNumber",
+    }
+)
+
+
+def _xscr_liha_drop_tips_step(
+    command_object: ET.Element,
+    group_name: str,
+    command_id: str,
+    compiled_path: str,
+) -> dict[str, Any]:
+    labware = registry_field_value(command_id, "labware", _command_field_map(command_object)) or _first_text(
+        command_object,
+        "LabwareName",
+    )
+    parameters: dict[str, Any] = {
+        "method": "drop_tips",
+        "target": labware,
+        "tip_channels": _xscr_selected_tip_channels(command_object),
+        "skip_if_nothing_mounted": _bool_text(_first_text(command_object, "SkipIfNothingMounted")),
+        "tip_mask": _first_text(command_object, "TipMask"),
+        "tip_offset": _number_or_text(_first_text(command_object, "TipOffset") or ""),
+        "tip_spacing": _number_or_text(_first_text(command_object, "TipSpacing") or ""),
+        "device_alias": _first_text(command_object, "DeviceAlias"),
+        "available_id": _first_text(command_object, "AvailableID"),
+    }
+    if _liha_drop_tips_preserves_raw_xml(command_object):
+        parameters["raw_xml"] = ET.tostring(command_object, encoding="unicode")
+    return {
+        "group": group_name,
+        "operation": "liha_drop_tips",
+        "name": _operation_name("liha_drop_tips"),
+        "command_id": command_id,
+        "target_labware": labware,
+        "parameters": parameters,
+        "compiled_path": compiled_path,
+    }
+
+
+def _xscr_selected_tip_channels(command_object: ET.Element) -> list[int] | None:
+    selected = _first_descendant(command_object, "SelectedTipsIndexes")
+    if selected is None:
+        return None
+    channels: list[int] = []
+    for element in selected.iter():
+        if _local_name(element.tag) != "int" or element.text is None:
+            continue
+        value = _number_or_text(element.text.strip())
+        if isinstance(value, int):
+            channels.append(value)
+    if channels:
+        return channels
+    text = (selected.text or "").strip()
+    if text:
+        values = [item for item in re.split(r"[,;\s]+", text) if item]
+        parsed = [_number_or_text(item) for item in values]
+        if parsed and all(isinstance(value, int) for value in parsed):
+            return parsed
+    return None
+
+
+def _liha_drop_tips_preserves_raw_xml(command_object: ET.Element) -> bool:
+    """Keep source XML for serialized selections or unmodeled vendor fields."""
+    serialized = _first_text(command_object, "SerializedTipsIndexes")
+    if serialized not in (None, ""):
+        return True
+    for element in command_object.iter():
+        if not isinstance(element.tag, str):
+            continue
+        local_name = _local_name(element.tag)
+        if local_name in _LIHA_DROP_TIPS_KNOWN_XML_FIELDS:
+            continue
+        if re.match(r"(?:liha|fca)droptipsscriptcommanddata", local_name, flags=re.IGNORECASE):
+            continue
+        return True
+    return False
 
 
 def _xscr_branch_step(
@@ -2225,6 +2383,16 @@ def _render_python_step(step: dict[str, Any], labware_vars: dict[str, str]) -> l
         return [f"head.pick_up({target_expr})"]
     if operation in {"set_tips_back", "mca384_drop_tips"}:
         return [f"head.return_tips({target_expr})"]
+    if operation == "liha_drop_tips":
+        raw_xml = str(params.get("raw_xml") or "").strip()
+        if raw_xml:
+            command_id = str(step.get("command_id") or "LihaDropTips")
+            return [f"wt.raw_xml_step({command_id!r}, {raw_xml!r})"]
+        parts = [target_expr] if target else []
+        tip_channels = params.get("tip_channels")
+        if tip_channels is not None:
+            parts.append(f"tip_channels={tip_channels!r}")
+        return [f"wt.liha.drop_tips({', '.join(parts)})"]
     if operation == "aspirate":
         return [f"head.aspirate({target_expr}, {volume_arg}, liquid_class={liquid_class!r})"]
     if operation == "dispense":
@@ -2418,6 +2586,7 @@ def _preserve_raw_xml_for_operation(operation: str) -> bool:
         "mca384_get_tips",
         "set_tips_back",
         "mca384_drop_tips",
+        "liha_drop_tips",
         "aspirate",
         "dispense",
         "mca384_mix",
@@ -2703,9 +2872,9 @@ def _operation_from_command_id(command_id: str) -> str | None:
     if "mix" in lowered:
         return "liha_mix" if "liha" in lowered else "mca384_mix"
     if "droptips" in lowered:
-        return "liha_drop_tips" if "liha" in lowered else "mca384_drop_tips"
+        return "liha_drop_tips" if "liha" in lowered or "fca" in lowered else "mca384_drop_tips"
     if "gettips" in lowered:
-        return "liha_get_tips" if "liha" in lowered else "mca384_get_tips"
+        return "liha_get_tips" if "liha" in lowered or "fca" in lowered else "mca384_get_tips"
     if "conditionalgroup" in lowered:
         return "conditional_branch"
     if "alternategroup" in lowered:
@@ -3178,7 +3347,12 @@ def _safe_var(value: str, *, used: set[str]) -> str:
 
 
 def _friendly_device_name(value: str) -> str:
-    return {"mca96": "MCA96 head", "liha": "LiHa arm", "fca": "FCA arm"}.get(value.lower(), value)
+    return {
+        "mca96": "MCA96 head",
+        "mca384": "MCA384 head",
+        "liha": "LiHa arm",
+        "fca": "FCA arm",
+    }.get(value.lower(), value)
 
 
 def _has_value(value: Any) -> bool:

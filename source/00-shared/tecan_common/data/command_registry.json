@@ -417,6 +417,26 @@
           "LabwareName",
           "WasteLabwareName",
           "RackLabel"
+        ],
+        "tip_channels": [
+          "SelectedTipsIndexes",
+          "SerializedTipsIndexes",
+          "TipMask"
+        ],
+        "device_alias": [
+          "DeviceAlias"
+        ],
+        "available_id": [
+          "AvailableID"
+        ],
+        "skip_if_nothing_mounted": [
+          "SkipIfNothingMounted"
+        ],
+        "tip_offset": [
+          "TipOffset"
+        ],
+        "tip_spacing": [
+          "TipSpacing"
         ]
       },
       "manual_step": "LiHa drop tips at {labware}",

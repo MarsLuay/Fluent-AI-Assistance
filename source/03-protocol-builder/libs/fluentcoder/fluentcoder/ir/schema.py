@@ -480,11 +480,47 @@ class LihaGetTipsStep(BaseStep):
 
 
 class LihaDropTipsStep(BaseStep):
-    """Step to drop tips using LiHa."""
+    """Step to release selected LiHa/FCA channels into the waste target.
+
+    FluentControl V2 source commands carry the selected channels as zero-based
+    ``SelectedTipsIndexes`` values. ``None`` deliberately means that the
+    source command did not provide a selection block, which is the legacy
+    all-applicable/default behavior; an explicit list is never broadened.
+    """
     step_type: Literal[StepType.LIHA_DROP_TIPS] = StepType.LIHA_DROP_TIPS
     labware_name: Optional[str] = Field(default=None, description="Location to drop tips")
+    tip_channels: Optional[list[int]] = Field(
+        default=None,
+        description="Selected zero-based LiHa tip channels (0-7); None means source/default all",
+    )
+    skip_if_nothing_mounted: bool = Field(
+        default=False,
+        description="Preserved FluentControl SkipIfNothingMounted behavior",
+    )
+    tip_mask: Optional[str] = Field(
+        default=None,
+        description="Source-backed FluentControl tip mask when present",
+    )
+    tip_offset: Optional[int] = Field(default=None, description="Source-backed tip offset")
+    tip_spacing: Optional[float] = Field(default=None, description="Source-backed tip spacing")
     device_alias: Optional[str] = None
     available_id: Optional[str] = None
+    raw_xml: Optional[str] = Field(default=None, description="Original Object XML when execution fields are unmodeled")
+
+    @field_validator("tip_channels")
+    @classmethod
+    def _validate_tip_channels(cls, value: Optional[list[int]]) -> Optional[list[int]]:
+        if value is None:
+            return None
+        if not value:
+            raise ValueError("tip_channels must contain at least one channel or be omitted")
+        if any(isinstance(channel, bool) or not isinstance(channel, int) for channel in value):
+            raise ValueError("LiHa tip channels must be integers")
+        if any(channel < 0 or channel > 7 for channel in value):
+            raise ValueError("LiHa tip channel indices must be in the range 0..7")
+        if len(set(value)) != len(value):
+            raise ValueError("LiHa tip channels must not contain duplicates")
+        return list(value)
 
 
 class Mca384GetTipsStep(BaseStep):
