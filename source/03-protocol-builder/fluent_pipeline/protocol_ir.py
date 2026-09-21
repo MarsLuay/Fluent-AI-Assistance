@@ -18,7 +18,7 @@ import zipfile
 from . import xml_compat as ET
 from pathlib import Path
 from typing import Any, Iterable
-from tecan_common.zeia_limits import validate_zeia_archive_limits
+from tecan_common.zeia_limits import build_zeia_archive_inventory
 
 from tecan_common.gwl import (
     Break,
@@ -536,13 +536,15 @@ def protocol_ir_bundle_from_zeia(path: Path) -> dict[str, Any]:
     if zipfile.is_zipfile(path):
         with zipfile.ZipFile(path) as zf, tempfile.TemporaryDirectory() as tmp:
             tmp_dir = Path(tmp)
-            infos = validate_zeia_archive_limits(zf)
-            for info in infos:
-                entry = info.filename
+            inventory = build_zeia_archive_inventory(zf)
+            for member in inventory.members:
+                info = member.info
+                entry = member.name
                 if Path(entry).suffix.lower() != ".xscr":
                     continue
                 target = tmp_dir / _safe_filename(Path(entry).name or f"script_{len(protocols) + 1}.xscr")
-                target.write_bytes(zf.read(entry))
+                with zf.open(info) as source:
+                    target.write_bytes(source.read(info.file_size))
                 protocol = protocol_ir_from_xscr(target, source_name=f"{path.name}!{entry}")
                 protocol["source"]["archive_entry"] = entry
                 protocols.append(protocol)

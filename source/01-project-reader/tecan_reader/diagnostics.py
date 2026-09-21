@@ -44,6 +44,9 @@ class DiagnosticCode:
     LIMIT_ENTRY_COUNT = "LIMIT_ENTRY_COUNT"
     LIMIT_UNCOMPRESSED_BYTES = "LIMIT_UNCOMPRESSED_BYTES"
     LIMIT_MEMBER_BYTES = "LIMIT_MEMBER_BYTES"
+    LIMIT_COMPRESSION_RATIO = "LIMIT_COMPRESSION_RATIO"
+    ARCHIVE_DUPLICATE_MEMBER = "ARCHIVE_DUPLICATE_MEMBER"
+    ARCHIVE_UNSAFE_PATH = "ARCHIVE_UNSAFE_PATH"
     REQUEST_INVALID = "REQUEST_INVALID"
 
 
@@ -61,6 +64,9 @@ class IngestionDiagnostic:
     reference: str | None = None
     limit: int | float | str | None = None
     value: int | float | str | None = None
+    compressed_size: int | None = None
+    uncompressed_size: int | None = None
+    violated_limit: str | None = None
     next_action: str | None = None
     exception_type: str | None = None
     exception_detail: str | None = None
@@ -74,7 +80,8 @@ class IngestionDiagnostic:
         }
         fields = (
             "archive_path", "entry_path", "adapter_id", "source_entity", "reference",
-            "limit", "value", "next_action", "exception_type", "exception_detail",
+            "limit", "value", "compressed_size", "uncompressed_size",
+            "violated_limit", "next_action", "exception_type", "exception_detail",
         )
         for field in fields:
             value = getattr(self, field)
@@ -95,6 +102,9 @@ def make_diagnostic(
     reference: str | None = None,
     limit: int | float | str | None = None,
     value: int | float | str | None = None,
+    compressed_size: int | None = None,
+    uncompressed_size: int | None = None,
+    violated_limit: str | None = None,
     next_action: str | None = None,
     exception: BaseException | None = None,
 ) -> dict[str, Any]:
@@ -110,6 +120,9 @@ def make_diagnostic(
         reference=reference,
         limit=limit,
         value=value,
+        compressed_size=compressed_size,
+        uncompressed_size=uncompressed_size,
+        violated_limit=violated_limit,
         next_action=next_action,
         exception_type=type(exception).__name__ if exception is not None else None,
         exception_detail=_redact_text(str(exception)) if exception is not None else None,

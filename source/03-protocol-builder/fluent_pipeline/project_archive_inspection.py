@@ -12,7 +12,7 @@ import tempfile
 import zipfile
 from typing import Any
 
-from tecan_common.zeia_limits import validate_zeia_archive_limits
+from tecan_common.zeia_limits import build_zeia_archive_inventory
 
 from .import_identity import build_source_import_identity
 from .project_context import (
@@ -51,9 +51,9 @@ def inspect_zeia_archive(archive: str | Path) -> dict[str, Any]:
         extracted_dir.mkdir(parents=True, exist_ok=True)
         try:
             with zipfile.ZipFile(archive_path) as zf:
-                infos = validate_zeia_archive_limits(zf)
-                entries = [info.filename for info in infos]
-                safe_extract_archive(zf, extracted_dir)
+                inventory = build_zeia_archive_inventory(zf)
+                entries = list(inventory.names)
+                safe_extract_archive(zf, extracted_dir, inventory=inventory)
         except zipfile.BadZipFile as exc:
             raise PipelineError(
                 f"ZEIA archive failed safety or format validation: {archive_path} ({exc})"
