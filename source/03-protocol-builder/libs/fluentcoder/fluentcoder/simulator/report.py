@@ -95,6 +95,7 @@ class SimulationReport:
     final_liha_tips: list[dict[str, Any] | None] = field(default_factory=list)
     state_summary: dict[str, Any] = field(default_factory=dict)
     attribute_lineage: list[dict[str, Any]] = field(default_factory=list)
+    physical_limitations: list[dict[str, Any]] = field(default_factory=list)
 
     def add_step(self, coverage: StepCoverage) -> None:
         self.steps.append(coverage)
@@ -107,6 +108,25 @@ class SimulationReport:
                 "message": coverage.message,
             }
             self.opaque_events.append(event)
+
+    def add_physical_limitation(
+        self,
+        *,
+        effect: str,
+        message: str,
+        step_index: int | None = None,
+        operation: str | None = None,
+    ) -> None:
+        """Record mechanical behavior the logical twin cannot prove."""
+        record = {
+            "effect": effect,
+            "message": message,
+            "step_index": step_index,
+            "operation": operation,
+            "requires_hardware_verification": True,
+        }
+        if record not in self.physical_limitations:
+            self.physical_limitations.append(record)
 
     @property
     def status(self) -> str:
@@ -183,4 +203,5 @@ class SimulationReport:
             "final_liha_tips": self.final_liha_tips,
             "state_summary": self.state_summary,
             "attribute_lineage": list(self.attribute_lineage),
+            "physical_limitations": list(self.physical_limitations),
         }

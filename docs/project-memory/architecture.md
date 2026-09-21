@@ -35,6 +35,16 @@ registries supply contracts, then request specs and protocol IR feed rendering,
 validation, and packaging. Generated outputs and host-derived assets are not
 canonical source files for hand edits.
 
+Physical hardware readiness is owned by
+`source/03-protocol-builder/fluent_pipeline/physical_readiness.py`. It
+normalizes source/provenance-backed head, tip, labware, site, software,
+configuration, device, and capability evidence; derives deterministic
+interaction and verification fingerprints; and keeps required real-instrument
+checks separate from offline readiness. Ready-to-import bundles persist the
+machine-readable physical verification report, while FluentCoder simulation
+reports the mechanical effects it cannot prove. Neither offline validation nor
+simulation certifies physical safety or hardware-run approval.
+
 Offline full-export end-to-end coverage lives in
 `source/03-protocol-builder/tests/test_full_export_e2e.py` plus
 `tests/full_export_e2e/feature_coverage_manifest.json`. The suite materializes
