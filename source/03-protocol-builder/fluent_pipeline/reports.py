@@ -28,6 +28,7 @@ def compact_simulation(data: dict[str, Any], *, protocol_ir: dict[str, Any] | No
         "raw_xml_generic_steps": data.get("raw_xml_generic_steps"),
         "modeled_coverage": data.get("modeled_coverage"),
         "warnings": data.get("warnings") or [],
+        "physical_limitations": data.get("physical_limitations") or [],
         "failure": data.get("failure"),
         "unsupported_command_ids": unsupported,
         "approved_opaque_command_ids": approved_opaque,
@@ -86,6 +87,17 @@ def render_simulation_markdown(
         if summary["warnings"]:
             lines.extend(["## Warnings", ""])
             lines.extend(f"- {warning}" for warning in summary["warnings"])
+            lines.append("")
+        if summary["physical_limitations"]:
+            lines.extend(["## Physical Effects Requiring Hardware Verification", ""])
+            for limitation in summary["physical_limitations"]:
+                if not isinstance(limitation, dict):
+                    continue
+                step = limitation.get("step_index")
+                prefix = f"Step `{step}`: " if step is not None else ""
+                lines.append(
+                    f"- {prefix}{limitation.get('effect')}: {limitation.get('message')}"
+                )
             lines.append("")
         if summary["failure"]:
             lines.extend(["## Failure", "", "```json"])

@@ -294,8 +294,54 @@ class Simulator:
         # All other step types (waits, comments, timers, variables, externals)
         # are opaque to the twin. They still get a snapshot below.
 
+        self._record_physical_limitations(step)
         self._snapshot(step, effect, message)
         self._current_step = None
+
+    def _record_physical_limitations(self, step) -> None:
+        """Keep logical simulation separate from unmodeled mechanics."""
+        step_type = getattr(getattr(step, "step_type", None), "value", getattr(step, "step_type", ""))
+        operation = str(step_type or type(step).__name__).casefold()
+        class_name = type(step).__name__.casefold()
+        params = getattr(step, "parameters", {})
+        text = " ".join(str(value or "") for value in (operation, class_name, *(params.values() if isinstance(params, dict) else []))).casefold()
+
+        if "gettips" in operation or "pickup" in class_name or "get_tips" in operation:
+            for effect, message in (
+                ("tip_rack_retention", "The simulator cannot prove tip-rack/tray seating or retention during pickup."),
+                ("tip_alignment", "The simulator cannot prove mounted-tip straightness or mechanical alignment."),
+            ):
+                self._report.add_physical_limitation(
+                    effect=effect,
+                    message=message,
+                    step_index=self._step_index,
+                    operation=operation,
+                )
+        elif isinstance(step, (AspirateStep, DispenseStep, Mca384MixStep, LihaAspirateStep, LihaDispenseStep, LihaMixStep)):
+            self._report.add_physical_limitation(
+                effect="well_entry_clearance",
+                message="The simulator cannot prove tip straightness, well-entry clearance, or labware contact.",
+                step_index=self._step_index,
+                operation=operation,
+            )
+        elif isinstance(step, RgaTransferLabwareStep):
+            for effect, message in (
+                ("nest_retention", "The simulator cannot prove carrier/nest retention during a gripper move."),
+                ("gripper_clearance", "The simulator cannot prove gripper force, contact, or adjacent-carrier clearance."),
+            ):
+                self._report.add_physical_limitation(
+                    effect=effect,
+                    message=message,
+                    step_index=self._step_index,
+                    operation=operation,
+                )
+        if "barcode" in text or "scanner" in text or "scan" in text:
+            self._report.add_physical_limitation(
+                effect="barcode_clearance",
+                message="The simulator cannot prove physical barcode-reader clearance or scan quality.",
+                step_index=self._step_index,
+                operation=operation,
+            )
 
     def _snapshot(self, step, effect: EffectKind, message: str = "") -> None:
         command_id = getattr(step, "step_type", type(step).__name__)

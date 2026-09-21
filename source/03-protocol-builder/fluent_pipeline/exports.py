@@ -71,6 +71,11 @@ from .readiness import (
     embed_readiness,
     readiness_status_from_readiness,
 )
+from .physical_readiness import (
+    PHYSICAL_VERIFICATION_FILENAME,
+    build_physical_verification,
+    write_physical_verification,
+)
 from .request_spec_resolver import normalize_protocol_stem, split_version_suffix
 from .runner import PipelineError, ensure_parent, write_json
 from .subroutine_dependencies import (
@@ -502,6 +507,40 @@ def export_ready_to_import(
         )
 
         try:
+            packaged_ir = load_protocol_ir(protocol_ir_dest)
+        except Exception:
+            packaged_ir = {}
+        physical_verification = build_physical_verification(
+            packaged_ir,
+            source_manifest,
+            host_environment=(validation_context or {}).get("host_environment"),
+            instrument_config=(validation_context or {}).get("host_instrument_configuration")
+            or (packaged_ir.get("source") or {}).get("host_instrument_configuration"),
+            previous_verification=(validation_context or {}).get("previous_physical_verification"),
+            verification_results=(validation_context or {}).get("physical_verification_results"),
+            offline_validation=validation_report.get("offline_validation")
+            if isinstance(validation_report, dict)
+            else None,
+        )
+        physical_verification_dest = reports_dir / PHYSICAL_VERIFICATION_FILENAME
+        write_physical_verification(physical_verification_dest, physical_verification)
+        exports.append(
+            ExportedArtifact(
+                physical_verification_dest,
+                physical_verification_dest,
+                "physical-verification",
+            )
+        )
+        copied_files.append(
+            _file_record(
+                "physical-verification",
+                physical_verification_dest,
+                physical_verification_dest,
+                bundle_root=bundle_root,
+            )
+        )
+
+        try:
             project_import_records = _write_project_import_archives(
                 source_projects or [],
                 filesystem_source_archives=filesystem_source_projects or source_projects or [],
@@ -736,6 +775,7 @@ def export_ready_to_import(
             "verification_state": lifecycle["verification_state"],
             "readiness_status": readiness_status,
             "readiness": readiness,
+            "physical_verification": physical_verification,
             "supersedes": lifecycle["supersedes"],
             "superseded_by": lifecycle["superseded_by"],
             "lifecycle": lifecycle,
@@ -796,6 +836,7 @@ def export_ready_to_import(
                 "script_editor_load_clean": "Not certified by this metadata. Requires the optional Gate 27 FluentControl import/load diagnostic or a manual Script Editor open/load check of the generated artifact.",
                 "simulation_clean": "Covered by validation_report.md Gate 7 for offline simulation; any live runtime evidence comes from the optional FluentControl import/load diagnostic.",
                 "hardware_run_ready": "Never certified by the ready-to-import bundle; requires operator review on the target instrument.",
+                "physical_verification": "See source/reports/physical_verification.json; offline simulation never certifies mechanical behavior.",
             },
             "layout": {
                 "recreate_script": "RECREATE_SCRIPT.md",
@@ -845,6 +886,7 @@ def export_ready_to_import(
                 "validation_diff_json": "source/validation_diff.json" if validation_diff_json is not None else None,
                 "validation_report": "source/reports/validation_report.md",
                 "validation_report_json": "source/reports/validation_report.json",
+                "physical_verification": "source/reports/physical_verification.json",
                 "metadata": "source/metadata.json",
             },
             "compiled_xscr": "direct-imports/scripts/full-script/generated_script.xscr",

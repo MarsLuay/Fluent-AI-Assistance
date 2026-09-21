@@ -1908,6 +1908,17 @@ def build_worktable():
                 ).read_text(encoding="utf-8")
                 self.assertIn('"schema_version": "tecan.method_touchtools_readiness.v1"', method_touchtools_json)
                 self.assertIn('"method_required_before_touchtools": true', method_touchtools_json)
+                physical_verification = (
+                    published_root / "source" / "reports" / "physical_verification.json"
+                )
+                self.assertTrue(physical_verification.is_file())
+                physical_payload = json.loads(physical_verification.read_text(encoding="utf-8"))
+                self.assertEqual(physical_payload["schema_version"], "tecan.physical_readiness.v1")
+                self.assertIn("hardware_profile_fingerprint", physical_payload)
+                self.assertEqual(
+                    metadata_payload["layout"]["physical_verification"],
+                    "source/reports/physical_verification.json",
+                )
                 guide = (published_root / "RECREATE_SCRIPT.md").read_text(
                     encoding="utf-8"
                 )

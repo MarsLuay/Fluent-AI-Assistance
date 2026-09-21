@@ -31,6 +31,44 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(summary["approved_opaque_command_ids"], {"ConditionalGroup": 2})
         self.assertEqual(summary["approved_opaque_support_statuses"], {"ConditionalGroup": "mapped"})
 
+    def test_compact_simulation_preserves_physical_limitations(self):
+        data = {
+            "status": "passed",
+            "total_executed_steps": 1,
+            "fully_simulated_steps": 1,
+            "modeled_coverage": 1.0,
+            "raw_xml_generic_steps": 0,
+            "warnings": [],
+            "unsupported_command_ids": {},
+            "final_labware": [],
+            "state_summary": {},
+            "physical_limitations": [
+                {
+                    "effect": "tip_alignment",
+                    "message": "alignment is not modeled",
+                    "step_index": 2,
+                    "requires_hardware_verification": True,
+                }
+            ],
+        }
+
+        summary = compact_simulation(data)
+        assert summary["physical_limitations"][0]["effect"] == "tip_alignment"
+
+        report = render_simulation_markdown(
+            Path("draft.py"),
+            data,
+            CommandResult(
+                command=("python", "-m", "fluentcoder.cli", "simulate"),
+                cwd=Path("repo"),
+                returncode=0,
+                stdout="",
+                stderr="",
+            ),
+        )
+        assert "Physical Effects Requiring Hardware Verification" in report
+        assert "tip_alignment" in report
+
     def test_simulation_markdown_handles_load_failure(self):
         result = CommandResult(
             command=("python", "-m", "fluentcoder.cli", "simulate"),
