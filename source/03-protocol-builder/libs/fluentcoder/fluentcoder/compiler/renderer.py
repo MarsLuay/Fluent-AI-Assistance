@@ -69,7 +69,7 @@ from ..ir.schema import (
     ConditionalStep, UserPromptStep,
     LihaAspirateStep, LihaDispenseStep, LihaMixStep,
     LihaDetectLiquidStep, GenerateReportStep,
-    LihaGetTipsStep, MoveAxisCommandStep, StartMoveCommandStep, WaitForAsyncResponseStep, EndScriptStep,
+    LihaGetTipsStep, LihaDropTipsStep, MoveAxisCommandStep, StartMoveCommandStep, WaitForAsyncResponseStep, EndScriptStep,
     ExecuteVbScriptStep, TeGioSetPwmOutputStep, LeaveStep,
     VariableMapping, GenericStep, ScriptGroupStep, ApplicationDriverMacroStep,
 )
@@ -669,7 +669,7 @@ class Renderer:
                            ExecuteVbScriptStep, TeGioSetPwmOutputStep, LeaveStep)) and getattr(step, "raw_xml", None):
             lines = str(step.raw_xml).strip().split("\n")
             return "\n".join("                        " + line for line in lines)
-        if isinstance(step, (LihaAspirateStep, LihaDispenseStep, LihaMixStep, LihaDetectLiquidStep, GenerateReportStep)) and getattr(step, "raw_xml", None):
+        if isinstance(step, (LihaAspirateStep, LihaDispenseStep, LihaMixStep, LihaDropTipsStep, LihaDetectLiquidStep, GenerateReportStep)) and getattr(step, "raw_xml", None):
             lines = str(step.raw_xml).strip().split("\n")
             return "\n".join("                        " + line for line in lines)
 
@@ -2026,6 +2026,8 @@ class Renderer:
         # Replace hardcoded SelectedTipsIndexes block
         if step.step_type == StepType.LIHA_GET_TIPS and isinstance(step, LihaGetTipsStep):
             selected_channels = self._resolve_liha_get_tips_channels(step)
+        elif step.step_type == StepType.LIHA_DROP_TIPS and isinstance(step, LihaDropTipsStep):
+            selected_channels = step.tip_channels
         else:
             selected_channels = None
         new_tips = self._build_liha_tips_xml(selected_channels, num_tips=num_channels)
@@ -2035,6 +2037,37 @@ class Renderer:
             xml,
             flags=re.DOTALL
         )
+
+        if step.step_type == StepType.LIHA_DROP_TIPS and isinstance(step, LihaDropTipsStep):
+            xml = re.sub(
+                r"<SkipIfNothingMounted>[^<]*</SkipIfNothingMounted>",
+                f"<SkipIfNothingMounted>{str(step.skip_if_nothing_mounted).capitalize()}</SkipIfNothingMounted>",
+                xml,
+                count=1,
+            )
+            if step.tip_mask is not None:
+                xml = re.sub(
+                    r"<TipMask(?:\s*/>|>.*?</TipMask>)",
+                    f"<TipMask>{self._xml_escape(str(step.tip_mask))}</TipMask>",
+                    xml,
+                    count=1,
+                    flags=re.DOTALL,
+                )
+            if step.tip_offset is not None:
+                xml = re.sub(
+                    r"<TipOffset>[^<]*</TipOffset>",
+                    f"<TipOffset>{step.tip_offset}</TipOffset>",
+                    xml,
+                    count=1,
+                )
+            if step.tip_spacing is not None:
+                spacing = int(step.tip_spacing) if float(step.tip_spacing).is_integer() else step.tip_spacing
+                xml = re.sub(
+                    r"<TipSpacing>[^<]*</TipSpacing>",
+                    f"<TipSpacing>{spacing}</TipSpacing>",
+                    xml,
+                    count=1,
+                )
 
         # Replace hardcoded well indexes for aspirate/dispense/mix
         if step.step_type in (StepType.LIHA_ASPIRATE, StepType.LIHA_DISPENSE, StepType.LIHA_MIX):

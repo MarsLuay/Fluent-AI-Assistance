@@ -745,8 +745,23 @@ class Simulator:
         self._liha_tip_box_label = step.labware_name
 
     def _on_liha_drop_tips(self, step: LihaDropTipsStep) -> None:
-        channels = [i for i, tip in enumerate(self._liha_tips) if tip is not None]
+        if step.tip_channels is None:
+            channels = [i for i, tip in enumerate(self._liha_tips) if tip is not None]
+        else:
+            channels = sorted(set(step.tip_channels))
+            for channel in channels:
+                if channel < 0 or channel > 7:
+                    raise MissingTipsError(f"LiHa channel index {channel} is outside 0..7")
+            missing = [channel for channel in channels if self._liha_tips[channel] is None]
+            if missing and not step.skip_if_nothing_mounted:
+                raise MissingTipsError(
+                    "LihaDropTips selected channel(s) without mounted tips: "
+                    + ", ".join(str(channel) for channel in missing)
+                )
+            channels = [channel for channel in channels if self._liha_tips[channel] is not None]
         if not channels:
+            if step.skip_if_nothing_mounted:
+                return
             raise MissingTipsError("LihaDropTips called but no LiHa tips are mounted")
         target = step.labware_name or self._liha_tip_box_label
         if target is not None:
@@ -755,7 +770,8 @@ class Simulator:
                 tip_box.return_tips(len(channels))
         for ch in channels:
             self._liha_tips[ch] = None
-        self._liha_tip_box_label = None
+        if not any(tip is not None for tip in self._liha_tips):
+            self._liha_tip_box_label = None
 
     def _on_liha_aspirate(self, step: LihaAspirateStep) -> None:
         target = self._require_labware(step.labware_name, "LiHa aspirate")
