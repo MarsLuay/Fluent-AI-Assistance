@@ -48,6 +48,15 @@
       "uses": ["diagnostics", "provenance"]
     },
     {
+      "id": "driverframework_pegasus_logs",
+      "purpose": "DriverFramework/Pegasus diagnostic log inventory",
+      "relative_paths": ["Pegasus\\Log"],
+      "sensitivity": "diagnostic",
+      "copy_into_diagnostics": false,
+      "capture": "fingerprint",
+      "uses": ["diagnostics", "provenance"]
+    },
+    {
       "id": "legacy_drivers",
       "purpose": "Legacy driver inventory when present",
       "relative_paths": ["VisionX\\LegacyDrivers", "FluentControl\\LegacyDrivers"],

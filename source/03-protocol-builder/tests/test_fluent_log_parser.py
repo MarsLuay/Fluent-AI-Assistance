@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fluent_pipeline.cli import main as cli_main
 from fluent_pipeline.fluent_log_parser import (
+    DEFAULT_FLUENT_LOG_LOCATIONS,
     build_latest_fluent_log_report,
     build_fluent_log_report,
     diagnose_fluent_log_text,
@@ -16,6 +17,12 @@ from fluent_pipeline.fluent_log_parser import (
 
 
 class FluentLogParserTests(unittest.TestCase):
+    def test_default_locations_include_documented_pegasus_logs(self):
+        self.assertIn(
+            (r"C:\ProgramData\Tecan\Pegasus\Log", "*.log"),
+            DEFAULT_FLUENT_LOG_LOCATIONS,
+        )
+
     def test_parses_script_editor_error_with_details(self):
         text = (
             "2026-06-11 10:45:00 [Script Editor] ERROR VX_SCEDT_001_005 failed during processing script commands\n"

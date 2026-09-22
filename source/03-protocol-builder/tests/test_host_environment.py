@@ -164,3 +164,13 @@ def test_bundle_setup_paths_are_in_inventory() -> None:
     for path in required:
         assert path in bat
         assert path in relatives
+
+
+def test_driverframework_log_inventory_is_metadata_only() -> None:
+    item = next(
+        item for item in load_state_inventory()["categories"]
+        if item["id"] == "driverframework_pegasus_logs"
+    )
+    assert item["relative_paths"] == [r"Pegasus\Log"]
+    assert item["capture"] == "fingerprint"
+    assert item["copy_into_diagnostics"] is False
