@@ -1,0 +1,27 @@
+{
+  "schema_version": "tecan.fluentcontrol_motion_defect_registry.v1",
+  "registry_source": {
+    "name": "Tecan FluentControl 3.8 SP1 revision history",
+    "document_version": "3.8.16.1118",
+    "section": "FluentControl 3.5 bug fixes",
+    "url": "https://www.tecan.com/hubfs/Knowledgebase/Manuals/Fluent%20Control/Revision%20History%20FluentControl%203.8%20SP1.pdf"
+  },
+  "issues": [
+    {
+      "vendor_issue_id": "120382",
+      "title": "PathFinder cannot evade MCA384 arm because it does not use all available range",
+      "fixed_in": "3.5",
+      "trigger_features": ["mca384_arm_motion", "pathfinder"],
+      "diagnostic_id": "fluent_log.pathfinder_mca384_evasion",
+      "source_excerpt": "PathFinder cannot evade MCA384 arm because it does not use all available range."
+    },
+    {
+      "vendor_issue_id": "120985",
+      "title": "RGA contouring error when evading MCA384",
+      "fixed_in": "3.5",
+      "trigger_features": ["mca384_arm_motion", "rga_contouring"],
+      "diagnostic_id": "fluent_log.rga_contouring_mca384_evasion",
+      "source_excerpt": "RGA contouring error when evading MCA384."
+    }
+  ]
+}

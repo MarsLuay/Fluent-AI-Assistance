@@ -1,0 +1,32 @@
+{
+  "host_environment": {
+    "schema_version": "tecan.host_environment.v1",
+    "fingerprint": "fixture-host-34",
+    "products": [
+      {
+        "family": "FluentControl",
+        "detected": true,
+        "version": "3.4 SP1",
+        "build": "fixture-34",
+        "version_source": "fixture"
+      }
+    ]
+  },
+  "protocol_ir": {
+    "steps": [
+      {
+        "id": "move-mca384",
+        "operation": "mca384_move_arm",
+        "source_path": "fixture.xscr:12"
+      }
+    ]
+  },
+  "log_records": [
+    {
+      "timestamp": "2026-09-22 12:00:00",
+      "channel": "Tecan/Fluent Control/Instrument/PathFinding/RGA 1",
+      "message": "PathFinder evaluating MCA384 arm evasion",
+      "source": "fixture.ulf"
+    }
+  ]
+}
