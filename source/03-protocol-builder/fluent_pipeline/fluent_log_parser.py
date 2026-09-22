@@ -40,6 +40,10 @@ DEFAULT_FLUENT_LOG_LOCATIONS: tuple[tuple[str, str], ...] = (
     (r"C:\ProgramData\Tecan\VisionX\Logs", "*.log"),
     (r"C:\ProgramData\Tecan\VisionX\LogFiles", "*.log"),
     (r"C:\ProgramData\Tecan\FluentControl", "*.log"),
+    # Tecan troubleshooting guidance documents this DriverFramework/Pegasus
+    # location.  Parsing remains evidence-only; no state or recovery action is
+    # inferred from the directory name.
+    (r"C:\ProgramData\Tecan\Pegasus\Log", "*.log"),
 )
 ERROR_ID_RE = re.compile(r"\b(VX_[A-Z0-9_]+)\b")
 TIMESTAMP_RE = re.compile(

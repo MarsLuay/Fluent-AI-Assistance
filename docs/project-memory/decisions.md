@@ -27,3 +27,10 @@
   paths, render progress/results, and return its stage-specific status; import,
   readiness, request-spec validation, generation, simulation, compilation, and
   packaging remain the existing workflow's responsibility.
+- Keep external-device health as a conservative consumer of the source-backed
+  `tecan.driver_command_contracts.v1` and `tecan.host_environment.v1` records:
+  command roles, documented DriverFramework states, and license capability
+  evidence require explicit provenance. #154 owns recovery policy, #155 owns
+  per-command contracts, and #156 owns host/environment evidence; unknown
+  evidence remains reviewable rather than becoming an inferred command,
+  timeout, keepalive, or root-cause claim.

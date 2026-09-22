@@ -143,6 +143,34 @@ class ExternalCommandContractTests(unittest.TestCase):
         self.assertEqual(dynamic["following_companion"]["name"], "Vendor_WaitFinished")
         self.assertIsNone(static.get("following_companion"))
 
+    def test_multiple_modules_remain_separate_ordered_source_usages(self) -> None:
+        xscr = """\
+<Script>
+  <ApplicationDriverMacro Name="DeviceA_Initialize" ModuleName="DeviceA" ExecutionTime="PT1S" LineNumber="10">
+    <ExecutionSettings>source-a-init</ExecutionSettings>
+  </ApplicationDriverMacro>
+  <ApplicationDriverMacro Name="DeviceA_Read" ModuleName="DeviceA" ExecutionTime="PT1S" LineNumber="11">
+    <ExecutionSettings>source-a-read</ExecutionSettings>
+  </ApplicationDriverMacro>
+  <LegacyDriverMacro Name="DeviceB_Status" ModuleName="DeviceB" ExecutionTime="PT1S" LineNumber="12">
+    <ExecutionSettings>source-b-status</ExecutionSettings>
+  </LegacyDriverMacro>
+</Script>
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "source.xscr").write_text(xscr, encoding="utf-8")
+            contracts = build_driver_usage_contracts(
+                {"scripts": [{"object_name": "Synthetic", "extracted_path": "source.xscr"}]},
+                context_root=root,
+            )
+
+        self.assertEqual(
+            [(item["module_name"], item["macro_name"]) for item in contracts],
+            [("DeviceA", "DeviceA_Initialize"), ("DeviceA", "DeviceA_Read"), ("DeviceB", "DeviceB_Status")],
+        )
+        self.assertEqual([item["command_index"] for item in contracts], [0, 1, 2])
+
 
 if __name__ == "__main__":
     unittest.main()
