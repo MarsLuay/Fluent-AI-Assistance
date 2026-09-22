@@ -1,0 +1,32 @@
+{
+  "host_environment": {
+    "schema_version": "tecan.host_environment.v1",
+    "fingerprint": "fixture-host-38",
+    "products": [
+      {
+        "family": "FluentControl",
+        "detected": true,
+        "version": "3.8 SP1",
+        "build": "fixture-38",
+        "version_source": "fixture"
+      }
+    ]
+  },
+  "protocol_ir": {
+    "steps": [
+      {
+        "id": "move-mca384",
+        "operation": "mca384_move_arm",
+        "source_path": "fixture.xscr:12"
+      }
+    ]
+  },
+  "log_records": [
+    {
+      "timestamp": "2026-09-22 12:01:00",
+      "channel": "Tecan/Fluent Control/Instrument/RGA 1",
+      "message": "RGA contouring error while evading MCA384 arm",
+      "source": "fixture.ulf"
+    }
+  ]
+}

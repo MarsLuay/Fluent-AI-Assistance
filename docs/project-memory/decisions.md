@@ -34,3 +34,10 @@
   per-command contracts, and #156 owns host/environment evidence; unknown
   evidence remains reviewable rather than becoming an inferred command,
   timeout, keepalive, or root-cause claim.
+- Keep FluentControl motion compatibility as a separate, source-backed report:
+  vendor issues 120382 and 120985 come from the Tecan revision-history registry,
+  version/build evidence comes from #156, typed MCA384 arm moves come from
+  canonical protocol IR, and PathFinder/RGA contouring signals come from
+  structured logs. Missing version or trigger evidence remains unknown or
+  trigger-not-present; motion analysis does not model geometry, physical
+  readiness (#160), direct arm workarounds, or pipetting root cause.
