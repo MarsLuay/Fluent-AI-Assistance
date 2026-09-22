@@ -3415,6 +3415,49 @@ class ArchiveWindowsNameRestorationTests(unittest.TestCase):
             # zipfile.namelist() normalizes backslashes to forward slashes.
             self.assertIn(b"DataStore\\file1.txt", data)
 
+
+    def test_eocd_with_trailing_padding(self):
+        """
+        Verify that `_restore_windows_datastore_zip_names` works correctly
+        when there is valid padding or a valid signature with extra trailing data after the EOCD block.
+        """
+        from fluent_pipeline.exports import _restore_windows_datastore_zip_names
+
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "test_trailing.zip"
+            with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_STORED) as zf:
+                zf.writestr("DataStore/file1.txt", b"hello trailing")
+
+            # Read original bytes and append fake trailing bytes.
+            # Normal tools tolerate some trailing garbage. We want to test our EOCD parser
+            # handles it correctly if it finds a valid EOCD with comment length matching the padding.
+            data = bytearray(p.read_bytes())
+
+            # Modify the EOCD comment length to include 4 bytes of padding.
+            eocd_offset = data.rfind(b"PK\x05\x06")
+            self.assertNotEqual(eocd_offset, -1)
+
+            # Read current comment length
+            comment_len = int.from_bytes(data[eocd_offset + 20 : eocd_offset + 22], "little")
+
+            # Add padding to data
+            padding = b"1234"
+            data.extend(padding)
+
+            # Update comment length in EOCD
+            new_comment_len = comment_len + len(padding)
+            data[eocd_offset + 20 : eocd_offset + 22] = new_comment_len.to_bytes(2, "little")
+
+            p.write_bytes(data)
+
+            _restore_windows_datastore_zip_names(p)
+
+            # Check if name is restored and ZIP is readable
+            with zipfile.ZipFile(p, "r") as zf:
+                self.assertIsNone(zf.testzip())
+            data = p.read_bytes()
+            self.assertIn(b"DataStore\\file1.txt", data)
+
     def test_rewrite_zip_filename_records_false_eocd_signature(self):
         """
         Verify that `_restore_windows_datastore_zip_names` correctly rejects spoofed EOCD
