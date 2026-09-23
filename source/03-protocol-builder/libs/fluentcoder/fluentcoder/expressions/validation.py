@@ -5,6 +5,8 @@ from __future__ import annotations
 import zipfile
 import re
 import hashlib
+import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -16,7 +18,10 @@ from .fields import (
     expression_fields_for_command,
 )
 from .parser import ExpressionParseError, parse_expression
+from .migration import extract_opaque_expression_references
+from .catalog import ExpressionSymbolCatalog
 from .semantics import (
+    FunctionResolution,
     SemanticIssue,
     check_expression_semantics,
     normalize_fluent_type_name,
@@ -44,9 +49,17 @@ def expression_inventory_from_xscr_text(
     entry: str = "",
     permitted_variables: Mapping[str, str] | None = None,
     source_preserved_allowlist: Iterable[Mapping[str, Any]] | None = None,
+    source_kind: str = "generated",
+    source_version: str | None = None,
+    version_evidence: Mapping[str, Any] | None = None,
+    target_version: str | None = None,
+    catalog: ExpressionSymbolCatalog | None = None,
 ) -> dict[str, Any]:
+    if source_kind not in {"generated", "imported"}:
+        raise ValueError("source_kind must be 'generated' or 'imported'")
     records: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
+    source_functions: list[dict[str, Any]] = []
     attribute_references = []
     try:
         root = _parse_xscr_text(text)
@@ -58,7 +71,17 @@ def expression_inventory_from_xscr_text(
             "reason": "xml_parse_error",
             "message": str(exc),
         }
-        return {"valid": False, "record_count": 0, "records": [], "failures": [failure]}
+        return {
+            "valid": False,
+            "record_count": 0,
+            "records": [],
+            "failures": [failure],
+            "source_kind": source_kind,
+            "source_version": source_version,
+            "version_evidence": _stable_value(version_evidence),
+            "source_functions": [],
+            "unknown_source_functions": [],
+        }
 
     script_name = script or _first_text(root, "ObjectName") or Path(entry).stem
     variables = _variable_declarations(root)
@@ -70,6 +93,8 @@ def expression_inventory_from_xscr_text(
     semantic_context = semantic_context_from_variables(
         semantic_variables,
         enforce_declared_variables=True,
+        catalog=catalog,
+        target_version=target_version,
     )
     charge_condition_semantic_context = semantic_context_from_variables(
         {
@@ -77,6 +102,8 @@ def expression_inventory_from_xscr_text(
             **_CHARGE_CONDITION_ENUM_LITERALS,
         },
         enforce_declared_variables=True,
+        catalog=catalog,
+        target_version=target_version,
     )
     source_preserved_records = tuple(source_preserved_allowlist or ())
     for command_index, obj in enumerate(_elements_by_local_name(root, "Object"), start=1):
@@ -135,6 +162,10 @@ def expression_inventory_from_xscr_text(
                     assignment_target=variable if command == "SetVariableStatement" else None,
                     seed_issues=issues,
                     source_preserved_allowlist=source_preserved_records,
+                    source_kind=source_kind,
+                    source_version=source_version,
+                    version_evidence=version_evidence,
+                    source_functions=source_functions,
                 )
                 try:
                     parsed = parse_expression(raw_expression)
@@ -150,6 +181,10 @@ def expression_inventory_from_xscr_text(
                         )
                     )
     attribute_diagnostics = attribute_conflict_diagnostics(attribute_references)
+    ordered_source_functions = _ordered_source_functions(source_functions)
+    unknown_source_functions = [
+        item for item in ordered_source_functions if item["status"] != "known_supported"
+    ]
     return {
         "valid": not failures,
         "record_count": len(records),
@@ -159,6 +194,13 @@ def expression_inventory_from_xscr_text(
         "failures": failures,
         "attribute_references": [reference.to_dict() for reference in attribute_references],
         "attribute_diagnostics": list(attribute_diagnostics),
+        "source_kind": source_kind,
+        "source_version": source_version,
+        "version_evidence": _stable_value(version_evidence),
+        "source_function_count": len(ordered_source_functions),
+        "unknown_source_function_count": len(unknown_source_functions),
+        "source_functions": ordered_source_functions,
+        "unknown_source_functions": unknown_source_functions,
     }
 
 
@@ -172,6 +214,10 @@ def _validate_expression_record(
     assignment_target: str | None = None,
     seed_issues: list[SemanticIssue] | None = None,
     source_preserved_allowlist: Iterable[Mapping[str, Any]] = (),
+    source_kind: str = "generated",
+    source_version: str | None = None,
+    version_evidence: Mapping[str, Any] | None = None,
+    source_functions: list[dict[str, Any]] | None = None,
 ) -> None:
     raw_expression = str(record.get("raw_expression") or "")
     try:
@@ -184,6 +230,15 @@ def _validate_expression_record(
         )
         if allowance is not None:
             seed = tuple(seed_issues or ())
+            referenced_variables, referenced_function_names = extract_opaque_expression_references(raw_expression)
+            allowed_resolutions = tuple(
+                semantic_context.resolve_function(name) for name in referenced_function_names
+            )
+            source_issues = tuple(
+                _source_resolution_issue(resolution)
+                for resolution in allowed_resolutions
+                if source_kind == "imported" and resolution.status != "known_supported"
+            )
             seed_errors = [issue for issue in seed if issue.severity == "error"]
             allowed = {
                 **record,
@@ -195,9 +250,22 @@ def _validate_expression_record(
                 "source_hash": _expression_source_hash(raw_expression),
                 "source_entry": allowance.get("source_entry") or allowance.get("accepted_source_entry"),
                 "provenance_policy": allowance.get("provenance_policy") or "source_preservation_allowed",
+                "referenced_variables": list(referenced_variables),
+                "referenced_functions": list(referenced_function_names),
             }
-            if seed:
-                allowed["semantic_issues"] = [issue.to_dict() for issue in seed]
+            all_issues = (*seed, *source_issues)
+            if all_issues:
+                allowed["semantic_issue_count"] = len(all_issues)
+                allowed["semantic_issues"] = [issue.to_dict() for issue in all_issues]
+            if source_functions is not None and source_kind == "imported":
+                source_functions.extend(
+                    _source_function_records(
+                        record=allowed,
+                        resolutions=allowed_resolutions,
+                        source_version=source_version,
+                        version_evidence=version_evidence,
+                    )
+                )
             records.append(allowed)
             if seed_errors:
                 failures.append(
@@ -223,7 +291,19 @@ def _validate_expression_record(
         expected_type=expected_type,
         assignment_target=assignment_target,
     )
-    semantic_issues = tuple(seed_issues or ()) + semantic_result.issues
+    semantic_issues = tuple(seed_issues or ()) + tuple(
+        _source_function_issue(issue, source_kind=source_kind)
+        for issue in semantic_result.issues
+    )
+    if source_functions is not None and source_kind == "imported":
+        source_functions.extend(
+            _source_function_records(
+                record=record,
+                resolutions=semantic_result.function_resolutions,
+                source_version=source_version,
+                version_evidence=version_evidence,
+            )
+        )
     semantic_errors = [issue for issue in semantic_issues if issue.severity == "error"]
     valid_record = {
         **record,
@@ -245,6 +325,147 @@ def _validate_expression_record(
             "reason": semantic_errors[0].code,
         }
         failures.append(failure)
+
+
+def _source_function_issue(issue: SemanticIssue, *, source_kind: str) -> SemanticIssue:
+    if source_kind != "imported" or issue.function_resolution is None:
+        return issue
+    status = issue.function_resolution.status
+    if issue.code == "unknown_function" and status == "catalog_unknown":
+        return replace(
+            issue,
+            code="source_function_signature_unknown",
+            message=(
+                f"Imported source function {issue.function_name or issue.function_resolution.name!r} "
+                "is not in the verified expression catalog; the source is retained for review."
+            ),
+            severity="warning",
+        )
+    if issue.code == "unsupported_function_version" and status == "known_unsupported":
+        return replace(
+            issue,
+            code="source_function_unsupported_for_target",
+            message=(
+                f"Imported source function {issue.function_name or issue.function_resolution.name!r} "
+                "is known but is unsupported for the requested target version; the source is retained for review."
+            ),
+            severity="warning",
+        )
+    return issue
+
+
+def _source_resolution_issue(resolution: FunctionResolution) -> SemanticIssue:
+    if resolution.status == "catalog_unknown":
+        return SemanticIssue(
+            code="source_function_signature_unknown",
+            message=(
+                f"Imported source function {resolution.name!r} is not in the verified expression catalog; "
+                "the source is retained for review."
+            ),
+            function_name=resolution.name,
+            function_resolution=resolution,
+            severity="warning",
+        )
+    if resolution.status == "known_unsupported":
+        return SemanticIssue(
+            code="source_function_unsupported_for_target",
+            message=(
+                f"Imported source function {resolution.name!r} is known but is unsupported for the requested "
+                "target version; the source is retained for review."
+            ),
+            function_name=resolution.name,
+            function_resolution=resolution,
+            severity="warning",
+        )
+    return SemanticIssue(
+        code="function_target_version_unknown",
+        message=(
+            f"Imported source function {resolution.name!r} has a version-scoped catalog entry, but the "
+            "target FluentControl version is unknown."
+        ),
+        function_name=resolution.name,
+        function_resolution=resolution,
+        severity="warning",
+    )
+
+
+def _source_function_records(
+    *,
+    record: Mapping[str, Any],
+    resolutions: Iterable[FunctionResolution],
+    source_version: str | None,
+    version_evidence: Mapping[str, Any] | None,
+) -> list[dict[str, Any]]:
+    raw_expression = str(record.get("raw_expression") or "")
+    source_hash = _expression_source_hash(raw_expression)
+    stable_version_evidence = _stable_value(version_evidence)
+    records: list[dict[str, Any]] = []
+    for resolution in resolutions:
+        item = {
+            "function_name": resolution.name,
+            "normalized_name": resolution.name.casefold(),
+            "status": resolution.status,
+            "category": resolution.category,
+            "script": record.get("script"),
+            "entry": record.get("entry"),
+            "source_entry": record.get("source_entry"),
+            "line": record.get("line"),
+            "command_index": record.get("command_index"),
+            "command": record.get("command"),
+            "field": record.get("field"),
+            "raw_expression": raw_expression,
+            "source_hash": source_hash,
+            "source_version": source_version,
+            "version_evidence": stable_version_evidence,
+            "function_resolution": resolution.to_dict(),
+        }
+        identity = {
+            key: item.get(key)
+            for key in (
+                "function_name",
+                "entry",
+                "source_entry",
+                "line",
+                "command_index",
+                "command",
+                "field",
+                "source_hash",
+                "source_version",
+            )
+        }
+        item["record_id"] = "sha256:" + hashlib.sha256(
+            json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        records.append({key: value for key, value in item.items() if value is not None})
+    return records
+
+
+def _ordered_source_functions(records: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        dict(item)
+        for item in sorted(
+            records,
+            key=lambda item: (
+                str(item.get("normalized_name") or ""),
+                str(item.get("entry") or ""),
+                str(item.get("script") or ""),
+                str(item.get("line") or ""),
+                int(item.get("command_index") or 0),
+                str(item.get("field") or ""),
+                str(item.get("record_id") or ""),
+            ),
+        )
+    ]
+
+
+def _stable_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _stable_value(value[key]) for key in sorted(value, key=str)}
+    if isinstance(value, (list, tuple)):
+        return [_stable_value(item) for item in value]
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    return str(value)
 
 
 def _matching_source_preserved_allowance(
@@ -373,6 +594,10 @@ def expression_inventory_from_zeia(
     *,
     permitted_variables: Mapping[str, str] | None = None,
     source_preserved_allowlist: Iterable[Mapping[str, Any]] | None = None,
+    source_version: str | None = None,
+    version_evidence: Mapping[str, Any] | None = None,
+    target_version: str | None = None,
+    catalog: ExpressionSymbolCatalog | None = None,
 ) -> dict[str, Any]:
     inventories: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
@@ -385,9 +610,14 @@ def expression_inventory_from_zeia(
             "failure_count": 1,
             "scripts": [],
             "failures": [{"valid": False, "reason": "not_a_readable_zeia", "archive": str(archive_path)}],
+            "source_kind": "imported",
+            "source_version": source_version,
+            "version_evidence": _stable_value(version_evidence),
+            "source_functions": [],
+            "unknown_source_functions": [],
         }
     with zipfile.ZipFile(archive_path, "r") as zf:
-        for name in zf.namelist():
+        for name in sorted(zf.namelist(), key=lambda value: value.replace("\\", "/").casefold()):
             if not name.replace("\\", "/").casefold().endswith(".xscr"):
                 continue
             data = zf.read(name)
@@ -397,9 +627,22 @@ def expression_inventory_from_zeia(
                 entry=name,
                 permitted_variables=permitted_variables,
                 source_preserved_allowlist=source_preserved_allowlist,
+                source_kind="imported",
+                source_version=source_version,
+                version_evidence=version_evidence,
+                target_version=target_version,
+                catalog=catalog,
             )
             inventories.append(inventory)
             failures.extend(inventory.get("failures") or [])
+    source_functions = _ordered_source_functions(
+        function
+        for inventory in inventories
+        for function in inventory.get("source_functions") or []
+    )
+    unknown_source_functions = [
+        item for item in source_functions if item["status"] != "known_supported"
+    ]
     return {
         "valid": not failures,
         "archive": str(archive_path),
@@ -408,6 +651,13 @@ def expression_inventory_from_zeia(
         "failure_count": len(failures),
         "scripts": inventories,
         "failures": failures,
+        "source_kind": "imported",
+        "source_version": source_version,
+        "version_evidence": _stable_value(version_evidence),
+        "source_function_count": len(source_functions),
+        "unknown_source_function_count": len(unknown_source_functions),
+        "source_functions": source_functions,
+        "unknown_source_functions": unknown_source_functions,
     }
 
 
