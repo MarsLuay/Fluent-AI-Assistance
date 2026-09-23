@@ -234,6 +234,10 @@ def _validate_expression_record(
     }
     if semantic_issues:
         valid_record["semantic_issues"] = [issue.to_dict() for issue in semantic_issues]
+    if semantic_result.function_resolutions:
+        valid_record["function_resolutions"] = [
+            resolution.to_dict() for resolution in semantic_result.function_resolutions
+        ]
     records.append(valid_record)
     if semantic_errors:
         failure = {

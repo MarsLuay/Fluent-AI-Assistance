@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from dataclasses import field
 from dataclasses import replace
-from typing import Any, Literal, Mapping
+from typing import Any, Literal, Mapping, Sequence
 
 from .ast import (
     BinaryExpression,
@@ -21,6 +22,12 @@ from .ast import (
     expression_kind,
 )
 from .attributes import attribute_references_in_expression, AttributeReference
+from .catalog import (
+    CatalogProvenance,
+    ExpressionSymbol,
+    ExpressionSymbolCatalog,
+    load_expression_symbol_catalog,
+)
 from .operators import (
     ExpectedTypeName as ExpectedType,
     ExpressionTypeName as ExpressionType,
@@ -103,6 +110,61 @@ class FunctionSignature:
         return len(self.argument_types)
 
 
+FunctionResolutionStatus = Literal[
+    "known_supported",
+    "known_unsupported",
+    "target_version_unknown",
+    "catalog_unknown",
+    "custom",
+]
+
+
+@dataclass(frozen=True)
+class FunctionResolution:
+    """Catalog-aware function resolution used by semantic validation."""
+
+    name: str
+    status: FunctionResolutionStatus
+    signature: FunctionSignature | None = None
+    category: str | None = None
+    provenance: tuple[CatalogProvenance, ...] = ()
+    symbol: ExpressionSymbol | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        signature = self.signature
+        return {
+            "name": self.name,
+            "status": self.status,
+            **({"category": self.category} if self.category else {}),
+            "provenance": [
+                {
+                    key: value
+                    for key, value in (
+                        ("source", item.source),
+                        ("reference", item.reference),
+                        ("note", item.note),
+                    )
+                    if value
+                }
+                for item in self.provenance
+            ],
+            **(
+                {
+                    "signature": {
+                        "name": signature.name,
+                        "argument_types": list(signature.argument_types),
+                        "return_type": signature.return_type,
+                        "variadic_type": signature.variadic_type,
+                        "min_arguments": signature.min_arguments,
+                        "max_arguments": signature.max_arguments,
+                    }
+                }
+                if signature is not None
+                else {}
+            ),
+        }
+
+
 @dataclass(frozen=True)
 class SemanticIssue:
     code: str
@@ -111,9 +173,11 @@ class SemanticIssue:
     severity: Literal["error", "warning"] = "error"
     expected_type: str | None = None
     actual_type: str | None = None
+    function_name: str | None = None
+    function_resolution: FunctionResolution | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             key: value
             for key, value in {
                 "code": self.code,
@@ -125,6 +189,11 @@ class SemanticIssue:
             }.items()
             if value not in (None, "")
         }
+        if self.function_name is not None:
+            payload["function_name"] = self.function_name
+        if self.function_resolution is not None:
+            payload["function_resolution"] = self.function_resolution.to_dict()
+        return payload
 
 
 @dataclass(frozen=True)
@@ -132,6 +201,7 @@ class SemanticResult:
     type_name: ExpressionType
     issues: tuple[SemanticIssue, ...] = ()
     attribute_references: tuple[AttributeReference, ...] = ()
+    function_resolutions: tuple[FunctionResolution, ...] = ()
 
     @property
     def valid(self) -> bool:
@@ -143,6 +213,9 @@ class ExpressionSemanticContext:
     variables: Mapping[str, VariableSymbol] | None = None
     functions: Mapping[str, FunctionSignature] | None = None
     enforce_declared_variables: bool = False
+    catalog: ExpressionSymbolCatalog | None = None
+    target_version: str | None = None
+    _uses_custom_functions: bool = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         variables = self.variables or {}
@@ -155,11 +228,15 @@ class ExpressionSemanticContext:
             normalized_variables[variable.name] = variable
         object.__setattr__(self, "variables", normalized_variables)
 
-        functions = self.functions or default_function_signatures()
+        uses_custom_functions = self.functions is not None
+        catalog = self.catalog or load_expression_symbol_catalog()
+        object.__setattr__(self, "catalog", catalog)
+        functions = self.functions if uses_custom_functions else catalog.function_signatures()
         normalized_functions: dict[str, FunctionSignature] = {}
         for name, signature in functions.items():
             normalized_functions[str(name).casefold()] = signature
         object.__setattr__(self, "functions", normalized_functions)
+        object.__setattr__(self, "_uses_custom_functions", uses_custom_functions)
 
     def variable(self, name: str) -> VariableSymbol | None:
         variables = dict(self.variables or {})
@@ -174,12 +251,95 @@ class ExpressionSemanticContext:
     def function(self, name: str) -> FunctionSignature | None:
         return dict(self.functions or {}).get(name.casefold())
 
+    def resolve_function(
+        self,
+        name: str,
+        *,
+        argument_types: Sequence[ExpressionType] | None = None,
+        argument_count: int | None = None,
+    ) -> FunctionResolution:
+        """Resolve a function with catalog category, provenance, and version state."""
+
+        if self._uses_custom_functions:
+            signature = self.function(name)
+            return FunctionResolution(
+                name=signature.name if signature is not None else str(name),
+                status="custom" if signature is not None else "catalog_unknown",
+                signature=signature,
+            )
+
+        symbol = self.catalog.lookup(name) if self.catalog is not None else None
+        if symbol is None:
+            return FunctionResolution(name=str(name), status="catalog_unknown")
+
+        version_status = symbol.version_status(self.target_version)
+        if version_status == "unsupported":
+            return FunctionResolution(
+                name=symbol.name,
+                status="known_unsupported",
+                category=symbol.kind,
+                provenance=symbol.provenance,
+                symbol=symbol,
+            )
+
+        signature = _select_catalog_signature(
+            symbol,
+            argument_types=argument_types,
+            argument_count=argument_count,
+        )
+        return FunctionResolution(
+            name=symbol.name,
+            status="target_version_unknown" if version_status == "cannot_determine" else "known_supported",
+            signature=signature,
+            category=symbol.kind,
+            provenance=symbol.provenance,
+            symbol=symbol,
+        )
+
+
+def _select_catalog_signature(
+    symbol: ExpressionSymbol,
+    *,
+    argument_types: Sequence[ExpressionType] | None,
+    argument_count: int | None,
+) -> FunctionSignature | None:
+    signatures = [signature.to_function_signature(symbol.name) for signature in symbol.signatures]
+    if not signatures:
+        return None
+    if argument_types is None and argument_count is None:
+        return signatures[0]
+
+    count = argument_count if argument_count is not None else len(argument_types or ())
+    typed_arguments = tuple(argument_types or ())
+    compatible: list[tuple[int, int, FunctionSignature]] = []
+    for signature_index, signature in enumerate(signatures):
+        if count < signature.min_count or (signature.max_count is not None and count > signature.max_count):
+            continue
+        exact_matches = 0
+        valid = True
+        for index, actual_type in enumerate(typed_arguments):
+            expected_type = signature.expected_argument_type(index)
+            if expected_type is None or not is_type_compatible(actual_type, expected_type):
+                valid = False
+                break
+            if actual_type == expected_type:
+                exact_matches += 1
+        if valid:
+            compatible.append((exact_matches, -signature_index, signature))
+    if compatible:
+        return max(compatible, key=lambda item: (item[0], item[1]))[2]
+
+    matching_count = [signature for signature in signatures if signature.min_count <= count and (signature.max_count is None or count <= signature.max_count)]
+    return matching_count[0] if matching_count else signatures[0]
+
 
 def semantic_context_from_variables(
     variables: Mapping[str, str | VariableSymbol] | None,
     *,
     enforce_declared_variables: bool | None = None,
     functions: Mapping[str, FunctionSignature] | None = None,
+    catalog: ExpressionSymbolCatalog | None = None,
+    target_version: str | None = None,
 ) -> ExpressionSemanticContext:
     normalized: dict[str, VariableSymbol] = {}
     for name, value in (variables or {}).items():
@@ -191,6 +351,8 @@ def semantic_context_from_variables(
         variables=normalized,
         functions=functions,
         enforce_declared_variables=bool(normalized) if enforce_declared_variables is None else enforce_declared_variables,
+        catalog=catalog,
+        target_version=target_version,
     )
 
 
@@ -231,7 +393,42 @@ def check_expression_semantics(
         type_name=inferred_type,
         issues=tuple(issues),
         attribute_references=tuple(references),
+        function_resolutions=tuple(_function_resolutions(expression, ctx)),
     )
+
+
+def _function_resolutions(
+    expression: Expression,
+    context: ExpressionSemanticContext,
+) -> list[FunctionResolution]:
+    if isinstance(expression, FunctionCall):
+        argument_types = tuple(
+            _infer_expression_type(argument, context, "$.resolution", [])
+            for argument in expression.arguments
+        )
+        return [
+            context.resolve_function(
+                expression.name,
+                argument_types=argument_types,
+                argument_count=len(expression.arguments),
+            ),
+            *[
+                resolution
+                for argument in expression.arguments
+                for resolution in _function_resolutions(argument, context)
+            ],
+        ]
+    if isinstance(expression, IndexExpression):
+        return _function_resolutions(expression.base, context) + _function_resolutions(expression.index, context)
+    if isinstance(expression, UnaryExpression):
+        return _function_resolutions(expression.operand, context)
+    if isinstance(expression, BinaryExpression):
+        return _function_resolutions(expression.left, context) + _function_resolutions(expression.right, context)
+    if isinstance(expression, SourcePreservedExpression):
+        return [context.resolve_function(name) for name in expression.referenced_functions]
+    if isinstance(expression, ReviewedRawExpression):
+        return [context.resolve_function(name) for name in expression.referenced_functions]
+    return []
 
 
 def normalize_fluent_type_name(type_name: str | None) -> ExpressionType:
@@ -324,6 +521,37 @@ def _infer_expression_type(
                 severity="warning",
             )
         )
+        if isinstance(expression, SourcePreservedExpression):
+            for index, function_name in enumerate(expression.referenced_functions):
+                resolution = context.resolve_function(function_name)
+                if resolution.status == "catalog_unknown":
+                    issues.append(
+                        SemanticIssue(
+                            code="source_preserved_unknown_function",
+                            message=(
+                                f"Source-preserved function {function_name!r} is not in the verified "
+                                "expression catalog; the original source is retained for review."
+                            ),
+                            path=f"{path}.referenced_functions[{index}]",
+                            severity="warning",
+                            function_name=function_name,
+                            function_resolution=resolution,
+                        )
+                    )
+                elif resolution.status == "known_unsupported":
+                    issues.append(
+                        SemanticIssue(
+                            code="source_preserved_unsupported_function",
+                            message=(
+                                f"Source-preserved function {function_name!r} is not supported for "
+                                f"target version {context.target_version!r}; the original source is retained for review."
+                            ),
+                            path=f"{path}.referenced_functions[{index}]",
+                            severity="warning",
+                            function_name=function_name,
+                            function_resolution=resolution,
+                        )
+                    )
         return "unknown"
     issues.append(
         SemanticIssue(
@@ -438,19 +666,59 @@ def _infer_function_call_type(
     path: str,
     issues: list[SemanticIssue],
 ) -> ExpressionType:
-    signature = context.function(expression.name)
     argument_types = [
         _infer_expression_type(argument, context, f"{path}.arguments[{index}]", issues)
         for index, argument in enumerate(expression.arguments)
     ]
-    if signature is None:
+    resolution = context.resolve_function(
+        expression.name,
+        argument_types=argument_types,
+        argument_count=len(expression.arguments),
+    )
+    if resolution.status == "catalog_unknown":
         issues.append(
             SemanticIssue(
                 code="unknown_function",
                 message=f"Function {expression.name!r} is not in the FluentControl expression registry.",
                 path=path,
+                function_name=expression.name,
+                function_resolution=resolution,
             )
         )
+        return "unknown"
+
+    if resolution.status == "known_unsupported":
+        issues.append(
+            SemanticIssue(
+                code="unsupported_function_version",
+                message=(
+                    f"Function {expression.name!r} is not supported for target version "
+                    f"{context.target_version!r}."
+                ),
+                path=path,
+                function_name=expression.name,
+                function_resolution=resolution,
+            )
+        )
+        return "unknown"
+
+    if resolution.status == "target_version_unknown":
+        issues.append(
+            SemanticIssue(
+                code="function_target_version_unknown",
+                message=(
+                    f"Function {expression.name!r} has a version-scoped catalog entry, but the "
+                    "target FluentControl version is unknown."
+                ),
+                path=path,
+                severity="warning",
+                function_name=expression.name,
+                function_resolution=resolution,
+            )
+        )
+
+    signature = resolution.signature
+    if signature is None:
         return "unknown"
 
     count = len(expression.arguments)
@@ -469,6 +737,8 @@ def _infer_function_call_type(
                 path=path,
                 expected_type=expected,
                 actual_type=str(count),
+                function_name=expression.name,
+                function_resolution=resolution,
             )
         )
 
@@ -487,6 +757,8 @@ def _infer_function_call_type(
                 path=f"{path}.arguments[{index}]",
                 expected_type=expected,
                 actual_type=actual_type,
+                function_name=expression.name,
+                function_resolution=resolution,
             )
         )
     if expression.name.casefold() in {"getattribute", "setattribute"} and expression.arguments:
