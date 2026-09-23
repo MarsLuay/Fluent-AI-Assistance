@@ -27,6 +27,12 @@
   paths, render progress/results, and return its stage-specific status; import,
   readiness, request-spec validation, generation, simulation, compilation, and
   packaging remain the existing workflow's responsibility.
+- Keep `tecan.generation_context.v1` provider/model agnostic and deterministic:
+  validated request facets preserve unknown intent as reviewable, while every
+  included evidence item carries a selection reason, source provenance, and
+  stable fingerprint. Later ranking, budget, and workflow children consume
+  this contract rather than widening it with implicit capabilities or raw
+  ZEIA/XSCR dumps.
 - Keep external-device health as a conservative consumer of the source-backed
   `tecan.driver_command_contracts.v1` and `tecan.host_environment.v1` records:
   command roles, documented DriverFramework states, and license capability

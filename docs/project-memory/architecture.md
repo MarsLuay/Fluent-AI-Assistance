@@ -43,6 +43,15 @@ registries supply contracts, then request specs and protocol IR feed rendering,
 validation, and packaging. Generated outputs and host-derived assets are not
 canonical source files for hand edits.
 
+The provider-neutral generation-context boundary is
+`tecan.generation_context.v1`. It turns a validated request/spec into
+deterministic task facets and carries only explicitly included evidence with a
+selection reason, source provenance, source fingerprint, omissions, and
+accounting. Unknown intent remains reviewable; this contract does not infer
+capabilities or dump whole ZEIA/XSCR sources. Pattern ranking, budget
+compaction, and one-shot workflow integration build on this boundary in later
+pipeline layers.
+
 Physical hardware readiness is owned by
 `source/03-protocol-builder/fluent_pipeline/physical_readiness.py`. It
 normalizes source/provenance-backed head, tip, labware, site, software,
