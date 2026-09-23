@@ -291,6 +291,7 @@ def test_cli_entry_points_against_full_export(full_export_env: dict) -> None:
     )
     invoke("catalog-info", ["catalog-info"])
     invoke("catalog-find", ["catalog-find", "Synthetic"])
+    invoke("expression-symbol", ["expression-symbol", "Round", "--json"])
     invoke("alias-list", ["alias-list", "--json"])
     invoke("alias-resolve", ["alias-resolve", "labware", "EVA[001]", "--json"])
     invoke("template-list", ["template-list", "--json"])

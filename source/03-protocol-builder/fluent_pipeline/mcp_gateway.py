@@ -16,11 +16,13 @@ from typing import Any
 from .authoring_status import AuthoringState
 from .application_services import (
     BundleVerificationRequest,
+    ExpressionSymbolQueryRequest,
     RepairApplyRequest,
     RepairPlanRequest,
     analyze_logs,
     apply_repair as apply_repair_service,
     create_request_spec as create_request_spec_service,
+    explain_expression_symbol,
     generate_protocol,
     inspect_project,
     import_project as import_project_service,
@@ -85,6 +87,7 @@ _CLI_COMMAND_COVERAGE: dict[str, dict[str, str]] = {
     "bundle-lifecycle": {"mode": "bridge"},
     "catalog-find": {"mode": "bridge"},
     "catalog-info": {"mode": "bridge"},
+    "expression-symbol": {"mode": "native", "tool": "fluent_explain_expression_symbol"},
     "clear-project": {"mode": "bridge"},
     "collection-info": {"mode": "bridge"},
     "compatibility-matrix": {"mode": "bridge"},
@@ -382,6 +385,23 @@ class ProtocolBuilderGateway:
 
     def projects(self) -> list[dict[str, Any]]:
         return list_projects()
+
+    def explain_expression_symbol(
+        self,
+        symbol: str,
+        *,
+        target_version: str | None = None,
+        version_evidence: dict[str, Any] | None = None,
+        source_examples: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        return explain_expression_symbol(
+            ExpressionSymbolQueryRequest(
+                symbol=symbol,
+                target_version=target_version,
+                version_evidence=version_evidence,
+                source_examples=tuple(source_examples or ()),
+            )
+        ).to_dict()
 
     def project(self, name: str | None = None) -> dict[str, Any]:
         return inspect_project(project_inspection_request_from_mcp(name)).to_dict()

@@ -52,6 +52,7 @@ from tecan_reader.full_export_readiness import (
 )
 from tecan_reader.project_index import discover_zeia_paths
 from tecan_reader.zeia_adapters import probe_zeia
+from fluentcoder.expressions import load_expression_symbol_catalog
 
 
 @dataclass(frozen=True)
@@ -114,6 +115,25 @@ class ProjectInspectionResult:
 
     def to_dict(self) -> dict[str, Any]:
         return inspection_payload(self.context, report_path=self.report_path)
+
+
+@dataclass(frozen=True)
+class ExpressionSymbolQueryRequest:
+    """Inputs for the shared expression-symbol explanation service."""
+
+    symbol: str
+    target_version: str | None = None
+    version_evidence: Mapping[str, Any] | None = None
+    source_examples: tuple[Mapping[str, Any], ...] = ()
+
+
+@dataclass(frozen=True)
+class ExpressionSymbolQueryResult:
+    request: ExpressionSymbolQueryRequest
+    report: dict[str, Any]
+
+    def to_dict(self) -> dict[str, Any]:
+        return dict(self.report)
 
 
 @dataclass(frozen=True)
@@ -531,6 +551,22 @@ def inspect_project(request: ProjectInspectionRequest) -> ProjectInspectionResul
         context=context,
         report_path=report_path if report_path.exists() else None,
     )
+
+
+def explain_expression_symbol(request: ExpressionSymbolQueryRequest) -> ExpressionSymbolQueryResult:
+    """Explain one catalog symbol through the adapter-neutral service boundary."""
+
+    symbol = str(request.symbol or "").strip()
+    if not symbol:
+        raise ValueError("symbol must be non-empty")
+    catalog = load_expression_symbol_catalog()
+    report = catalog.introspect(
+        symbol,
+        target_version=request.target_version,
+        version_evidence=request.version_evidence,
+        source_examples=list(request.source_examples),
+    )
+    return ExpressionSymbolQueryResult(request=request, report=report)
 
 
 def resolve_full_export_readiness(

@@ -2038,10 +2038,17 @@ def _expression_semantic_context_for_ir(payload: dict[str, Any]) -> tuple[Any, d
             continue
         type_name = _variable_type_name(variable)
         variable_types[name] = normalize_fluent_type_name(str(type_name))
+    target_version = payload.get("target_fluentcontrol_version")
+    for key in ("generation", "generation_options", "metadata"):
+        nested = payload.get(key)
+        if isinstance(nested, dict) and nested.get("target_fluentcontrol_version"):
+            target_version = nested.get("target_fluentcontrol_version")
+            break
     return (
         semantic_context_from_variables(
             variable_types,
             enforce_declared_variables=True,
+            target_version=str(target_version).strip() if target_version else None,
         ),
         variable_types,
     )

@@ -86,6 +86,22 @@ def fluent_list_projects() -> list[dict]:
 
 
 @mcp.tool()
+def fluent_explain_expression_symbol(
+    symbol: str,
+    target_version: str | None = None,
+    version_evidence: dict | None = None,
+    source_examples: list[dict] | None = None,
+) -> dict:
+    """Explain a catalog-backed FluentControl expression symbol."""
+    return gateway.explain_expression_symbol(
+        symbol,
+        target_version=target_version,
+        version_evidence=version_evidence,
+        source_examples=source_examples,
+    )
+
+
+@mcp.tool()
 def fluent_import_project(
     archive: str,
     name: str | None = None,

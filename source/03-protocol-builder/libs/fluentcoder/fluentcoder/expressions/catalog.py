@@ -83,9 +83,10 @@ class ExpressionSymbol:
     def version_status(self, target_version: str | None) -> str:
         if not self.version_ranges:
             return "supported"
-        if not target_version:
+        candidate = _target_version(target_version)
+        if candidate is None:
             return "cannot_determine"
-        return "supported" if any(version_range.contains(target_version) for version_range in self.version_ranges) else "unsupported"
+        return "supported" if any(version_range.contains(candidate) for version_range in self.version_ranges) else "unsupported"
 
 
 @dataclass(frozen=True)
@@ -120,6 +121,111 @@ class ExpressionSymbolCatalog:
             if symbol.signatures:
                 signatures[symbol.normalized_name] = symbol.signatures[0].to_function_signature(symbol.name)
         return signatures
+
+    def introspect(
+        self,
+        name: str,
+        *,
+        target_version: str | None = None,
+        version_evidence: Mapping[str, Any] | None = None,
+        source_examples: list[Mapping[str, Any]] | tuple[Mapping[str, Any], ...] = (),
+    ) -> dict[str, Any]:
+        """Return a deterministic, review-oriented explanation of one symbol."""
+
+        symbol = self.lookup(name)
+        if symbol is None:
+            return {
+                "schema": "tecan.expression_symbol_introspection.v1",
+                "query": str(name),
+                "canonical_name": None,
+                "status": "unknown",
+                "category": None,
+                "signatures": [],
+                "overloads": [],
+                "return_types": [],
+                "version_status": "unknown",
+                "catalog_version_status": "unknown_symbol",
+                "target_version": target_version,
+                "version_evidence": _stable_value(version_evidence),
+                "provenance": [],
+                "source_examples": [],
+            }
+
+        catalog_status = symbol.version_status(target_version)
+        status = {
+            "cannot_determine": "indeterminate",
+            "unknown_symbol": "unknown",
+        }.get(catalog_status, catalog_status)
+        signatures = [_signature_to_mapping(signature, symbol.name) for signature in symbol.signatures]
+        provenance = [
+            {
+                key: value
+                for key, value in (
+                    ("source", item.source),
+                    ("reference", item.reference),
+                    ("note", item.note),
+                )
+                if value
+            }
+            for item in symbol.provenance
+        ]
+        examples = _stable_examples(source_examples, symbol.name)
+        return {
+            "schema": "tecan.expression_symbol_introspection.v1",
+            "query": str(name),
+            "canonical_name": symbol.name,
+            "status": status,
+            "category": symbol.kind,
+            "description": symbol.description,
+            "signatures": signatures,
+            "overloads": signatures,
+            "return_types": sorted({str(item["return_type"]) for item in signatures}),
+            "version_status": status,
+            "catalog_version_status": catalog_status,
+            "target_version": target_version,
+            "version_evidence": _stable_value(version_evidence),
+            "provenance": provenance,
+            "source_examples": examples,
+        }
+
+    explain = introspect
+    introspect_symbol = introspect
+
+    def generation_policy(
+        self,
+        name: str,
+        *,
+        target_version: str | None = None,
+        source_kind: str = "generated",
+        reviewer_approved: bool = False,
+    ) -> dict[str, Any]:
+        """Classify whether a symbol may be generated or only preserved."""
+
+        if source_kind not in {"generated", "imported"}:
+            raise ValueError("source_kind must be 'generated' or 'imported'")
+        symbol = self.lookup(name)
+        status = "catalog_unknown" if symbol is None else symbol.version_status(target_version)
+        if reviewer_approved:
+            action = "generate_reviewed"
+            allowed = True
+        elif status == "supported":
+            action = "generate"
+            allowed = True
+        elif source_kind == "imported":
+            action = "preserve_source"
+            allowed = True
+        else:
+            action = "reject"
+            allowed = False
+        return {
+            "symbol": symbol.name if symbol else str(name),
+            "status": status,
+            "source_kind": source_kind,
+            "action": action,
+            "allowed": allowed,
+            "requires_review": status != "supported" and not reviewer_approved,
+            "target_version": target_version,
+        }
 
     def as_mapping(self) -> dict[str, Any]:
         return {
@@ -295,6 +401,59 @@ def _symbol_to_mapping(symbol: ExpressionSymbol) -> dict[str, Any]:
 
 def _signature_key(signature: CatalogSignature) -> tuple[Any, ...]:
     return (signature.argument_types, signature.return_type, signature.variadic_type, signature.min_arguments, signature.max_arguments)
+
+
+def _signature_to_mapping(signature: CatalogSignature, name: str) -> dict[str, Any]:
+    return {
+        "name": name,
+        "argument_types": list(signature.argument_types),
+        "return_type": signature.return_type,
+        "variadic_type": signature.variadic_type,
+        "min_arguments": signature.min_arguments,
+        "max_arguments": signature.max_arguments,
+    }
+
+
+def _stable_examples(
+    examples: list[Mapping[str, Any]] | tuple[Mapping[str, Any], ...],
+    name: str,
+) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    wanted = str(name).casefold()
+    for example in examples:
+        if not isinstance(example, Mapping):
+            continue
+        function_name = str(example.get("function_name") or example.get("name") or "")
+        if function_name and function_name.casefold() != wanted:
+            continue
+        normalized.append({str(key): _stable_value(example[key]) for key in sorted(example, key=str)})
+    deduplicated = {json.dumps(item, sort_keys=True, separators=(",", ":")): item for item in normalized}
+    return [deduplicated[key] for key in sorted(deduplicated)]
+
+
+def _stable_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _stable_value(value[key]) for key in sorted(value, key=str)}
+    if isinstance(value, (list, tuple)):
+        return [_stable_value(item) for item in value]
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    return str(value)
+
+
+def _target_version(value: str | None) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    match = re.search(r"\b\d+(?:\.\d+)*\b", text)
+    if not match:
+        return None
+    candidate = match.group(0)
+    try:
+        _parse_version(candidate)
+    except CatalogValidationError:
+        return None
+    return candidate
 
 
 def _required_text(value: Any, path: str) -> str:
