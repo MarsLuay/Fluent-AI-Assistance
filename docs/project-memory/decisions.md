@@ -33,6 +33,10 @@
   stable fingerprint. Later ranking, budget, and workflow children consume
   this contract rather than widening it with implicit capabilities or raw
   ZEIA/XSCR dumps.
+- Keep source-pattern selection deterministic and auditable: exact operation
+  families and verified compatibility evidence outrank incidental text matches;
+  explicit IDs, queries, and source scripts remain overrides; ties,
+  incompatibility, and low confidence stay visible as review/omission records.
 - Keep external-device health as a conservative consumer of the source-backed
   `tecan.driver_command_contracts.v1` and `tecan.host_environment.v1` records:
   command roles, documented DriverFramework states, and license capability
