@@ -87,3 +87,12 @@ If you touch launch or discovery behavior, also smoke-test the local launcher:
 ```bash
 python3 ../tools/simulator/launch_simulator.py --no-open
 ```
+
+## RGA evidence boundary
+
+The simulator may display source-backed RGA route, storage, occupancy, and
+physical-limit metadata from protocol IR. That metadata is a logical review
+aid: it is not PathFinder collision proof, taught-vector accuracy, gripper
+clearance or retention proof, or physical instrument readiness. Ambiguous or
+missing route evidence remains a review state and must not become a simulated
+success claim.

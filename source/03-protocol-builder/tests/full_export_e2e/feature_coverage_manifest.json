@@ -150,6 +150,46 @@
       "tests": ["test_full_export_workflow_completes", "test_full_export_negative_paths"]
     },
     {
+      "id": "pipeline.rga_route_analysis",
+      "tests": [
+        "test_shared_vector_and_grip_is_direct_and_ambiguous_candidates_are_retained",
+        "test_regrip_is_source_backed_when_no_direct_route_exists",
+        "test_missing_and_incompatible_routes_are_distinct",
+        "test_target_drift_and_endpoint_inconsistency_are_explicit"
+      ],
+      "coverage": "declared_gap",
+      "gap_reason": "The synthetic full-export fixture has no RGA route commands; source-backed route outcomes are covered by focused contract tests instead of a synthetic hardware success path."
+    },
+    {
+      "id": "pipeline.rga_storage_topology",
+      "tests": [
+        "test_preserves_stack_lid_relation_orientation_and_occupancy",
+        "test_explicit_storage_order_is_deterministic_and_transition_keeps_route_boundary",
+        "test_missing_or_name_only_storage_is_unknown_not_inferred",
+        "test_duplicate_order_and_capacity_overflow_are_reviewable"
+      ],
+      "coverage": "declared_gap",
+      "gap_reason": "The synthetic full-export fixture has no source-backed RGA storage carrier; stack, occupancy, and ambiguity contracts are covered by focused synthetic tests."
+    },
+    {
+      "id": "pipeline.rga_transfer_assessment",
+      "tests": [
+        "test_assessment_combines_route_topology_and_logical_only_limits",
+        "test_ambiguous_route_is_needs_review_and_stepped_validation_fails_closed",
+        "test_generation_attachment_and_simulation_metadata_preserve_contract_boundary",
+        "test_transfer_xml_is_unchanged_when_rga_metadata_is_attached",
+        "test_ambiguous_simulation_metadata_reports_review_and_physical_limits"
+      ],
+      "coverage": "declared_gap",
+      "gap_reason": "The synthetic full-export fixture has no RGA Transfer Labware payload; validation, generation metadata, simulation limits, and XML non-interference are covered by focused contract tests."
+    },
+    {
+      "id": "pipeline.rga_command_order",
+      "tests": ["test_rga_finger_transfer_drop_source_order_is_preserved"],
+      "coverage": "declared_gap",
+      "gap_reason": "The synthetic full-export fixture intentionally omits RGA finger commands; source ordering is covered by a focused compiled-command contract test."
+    },
+    {
       "id": "pipeline.python_generation",
       "tests": ["test_full_export_workflow_completes"]
     },
