@@ -679,10 +679,21 @@ def test_feature_coverage_gaps_are_explicit() -> None:
 
 def _assert_tests_exist(names: list[str]) -> None:
     import test_feature_coverage_manifest as coverage_module
+    import test_api_v2_command_to_xml as command_to_xml_module
+    import test_rga_routing as routing_module
+    import test_rga_topology as topology_module
+    import test_rga_transfer as transfer_module
 
     available = {
         name
-        for module in (sys.modules[__name__], coverage_module)
+        for module in (
+            sys.modules[__name__],
+            coverage_module,
+            command_to_xml_module,
+            routing_module,
+            topology_module,
+            transfer_module,
+        )
         for name, value in vars(module).items()
         if name.startswith("test_") and inspect.isfunction(value)
     }

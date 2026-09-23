@@ -4,6 +4,11 @@ import inspect
 import json
 import sys
 
+import test_api_v2_command_to_xml as command_to_xml_module
+import test_rga_routing as routing_module
+import test_rga_topology as topology_module
+import test_rga_transfer as transfer_module
+
 from full_export_e2e.harness import (
     MANIFEST_PATH,
     RECIPE_PATH,
@@ -31,7 +36,14 @@ def test_feature_manifest_covers_every_live_surface() -> None:
 
     available = {
         name
-        for module in (e2e, sys.modules[__name__])
+        for module in (
+            e2e,
+            sys.modules[__name__],
+            command_to_xml_module,
+            routing_module,
+            topology_module,
+            transfer_module,
+        )
         for name, value in vars(module).items()
         if name.startswith("test_") and inspect.isfunction(value)
     }

@@ -167,6 +167,34 @@ TRANSFER_TO_BASE_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 </Objects></ScriptGroup></Commands></Script></PayloadData></Payload></VxData>
 """
 
+
+def _assert_rga_finger_transfer_drop_source_order_is_preserved() -> None:
+    def object_xml(source: str) -> str:
+        start = source.index("<Object ")
+        end = source.rindex("</Object>") + len("</Object>")
+        return source[start:end]
+
+    xscr = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        "<VxData><Payload><PayloadData><Script><Commands><ScriptGroup><Objects>"
+        + object_xml(GET_FINGERS_XSCR)
+        + object_xml(TRANSFER_TO_BASE_XSCR)
+        + object_xml(DROP_FINGERS_XSCR)
+        + "</Objects></ScriptGroup></Commands></Script></PayloadData></Payload></VxData>"
+    )
+
+    records = extract_command_objects_from_xscr(xscr)
+    assert [record["command_id"] for record in records] == [
+        "CgaGetFingersScriptCommandDataV1",
+        "ApplicationDriverMacro",
+        "CgaDropFingersScriptCommandDataV1",
+    ]
+    commands = [
+        command_from_xscr_object(ET.fromstring(record["xml"]), command_id=record["command_id"])
+        for record in records
+    ]
+    assert [type(command).__name__ for command in commands] == ["GetFingers", "TransferLabware", "DropFingers"]
+
 EXECUTE_VECTOR_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 <VxData><Payload><PayloadData><Script><Commands><ScriptGroup><Objects>
 <Object Type="Tecan.VisionX.ApplicationDriver.ApplicationDriverBase.ApplicationDriverMacro">
@@ -394,6 +422,13 @@ class ApiV2CommandSerializerTests(unittest.TestCase):
         self.assertIn("&amp;lt;Site&amp;gt;&amp;lt;/Site&amp;gt;", native_xml)
         result = compare_command_xml(records[0]["xml"], native_xml)
         self.assertTrue(result.equal, result.diff_hint)
+
+    def test_rga_finger_transfer_drop_source_order_is_preserved(self):
+        _assert_rga_finger_transfer_drop_source_order_is_preserved()
+
+
+def test_rga_finger_transfer_drop_source_order_is_preserved():
+    _assert_rga_finger_transfer_drop_source_order_is_preserved()
 
     def test_transfer_labware_from_ir_uses_canonical_site_expression(self):
         ir = {

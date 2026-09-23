@@ -79,4 +79,22 @@ MCP uses local stdio. ZEIA files, logs, generated scripts, and instrument data
 stay on the same computer as the client. The server does not open a network
 listener.
 
+## RGA evidence boundaries
+
+RGA route and storage assessments are source-backed logical metadata carried
+alongside the protocol IR. They classify available vectors, grip modes, regrip
+paths, storage order, occupancy, and ambiguity from imported evidence; they do
+not add those assessments to `RGA1_TransferLabware` command XML.
+
+The protocol-builder and simulator must keep these boundaries visible:
+
+- A route classification is not PathFinder geometry, contouring, collision
+  avoidance, or proof that a taught vector is accurate on the target arm.
+- Simulator metadata reports logical occupancy and physical limitations; it
+  cannot prove gripper clearance, force, retention, deck state, or instrument
+  readiness.
+- Physical readiness remains a separate source-backed gate. Missing or
+  ambiguous route/storage evidence stays reviewable and fail-closed rather than
+  being inferred from labware names, coordinates, or a successful simulation.
+
 Durable agent architecture: [project memory](project-memory/architecture.md). Current-code detail belongs in Serena.
