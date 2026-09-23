@@ -266,41 +266,9 @@ def normalize_fluent_type_name(type_name: str | None) -> ExpressionType:
 
 
 def default_function_signatures() -> dict[str, FunctionSignature]:
-    any_type: ExpectedType = "any"
-    signatures = [
-        FunctionSignature("concat", return_type="string", variadic_type=any_type, min_arguments=1),
-        FunctionSignature("SetAttribute", argument_types=("string", "string", any_type), return_type="string"),
-        FunctionSignature("GetAttribute", argument_types=("string", "string"), return_type="string"),
-        FunctionSignature("MountedFESfinger", return_type="string"),
-        FunctionSignature("GetCoverSiteName", argument_types=("string",), return_type="string"),
-        FunctionSignature("GetCoverSiteIndex", argument_types=("string",), return_type="number"),
-        FunctionSignature("GetLocationName", argument_types=("string",), return_type="string"),
-        FunctionSignature("GetLocationIndex", argument_types=("string",), return_type="number"),
-        FunctionSignature("Abs", argument_types=("number",), return_type="number"),
-        FunctionSignature("Ceil", argument_types=("number",), return_type="number"),
-        FunctionSignature("Round", argument_types=("number",), return_type="number", min_arguments=1, max_arguments=2),
-        FunctionSignature("Int", argument_types=("number",), return_type="number"),
-        FunctionSignature("Fix", argument_types=("number",), return_type="number"),
-        FunctionSignature("Sqr", argument_types=("number",), return_type="number"),
-        FunctionSignature("Len", argument_types=("string",), return_type="number"),
-        FunctionSignature("Left", argument_types=("string", "number"), return_type="string"),
-        FunctionSignature("Right", argument_types=("string", "number"), return_type="string"),
-        FunctionSignature("Mid", argument_types=("string", "number", "number"), return_type="string", min_arguments=2, max_arguments=3),
-        FunctionSignature("substring", argument_types=("string", "number", "number"), return_type="string"),
-        FunctionSignature("Replace", argument_types=("string", "string", "string"), return_type="string"),
-        FunctionSignature("Trim", argument_types=("string",), return_type="string"),
-        FunctionSignature("LCase", argument_types=("string",), return_type="string"),
-        FunctionSignature("UCase", argument_types=("string",), return_type="string"),
-        FunctionSignature("CStr", argument_types=(any_type,), return_type="string"),
-        FunctionSignature("Str", argument_types=(any_type,), return_type="string"),
-        FunctionSignature("CDbl", argument_types=(any_type,), return_type="number"),
-        FunctionSignature("CInt", argument_types=(any_type,), return_type="number"),
-        FunctionSignature("Val", argument_types=("string",), return_type="number"),
-        FunctionSignature("IsNumeric", argument_types=(any_type,), return_type="boolean"),
-        FunctionSignature("If", argument_types=("boolean", any_type, any_type), return_type="any"),
-        FunctionSignature("IIf", argument_types=("boolean", any_type, any_type), return_type="any"),
-    ]
-    return {signature.name.casefold(): signature for signature in signatures}
+    from .catalog import load_expression_symbol_catalog
+
+    return load_expression_symbol_catalog().function_signatures()
 
 
 def _infer_expression_type(
