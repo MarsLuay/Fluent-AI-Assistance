@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from . import xml_compat as ET
 from pathlib import Path
@@ -10,6 +12,7 @@ from typing import Any, Mapping
 
 GEOMETRY_SCHEMA_VERSION = "tecan.worktable_geometry.v1"
 ZERO_GUID = "00000000-0000-0000-0000-000000000000"
+RGA_ROUTING_SCHEMA_VERSION = "tecan.rga_routing.v1"
 
 
 def build_worktable_geometry(
@@ -170,6 +173,7 @@ def parse_component(path: Path | str, *, max_xml_bytes: int = 4 * 1024 * 1024) -
     guid = _child_text(template, "GUID") or path.stem
     mesh_guids, mesh_names = _mesh_references(payload)
     compatible_names, compatible_guids = _compatible_components(payload, template, object_name=object_name, guid=guid)
+    arrangements = _component_arrangements(template)
     return _clean(
         {
             "kind": "component",
@@ -184,7 +188,12 @@ def parse_component(path: Path | str, *, max_xml_bytes: int = 4 * 1024 * 1024) -
             "connector_guids": _references(payload, "WorktableConnector"),
             "mesh_guids": mesh_guids,
             "mesh_names": mesh_names,
-            "arrangements": _component_arrangements(template),
+            "arrangements": arrangements,
+            "rga_routing": _component_rga_routing(
+                template,
+                arrangements=arrangements,
+                source_path=str(path),
+            ),
             "pipettable": _component_pipettable(template),
             "custom_attributes": _component_custom_attributes(template),
             "sub_component_names": _sub_component_names(template, object_name=object_name),
@@ -470,10 +479,212 @@ def _component_arrangements(template: ET.Element) -> list[dict[str, Any]]:
                     "site_offsets_mm": site_offsets,
                     "site_template_identifiers": site_templates,
                     "allowed_grip_modes": _allowed_grip_modes(_direct_child(arrangement, "AllowedGripModes")),
+                    "rga_site_capabilities": _rga_site_capabilities(arrangement),
                 }
             )
         )
     return arrangements
+
+
+def _component_rga_routing(
+    template: ET.Element,
+    *,
+    arrangements: list[dict[str, Any]],
+    source_path: str,
+) -> dict[str, Any]:
+    """Extract only explicitly represented RGA/carrier capability records.
+
+    The worktable geometry parser intentionally does not infer a vector from a
+    component name, coordinates, or a grip mode.  A missing RGA member is
+    therefore reported as ``unknown`` and an explicitly empty source member is
+    reported as ``present_empty`` so later route analysis can remain
+    conservative.
+    """
+
+    vector_nodes = _named_descendants(template, {"robotvector", "rgarobotvector"})
+    regrip_nodes = _named_descendants(
+        template,
+        {"regripstation", "regripsite", "regripnest"},
+    )
+    storage_nodes = _named_descendants(
+        template,
+        {"storagecarrier", "storageposition", "carouselposition", "stackersite", "hotelsite"},
+    )
+    explicit_members = _named_descendants(
+        template,
+        {"robotvectors", "rgavectors", "allowedvectors", "regripstations", "storagecarrier", "storage"},
+    )
+    site_capabilities = [
+        {
+            **capability,
+            "arrangement_index": arrangement_index,
+        }
+        for arrangement_index, arrangement in enumerate(arrangements, start=1)
+        for capability in arrangement.get("rga_site_capabilities") or []
+    ]
+    records = {
+        "schema_version": RGA_ROUTING_SCHEMA_VERSION,
+        "evidence_status": (
+            "present"
+            if vector_nodes or regrip_nodes or storage_nodes or any(
+                item.get("allowed_vector_ids") for item in site_capabilities
+            )
+            else "present_empty" if explicit_members else "unknown"
+        ),
+        "vectors": [_rga_vector_record(node) for node in vector_nodes],
+        "site_capabilities": site_capabilities,
+        "regrip_stations": [_rga_source_record(node, kind="regrip_station") for node in regrip_nodes],
+        "storage_sites": [_rga_source_record(node, kind="storage_site") for node in storage_nodes],
+        "provenance": {"source_path": source_path},
+    }
+    fingerprint_input = {key: value for key, value in records.items() if key != "provenance"}
+    records["fingerprint"] = _stable_fingerprint(fingerprint_input)
+    return _clean(records)
+
+
+def _rga_site_capabilities(arrangement: ET.Element) -> list[dict[str, Any]]:
+    site_templates = _indexed_values(_find(arrangement, "SiteTemplateIdentifiers"))
+    grip_modes = _allowed_grip_modes(_direct_child(arrangement, "AllowedGripModes"))
+    vector_container = _first_named_direct_child(arrangement, {"allowedvectors", "allowedvectorids"})
+    vector_ids = _indexed_source_values(vector_container)
+    regrip_container = _first_named_direct_child(arrangement, {"regripsites", "regripstations", "regripnests"})
+    regrip_ids = _indexed_source_values(regrip_container)
+    site_indices = sorted({*site_templates, *grip_modes, *vector_ids, *regrip_ids}, key=_site_index_sort_key)
+    capabilities: list[dict[str, Any]] = []
+    for site_index in site_indices:
+        vector_evidence = "unknown"
+        if vector_container is not None:
+            vector_evidence = "present" if vector_ids.get(site_index) else "present_empty"
+        capabilities.append(
+            _clean(
+                {
+                    "site_index": site_index,
+                    "site_template_guid": site_templates.get(site_index),
+                    "allowed_vector_ids": vector_ids.get(site_index, []),
+                    "allowed_vector_evidence": vector_evidence,
+                    "allowed_grip_modes": grip_modes.get(site_index, []),
+                    "allowed_grip_evidence": "present" if site_index in grip_modes else "unknown",
+                    "regrip_site_ids": regrip_ids.get(site_index, []),
+                    "regrip_evidence": "present" if site_index in regrip_ids else "unknown",
+                }
+            )
+        )
+    return capabilities
+
+
+def _rga_vector_record(node: ET.Element) -> dict[str, Any]:
+    record = _rga_source_record(node, kind="robot_vector")
+    record.update(
+        {
+            "robot_or_device": _first_named_text(
+                node,
+                {"robotid", "robotidentifier", "deviceid", "deviceidentifier", "robot"},
+            ),
+            "safe_position": _first_named_vec(node, {"safeposition", "safepoint"}),
+            "start_position": _first_named_vec(node, {"startposition", "startpoint"}),
+            "end_position": _first_named_vec(node, {"endposition", "endpoint"}),
+            "orientation": _first_named_vec(node, {"orientation"}),
+            "waypoints": _vector_waypoints(node),
+        }
+    )
+    return _clean(record)
+
+
+def _rga_source_record(node: ET.Element, *, kind: str) -> dict[str, Any]:
+    return _clean(
+        {
+            "kind": kind,
+            "id": _first_named_text(node, {"guid", "id", "identifier", "vectorid", "regripid", "storageid"}),
+            "name": _first_named_text(node, {"objectname", "name", "vectorname", "regripname"}),
+            "raw_xml": ET.tostring(node, encoding="unicode"),
+            "source_member": _local_name(node.tag),
+        }
+    )
+
+
+def _vector_waypoints(node: ET.Element) -> list[dict[str, float]]:
+    points: list[dict[str, float]] = []
+    for container in _named_descendants(node, {"intermediatewaypoints", "waypoints", "intermediatepoints"}):
+        for child in list(container):
+            point = _vec_dict(child) or _vec_dict(_find(child, "Position"))
+            if point and point not in points:
+                points.append(point)
+    return points
+
+
+def _named_descendants(elem: ET.Element | None, names: set[str]) -> list[ET.Element]:
+    if elem is None:
+        return []
+    return [
+        child
+        for child in elem.iter()
+        if isinstance(child.tag, str) and _local_name(child.tag).casefold() in names
+    ]
+
+
+def _first_named_direct_child(elem: ET.Element | None, names: set[str]) -> ET.Element | None:
+    if elem is None:
+        return None
+    for child in list(elem):
+        if isinstance(child.tag, str) and _local_name(child.tag).casefold() in names:
+            return child
+    return None
+
+
+def _first_named_text(elem: ET.Element | None, names: set[str]) -> str:
+    for child in _named_descendants(elem, names):
+        value = _text(child)
+        if value:
+            return value
+    return ""
+
+
+def _first_named_vec(elem: ET.Element | None, names: set[str]) -> dict[str, float]:
+    for child in _named_descendants(elem, names):
+        value = _vec_dict(child)
+        if value:
+            return value
+    return {}
+
+
+def _indexed_source_values(elem: ET.Element | None) -> dict[str, list[str]]:
+    out: dict[str, list[str]] = {}
+    if elem is None:
+        return out
+    for child in list(elem):
+        if not isinstance(child.tag, str):
+            continue
+        key = _int_text(_find(child, "Key"))
+        value = _direct_child(child, "Value")
+        values = _leaf_texts(value if value is not None else child)
+        if key is not None:
+            out[str(key)] = list(dict.fromkeys(value for value in values if value and not value.isdigit()))
+    return out
+
+
+def _leaf_texts(elem: ET.Element | None) -> list[str]:
+    if elem is None:
+        return []
+    children = [child for child in list(elem) if isinstance(child.tag, str)]
+    if not children:
+        value = _text(elem)
+        return [value] if value else []
+    values: list[str] = []
+    for child in children:
+        values.extend(_leaf_texts(child))
+    return values
+
+
+def _site_index_sort_key(value: str) -> tuple[int, str]:
+    try:
+        return (0, f"{int(value):012d}")
+    except (TypeError, ValueError):
+        return (1, str(value))
+
+
+def _stable_fingerprint(value: Mapping[str, Any]) -> str:
+    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _component_pipettable(template: ET.Element | None) -> dict[str, Any] | None:
