@@ -119,6 +119,11 @@ from ...protocol_ir import (
     write_protocol_ir,
 )
 from ...protocol_ir_schema import ProtocolIRIssue, ProtocolIRValidationError
+from ...rga_transfer import (
+    attach_rga_assessments_to_ir,
+    attach_rga_simulation_metadata,
+    render_rga_assessment_markdown,
+)
 from ...request_spec import (
     build_request_spec,
     build_request_validation_diff,
@@ -651,6 +656,7 @@ def run_generation_workflow(
     ir = _clear_verification_script_protocol_comment(ir)
     ir = apply_rga_move_pattern_policy(ir)
     ir = bind_protocol_ir_expression_provenance(ir, expression_provenance)
+    ir, rga_integration_report = attach_rga_assessments_to_ir(ir)
 
     subroutine_resolution = resolve_subroutine_dependencies(
         ir,
@@ -678,11 +684,20 @@ def run_generation_workflow(
     rga_policy_report_path = out_dir / "rga_move_policy.md"
     write_json(rga_policy_json_path, rga_policy)
     rga_policy_report_path.write_text(render_rga_move_policy_markdown(rga_policy), encoding="utf-8")
+    rga_integration_json_path = out_dir / "rga_transfer_assessments.json"
+    rga_integration_report_path = out_dir / "rga_transfer_assessments.md"
+    write_json(rga_integration_json_path, rga_integration_report)
+    rga_integration_report_path.write_text(
+        render_rga_assessment_markdown(rga_integration_report),
+        encoding="utf-8",
+    )
     ir_outputs = {
         "ir": str(ir_path),
         "expression_provenance": str(expression_provenance_path),
         "rga_move_policy": str(rga_policy_report_path),
         "rga_move_policy_json": str(rga_policy_json_path),
+        "rga_transfer_assessments": str(rga_integration_report_path),
+        "rga_transfer_assessments_json": str(rga_integration_json_path),
     }
     if synthesis_path is not None:
         ir_outputs["synthesis"] = str(synthesis_path)
@@ -740,6 +755,8 @@ def run_generation_workflow(
         "python": python_path.name,
         "rga_move_policy": rga_policy_report_path.name,
         "rga_move_policy_json": rga_policy_json_path.name,
+        "rga_transfer_assessments": rga_integration_report_path.name,
+        "rga_transfer_assessments_json": rga_integration_json_path.name,
     }
     gwl_path = out_dir / f"{base}.gwl"
     if gwl_text.strip():
@@ -812,6 +829,7 @@ def run_generation_workflow(
             except json.JSONDecodeError:
                 current_simulation_data = None
             if current_simulation_data is not None:
+                current_simulation_data = attach_rga_simulation_metadata(current_simulation_data, ir)
                 write_json(current_simulation_json_path, current_simulation_data)
             current_simulation_report_path.write_text(
                 render_simulation_markdown(current_candidate_path, current_simulation_data, current_simulation_result),
@@ -1551,6 +1569,8 @@ def run_generation_workflow(
         "ir_synthesis": str(synthesis_path) if synthesis_path else None,
         "rga_move_policy": str(rga_policy_report_path),
         "rga_move_policy_json": str(rga_policy_json_path),
+        "rga_transfer_assessments": str(rga_integration_report_path),
+        "rga_transfer_assessments_json": str(rga_integration_json_path),
         "liquid_state_validation": str(liquid_state_report_path),
         "simulation_report": str(simulation_report_path) if simulation_report_path and simulation_report_path.exists() else None,
         "simulation_json": str(simulation_json_path) if simulation_json_path and simulation_json_path.exists() else None,
@@ -1652,6 +1672,8 @@ def run_generation_workflow(
                 "reports/validation_diff.json": validation_diff_json_path,
                 "reports/worktable_changes.md": worktable_changes_path,
                 "reports/worktable.patch.json": worktable_patch_path,
+                "reports/rga-transfer-assessments.md": rga_integration_report_path,
+                "reports/rga-transfer-assessments.json": rga_integration_json_path,
             },
         )
         if not _generation_published_zeia_success(

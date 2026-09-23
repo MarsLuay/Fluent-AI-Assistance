@@ -17,7 +17,7 @@ import tempfile
 import zipfile
 from . import xml_compat as ET
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 from tecan_common.zeia_limits import build_zeia_archive_inventory
 
 from tecan_common.gwl import (
@@ -2579,6 +2579,7 @@ def _render_python_step(step: dict[str, Any], labware_vars: dict[str, str]) -> l
     if operation == "move_plate":
         labware = str(params.get("labware") or target or "")
         labware_expr = labware_vars.get(labware, repr(labware))
+        rga_metadata = _rga_gripper_metadata_args(params)
         site_expression = params.get("site_expression")
         destination_site_fallback = (
             params.get("destination_site")
@@ -2621,7 +2622,7 @@ def _render_python_step(step: dict[str, Any], labware_vars: dict[str, str]) -> l
         onto_labware = str(params.get("onto_labware") or params.get("onto") or "")
         if onto_labware:
             onto_expr = labware_vars.get(onto_labware, repr(onto_labware))
-            return [f"wt.gripper.move({labware_expr}, onto={onto_expr})"]
+            return [f"wt.gripper.move({labware_expr}, onto={onto_expr}{rga_metadata})"]
         destination_location = str(
             params.get("destination_location")
             or params.get("to_location")
@@ -2632,7 +2633,9 @@ def _render_python_step(step: dict[str, Any], labware_vars: dict[str, str]) -> l
             destination_site_arg = _expression_python_arg(site_expression)
         else:
             destination_site_arg = repr(destination_site_fallback)
-        return [f"wt.gripper.move({labware_expr}, to=({destination_location!r}, {destination_site_arg}))"]
+        return [
+            f"wt.gripper.move({labware_expr}, to=({destination_location!r}, {destination_site_arg}){rga_metadata})"
+        ]
     if operation == "call_subroutine":
         params = step.get("parameters") or {}
         subroutine = str(params.get("subroutine") or params.get("SubRoutine") or "").strip().strip('"')
@@ -2679,6 +2682,22 @@ def _render_python_step(step: dict[str, Any], labware_vars: dict[str, str]) -> l
         args_str = ", ".join(args_list)
         return [f"wt.generic_step({str(command_id)!r}, {args_str})"]
     return [f"wt.generic_step({str(command_id)!r})"]
+
+
+def _rga_gripper_metadata_args(params: Mapping[str, Any]) -> str:
+    """Render derived RGA evidence as non-command gripper metadata."""
+
+    parts: list[str] = []
+    for argument, key in (
+        ("rga_route_assessment", "rga_route_assessment"),
+        ("rga_topology_transition", "rga_topology_transition"),
+        ("rga_logical_occupancy", "rga_logical_occupancy"),
+        ("rga_physical_limitations", "rga_physical_limitations"),
+    ):
+        value = params.get(key)
+        if value is not None:
+            parts.append(f", {argument}={value!r}")
+    return "".join(parts)
 
 
 def _preserve_raw_xml_for_operation(operation: str) -> bool:

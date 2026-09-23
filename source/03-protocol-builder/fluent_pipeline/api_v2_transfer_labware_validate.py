@@ -93,9 +93,16 @@ class TransferLabwareCommandLike(Protocol):
 
 
 def is_transfer_labware_command(command: TransferLabwareCommandLike) -> bool:
-    if str(command.type_name or "") not in TRANSFER_LABWARE_TYPE_NAMES:
+    type_name = str(command.type_name or "")
+    # XSCR commands carry the ApplicationDriverMacro type name, while IR
+    # commands retain their semantic ``move_plate`` operation.  Both are the
+    # same RGA transfer surface once structured transfer fields are present.
+    if (
+        type_name not in TRANSFER_LABWARE_TYPE_NAMES
+        and str(getattr(command, "operation", "") or "") != "move_plate"
+    ):
         return False
-    fields = extract_transfer_labware_fields(command)
+    fields = _transfer_labware_fields_from_command(command)
     return fields is not None and fields.macro_name == RGA_TRANSFER_MACRO
 
 
@@ -152,6 +159,9 @@ def validate_transfer_labware_fields(
     occupied_slots: set[tuple[str, str]] | None = None,
     step_index: int | None = None,
     step_label: str = "",
+    route_assessment: Mapping[str, Any] | None = None,
+    topology_transition: Mapping[str, Any] | None = None,
+    require_rga_evidence: bool = False,
 ) -> TransferLabwareValidateResult:
     """Offline ``TransferLabware.Validate()`` with strict deck simulation."""
     labels = deck_labels or set()
@@ -170,6 +180,21 @@ def validate_transfer_labware_fields(
             fields=fields.as_dict(),
         )
 
+    evidence = _rga_evidence_fields(
+        fields,
+        route_assessment=route_assessment,
+        topology_transition=topology_transition,
+        require_rga_evidence=require_rga_evidence,
+        prefix=prefix,
+    )
+    if evidence is not None:
+        return evidence
+    enriched_fields = _enrich_transfer_fields(
+        fields,
+        route_assessment=route_assessment,
+        topology_transition=topology_transition,
+    )
+
     label_key = _norm(fields.labware)
     if label_key and label_key not in labels:
         return TransferLabwareValidateResult(
@@ -180,7 +205,7 @@ def validate_transfer_labware_fields(
                 "present on the simulated deck (AddLabware or an earlier transfer required)."
             ),
             field="labware",
-            fields=fields.as_dict(),
+            fields=enriched_fields,
         )
 
     destination = fields.destination_slot()
@@ -195,7 +220,7 @@ def validate_transfer_labware_fields(
                     f"{destination[0]}[{destination[1]}] it already occupies."
                 ),
                 field="location",
-                fields=fields.as_dict(),
+                fields=enriched_fields,
             )
         if destination in occupied and destination != source:
             return TransferLabwareValidateResult(
@@ -206,10 +231,10 @@ def validate_transfer_labware_fields(
                     "occupied in the simulated deck."
                 ),
                 field="site",
-                fields=fields.as_dict(),
+                fields=enriched_fields,
             )
 
-    return TransferLabwareValidateResult(ok=True, fields=fields.as_dict())
+    return TransferLabwareValidateResult(ok=True, fields=enriched_fields)
 
 
 def validate_transfer_labware_offline(
@@ -218,11 +243,25 @@ def validate_transfer_labware_offline(
     deck_labels: set[str] | None = None,
     deck_slots: dict[str, tuple[str, str]] | None = None,
     occupied_slots: set[tuple[str, str]] | None = None,
+    route_assessment: Mapping[str, Any] | None = None,
+    topology_transition: Mapping[str, Any] | None = None,
+    require_rga_evidence: bool = False,
 ) -> TransferLabwareValidateResult:
     if not is_transfer_labware_command(command):
         return TransferLabwareValidateResult(ok=True, source="skipped_non_transfer")
 
-    fields = extract_transfer_labware_fields(command)
+    # IR-mapped commands carry the assessment on the command itself.  Honor
+    # that metadata for direct offline validation callers as well as the
+    # stepped runner, which passes the same values explicitly.
+    if route_assessment is None:
+        route_assessment = getattr(command, "rga_route_assessment", None)
+    if topology_transition is None:
+        topology_transition = getattr(command, "rga_topology_transition", None)
+    require_rga_evidence = require_rga_evidence or bool(
+        getattr(command, "rga_require_evidence", False)
+    )
+
+    fields = _transfer_labware_fields_from_command(command)
     if fields is None:
         return TransferLabwareValidateResult(
             ok=True,
@@ -240,7 +279,100 @@ def validate_transfer_labware_offline(
             f"TransferLabware at step {command.index + 1} "
             f"({command.type_name} in {command.group})"
         ),
+        route_assessment=route_assessment,
+        topology_transition=topology_transition,
+        require_rga_evidence=require_rga_evidence,
     )
+
+
+def _transfer_labware_fields_from_command(
+    command: TransferLabwareCommandLike,
+) -> TransferLabwareFields | None:
+    fields = extract_transfer_labware_fields(command)
+    if fields is not None:
+        return fields
+    raw = getattr(command, "transfer_labware_fields", None)
+    if not isinstance(raw, Mapping):
+        return None
+    return TransferLabwareFields(
+        labware=str(raw.get("labware") or ""),
+        location=str(raw.get("location") or ""),
+        site=str(raw.get("site") or ""),
+        move_to_base=bool(raw.get("move_to_base")),
+        fixed_site=bool(raw.get("fixed_site", True)),
+        macro_name=str(raw.get("macro_name") or RGA_TRANSFER_MACRO),
+    )
+
+
+def _enrich_transfer_fields(
+    fields: TransferLabwareFields,
+    *,
+    route_assessment: Mapping[str, Any] | None,
+    topology_transition: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    enriched = fields.as_dict()
+    if route_assessment is not None:
+        enriched["rga_route_assessment"] = dict(route_assessment)
+    if topology_transition is not None:
+        enriched["rga_topology_transition"] = dict(topology_transition)
+    return enriched
+
+
+def _rga_evidence_fields(
+    fields: TransferLabwareFields,
+    *,
+    route_assessment: Mapping[str, Any] | None,
+    topology_transition: Mapping[str, Any] | None,
+    require_rga_evidence: bool,
+    prefix: str,
+) -> TransferLabwareValidateResult | None:
+    enriched = _enrich_transfer_fields(
+        fields,
+        route_assessment=route_assessment,
+        topology_transition=topology_transition,
+    )
+    if require_rga_evidence and route_assessment is None:
+        return TransferLabwareValidateResult(
+            ok=False,
+            reason="rga_route_review_required",
+            message=f"{prefix}: source-backed RGA route assessment is required before transfer.",
+            field="rga_route_assessment",
+            fields=enriched,
+        )
+    if route_assessment is not None:
+        status = str(route_assessment.get("status") or "")
+        if status not in {"direct_supported_by_source", "regrip_required_and_resolved"}:
+            return TransferLabwareValidateResult(
+                ok=False,
+                reason="rga_route_review_required",
+                message=f"{prefix}: RGA route assessment is {status or 'unknown'}; review is required before transfer.",
+                field="rga_route_assessment",
+                fields=enriched,
+            )
+        route_selection = (
+            route_assessment.get("selected_route")
+            if status == "direct_supported_by_source"
+            else route_assessment.get("regrip_path")
+        )
+        if not isinstance(route_selection, Mapping):
+            return TransferLabwareValidateResult(
+                ok=False,
+                reason="rga_route_review_required",
+                message=f"{prefix}: RGA route selection is ambiguous; review is required before transfer.",
+                field="rga_route_assessment",
+                fields=enriched,
+            )
+    if topology_transition is not None:
+        status = str(topology_transition.get("status") or "")
+        if status not in {"logical_transition_supported_by_source"}:
+            return TransferLabwareValidateResult(
+                ok=False,
+                reason="rga_topology_review_required",
+                message=f"{prefix}: source-backed storage topology is {status}; review is required before transfer.",
+                field="rga_topology_transition",
+                fields=enriched,
+            )
+    return None
 
 
 def validate_transfer_labware_before_execute(
@@ -250,12 +382,18 @@ def validate_transfer_labware_before_execute(
     deck_labels: set[str] | None = None,
     deck_slots: dict[str, tuple[str, str]] | None = None,
     occupied_slots: set[tuple[str, str]] | None = None,
+    route_assessment: Mapping[str, Any] | None = None,
+    topology_transition: Mapping[str, Any] | None = None,
+    require_rga_evidence: bool = False,
 ) -> TransferLabwareValidateResult:
     offline = validate_transfer_labware_offline(
         command,
         deck_labels=deck_labels,
         deck_slots=deck_slots,
         occupied_slots=occupied_slots,
+        route_assessment=route_assessment,
+        topology_transition=topology_transition,
+        require_rga_evidence=require_rga_evidence,
     )
     if not offline.ok:
         return offline

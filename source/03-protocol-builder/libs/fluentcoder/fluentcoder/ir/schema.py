@@ -302,6 +302,12 @@ class RgaTransferLabwareStep(BaseStep):
     move_to_base: bool = Field(default=False, description="Move to base position after transfer")
     module_name: str = Field(default="", description="RGA module name from ZEIA/recipe (never invent 'RGA 1')")
     available_id: Optional[str] = None
+    # Derived source-backed evidence. These fields are report metadata only;
+    # compiler/renderers must not turn them into FluentControl command fields.
+    rga_route_assessment: Optional[dict[str, Any]] = None
+    rga_topology_transition: Optional[dict[str, Any]] = None
+    rga_logical_occupancy: Optional[dict[str, Any]] = None
+    rga_physical_limitations: list[dict[str, Any]] = Field(default_factory=list)
 
     @field_validator("destination_site", mode="before")
     @classmethod

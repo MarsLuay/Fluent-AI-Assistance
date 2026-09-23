@@ -263,6 +263,7 @@ class Simulator:
             effect = EffectKind.VALIDATION_ONLY
             pass  # gripper-finger-drop is a no-op in the twin
         elif isinstance(step, RgaTransferLabwareStep):
+            self._validate_rga_evidence(step)
             self._on_gripper_move(step)
             effect = EffectKind.LABWARE_MOVEMENT
         elif isinstance(step, ApplicationDriverMacroStep):
@@ -354,6 +355,7 @@ class Simulator:
             effect=effect,
             raw_xml=raw_xml,
             message=message,
+            details=self._step_metadata(step),
         )
         self._report.add_step(coverage)
         self._last_snapshot_step = step
@@ -387,6 +389,49 @@ class Simulator:
                 warnings=self._report.warnings,
             ))
         self._step_index += 1
+
+    def _step_metadata(self, step) -> dict[str, Any]:
+        if not isinstance(step, RgaTransferLabwareStep):
+            return {}
+        return {
+            key: value
+            for key, value in {
+                "route_assessment": step.rga_route_assessment,
+                "topology_transition": step.rga_topology_transition,
+                "logical_occupancy": step.rga_logical_occupancy,
+                "physical_limitations": step.rga_physical_limitations,
+            }.items()
+            if value not in (None, {}, [])
+        }
+
+    def _validate_rga_evidence(self, step: RgaTransferLabwareStep) -> None:
+        route = step.rga_route_assessment or {}
+        topology = step.rga_topology_transition or {}
+        route_status = str(route.get("status") or "")
+        findings = {str(item) for item in route.get("findings") or []}
+        if route_status and route_status not in {"direct_supported_by_source", "regrip_required_and_resolved"}:
+            raise _with_sim_details(
+                SimulationError(
+                    f"RGA transfer requires review because route assessment is {route_status!r}."
+                ),
+                category="rga_review_required",
+                route_assessment=route,
+            )
+        if findings & {"multiple_direct_routes_remain_ambiguous", "multiple_regrip_routes_remain_ambiguous"}:
+            raise _with_sim_details(
+                SimulationError("RGA transfer route candidates remain ambiguous; no route was selected."),
+                category="rga_review_required",
+                route_assessment=route,
+            )
+        topology_status = str(topology.get("status") or "")
+        if topology_status and topology_status != "logical_transition_supported_by_source":
+            raise _with_sim_details(
+                SimulationError(
+                    f"RGA transfer requires review because topology transition is {topology_status!r}."
+                ),
+                category="rga_review_required",
+                topology_transition=topology,
+            )
 
     def _append_final_snapshot(self) -> None:
         if self._snapshot_mode != "final_only" or self._last_snapshot_step is None:

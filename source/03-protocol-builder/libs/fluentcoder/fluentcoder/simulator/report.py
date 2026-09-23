@@ -34,6 +34,7 @@ class StepCoverage:
     effect: EffectKind
     raw_xml: bool = False
     message: str = ""
+    details: dict[str, Any] = field(default_factory=dict)
 
     @property
     def is_fully_simulated(self) -> bool:
@@ -55,6 +56,7 @@ class StepCoverage:
             "effect": self.effect.value,
             "raw_xml": self.raw_xml,
             "message": self.message,
+            "details": dict(self.details),
         }
 
 

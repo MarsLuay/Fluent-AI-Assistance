@@ -24,10 +24,12 @@ from .api_v2_add_labware_validate import (
 )
 from .api_v2_transfer_labware_validate import (
     extract_transfer_labware_fields,
+    transfer_labware_fields_from_ir_step,
     record_successful_transfer,
     runtime_error_for_validate_failure as transfer_runtime_error_for_validate_failure,
     validate_transfer_labware_before_execute,
 )
+from .rga_transfer import assess_rga_transfer_step
 from .api_v2_subroutine_validate import (
     runtime_error_for_validate_failure as subroutine_runtime_error_for_validate_failure,
     validate_subroutine_before_execute,
@@ -99,6 +101,10 @@ class ICommand:
     source: str = "xscr"
     api_v2_type: str = ""
     execute_xml: str = ""
+    rga_route_assessment: Mapping[str, Any] | None = None
+    rga_topology_transition: Mapping[str, Any] | None = None
+    rga_require_evidence: bool = False
+    transfer_labware_fields: Mapping[str, Any] | None = None
 
     @property
     def command_type(self) -> str:
@@ -264,6 +270,12 @@ def map_ir_steps_to_commands(ir: Mapping[str, Any]) -> list[ICommand]:
         payload_xml = ""
         if isinstance(params, dict):
             payload_xml = str(params.get("raw_xml") or "")
+        rga_assessment = (
+            assess_rga_transfer_step(step)
+            if str(step.get("operation") or "") == "move_plate"
+            else {}
+        )
+        transfer_fields = transfer_labware_fields_from_ir_step(step)
         commands.append(
             ICommand(
                 type_name=command_id,
@@ -274,6 +286,19 @@ def map_ir_steps_to_commands(ir: Mapping[str, Any]) -> list[ICommand]:
                 ir_step_id=str(step.get("id") or f"step_{index:03d}"),
                 payload_xml=payload_xml,
                 source="ir",
+                rga_route_assessment=rga_assessment.get("route_assessment"),
+                rga_topology_transition=rga_assessment.get("topology_transition"),
+                rga_require_evidence=bool(
+                    isinstance(params, dict)
+                    and (
+                        params.get("rga_require_evidence")
+                        or params.get("require_rga_evidence")
+                        or params.get("rga_route_input")
+                        or params.get("rga_route_evidence")
+                        or params.get("route_evidence")
+                    )
+                ),
+                transfer_labware_fields=transfer_fields.as_dict() if transfer_fields is not None else None,
             )
         )
     return commands
@@ -560,6 +585,9 @@ class SteppedRunner:
                 deck_labels=deck_labels,
                 deck_slots=deck_slots,
                 occupied_slots=occupied_slots,
+                route_assessment=command.rga_route_assessment,
+                topology_transition=command.rga_topology_transition,
+                require_rga_evidence=command.rga_require_evidence,
             )
             if not transfer_validation.ok:
                 log_entry = {
