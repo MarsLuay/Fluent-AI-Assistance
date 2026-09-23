@@ -46,6 +46,7 @@ from .operators import (
 from .renderer import ExpressionRenderError, render_expression, render_string_literal
 from .semantics import (
     ExpressionSemanticContext,
+    FunctionResolution,
     FunctionSignature,
     SemanticIssue,
     SemanticResult,
@@ -110,6 +111,7 @@ __all__ = [
     "ExpressionSemanticContext",
     "ExpressionSymbol",
     "ExpressionSymbolCatalog",
+    "FunctionResolution",
     "FunctionCall",
     "IndexExpression",
     "FunctionSignature",
