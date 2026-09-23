@@ -68,6 +68,7 @@ from ...pattern_index import (
     load_pattern_windows,
     pattern_window_dependencies,
     pattern_window_refs,
+    rank_pattern_windows,
     summarize_pattern_windows,
 )
 from ...project_catalog import ensure_project_catalog
@@ -87,6 +88,11 @@ from ...project_context import (
 )
 from ...prompt_media import ensure_compiled_prompt_media_references
 from ...provenance import environment_provenance, sha256_path
+from ...generation_context import (
+    build_generation_context,
+    compact_generation_context,
+    extract_task_facets,
+)
 from ...generation_options import GenerationOptions, normalize_generation_options
 from ...progress import GENERATION_PROGRESS_STAGES, ProgressCallback, ProgressEmitter
 from ...protocol_ir import (
@@ -219,6 +225,9 @@ GENERATION_STAGES = [
 ]
 
 PROGRESS_HEARTBEAT_SECONDS = 5.0
+DEFAULT_GENERATION_CONTEXT_MAX_TOKENS = 1800
+DEFAULT_AUTOMATIC_PATTERN_LIMIT = 256
+DEFAULT_AUTOMATIC_PATTERN_SELECTION = 4
 
 
 @dataclass(frozen=True)
@@ -472,40 +481,34 @@ def run_generation_workflow(
     catalog_db = ensure_project_catalog(context)
 
     inspection = inspect_generation_context(context, selected_scripts)
-    source_script_paths = _selected_source_script_paths(
-        inspection["selected_source_scripts"],
+    context_inputs = _resolve_generation_context_inputs(
+        request_spec_doc=request_spec_doc,
         context=context,
+        inspection=inspection,
+        selected_scripts=selected_scripts,
+        pattern_refs=selected_patterns,
+        indexed_pattern_windows=indexed_pattern_windows,
+        index_db=index_db,
+        pattern_ids=pattern_ids,
+        pattern_queries=pattern_queries,
+        source_script_rank=source_script_rank,
+        target_fluentcontrol_version=generation_options.target_fluentcontrol_version,
     )
-    recipe = verification_recipe(request_spec_doc)
-    regeneration_baseline = _matching_regeneration_baseline_script(
-        context,
-        protocol_name,
+    selected_scripts = context_inputs["selected_source_names"]
+    selected_patterns = context_inputs["selected_pattern_refs"]
+    indexed_pattern_windows = context_inputs["selected_pattern_windows"]
+    inspection["selected_source_scripts"] = context_inputs["selected_source_records"]
+    _update_request_spec_selection(
+        request_spec_doc,
+        selected_scripts=selected_scripts,
+        selected_pattern_refs=selected_patterns,
+        selected_pattern_ids=[
+            window.get("id")
+            for window in indexed_pattern_windows
+            if window.get("id") is not None
+        ],
     )
-    if regeneration_baseline is not None:
-        # A matching baseline remains context for identity, dependency, and file
-        # references regardless of which higher-precedence source supplies steps.
-        source_script_paths = [
-            regeneration_baseline,
-            *(
-                path
-                for path in source_script_paths
-                if path.resolve() != regeneration_baseline.resolve()
-            ),
-        ]
-    expression_provenance_path = out_dir / "expression_provenance.json"
-    expression_provenance = build_expression_provenance_ledger(
-        [
-            *_context_source_projects(context),
-            *source_script_paths,
-        ]
-    )
-    write_expression_provenance_ledger(expression_provenance_path, expression_provenance)
-    ir_source_mode = _generation_ir_source_mode(
-        ir_source=ir_source,
-        recipe=recipe,
-        preserve_regeneration_baseline=generation_options.preserve_regeneration_baseline,
-        regeneration_baseline=regeneration_baseline,
-    )
+
     inspection_path = out_dir / "01_context_inspection.json"
     write_json(inspection_path, inspection)
     inspection_report = out_dir / "01_context_inspection.md"
@@ -539,6 +542,62 @@ def run_generation_workflow(
         outputs={"json": str(host_config_json_path), "report": str(host_config_report_path)},
     )
 
+    generation_context = _build_generation_context_pack(
+        request_spec_doc=request_spec_doc,
+        context=context,
+        inspection=inspection,
+        full_zeia_export=full_zeia_export,
+        context_inputs=context_inputs,
+        host_config_report=host_config_report,
+        target_fluentcontrol_version=generation_options.target_fluentcontrol_version,
+    )
+    generation_context_path = out_dir / "generation_context.json"
+    generation_context_markdown_path = out_dir / "generation_context.md"
+    generation_context_selection_path = out_dir / "generation_context_selection.json"
+    write_json(generation_context_path, generation_context["context"])
+    generation_context_markdown_path.write_text(
+        render_generation_context_markdown(generation_context["context"]),
+        encoding="utf-8",
+    )
+    write_json(generation_context_selection_path, generation_context["selection"])
+    write_request_spec(request_spec_doc, request_spec_path)
+
+    recipe = verification_recipe(request_spec_doc)
+    regeneration_baseline = _matching_regeneration_baseline_script(
+        context,
+        protocol_name,
+    )
+    source_script_paths = _selected_source_script_paths(
+        inspection["selected_source_scripts"],
+        context=context,
+    )
+    if regeneration_baseline is not None:
+        # A matching baseline remains context for identity, dependency, and file
+        # references regardless of which higher-precedence source supplies steps.
+        source_script_paths = [
+            regeneration_baseline,
+            *(
+                path
+                for path in source_script_paths
+                if path.resolve() != regeneration_baseline.resolve()
+            ),
+        ]
+    expression_provenance_path = out_dir / "expression_provenance.json"
+    expression_provenance = build_expression_provenance_ledger(
+        [
+            *_context_source_projects(context),
+            *source_script_paths,
+        ]
+    )
+    write_expression_provenance_ledger(expression_provenance_path, expression_provenance)
+    ir_source_mode = _generation_ir_source_mode(
+        ir_source=ir_source,
+        recipe=recipe,
+        preserve_regeneration_baseline=generation_options.preserve_regeneration_baseline,
+        regeneration_baseline=regeneration_baseline,
+    )
+
+    indexed_pattern_summaries = summarize_pattern_windows(indexed_pattern_windows)
     selection = {
         "intent": intent,
         "intent_summary": intent_summary,
@@ -551,6 +610,8 @@ def run_generation_workflow(
         "source_script_rank": source_script_rank,
         "indexed_pattern_windows": indexed_pattern_summaries,
         "resolved_source_scripts": inspection["selected_source_scripts"],
+        "source_selection": context_inputs["source_selection"],
+        "pattern_selection": context_inputs["pattern_selection"],
     }
     selection_path = out_dir / "02_selected_sources.json"
     write_json(selection_path, selection)
@@ -559,9 +620,16 @@ def run_generation_workflow(
     _record_stage(
         stages,
         "select_source_scripts_and_patterns",
-        "passed" if selected_scripts or selected_patterns or indexed_pattern_windows else "needs_user",
+        generation_context["context"]["status"],
         _selection_stage_summary(selected_scripts, selected_patterns, indexed_pattern_windows),
-        outputs={"selection": str(selection_path), "plan": str(plan_path)},
+        outputs={
+            "selection": str(selection_path),
+            "plan": str(plan_path),
+            "generation_context": str(generation_context_path),
+            "generation_context_markdown": str(generation_context_markdown_path),
+            "generation_context_selection": str(generation_context_selection_path),
+            "context_fingerprint": generation_context["context"]["context_fingerprint"],
+        },
     )
 
     progress_emitter.started("build_protocol_ir")
@@ -635,6 +703,13 @@ def run_generation_workflow(
             supplies_steps=ir_source_mode == "preserve_regeneration_baseline",
         )
     _attach_request_spec_metadata(ir, request_spec_doc, request_spec_path)
+    _attach_generation_context_metadata(
+        ir,
+        generation_context["context"],
+        json_path=generation_context_path,
+        markdown_path=generation_context_markdown_path,
+        selection_path=generation_context_selection_path,
+    )
     _attach_host_config_metadata(ir, host_config_report)
     ir = normalize_protocol_ir_aliases(ir)
     if ir_source_mode == "explicit_recipe":
@@ -1565,6 +1640,16 @@ def run_generation_workflow(
         "out_dir": str(out_dir),
         "pattern_index": str(index_db) if index_db else None,
         "indexed_pattern_count": len(indexed_pattern_windows),
+        "indexed_pattern_candidate_count": context_inputs.get("candidate_pattern_count", 0),
+        "generation_context": {
+            "schema_version": generation_context["context"].get("schema_version"),
+            "status": generation_context["context"].get("status"),
+            "context_fingerprint": generation_context["context"].get("context_fingerprint"),
+            "json": str(generation_context_path),
+            "markdown": str(generation_context_markdown_path),
+            "selection": str(generation_context_selection_path),
+            "review_diagnostics": generation_context["selection"].get("review_diagnostics") or [],
+        },
         "protocol_ir": str(ir_path),
         "ir_synthesis": str(synthesis_path) if synthesis_path else None,
         "rga_move_policy": str(rga_policy_report_path),
@@ -1629,6 +1714,9 @@ def run_generation_workflow(
         repair_report_path=repair_report_path,
         finalization_report=finalization_report,
         simulation_backend=simulation_backend,
+        generation_context_path=generation_context_path,
+        generation_context_markdown_path=generation_context_markdown_path,
+        generation_context_selection_path=generation_context_selection_path,
     )
     if simulate:
         manifest["repair_iterations"]["termination_reason"] = repair_loop_termination_reason
@@ -1666,6 +1754,9 @@ def run_generation_workflow(
                 "reports/variable-reconciliation.md": variable_reconciliation_report_path,
                 "reports/variable-reconciliation.json": variable_reconciliation_json_path,
                 "reports/expression_provenance.json": expression_provenance_path,
+                "reports/generation-context.json": generation_context_path,
+                "reports/generation-context.md": generation_context_markdown_path,
+                "reports/generation-context-selection.json": generation_context_selection_path,
                 "reports/traceability.md": traceability_report_path,
                 "reports/traceability.json": traceability_json_path,
                 "reports/validation_diff.md": validation_diff_report_path,
@@ -1691,6 +1782,551 @@ def run_generation_workflow(
         "generation_manifest": str(manifest_path),
         "workflow_report": str(summary_path),
     }
+
+
+def _resolve_generation_context_inputs(
+    *,
+    request_spec_doc: Mapping[str, Any],
+    context: ProjectLike | None,
+    inspection: Mapping[str, Any],
+    selected_scripts: list[str],
+    pattern_refs: list[str],
+    indexed_pattern_windows: list[dict[str, Any]],
+    index_db: Path | None,
+    pattern_ids: list[int | str],
+    pattern_queries: list[str],
+    source_script_rank: int,
+    target_fluentcontrol_version: str | None,
+) -> dict[str, Any]:
+    facets = extract_task_facets(request_spec_doc)
+    source_selection = _rank_generation_source_scripts(
+        inspection.get("scripts") if isinstance(inspection, Mapping) else [],
+        inspection.get("selected_source_scripts") if isinstance(inspection, Mapping) else [],
+        requested=selected_scripts,
+        facets=facets,
+    )
+    selected_source_records = list(source_selection.get("selected") or [])
+    selected_source_names = [
+        _source_selection_name(record)
+        for record in selected_source_records
+        if _source_selection_name(record)
+    ]
+
+    candidate_windows = list(indexed_pattern_windows)
+    automatic_index = bool(index_db and not pattern_ids and not pattern_queries)
+    if automatic_index:
+        candidate_windows = load_pattern_windows(
+            index_db,
+            source_script_rank=source_script_rank,
+            include_all=True,
+            max_windows=DEFAULT_AUTOMATIC_PATTERN_LIMIT,
+        )
+
+    explicit_source_names = [
+        value
+        for record in selected_source_records
+        for value in (
+            record.get("object_name"),
+            record.get("qualified_name"),
+            record.get("entry"),
+        )
+        if str(value or "").strip()
+    ]
+    if candidate_windows:
+        requested_count = len(pattern_ids) + len(pattern_queries)
+        max_selected = max(
+            DEFAULT_AUTOMATIC_PATTERN_SELECTION,
+            requested_count,
+        )
+        pattern_selection = rank_pattern_windows(
+            candidate_windows,
+            facets,
+            explicit_pattern_ids=pattern_ids,
+            explicit_pattern_queries=pattern_queries,
+            explicit_source_scripts=explicit_source_names,
+            target_evidence={
+                "target_fluentcontrol_version": target_fluentcontrol_version,
+            },
+            max_selected=max_selected,
+        )
+        selected_pattern_windows = [
+            dict(item.get("pattern") or {})
+            for item in pattern_selection.get("selected") or []
+            if isinstance(item.get("pattern"), Mapping)
+        ]
+    else:
+        pattern_selection = {
+            "schema_version": "tecan.generation_pattern_selection.v1",
+            "status": "not_available",
+            "selection_mode": "explicit" if pattern_ids or pattern_queries else "automatic_ranked",
+            "selected": [],
+            "alternatives": [],
+            "candidates": [],
+            "omissions": [],
+            "review_reasons": [],
+            "fingerprint": None,
+        }
+        selected_pattern_windows = []
+
+    selected_pattern_refs = list(dict.fromkeys(
+        [
+            *pattern_refs,
+            *pattern_window_refs(selected_pattern_windows),
+        ]
+    ))
+    return {
+        "facets": facets,
+        "source_selection": source_selection,
+        "pattern_selection": pattern_selection,
+        "selected_source_records": selected_source_records,
+        "selected_source_names": selected_source_names,
+        "selected_pattern_windows": selected_pattern_windows,
+        "selected_pattern_refs": selected_pattern_refs,
+        "candidate_pattern_count": len(candidate_windows),
+        "automatic_pattern_index": automatic_index,
+    }
+
+
+def _rank_generation_source_scripts(
+    records: Any,
+    selected_records: Any,
+    *,
+    requested: list[str],
+    facets: Mapping[str, Any],
+) -> dict[str, Any]:
+    available = [dict(item) for item in records or [] if isinstance(item, Mapping)]
+    explicit = [dict(item) for item in selected_records or [] if isinstance(item, Mapping)]
+    if requested:
+        return {
+            "schema_version": "tecan.generation_source_selection.v1",
+            "status": "ready" if explicit else "needs_review",
+            "selection_mode": "explicit",
+            "selected": explicit,
+            "candidates": [],
+            "review_reasons": [] if explicit else ["explicit_source_script_not_found"],
+        }
+    if not available:
+        return {
+            "schema_version": "tecan.generation_source_selection.v1",
+            "status": "needs_review",
+            "selection_mode": "automatic_ranked",
+            "selected": [],
+            "candidates": [],
+            "review_reasons": ["no_source_script_evidence"],
+        }
+    if len(available) == 1:
+        candidate = _source_candidate(available[0], score=100, matches=["only_source_script"])
+        return {
+            "schema_version": "tecan.generation_source_selection.v1",
+            "status": "ready",
+            "selection_mode": "automatic_ranked",
+            "selected": available,
+            "candidates": [candidate],
+            "review_reasons": [],
+        }
+
+    operation_facets = {
+        str(value).casefold().replace("_", " ")
+        for value in facets.get("operation_families") or []
+    }
+    other_facets = {
+        str(value).casefold()
+        for key in ("device_families", "labware_names", "labware_types", "liquid_roles")
+        for value in facets.get(key) or []
+    }
+    candidates = []
+    for record in available:
+        dependencies = record.get("dependencies") if isinstance(record.get("dependencies"), Mapping) else {}
+        haystack = " ".join(
+            [
+                str(record.get("object_name") or ""),
+                str(record.get("qualified_name") or ""),
+                " ".join(str(key) for key in (record.get("family_counts") or {})),
+                " ".join(str(value) for value in dependencies.values()),
+            ]
+        ).casefold()
+        matches = sorted(
+            {
+                f"operation:{facet}"
+                for facet in operation_facets
+                if facet and (facet in haystack or facet.replace(" ", "_") in haystack)
+            }
+            | {
+                f"evidence:{facet}"
+                for facet in other_facets
+                if facet and facet in haystack
+            }
+        )
+        score = len(matches) * 20
+        candidates.append(_source_candidate(record, score=score, matches=matches))
+    candidates.sort(key=lambda item: (-item["score"], str(item["candidate_id"]).casefold()))
+    eligible = [item for item in candidates if item["score"] > 0]
+    if not eligible:
+        reasons = ["no_relevant_source_script_match"]
+        selected = []
+    else:
+        top_score = eligible[0]["score"]
+        tied = [item for item in eligible if item["score"] == top_score]
+        selected = [] if len(tied) > 1 else [tied[0]["record"]]
+        reasons = ["ambiguous_source_script_candidates"] if len(tied) > 1 else []
+    return {
+        "schema_version": "tecan.generation_source_selection.v1",
+        "status": "needs_review" if reasons else "ready",
+        "selection_mode": "automatic_ranked",
+        "selected": selected,
+        "candidates": candidates,
+        "review_reasons": reasons,
+    }
+
+
+def _source_candidate(record: Mapping[str, Any], *, score: int, matches: list[str]) -> dict[str, Any]:
+    name = _source_selection_name(record) or "unknown"
+    return {
+        "candidate_id": f"source_script:{name}",
+        "record": dict(record),
+        "score": int(score),
+        "matched_facets": list(matches),
+        "provenance": {
+            "source_context": record.get("source_context"),
+            "source_path": record.get("extracted_path") or record.get("entry"),
+        },
+    }
+
+
+def _source_selection_name(record: Mapping[str, Any]) -> str:
+    for key in ("qualified_name", "object_name", "entry", "extracted_path"):
+        value = str(record.get(key) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _update_request_spec_selection(
+    spec: dict[str, Any],
+    *,
+    selected_scripts: list[str],
+    selected_pattern_refs: list[str],
+    selected_pattern_ids: list[Any],
+) -> None:
+    source = spec.setdefault("source", {})
+    if not isinstance(source, dict):
+        return
+    if selected_scripts:
+        source["source_scripts"] = list(selected_scripts)
+    if selected_pattern_refs:
+        source["pattern_refs"] = list(selected_pattern_refs)
+    pattern_index = source.setdefault("pattern_index", {})
+    if isinstance(pattern_index, dict) and selected_pattern_ids:
+        pattern_index["pattern_ids"] = [str(value) for value in selected_pattern_ids]
+
+
+def _build_generation_context_pack(
+    *,
+    request_spec_doc: Mapping[str, Any],
+    context: ProjectLike | None,
+    inspection: Mapping[str, Any],
+    full_zeia_export: Mapping[str, Any],
+    context_inputs: Mapping[str, Any],
+    host_config_report: Mapping[str, Any],
+    target_fluentcontrol_version: str | None,
+) -> dict[str, Any]:
+    source_selection = context_inputs.get("source_selection") or {}
+    pattern_selection = context_inputs.get("pattern_selection") or {}
+    selected_sources = context_inputs.get("selected_source_records") or []
+    selected_windows = context_inputs.get("selected_pattern_windows") or []
+    facets = context_inputs.get("facets") or extract_task_facets(request_spec_doc)
+    evidence: list[dict[str, Any]] = []
+    for record in selected_sources:
+        name = _source_selection_name(record)
+        evidence.append(
+            {
+                "id": f"source_script:{name}",
+                "category": "source_lineage",
+                "content": {
+                    "name": name,
+                    "source_context": record.get("source_context"),
+                    "qualified_name": record.get("qualified_name"),
+                    "object_name": record.get("object_name"),
+                    "source_path": record.get("extracted_path") or record.get("entry"),
+                    "family_counts": record.get("family_counts") or {},
+                    "dependencies": record.get("dependencies") or {},
+                },
+                "selection_reason": _selection_reason_for_source(source_selection, name),
+                "selection_mode": source_selection.get("selection_mode") or "source_required",
+                "provenance": {
+                    "context": record.get("source_context") or getattr(context, "name", None),
+                    "source_path": record.get("extracted_path") or record.get("entry") or name,
+                },
+                "conflict_key": f"source_script:{name}",
+            }
+        )
+    for item in pattern_selection.get("selected") or []:
+        if not isinstance(item, Mapping):
+            continue
+        pattern = item.get("pattern") if isinstance(item.get("pattern"), Mapping) else {}
+        evidence.append(
+            {
+                "id": f"pattern:{pattern.get('id')}",
+                "category": "source_pattern",
+                "content": dict(pattern),
+                "selection_reason": str(item.get("selection_reason") or "ranked source pattern"),
+                "selection_mode": str(item.get("selection_mode") or "automatic_ranked"),
+                "provenance": dict(item.get("provenance") or {}),
+                "source_fingerprint": item.get("source_fingerprint"),
+                "conflict_key": f"pattern:{pattern.get('id')}",
+                "extensions": {
+                    "score": item.get("score"),
+                    "score_breakdown": item.get("score_breakdown") or {},
+                    "matched_facets": item.get("matched_facets") or [],
+                },
+            }
+        )
+    for reference in context_inputs.get("selected_pattern_refs") or []:
+        if str(reference).startswith("pattern:"):
+            continue
+        evidence.append(
+            {
+                "id": f"pattern_ref:{reference}",
+                "category": "source_pattern",
+                "content": {"reference": reference},
+                "selection_reason": "explicit pattern/source reference from the request",
+                "selection_mode": "explicit",
+                "provenance": {"request": "source.pattern_refs"},
+                "conflict_key": f"pattern_ref:{reference}",
+            }
+        )
+    if context is not None:
+        manifest = context.manifest
+        for category, values, source_key in (
+            ("worktable_contract", manifest.get("workspaces") or [], "workspaces"),
+            ("catalog", manifest.get("labware_names") or [], "labware_names"),
+            ("catalog", manifest.get("liquid_classes") or [], "liquid_classes"),
+        ):
+            for index, value in enumerate(values[:64]):
+                content = dict(value) if isinstance(value, Mapping) else {"name": value}
+                name = str(content.get("name") or content.get("object_name") or value)
+                evidence.append(
+                    {
+                        "id": f"{category}:{source_key}:{index}:{name}",
+                        "category": category,
+                        "content": content,
+                        "selection_reason": "source-backed project inspection evidence",
+                        "selection_mode": "source_required",
+                        "provenance": {
+                            "context": context.name,
+                            "manifest": str(context.root / "manifest.json"),
+                            "field": source_key,
+                        },
+                        "conflict_key": f"{category}:{source_key}:{name}",
+                    }
+                )
+    if context is not None:
+        evidence.append(
+            {
+                "id": "full_zeia_export:assessment",
+                "category": "source_lineage",
+                "content": {
+                    "status": full_zeia_export.get("status"),
+                    "accepted": bool(full_zeia_export.get("accepted")),
+                    "summary": full_zeia_export.get("summary"),
+                },
+                "selection_reason": "full ZEIA export readiness assessment",
+                "selection_mode": "source_required",
+                "provenance": {"context": context.name, "manifest": str(context.root / "manifest.json")},
+                "conflict_key": "full_zeia_export:assessment",
+            }
+        )
+
+    diagnostics: list[dict[str, Any]] = []
+    selected_pattern_evidence = bool(pattern_selection.get("selected"))
+    if facets.get("unknown_intent"):
+        diagnostics.append(
+            {
+                "code": "unknown_request_facets",
+                "message": "The request did not identify a supported operation or source facet.",
+                "action": "Add task_facets or an explicit source script/pattern reference before generation.",
+            }
+        )
+    for reason in source_selection.get("review_reasons") or []:
+        if reason == "no_source_script_evidence" and selected_pattern_evidence:
+            # A selected mined window is itself source-backed evidence. Do not
+            # require a separate ZEIA script selection when the pattern index
+            # is the strongest available source for this request.
+            continue
+        diagnostics.append(
+            {
+                "code": str(reason),
+                "message": "Automatic source-script selection could not establish one source-backed match.",
+                "action": "Select the intended source script explicitly or provide stronger request evidence.",
+            }
+        )
+    for reason in pattern_selection.get("review_reasons") or []:
+        diagnostics.append(
+            {
+                "code": str(reason),
+                "message": "Automatic pattern selection could not establish one safe source-backed choice.",
+                "action": "Select a pattern ID/query explicitly or resolve the ranked alternatives in the context artifact.",
+            }
+        )
+    if not evidence:
+        diagnostics.append(
+            {
+                "code": "no_generation_context_evidence",
+                "message": "No source-backed project, script, or pattern evidence was available.",
+                "action": "Provide an imported project context or an explicit source-backed selection.",
+            }
+        )
+
+    selection_summary = {
+        "source": _selection_summary(source_selection),
+        "patterns": _selection_summary(pattern_selection),
+        "candidate_pattern_count": context_inputs.get("candidate_pattern_count", 0),
+        "automatic_pattern_index": bool(context_inputs.get("automatic_pattern_index")),
+    }
+    context = build_generation_context(
+        request_spec_doc,
+        evidence_items=evidence,
+        omissions=[
+            *list(pattern_selection.get("omissions") or []),
+            *[
+                {
+                    "candidate_id": f"generation_context:{item['code']}",
+                    "category": "selection",
+                    "reason": item["message"],
+                    "provenance": {"action": item["action"]},
+                }
+                for item in diagnostics
+            ],
+        ],
+        target_provenance={
+            "context": getattr(context, "name", None),
+            "context_kind": _context_kind(context) if context else None,
+            "target_fluentcontrol_version": target_fluentcontrol_version,
+            "host_instrument_configuration": host_config_report.get("status"),
+        },
+        status="needs_review" if diagnostics else "ready",
+        extensions={
+            "workflow": "tecan.generation_context_workflow.v1",
+            "selection": selection_summary,
+            "review_diagnostics": diagnostics,
+        },
+    )
+    context = compact_generation_context(
+        context,
+        **_generation_context_budget(request_spec_doc),
+    )
+    return {
+        "context": context,
+        "selection": {
+            "schema_version": "tecan.generation_context_selection.v1",
+            "context_fingerprint": context["context_fingerprint"],
+            "source_selection": source_selection,
+            "pattern_selection": pattern_selection,
+            "review_diagnostics": diagnostics,
+        },
+    }
+
+
+def _selection_summary(selection: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "status": selection.get("status"),
+        "selection_mode": selection.get("selection_mode"),
+        "selected_candidate_ids": [
+            str(item.get("candidate_id"))
+            for item in selection.get("selected") or []
+            if isinstance(item, Mapping)
+        ],
+        "alternative_candidate_ids": [
+            str(item.get("candidate_id"))
+            for item in selection.get("alternatives") or []
+            if isinstance(item, Mapping)
+        ],
+        "omission_count": len(selection.get("omissions") or []),
+        "review_reasons": list(selection.get("review_reasons") or []),
+        "fingerprint": selection.get("fingerprint"),
+    }
+
+
+def _selection_reason_for_source(selection: Mapping[str, Any], name: str) -> str:
+    for candidate in selection.get("candidates") or []:
+        if isinstance(candidate, Mapping) and str(candidate.get("candidate_id") or "").endswith(name):
+            matches = candidate.get("matched_facets") or []
+            if matches:
+                return "automatically ranked by " + ", ".join(str(value) for value in matches)
+    if selection.get("selection_mode") == "explicit":
+        return "explicit source script selection"
+    return "only source-backed script available"
+
+
+def _generation_context_budget(spec: Mapping[str, Any]) -> dict[str, int]:
+    generation = spec.get("generation") if isinstance(spec, Mapping) else None
+    generation = generation if isinstance(generation, Mapping) else {}
+    raw = generation.get("context_budget")
+    raw = raw if isinstance(raw, Mapping) else {}
+    limits: dict[str, int] = {}
+    for key in ("max_bytes", "max_characters", "max_tokens"):
+        value = raw.get(key)
+        if value is not None:
+            limits[key] = max(1, int(value))
+    if not limits:
+        limits["max_tokens"] = DEFAULT_GENERATION_CONTEXT_MAX_TOKENS
+    return limits
+
+
+def render_generation_context_markdown(context: Mapping[str, Any]) -> str:
+    facets = context.get("task_facets") if isinstance(context.get("task_facets"), Mapping) else {}
+    lines = [
+        "# Generation Context",
+        "",
+        f"- Schema: `{context.get('schema_version')}`",
+        f"- Status: `{context.get('status')}`",
+        f"- Context fingerprint: `{context.get('context_fingerprint')}`",
+        f"- Request fingerprint: `{context.get('request_fingerprint')}`",
+        f"- Evidence items: `{len(context.get('evidence_items') or [])}`",
+        f"- Omissions: `{len(context.get('omissions') or [])}`",
+        "",
+        "## Task facets",
+        "",
+    ]
+    for key, values in facets.items():
+        if values:
+            lines.append(f"- {key}: `{', '.join(str(value) for value in values)}`")
+    lines.extend(["", "## Included evidence", ""])
+    for item in context.get("evidence_items") or []:
+        lines.append(
+            f"- `{item.get('id')}` ({item.get('category')}, {item.get('selection_mode')}): "
+            f"{item.get('selection_reason')}"
+        )
+        provenance = item.get("provenance") or {}
+        if provenance:
+            lines.append(f"  - Provenance: `{json.dumps(provenance, sort_keys=True)}`")
+    lines.extend(["", "## Omitted candidates", ""])
+    omissions = context.get("omissions") or []
+    if omissions:
+        for item in omissions:
+            lines.append(f"- `{item.get('candidate_id')}`: {item.get('reason')}")
+    else:
+        lines.append("- none")
+    diagnostics = (context.get("extensions") or {}).get("review_diagnostics") or []
+    lines.extend(["", "## Review diagnostics", ""])
+    if diagnostics:
+        for item in diagnostics:
+            lines.append(f"- `{item.get('code')}`: {item.get('message')}")
+            lines.append(f"  - Action: {item.get('action')}")
+    else:
+        lines.append("- none")
+    accounting = context.get("accounting") or {}
+    lines.extend(
+        [
+            "",
+            "## Accounting",
+            "",
+            f"- Serialized characters: `{accounting.get('serialized_characters')}`",
+            f"- Serialized bytes: `{accounting.get('serialized_bytes')}`",
+            f"- Estimated tokens: `{accounting.get('estimated_tokens')}`",
+        ]
+    )
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def inspect_generation_context(
@@ -2145,6 +2781,9 @@ def _companion_artifact_records(artifact_paths: list[str | Path]) -> list[dict[s
             ("request_specification", "source/request.spec.yaml"),
             ("protocol_ir", "source/protocol.ir.json"),
             ("generated_python", "source/generated/protocol.py"),
+            ("generation_context_json", "source/reports/generation-context.json"),
+            ("generation_context_markdown", "source/reports/generation-context.md"),
+            ("generation_context_selection", "source/reports/generation-context-selection.json"),
             ("reports", "source/reports/"),
         ):
             records.append(
@@ -2392,6 +3031,9 @@ def _attach_manifest_provenance(
     repair_report_path: Path | None,
     finalization_report: Any | None,
     simulation_backend: str,
+    generation_context_path: Path | None = None,
+    generation_context_markdown_path: Path | None = None,
+    generation_context_selection_path: Path | None = None,
 ) -> None:
     manifest["environment"] = environment_provenance(simulation_backend=simulation_backend)
     manifest["source_archive_hashes"] = _source_archive_hashes(context)
@@ -2404,6 +3046,15 @@ def _attach_manifest_provenance(
     manifest["artifact_hashes"] = {
         "request_spec": _artifact_hash_record(request_spec_path, source_path=request_spec_source, roots=hash_roots),
         "input_ir": _artifact_hash_record(ir_path, source_path=ir_source, roots=hash_roots),
+        "generation_context": _artifact_hash_record(generation_context_path, roots=hash_roots),
+        "generation_context_markdown": _artifact_hash_record(
+            generation_context_markdown_path,
+            roots=hash_roots,
+        ),
+        "generation_context_selection": _artifact_hash_record(
+            generation_context_selection_path,
+            roots=hash_roots,
+        ),
         "python_draft": _artifact_hash_record(python_path, roots=hash_roots),
         "repaired_python": _artifact_hash_record(repaired_path, roots=hash_roots),
         "finalized_xscr": _artifact_hash_record(xscr_path, roots=hash_roots),
@@ -3179,6 +3830,28 @@ def _render_full_zeia_export_markdown(assessment: dict[str, Any]) -> str:
             for item in finding.get("items") or []:
                 lines.append(f"  - `{json.dumps(item, sort_keys=True)}`")
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _attach_generation_context_metadata(
+    ir: dict[str, Any],
+    context: Mapping[str, Any],
+    *,
+    json_path: Path,
+    markdown_path: Path,
+    selection_path: Path,
+) -> None:
+    source = ir.setdefault("source", {})
+    source["generation_context"] = {
+        "schema_version": context.get("schema_version"),
+        "status": context.get("status"),
+        "context_fingerprint": context.get("context_fingerprint"),
+        "request_fingerprint": context.get("request_fingerprint"),
+        "json_path": str(json_path),
+        "markdown_path": str(markdown_path),
+        "selection_path": str(selection_path),
+        "evidence_item_count": len(context.get("evidence_items") or []),
+        "omission_count": len(context.get("omissions") or []),
+    }
 
 
 def _attach_request_spec_metadata(ir: dict[str, Any], spec: dict[str, Any], request_spec_path: Path) -> None:

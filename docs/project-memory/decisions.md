@@ -42,6 +42,12 @@
   families and verified compatibility evidence outrank incidental text matches;
   explicit IDs, queries, and source scripts remain overrides; ties,
   incompatibility, and low confidence stay visible as review/omission records.
+- Keep generation context selection in the shared generation workflow rather
+  than duplicating it in CLI or MCP adapters. Use source-backed pattern evidence
+  as sufficient evidence when it is the strongest available match, preserve
+  manual selections, and persist the bounded context JSON/Markdown, selection
+  diagnostics, fingerprint, and normalized hashes through IR and packaged
+  reports.
 - Keep external-device health as a conservative consumer of the source-backed
   `tecan.driver_command_contracts.v1` and `tecan.host_environment.v1` records:
   command roles, documented DriverFramework states, and license capability

@@ -1350,6 +1350,77 @@ class GenerationWorkflowTests(unittest.TestCase):
             )
             self.assertEqual(ranked_ir["steps"][1]["target_labware"], "AlternateDestination")
 
+    def test_generation_workflow_automatically_builds_context_pack_from_strong_pattern_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            index_db = tmp_path / "tecan_project_index.sqlite"
+            _write_pattern_index(index_db)
+            out_dir = tmp_path / "generation"
+
+            manifest = run_generation_workflow(
+                intent="Reuse a mined aspirate window for a new transfer",
+                out_dir=out_dir,
+                index_db=index_db,
+                simulate=False,
+                compile_xscr=False,
+                approve_partial_zeia=True,
+                request_spec={
+                    "schema_version": "tecan.request_spec.v1",
+                    "request": {"intent": "Reuse a mined aspirate window for a new transfer"},
+                    "task_facets": {"operation_families": ["aspirate"]},
+                    "worktable": {"name": "StubWorkspace", "auto_place": False},
+                    "review": {"state": "approved"},
+                },
+            )
+
+            context_paths = manifest["generation_context"]
+            context = json.loads(Path(context_paths["json"]).read_text(encoding="utf-8"))
+            selection = json.loads(Path(context_paths["selection"]).read_text(encoding="utf-8"))
+            ir = json.loads(Path(manifest["protocol_ir"]).read_text(encoding="utf-8"))
+            stages = {stage["id"]: stage for stage in manifest["stages"]}
+
+            self.assertEqual(context["status"], "ready")
+            self.assertEqual(selection["context_fingerprint"], context["context_fingerprint"])
+            self.assertEqual(
+                [item["pattern"]["id"] for item in selection["pattern_selection"]["selected"]],
+                [1],
+            )
+            self.assertEqual(manifest["indexed_pattern_count"], 1)
+            self.assertEqual(stages["select_source_scripts_and_patterns"]["status"], "ready")
+            self.assertEqual(
+                ir["source"]["generation_context"]["context_fingerprint"],
+                context["context_fingerprint"],
+            )
+            self.assertTrue(manifest["artifact_hashes"]["generation_context"]["sha256"])
+            self.assertTrue(Path(context_paths["markdown"]).is_file())
+
+    def test_generation_workflow_records_review_diagnostics_when_context_evidence_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            manifest = run_generation_workflow(
+                intent="Do the requested work",
+                out_dir=tmp_path / "generation",
+                simulate=False,
+                compile_xscr=False,
+                approve_partial_zeia=True,
+                request_spec={
+                    "schema_version": "tecan.request_spec.v1",
+                    "request": {"intent": "Do the requested work"},
+                    "worktable": {"name": "StubWorkspace", "auto_place": False},
+                    "review": {"state": "approved"},
+                },
+            )
+
+            context = json.loads(Path(manifest["generation_context"]["json"]).read_text(encoding="utf-8"))
+            codes = {item["code"] for item in manifest["generation_context"]["review_diagnostics"]}
+            self.assertEqual(context["status"], "needs_review")
+            self.assertIn("unknown_request_facets", codes)
+            self.assertIn("no_generation_context_evidence", codes)
+            self.assertEqual(
+                {item["code"] for item in context["extensions"]["review_diagnostics"]},
+                codes,
+            )
+
     def test_generation_workflow_reports_pattern_backed_rga_moves(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

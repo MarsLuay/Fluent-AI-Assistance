@@ -22,6 +22,8 @@ def load_pattern_windows(
     pattern_ids: list[int | str] | None = None,
     pattern_queries: list[str] | None = None,
     source_script_rank: int = 1,
+    include_all: bool = False,
+    max_windows: int = 256,
 ) -> list[dict[str, Any]]:
     """Load exact mined command windows from a tecan-reader SQLite index."""
     try:
@@ -29,7 +31,7 @@ def load_pattern_windows(
     except (TypeError, ValueError) as exc:
         raise PipelineError("--pattern-id must be an integer") from exc
     queries = [str(value) for value in pattern_queries or []]
-    if not ids and not queries:
+    if not ids and not queries and not include_all:
         return []
     if db_path is None:
         raise PipelineError("--index-db is required when using --pattern-id or --pattern-query")
@@ -39,6 +41,8 @@ def load_pattern_windows(
         raise PipelineError(f"Pattern index database does not exist: {database}")
     if source_script_rank < 1:
         raise PipelineError("--source-script-rank must be 1 or greater")
+    if max_windows < 1:
+        raise PipelineError("max_windows must be at least 1")
 
     conn = sqlite3.connect(database)
     conn.row_factory = sqlite3.Row
@@ -71,6 +75,14 @@ def load_pattern_windows(
             if int(window["id"]) not in seen:
                 windows.append(window)
                 seen.add(int(window["id"]))
+
+        if include_all:
+            for row in _all_pattern_rows(conn, limit=max_windows):
+                pattern_id = int(row["id"])
+                if pattern_id in seen:
+                    continue
+                windows.append(_pattern_result(conn, row))
+                seen.add(pattern_id)
         return windows
     except sqlite3.Error as exc:
         raise PipelineError(f"Could not read pattern index {database}: {exc}") from exc
@@ -479,6 +491,22 @@ def _pattern_row_by_id(conn: sqlite3.Connection, pattern_id: int) -> sqlite3.Row
         """,
         (pattern_id,),
     ).fetchone()
+
+
+def _all_pattern_rows(conn: sqlite3.Connection, *, limit: int) -> list[sqlite3.Row]:
+    return list(
+        conn.execute(
+            """
+            SELECT p.*, z.path AS zeia_file
+            FROM script_patterns p
+            JOIN zeia_files z ON z.id = p.zeia_file_id
+            ORDER BY p.source_script, p.source_path, p.pattern_type,
+                     p.start_command_index, p.id
+            LIMIT ?
+            """,
+            (int(limit),),
+        )
+    )
 
 
 def _pattern_row_for_query(

@@ -61,6 +61,16 @@ matches, keeps ranked alternatives and omissions, preserves explicit pattern
 or source-script overrides, and leaves ties, incompatible targets, and
 low-confidence candidates in review rather than silently guessing.
 
+Generation context is assembled by the shared generation workflow after project
+inspection and before IR planning. It ranks source scripts and mined pattern
+windows against request facets, preserves explicit selections, and emits a
+bounded JSON context pack plus a concise Markdown review artifact. The pack's
+fingerprint and review status are carried into protocol IR, the generation
+manifest, normalized artifact hashes, and ready-to-import report companions;
+CLI, MCP, and one-shot callers therefore consume the same selection behavior.
+Automatic selection is ready only when source-backed evidence is sufficient;
+missing or ambiguous evidence remains an actionable review diagnostic.
+
 Physical hardware readiness is owned by
 `source/03-protocol-builder/fluent_pipeline/physical_readiness.py`. It
 normalizes source/provenance-backed head, tip, labware, site, software,
