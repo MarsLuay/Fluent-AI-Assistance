@@ -50,7 +50,10 @@ selection reason, source provenance, source fingerprint, omissions, and
 accounting. Unknown intent remains reviewable; this contract does not infer
 capabilities or dump whole ZEIA/XSCR sources. Pattern ranking, budget
 compaction, and one-shot workflow integration build on this boundary in later
-pipeline layers.
+pipeline layers. Its deterministic compaction keeps critical structured
+evidence atomic, records duplicate and budget omissions, and exposes byte,
+character, and estimated-token accounting. Repair-delta contexts further narrow
+diagnostics to implicated lineage, contracts, and explicitly safe actions.
 
 Pattern selection is exposed as `tecan.generation_pattern_selection.v1` over
 compact mined windows. It scores exact operation-family and source-evidence

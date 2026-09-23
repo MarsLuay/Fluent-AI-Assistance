@@ -33,6 +33,11 @@
   stable fingerprint. Later ranking, budget, and workflow children consume
   this contract rather than widening it with implicit capabilities or raw
   ZEIA/XSCR dumps.
+- Keep generation-context compaction deterministic and structure-preserving:
+  critical source-backed evidence remains atomic, duplicate windows retain
+  candidate metadata, budget omissions and byte/character/estimated-token
+  accounting remain explicit, and repair-delta contexts allow only implicated
+  diagnostics, lineage/contracts, and explicitly safe actions.
 - Keep source-pattern selection deterministic and auditable: exact operation
   families and verified compatibility evidence outrank incidental text matches;
   explicit IDs, queries, and source scripts remain overrides; ties,
