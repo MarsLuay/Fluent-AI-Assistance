@@ -296,6 +296,22 @@ class ExpressionSemanticContext:
             symbol=symbol,
         )
 
+    def generation_policy(
+        self,
+        name: str,
+        *,
+        source_kind: str = "generated",
+        reviewer_approved: bool = False,
+    ) -> dict[str, Any]:
+        """Return the catalog-backed generation decision for one symbol."""
+
+        return self.catalog.generation_policy(
+            name,
+            target_version=self.target_version,
+            source_kind=source_kind,
+            reviewer_approved=reviewer_approved,
+        )
+
 
 def _select_catalog_signature(
     symbol: ExpressionSymbol,

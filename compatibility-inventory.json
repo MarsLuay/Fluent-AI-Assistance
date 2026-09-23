@@ -361,6 +361,15 @@
       "replacement": null
     },
     {
+      "id": "cli.expression-symbol",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder expression-symbol subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
       "id": "cli.fluent-prepare-check",
       "class": "supported",
       "kind": "cli-command",
@@ -708,6 +717,15 @@
       "kind": "mcp-tool",
       "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
       "reason": "MCP tool fluent_diagnose.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_explain_expression_symbol",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_explain_expression_symbol.",
       "supportedVersion": "current",
       "replacement": null
     },

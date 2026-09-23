@@ -1286,6 +1286,7 @@ def _compiled_command_inventory(
         script=path.stem,
         entry=str(path),
         source_preserved_allowlist=source_preserved_allowlist,
+        target_version=_target_fluentcontrol_version(ir),
     )
     command_ids = []
     unsupported = []
@@ -1334,6 +1335,21 @@ def _compiled_command_inventory(
         "command_validation": command_validation,
         "generic_command_validation": generic_validation,
     }, ir=ir, xscr_path=path, xscr_text=text)
+
+
+def _target_fluentcontrol_version(ir: Mapping[str, Any] | None) -> str | None:
+    if not isinstance(ir, Mapping):
+        return None
+    candidates: list[Any] = [ir.get("target_fluentcontrol_version")]
+    for key in ("generation", "generation_options", "metadata"):
+        value = ir.get(key)
+        if isinstance(value, Mapping):
+            candidates.append(value.get("target_fluentcontrol_version"))
+    for value in candidates:
+        text = str(value or "").strip()
+        if text:
+            return text
+    return None
 
 
 def _compiled_xsi_type_namespace_findings(text: str) -> list[dict[str, Any]]:

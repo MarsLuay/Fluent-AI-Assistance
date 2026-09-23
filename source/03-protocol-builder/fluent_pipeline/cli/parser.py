@@ -9,7 +9,7 @@ from .commands.diagnostics import _cmd_analyze, _cmd_diagnose, _cmd_map_media, _
 from .commands.doctor import _cmd_bootstrap_status, _cmd_compatibility_matrix, _cmd_doctor, _cmd_setup
 from .commands.generation import _cmd_bundle_lifecycle, _cmd_compile, _cmd_decompile, _cmd_determinism_check, _cmd_generate, _cmd_ir_build, _cmd_ir_export, _cmd_ir_schema, _cmd_repair_draft, _cmd_repair_plan, _cmd_roundtrip
 from .commands.run import _cmd_run
-from .commands.projects import _cmd_alias_list, _cmd_alias_normalize_ir, _cmd_alias_resolve, _cmd_catalog_find, _cmd_catalog_info, _cmd_clear_project, _cmd_collection_info, _cmd_create_collection, _cmd_current_project, _cmd_import_project, _cmd_inspect, _cmd_inspect_external_command, _cmd_list_collections, _cmd_list_projects, _cmd_project_find, _cmd_project_info, _cmd_script_report, _cmd_use_project
+from .commands.projects import _cmd_alias_list, _cmd_alias_normalize_ir, _cmd_alias_resolve, _cmd_catalog_find, _cmd_catalog_info, _cmd_clear_project, _cmd_collection_info, _cmd_create_collection, _cmd_current_project, _cmd_expression_symbol, _cmd_import_project, _cmd_inspect, _cmd_inspect_external_command, _cmd_list_collections, _cmd_list_projects, _cmd_project_find, _cmd_project_info, _cmd_script_report, _cmd_use_project
 from .commands.simulator import _cmd_launch_simulator, _cmd_simulate
 from .commands.validation import _cmd_fluent_prepare_check, _cmd_ir_validate, _cmd_request_spec, _cmd_resolve_spec, _cmd_validate, _cmd_validate_delivery_bundle, _cmd_validate_spec, _cmd_verify_bundle, _cmd_worktable_diff
 from ..protocol_ir import CANONICAL_IR_VERSION
@@ -199,6 +199,15 @@ def _build_parser() -> argparse.ArgumentParser:
     p_cat_find.add_argument("pattern")
     p_cat_find.add_argument("--category", default=None)
     p_cat_find.set_defaults(func=_cmd_catalog_find)
+
+    p_expression_symbol = sub.add_parser(
+        "expression-symbol",
+        help="explain one catalog-backed FluentControl expression symbol",
+    )
+    p_expression_symbol.add_argument("symbol")
+    p_expression_symbol.add_argument("--target-version", default=None)
+    p_expression_symbol.add_argument("--json", dest="as_json", action="store_true")
+    p_expression_symbol.set_defaults(func=_cmd_expression_symbol)
 
     p_alias_list = sub.add_parser("alias-list", help="list configured catalog/labware/liquid/device aliases")
     p_alias_list.add_argument("--json", dest="as_json", action="store_true")

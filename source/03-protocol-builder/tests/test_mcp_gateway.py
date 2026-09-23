@@ -321,7 +321,7 @@ class McpGatewayTests(unittest.TestCase):
 
         self.assertEqual(capabilities["unclassified_cli_commands"], [])
         self.assertEqual(capabilities["stale_classifications"], [])
-        self.assertEqual(capabilities["registered_cli_command_count"], 52)
+        self.assertEqual(capabilities["registered_cli_command_count"], 53)
         self.assertEqual(capabilities["commands"]["simulate"]["mode"], "opt_in")
         self.assertEqual(capabilities["commands"]["fluent-prepare-check"]["mode"], "opt_in")
         self.assertEqual(capabilities["commands"]["worktable-diff"]["mode"], "bridge")

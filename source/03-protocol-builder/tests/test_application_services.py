@@ -6,6 +6,7 @@ from unittest import mock
 
 from fluent_pipeline.application_services import (
     BundleVerificationRequest,
+    ExpressionSymbolQueryRequest,
     GenerationResult,
     FullExportReadinessRequest,
     LogAnalysisRequest,
@@ -18,6 +19,7 @@ from fluent_pipeline.application_services import (
     analyze_logs,
     apply_repair,
     create_request_spec,
+    explain_expression_symbol,
     generate_protocol,
     import_project,
     inspect_project,
@@ -33,6 +35,22 @@ from fluent_pipeline.spec_lint import LintResult
 
 
 class ApplicationServicesTests(unittest.TestCase):
+    def test_expression_symbol_explanation_uses_shared_catalog_service(self):
+        result = explain_expression_symbol(
+            ExpressionSymbolQueryRequest(
+                symbol="Round",
+                target_version="3.8",
+                version_evidence={"source": "fixture"},
+                source_examples=(
+                    {"function_name": "Round", "entry": "DataStore/Example.xscr", "line": 10},
+                ),
+            )
+        )
+
+        self.assertEqual(result.report["canonical_name"], "Round")
+        self.assertEqual(result.report["status"], "supported")
+        self.assertEqual(result.report["source_examples"][0]["entry"], "DataStore/Example.xscr")
+
     def test_full_export_readiness_routes_through_one_reader_service(self):
         reader_result = SimpleNamespace(to_dict=lambda: {"status": "complete"})
         with mock.patch(
@@ -268,8 +286,10 @@ class ApplicationServicesTests(unittest.TestCase):
         requests = (root / "mcp_requests.py").read_text(encoding="utf-8")
         self.assertIn("from ...application_services import", projects)
         self.assertIn("import_project as import_project_service", projects)
+        self.assertIn("explain_expression_symbol", projects)
         self.assertIn("from .application_services import", gateway)
         self.assertIn("import_project as import_project_service", gateway)
+        self.assertIn("explain_expression_symbol", gateway)
         self.assertIn("from .application_services import", requests)
 
 

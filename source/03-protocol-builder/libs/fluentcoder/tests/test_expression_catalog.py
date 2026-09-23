@@ -108,6 +108,46 @@ def test_catalog_version_ranges_are_explicit_and_fail_closed_when_unknown() -> N
     assert catalog.version_status("Missing", "3.5") == "unknown_symbol"
 
 
+def test_catalog_introspection_and_generation_policy_are_version_aware() -> None:
+    catalog = load_expression_symbol_catalog(
+        _catalog(
+            _symbol(
+                "Versioned",
+                signatures=[
+                    {"argumentTypes": ["number"], "returnType": "number"},
+                    {"argumentTypes": ["string"], "returnType": "string"},
+                ],
+                version_ranges=[{"min": "3.2", "max": "3.8"}],
+                provenance=[{"source": "verified", "reference": "fixture.pdf"}],
+            )
+        )
+    )
+
+    report = catalog.introspect(
+        "versioned",
+        target_version="FluentControl 3.5 SP1",
+        version_evidence={"source": "fixture", "build": "3.5.1"},
+        source_examples=[
+            {"function_name": "Versioned", "entry": "z.xscr", "line": 20},
+            {"function_name": "Versioned", "entry": "a.xscr", "line": 10},
+            {"function_name": "Other", "entry": "ignored.xscr"},
+        ],
+    )
+
+    assert report["canonical_name"] == "Versioned"
+    assert report["status"] == "supported"
+    assert report["category"] == "function"
+    assert len(report["overloads"]) == 2
+    assert report["return_types"] == ["number", "string"]
+    assert [item["entry"] for item in report["source_examples"]] == ["a.xscr", "z.xscr"]
+    assert catalog.introspect("Versioned", target_version="not verified")["status"] == "indeterminate"
+
+    assert catalog.generation_policy("Versioned", target_version="3.5")["action"] == "generate"
+    assert catalog.generation_policy("Versioned", target_version="4.0")["allowed"] is False
+    assert catalog.generation_policy("Unknown", source_kind="generated")["allowed"] is False
+    assert catalog.generation_policy("Unknown", source_kind="imported")["action"] == "preserve_source"
+
+
 def test_catalog_rejects_invalid_version_ranges() -> None:
     with pytest.raises(CatalogValidationError, match="min cannot exceed max"):
         load_expression_symbol_catalog(_catalog(_symbol("Fn", version_ranges=[{"min": "4.0", "max": "3.0"}])))

@@ -47,8 +47,10 @@ from ...external_commands import (
     write_external_command_contract,
 )
 from ...application_services import (
+    ExpressionSymbolQueryRequest,
     InputInspectionRequest,
     ProjectImportRequest,
+    explain_expression_symbol,
     import_project as import_project_service,
     inspect_input as inspect_input_service,
 )
@@ -387,6 +389,26 @@ def _cmd_catalog_find(args: argparse.Namespace) -> int:
     result = run_fluentcoder(command)
     _print_process(result)
     return result.returncode
+
+
+def _cmd_expression_symbol(args: argparse.Namespace) -> int:
+    result = explain_expression_symbol(
+        ExpressionSymbolQueryRequest(
+            symbol=args.symbol,
+            target_version=args.target_version,
+        )
+    )
+    payload = result.to_dict()
+    if args.as_json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print(f"Symbol: {payload.get('canonical_name') or payload.get('query')}")
+        print(f"Status: {payload.get('status')}")
+        print(f"Category: {payload.get('category') or 'unknown'}")
+        print(f"Version: {payload.get('version_status')}")
+        for signature in payload.get("signatures") or []:
+            print(f"Signature: {signature.get('name')}({', '.join(signature.get('argument_types') or [])}) -> {signature.get('return_type')}")
+    return 0 if payload.get("status") != "unknown" else 1
 
 def _cmd_alias_list(args: argparse.Namespace) -> int:
     records = alias_records(load_alias_maps())
