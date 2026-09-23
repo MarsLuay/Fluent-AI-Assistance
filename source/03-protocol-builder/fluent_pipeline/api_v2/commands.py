@@ -190,6 +190,9 @@ class TransferLabware:
     is_disabled_for_execution: bool = False
     execution_settings: str = ""
     line_number: int = 0
+    rga_route_assessment: Mapping[str, Any] | None = None
+    rga_topology_transition: Mapping[str, Any] | None = None
+    rga_require_evidence: bool = False
 
     def to_string(self) -> str:
         return (
@@ -214,6 +217,9 @@ class TransferLabware:
             # still catch missing labware or occupied destinations.
             deck_labels={str(self.labware or "").strip().casefold()},
             step_label="TransferLabware",
+            route_assessment=self.rga_route_assessment,
+            topology_transition=self.rga_topology_transition,
+            require_rga_evidence=bool(self.rga_require_evidence),
         )
         if not result.ok:
             raise ApiV2ValidationError(
@@ -814,6 +820,19 @@ def transfer_labware_from_ir_step(step: Mapping[str, Any]) -> TransferLabware:
         is_breakpoint=bool(params.get("is_breakpoint", False)),
         is_disabled_for_execution=bool(params.get("is_disabled_for_execution", False)),
         line_number=int(step.get("line_number") or 0),
+        rga_route_assessment=(
+            dict(params.get("rga_route_assessment"))
+            if isinstance(params.get("rga_route_assessment"), Mapping)
+            else None
+        ),
+        rga_topology_transition=(
+            dict(params.get("rga_topology_transition"))
+            if isinstance(params.get("rga_topology_transition"), Mapping)
+            else None
+        ),
+        rga_require_evidence=bool(
+            params.get("rga_require_evidence") or params.get("require_rga_evidence")
+        ),
     )
 
 

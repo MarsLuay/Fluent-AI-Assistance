@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Union
+from typing import Any, TYPE_CHECKING, Mapping, Optional, Union
 
 from .expressions import Expression
 from .ir.schema import (
@@ -33,6 +33,10 @@ class Gripper:
         onto: Optional[Labware] = None,
         module_name: Optional[str] = None,
         available_id: Optional[str] = None,
+        rga_route_assessment: Mapping[str, Any] | None = None,
+        rga_topology_transition: Mapping[str, Any] | None = None,
+        rga_logical_occupancy: Mapping[str, Any] | None = None,
+        rga_physical_limitations: list[Mapping[str, Any]] | None = None,
     ) -> None:
         if (to is None) == (onto is None):
             raise TypeError("Gripper.move requires exactly one of `to=` or `onto=`")
@@ -64,6 +68,12 @@ class Gripper:
             destination_site=dest_pos,
             module_name=str(rga_module or ""),
             available_id=rga_available,
+            rga_route_assessment=dict(rga_route_assessment) if rga_route_assessment is not None else None,
+            rga_topology_transition=(
+                dict(rga_topology_transition) if rga_topology_transition is not None else None
+            ),
+            rga_logical_occupancy=dict(rga_logical_occupancy) if rga_logical_occupancy is not None else None,
+            rga_physical_limitations=[dict(item) for item in (rga_physical_limitations or [])],
         ))
         self._wt._emit(CgaDropFingersStep(labware_name=labware_name))
 
