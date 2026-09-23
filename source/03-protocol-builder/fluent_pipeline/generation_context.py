@@ -16,9 +16,19 @@ from typing import Any, Iterable, Mapping, Sequence
 
 
 GENERATION_CONTEXT_SCHEMA_VERSION = "tecan.generation_context.v1"
+REPAIR_DELTA_SCHEMA_VERSION = "tecan.generation_repair_delta.v1"
 SELECTION_MODES = ("explicit", "automatic_ranked", "source_required")
 CONTEXT_STATUSES = ("ready", "needs_review")
 ESTIMATED_TOKEN_CHARS = 4
+_COMPACTION_EXTENSION_KEY = "compaction"
+_CRITICAL_EVIDENCE_CATEGORIES = {
+    "source_pattern",
+    "source_lineage",
+    "protocol_contract",
+    "command_contract",
+    "device_binding",
+    "worktable_contract",
+}
 
 
 class GenerationContextValidationError(ValueError):
@@ -526,6 +536,292 @@ def assert_valid_generation_context(payload: Mapping[str, Any]) -> None:
         raise GenerationContextValidationError(errors)
 
 
+def compact_generation_context(
+    payload: Mapping[str, Any],
+    *,
+    max_bytes: int | None = None,
+    max_characters: int | None = None,
+    max_tokens: int | None = None,
+) -> dict[str, Any]:
+    """Deduplicate and budget context without truncating structured evidence."""
+    limits = _context_budget_limits(
+        max_bytes=max_bytes,
+        max_characters=max_characters,
+        max_tokens=max_tokens,
+    )
+    normalized = normalize_generation_context(payload)
+    evidence, duplicate_omissions = _deduplicate_evidence(normalized["evidence_items"])
+    existing_omissions = [dict(item) for item in normalized["omissions"]]
+    base_extensions = dict(normalized.get("extensions") or {})
+    before_count = len(evidence) + len(duplicate_omissions)
+    selected: list[dict[str, Any]] = []
+    deferred: list[dict[str, Any]] = []
+    for item in evidence:
+        if _evidence_priority(item) >= 2:
+            selected.append(item)
+        else:
+            deferred.append(item)
+
+    def build(items: list[dict[str, Any]], omitted: list[dict[str, Any]]) -> dict[str, Any]:
+        extension = dict(base_extensions)
+        extension[_COMPACTION_EXTENSION_KEY] = {
+            "schema_version": "tecan.generation_context_compaction.v1",
+            "limits": limits,
+            "deduplicated_count": len(duplicate_omissions),
+            "selected_count": len(items),
+            "omitted_count": len(omitted),
+            "critical_count": sum(_evidence_priority(value) >= 2 for value in items),
+        }
+        result = dict(normalized)
+        result["evidence_items"] = items
+        result["omissions"] = [*existing_omissions, *duplicate_omissions, *omitted]
+        result["extensions"] = extension
+        result["accounting"] = _accounting(result)
+        fingerprint_material = dict(result)
+        fingerprint_material.pop("context_fingerprint", None)
+        result["context_fingerprint"] = _fingerprint(fingerprint_material)
+        return result
+
+    omitted = list(_budget_omissions(deferred, reason="budget_compacted"))
+    candidate = build(selected, omitted)
+    for item in deferred:
+        trial = build([*selected, item], [
+            value for value in omitted if value.get("candidate_id") != _evidence_id(item)
+        ])
+        if _within_context_budget(trial, limits):
+            selected.append(item)
+            omitted = [
+                value for value in omitted if value.get("candidate_id") != _evidence_id(item)
+            ]
+            candidate = trial
+        else:
+            candidate = build(selected, omitted)
+
+    if not _within_context_budget(candidate, limits):
+        # Critical source/evidence objects are atomic and remain present even
+        # when their minimum valid context is larger than the requested limit.
+        candidate["extensions"][_COMPACTION_EXTENSION_KEY]["over_budget_critical"] = True
+        candidate["accounting"] = _accounting(candidate)
+        fingerprint_material = dict(candidate)
+        fingerprint_material.pop("context_fingerprint", None)
+        candidate["context_fingerprint"] = _fingerprint(fingerprint_material)
+    assert_valid_generation_context(candidate)
+    candidate["extensions"][_COMPACTION_EXTENSION_KEY]["input_evidence_count"] = before_count
+    candidate["extensions"][_COMPACTION_EXTENSION_KEY]["output_evidence_count"] = len(selected)
+    candidate["accounting"] = _accounting(candidate)
+    fingerprint_material = dict(candidate)
+    fingerprint_material.pop("context_fingerprint", None)
+    candidate["context_fingerprint"] = _fingerprint(fingerprint_material)
+    return candidate
+
+
+def build_repair_delta_context(
+    diagnostics: Iterable[Mapping[str, Any]],
+    source_lineage: Iterable[Mapping[str, Any]] = (),
+    relevant_contracts: Iterable[Mapping[str, Any]] = (),
+    repair_actions: Iterable[Mapping[str, Any]] = (),
+    *,
+    max_bytes: int | None = None,
+    max_characters: int | None = None,
+    max_tokens: int | None = None,
+) -> dict[str, Any]:
+    """Build a compact context containing only safe, implicated repair data."""
+    diagnostic_items = [_repair_diagnostic(value) for value in diagnostics if isinstance(value, Mapping)]
+    references = _repair_references(diagnostic_items)
+    lineage_items = [
+        _repair_lineage(value)
+        for value in source_lineage
+        if isinstance(value, Mapping) and _repair_item_implicated(value, references)
+    ]
+    contract_items = [
+        _repair_contract(value)
+        for value in relevant_contracts
+        if isinstance(value, Mapping) and _repair_item_implicated(value, references)
+    ]
+    action_items = [
+        _repair_action(value)
+        for value in repair_actions
+        if isinstance(value, Mapping) and _is_safe_repair_action(value)
+    ]
+    evidence: list[dict[str, Any]] = []
+    for category, items, reason in (
+        ("repair_diagnostic", diagnostic_items, "implicated structured diagnostic"),
+        ("source_lineage", lineage_items, "diagnostic-referenced source lineage"),
+        ("repair_contract", contract_items, "diagnostic-referenced execution contract"),
+        ("repair_action", action_items, "explicitly marked safe repair action"),
+    ):
+        for index, item in enumerate(items):
+            item_id = str(item.get("id") or item.get("code") or f"{category}:{index}")
+            evidence.append(
+                ContextEvidence(
+                    category=category,
+                    content=item,
+                    selection_reason=reason,
+                    selection_mode="source_required" if category != "repair_action" else "automatic_ranked",
+                    provenance={"repair_delta": REPAIR_DELTA_SCHEMA_VERSION, "item_id": item_id},
+                    item_id=f"{category}:{item_id}",
+                    conflict_key=f"{category}:{item_id}",
+                ).as_dict()
+            )
+    context = build_generation_context(
+        {"request": {"intent": "Repair implicated protocol diagnostics"}},
+        evidence_items=evidence,
+        extensions={
+            "repair_delta": {
+                "schema_version": REPAIR_DELTA_SCHEMA_VERSION,
+                "diagnostic_count": len(diagnostic_items),
+                "lineage_count": len(lineage_items),
+                "contract_count": len(contract_items),
+                "safe_action_count": len(action_items),
+            }
+        },
+    )
+    return compact_generation_context(
+        context,
+        max_bytes=max_bytes,
+        max_characters=max_characters,
+        max_tokens=max_tokens,
+    )
+
+
+def _context_budget_limits(*, max_bytes: int | None, max_characters: int | None, max_tokens: int | None) -> dict[str, int]:
+    values = {"max_bytes": max_bytes, "max_characters": max_characters, "max_tokens": max_tokens}
+    if not any(value is not None for value in values.values()):
+        return {}
+    for key, value in values.items():
+        if value is not None and value < 1:
+            raise ValueError(f"{key} must be at least 1")
+    return {key: int(value) for key, value in values.items() if value is not None}
+
+
+def _within_context_budget(payload: Mapping[str, Any], limits: Mapping[str, int]) -> bool:
+    serialized = json.dumps(_canonical(payload), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    characters = len(serialized)
+    bytes_count = len(serialized.encode("utf-8"))
+    tokens = (characters + ESTIMATED_TOKEN_CHARS - 1) // ESTIMATED_TOKEN_CHARS
+    return (
+        ("max_bytes" not in limits or bytes_count <= limits["max_bytes"])
+        and ("max_characters" not in limits or characters <= limits["max_characters"])
+        and ("max_tokens" not in limits or tokens <= limits["max_tokens"])
+    )
+
+
+def _evidence_priority(item: Mapping[str, Any]) -> int:
+    category = str(item.get("category") or "").casefold()
+    if category in _CRITICAL_EVIDENCE_CATEGORIES or item.get("selection_mode") == "explicit":
+        return 2
+    if category in {"repair_diagnostic", "repair_contract", "repair_action"}:
+        return 1
+    return 0
+
+
+def _evidence_id(item: Mapping[str, Any]) -> str:
+    return str(item.get("id") or item.get("item_id") or item.get("source_fingerprint") or "")
+
+
+def _deduplicate_evidence(items: Sequence[Mapping[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    unique: dict[str, dict[str, Any]] = {}
+    duplicate_omissions: list[dict[str, Any]] = []
+    for raw in sorted((dict(item) for item in items), key=lambda item: _evidence_id(item)):
+        key = str(raw.get("conflict_key") or raw.get("source_fingerprint") or _evidence_id(raw))
+        if key not in unique:
+            unique[key] = raw
+            continue
+        kept = unique[key]
+        extensions = dict(kept.get("extensions") or {})
+        duplicates = list(extensions.get("duplicate_candidates") or [])
+        duplicates.append({
+            field: _canonical(raw.get(field))
+            for field in ("id", "category", "content", "selection_reason", "selection_mode", "provenance", "source_fingerprint", "extensions")
+            if field in raw
+        })
+        extensions["duplicate_candidates"] = sorted(duplicates, key=lambda value: str(value.get("id") or ""))
+        kept["extensions"] = extensions
+        duplicate_omissions.append({
+            "candidate_id": _evidence_id(raw),
+            "category": str(raw.get("category") or "evidence"),
+            "reason": "duplicate_evidence_window",
+            "provenance": _canonical(raw.get("provenance") or {}),
+        })
+    return list(unique.values()), duplicate_omissions
+
+
+def _budget_omissions(items: Iterable[Mapping[str, Any]], *, reason: str) -> list[dict[str, Any]]:
+    return [
+        {
+            "candidate_id": _evidence_id(item),
+            "category": str(item.get("category") or "evidence"),
+            "reason": reason,
+            "provenance": _canonical(item.get("provenance") or {}),
+        }
+        for item in items
+    ]
+
+
+def _repair_references(items: Iterable[Mapping[str, Any]]) -> set[str]:
+    references: set[str] = set()
+    for item in items:
+        for key in ("id", "code", "source_path", "source_ref", "lineage_id", "contract_id", "command_id"):
+            value = item.get(key)
+            if value:
+                references.add(str(value).casefold())
+        for key in ("source_refs", "lineage_ids", "contract_ids", "related_paths"):
+            references.update(str(value).casefold() for value in item.get(key, []) if value)
+    return references
+
+
+def _repair_item_implicated(item: Mapping[str, Any], references: set[str]) -> bool:
+    if not references:
+        return False
+    values = _repair_references([item])
+    return bool(values & references) or any(
+        reference in str(item.get(key) or "").casefold()
+        for reference in references
+        for key in ("path", "source_path", "source_ref", "id", "lineage_id", "contract_id")
+    )
+
+
+def _repair_diagnostic(value: Mapping[str, Any]) -> dict[str, Any]:
+    return _allowlisted_mapping(value, {
+        "id", "code", "title", "severity", "category", "message", "summary", "likely_cause",
+        "suggested_fix", "source_path", "source_ref", "lineage_id", "lineage_ids", "contract_id",
+        "contract_ids", "related_paths", "safe_actions",
+    })
+
+
+def _repair_lineage(value: Mapping[str, Any]) -> dict[str, Any]:
+    return _allowlisted_mapping(value, {
+        "id", "lineage_id", "source_path", "source_ref", "script", "command_range", "command_index",
+        "symbol", "pattern_id", "source_fingerprint", "provenance",
+    })
+
+
+def _repair_contract(value: Mapping[str, Any]) -> dict[str, Any]:
+    return _allowlisted_mapping(value, {
+        "id", "contract_id", "name", "category", "requirements", "fields", "parameters", "provenance",
+        "source_fingerprint", "selection_reason",
+    })
+
+
+def _repair_action(value: Mapping[str, Any]) -> dict[str, Any]:
+    return _allowlisted_mapping(value, {
+        "id", "action_id", "action", "description", "target", "parameters", "safety", "safe",
+        "requires_approval", "source_ref",
+    })
+
+
+def _allowlisted_mapping(value: Mapping[str, Any], allowed: set[str]) -> dict[str, Any]:
+    return {str(key): _canonical(value[key]) for key in sorted(value, key=str) if str(key) in allowed}
+
+
+def _is_safe_repair_action(value: Mapping[str, Any]) -> bool:
+    if value.get("safe") is True:
+        return True
+    if value.get("requires_approval") is True:
+        return False
+    return str(value.get("safety") or "").casefold() in {"safe", "offline", "review_only"}
+
+
 def _accounting(payload: Mapping[str, Any]) -> dict[str, Any]:
     material = dict(payload)
     material.pop("accounting", None)
@@ -766,10 +1062,13 @@ __all__ = [
     "ContextOmission",
     "GENERATION_CONTEXT_SCHEMA_VERSION",
     "GenerationContextValidationError",
+    "REPAIR_DELTA_SCHEMA_VERSION",
     "SELECTION_MODES",
     "TaskFacets",
     "assert_valid_generation_context",
+    "build_repair_delta_context",
     "build_generation_context",
+    "compact_generation_context",
     "extract_task_facets",
     "generation_context_json_schema",
     "normalize_generation_context",
