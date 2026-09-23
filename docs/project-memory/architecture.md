@@ -52,6 +52,12 @@ capabilities or dump whole ZEIA/XSCR sources. Pattern ranking, budget
 compaction, and one-shot workflow integration build on this boundary in later
 pipeline layers.
 
+Pattern selection is exposed as `tecan.generation_pattern_selection.v1` over
+compact mined windows. It scores exact operation-family and source-evidence
+matches, keeps ranked alternatives and omissions, preserves explicit pattern
+or source-script overrides, and leaves ties, incompatible targets, and
+low-confidence candidates in review rather than silently guessing.
+
 Physical hardware readiness is owned by
 `source/03-protocol-builder/fluent_pipeline/physical_readiness.py`. It
 normalizes source/provenance-backed head, tip, labware, site, software,
