@@ -31,6 +31,7 @@ include-package-data = true
 fluentcoder = [
   "_assets/templates/*.xml",
   "_assets/reference/*.yaml",
+  "_assets/reference/*.json",
   "_assets/reference/*.txt",
   "_assets/config/*.yaml",
   "_assets/config/*.yaml.example",
