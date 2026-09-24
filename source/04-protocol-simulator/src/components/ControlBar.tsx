@@ -202,8 +202,6 @@ export function ControlBar({
 
   const showLiquidClasses = selectedSection === "liquidClasses";
 
-  const liquidClassTemplate = controlBarCommandsGroupById("fca1").commands.find((command) => command.id === "fca1-set-liquid-class");
-
   return (
     <div className="control-bar">
       <div className="control-bar-section-tabs" role="tablist" aria-label="Control Bar sections">
@@ -321,24 +319,10 @@ export function ControlBar({
               !normalizedSearch || normalizeSearchText(liquidClass).includes(normalizedSearch)
             ).map((liquidClass) => (
               <article key={liquidClass} className="control-bar-command-card">
-                <button
-                  type="button"
-                  className="control-bar-command-main control-bar-command-main-full"
-                  onClick={() => {
-                    if (!liquidClassTemplate) return;
-                    onAddCommand({
-                      ...liquidClassTemplate,
-                      defaults: {
-                        ...liquidClassTemplate.defaults,
-                        liquidClass
-                      }
-                    });
-                  }}
-                  title={`Add Set Liquid Class for ${liquidClass}`}
-                >
+                <div className="control-bar-command-main control-bar-command-main-full">
                   <strong>{liquidClass}</strong>
-                  <span>Set Liquid Class</span>
-                </button>
+                  <span>Use this catalog value in a canonical liquid operation.</span>
+                </div>
               </article>
             ))}
             {!CONTROL_BAR_LIQUID_CLASSES.length && <p className="muted">No liquid classes available.</p>}

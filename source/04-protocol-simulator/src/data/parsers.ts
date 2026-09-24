@@ -31,6 +31,7 @@ import { enrichIrCommandWithRgaCues } from "../sim/rgaGripper";
 import { isWorktableGeometryName, parseFluentGeometryArtifacts } from "./fluentGeometry";
 import { artifactSelectionKey } from "./sourceCatalog";
 import { PROTOCOL_IR_VERSION, validateProtocolIr } from "./protocolIrContract";
+import { isOfflineMotionOperation } from "./protocolIrOperations";
 import {
   completeValidationGates,
   issueFromValidationGate,
@@ -2483,6 +2484,7 @@ function operationFromCommandId(commandId: string): string {
 
 function familyForOperation(operation: string): OperationFamily {
   const lower = operation.toLowerCase();
+  if (isOfflineMotionOperation(lower)) return "motion";
   if (lower.includes("aspirate") || lower.includes("dispense") || lower.includes("mix")) return "liquid";
   if (lower.includes("tip") || lower.includes("adapter")) return "tips";
   if (lower.includes("labware")) return "labware";
@@ -2496,6 +2498,7 @@ function familyForOperation(operation: string): OperationFamily {
 }
 
 function effectForOperation(operation: string): string {
+  if (isOfflineMotionOperation(operation.toLowerCase())) return "offline_validation_only";
   const family = familyForOperation(operation);
   if (family === "liquid") return "liquid_transfer";
   if (family === "tips") return "tip_state_change";

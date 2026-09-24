@@ -12,6 +12,7 @@ import type {
   SnapshotModel,
   TipState
 } from "../types";
+import { isOfflineMotionOperation, isProtocolIrOperation } from "../data/protocolIrOperations";
 import { applyGripperCommand, cloneGripperState, emptyGripperState } from "./rgaGripper";
 
 export function buildSnapshots(labware: LabwareModel[], commands: CommandModel[]): SnapshotModel[] {
@@ -102,6 +103,7 @@ export function enabledCommandsFromScriptCommands(
           message: command.message || fallback.message
         };
       })
+      .filter((command) => isProtocolIrOperation(command.operation))
   );
 }
 
@@ -364,6 +366,7 @@ function emptyCommand(index: number): CommandModel {
 
 function familyForOperation(operation: string): OperationFamily {
   const lower = operation.toLowerCase();
+  if (isOfflineMotionOperation(lower)) return "motion";
   if (isAspirate(lower) || isDispense(lower) || lower.includes("mix")) return "liquid";
   if (lower.includes("tip")) return "tips";
   if (lower.includes("move") || lower.includes("transfer_labware")) return "motion";
@@ -377,6 +380,7 @@ function familyForOperation(operation: string): OperationFamily {
 
 function effectForOperation(operation: string, family: OperationFamily): string {
   const lower = operation.toLowerCase();
+  if (isOfflineMotionOperation(lower)) return "offline_validation_only";
   if (isAspirate(lower)) return "aspirate";
   if (isDispense(lower)) return "dispense";
   if (lower.includes("mix")) return "mix";
