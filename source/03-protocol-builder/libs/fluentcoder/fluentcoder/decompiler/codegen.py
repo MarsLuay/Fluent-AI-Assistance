@@ -413,7 +413,54 @@ class _StepEmitter:
 
         if isinstance(step, PickUpTipsStep):
             target = _label_arg(step.labware_name, self.label_to_var) or repr(step.labware_name)
-            self.out.append(self.indent + f"head.pick_up({target})")
+            args = [target]
+            if step.tip_columns is not None:
+                args.append(f"tip_columns={step.tip_columns!r}")
+            if step.tip_count is not None:
+                args.append(f"tip_count={step.tip_count!r}")
+            if step.partial_columns != 24:
+                args.append(f"partial_columns={step.partial_columns!r}")
+            if step.partial_rows != 16:
+                args.append(f"partial_rows={step.partial_rows!r}")
+            expression_defaults = {
+                "partial_column_offset": 0,
+                "partial_rows_offset": 0,
+                "well_offset": 0,
+                "position_first_tip_x": 0,
+                "position_first_tip_y": 0,
+                "first_tip_x_position": 1,
+                "first_tip_y_position": 1,
+                "column": 0,
+                "row": 0,
+                "row_offset": 0,
+                "column_offset": 0,
+                "orientation_phi": 0,
+                "orientation_psi": 0,
+                "orientation_theta": 0,
+            }
+            for name, default in expression_defaults.items():
+                value = getattr(step, name)
+                if value != default:
+                    args.append(f"{name}={_emit_expression_arg(value, self.classes_used)}")
+            if step.last_tip_x_position is not None:
+                args.append(
+                    f"last_tip_x_position={_emit_expression_arg(step.last_tip_x_position, self.classes_used)}"
+                )
+            if step.last_tip_y_position is not None:
+                args.append(
+                    f"last_tip_y_position={_emit_expression_arg(step.last_tip_y_position, self.classes_used)}"
+                )
+            if step.compartment != 1:
+                args.append(f"compartment={step.compartment!r}")
+            if step.remove_rack:
+                args.append("remove_rack=True")
+            if step.subsequent_pipetting_direction_is_row:
+                args.append("subsequent_pipetting_direction_is_row=True")
+            if step.blowout_airgap:
+                args.append(f"blowout_airgap={step.blowout_airgap!r}")
+            if step.head_position != "Left":
+                args.append(f"head_position={step.head_position!r}")
+            self.out.append(self.indent + f"head.pick_up({', '.join(args)})")
             self.i += 1
             return True
 

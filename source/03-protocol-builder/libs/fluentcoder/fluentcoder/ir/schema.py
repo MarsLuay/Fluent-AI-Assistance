@@ -12,6 +12,7 @@ from enum import Enum
 from ..expressions import (
     Expression,
     IndexExpression,
+    NumberLiteral,
     coerce_literal_expression,
     coerce_source_expression,
     loop_count_expression_error,
@@ -230,7 +231,13 @@ class DropHeadAdapterStep(BaseStep):
 
 
 class PickUpTipsStep(BaseStep):
-    """Step to pick up tips."""
+    """Step to pick up tips, including source-backed MCA well selection fields.
+
+    The coordinate and offset values are expressions because imported XSCR may
+    bind them to FluentControl variables.  Defaults mirror the reference
+    command template; fields not represented here remain available in
+    ``raw_xml`` for fail-closed/source-preserved handling.
+    """
     step_type: Literal[StepType.PICK_UP_TIPS] = StepType.PICK_UP_TIPS
     labware_name: str = Field(..., description="Labware containing tips")
     device_alias: Optional[str] = None
@@ -238,6 +245,25 @@ class PickUpTipsStep(BaseStep):
     blowout_airgap: int = Field(default=0, ge=0)
     partial_columns: int = Field(default=24, ge=1, le=24, description="Number of columns")
     partial_rows: int = Field(default=16, ge=1, le=16, description="Number of rows")
+    partial_column_offset: Expression = Field(default_factory=lambda: NumberLiteral(0))
+    partial_rows_offset: Expression = Field(default_factory=lambda: NumberLiteral(0))
+    well_offset: Expression = Field(default_factory=lambda: NumberLiteral(0))
+    position_first_tip_x: Expression = Field(default_factory=lambda: NumberLiteral(0))
+    position_first_tip_y: Expression = Field(default_factory=lambda: NumberLiteral(0))
+    compartment: int = Field(default=1, ge=0)
+    first_tip_x_position: Expression = Field(default_factory=lambda: NumberLiteral(1))
+    first_tip_y_position: Expression = Field(default_factory=lambda: NumberLiteral(1))
+    last_tip_x_position: Optional[Expression] = None
+    last_tip_y_position: Optional[Expression] = None
+    column: Expression = Field(default_factory=lambda: NumberLiteral(0))
+    row: Expression = Field(default_factory=lambda: NumberLiteral(0))
+    row_offset: Expression = Field(default_factory=lambda: NumberLiteral(0))
+    column_offset: Expression = Field(default_factory=lambda: NumberLiteral(0))
+    orientation_phi: Expression = Field(default_factory=lambda: NumberLiteral(0))
+    orientation_psi: Expression = Field(default_factory=lambda: NumberLiteral(0))
+    orientation_theta: Expression = Field(default_factory=lambda: NumberLiteral(0))
+    remove_rack: bool = False
+    subsequent_pipetting_direction_is_row: bool = False
     tip_columns: Optional[list[int]] = Field(
         default=None,
         description="1-based column numbers to pick (MCA partial pickup)",
@@ -248,6 +274,38 @@ class PickUpTipsStep(BaseStep):
         description="Pick the first N available tips in column-major order",
     )
     head_position: str = Field(default="Left", description="Head position (Left/Right)")
+    raw_xml: Optional[str] = Field(
+        default=None,
+        description="Original Object XML for unsupported/additive pickup fields",
+    )
+
+    @field_validator(
+        "partial_column_offset",
+        "partial_rows_offset",
+        "well_offset",
+        "position_first_tip_x",
+        "position_first_tip_y",
+        "first_tip_x_position",
+        "first_tip_y_position",
+        "column",
+        "row",
+        "row_offset",
+        "column_offset",
+        "orientation_phi",
+        "orientation_psi",
+        "orientation_theta",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_pickup_expression(cls, value: Any) -> Expression:
+        return _coerce_expression_field(value)
+
+    @field_validator("last_tip_x_position", "last_tip_y_position", mode="before")
+    @classmethod
+    def _coerce_optional_pickup_expression(cls, value: Any) -> Optional[Expression]:
+        if value is None:
+            return None
+        return _coerce_expression_field(value)
 
 
 class SetTipsBackStep(BaseStep):

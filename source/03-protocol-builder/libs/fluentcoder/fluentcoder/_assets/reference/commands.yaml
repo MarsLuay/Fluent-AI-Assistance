@@ -535,10 +535,10 @@ commands:
     >\n  <Mca384PickUpTipsScriptCommandDataV2>\n    <BlowoutAirgap>{{BlowoutAirgap}}</BlowoutAirgap>\n\
     \    <Data Type=\"Tecan.Core.Instrument.Devices.Mca.Mca384.Scripting.Mca384PartialTipCommandBaseDataV2\"\
     >\n      <Mca384PartialTipCommandBaseDataV2>\n        <PartialColumns>{{PartialColumns}}</PartialColumns>\n\
-    \        <PartialRows>{{PartialRows}}</PartialRows>\n        <PartialColumnOffset>0</PartialColumnOffset>\n\
-    \        <PartialRowsOffset>0</PartialRowsOffset>\n        <HeadPosition>\n  \
+    \        <PartialRows>{{PartialRows}}</PartialRows>\n        <PartialColumnOffset>{{PartialColumnOffset}}</PartialColumnOffset>\n\
+    \        <PartialRowsOffset>{{PartialRowsOffset}}</PartialRowsOffset>\n        <HeadPosition>\n  \
     \        <HeadPositions>{{HeadPosition}}</HeadPositions>\n        </HeadPosition>\n\
-    \        <RemoveRack>False</RemoveRack>\n        <WasteForDitis />\n        <Data\
+    \        <RemoveRack>{{RemoveRack}}</RemoveRack>\n        <WasteForDitis />\n        <Data\
     \ Type=\"Tecan.Core.Instrument.Devices.Mca._384.Scripting.Data.Mca384ScriptCommandUsingWellSelectionBaseDataV6\"\
     >\n          <Mca384ScriptCommandUsingWellSelectionBaseDataV6>\n            <Data\
     \ Type=\"Tecan.Core.Instrument.Helpers.Scripting.ScriptCommandCommonDataV2\">\n\
@@ -556,10 +556,10 @@ commands:
     \                        <LineNumber>{{LineNumber}}</LineNumber>\n           \
     \           </ScriptStatementBaseDataV1>\n                    </Data>\n      \
     \            </DeviceAliasStatementBaseDataV1>\n                </Data>\n    \
-    \          </ScriptCommandCommonDataV2>\n            </Data>\n            <WellOffset>0</WellOffset>\n\
-    \            <PositionFirstTip>\n              <Point>\n                <X>0</X>\n\
-    \                <Y>0</Y>\n              </Point>\n            </PositionFirstTip>\n\
-    \            <Compartment>1</Compartment>\n            <AdapterPlate>\n      \
+    \          </ScriptCommandCommonDataV2>\n            </Data>\n            <WellOffset>{{WellOffset}}</WellOffset>\n\
+    \            <PositionFirstTip>\n              <Point>\n                <X>{{PositionFirstTipX}}</X>\n\
+    \                <Y>{{PositionFirstTipY}}</Y>\n              </Point>\n            </PositionFirstTip>\n\
+    \            <Compartment>{{Compartment}}</Compartment>\n            <AdapterPlate>\n      \
     \        <AdapterData>\n                <Name>{{AdapterName}}</Name>\n       \
     \         <Type>DiTiAdapter</Type>\n                <CanMountTecanDiTis>{{CanMountTecanDiTis}}</CanMountTecanDiTis>\n\
     \                <XCount>{{AdapterXCount}}</XCount>\n                <YCount>{{AdapterYCount}}</YCount>\n\
@@ -568,13 +568,13 @@ commands:
     \        <SortNumber>{{AdapterSortNumber}}</SortNumber>\n                <MountColumnRowWise>{{AdapterMountColumnRowWise}}</MountColumnRowWise>\n\
     \              </AdapterData>\n            </AdapterPlate>\n            <UsedTip>\n\
     \              <UsableTips>All</UsableTips>\n            </UsedTip>\n        \
-    \    <FirstTipXPosition>1</FirstTipXPosition>\n            <FirstTipYPosition>1</FirstTipYPosition>\n\
+    \    <FirstTipXPosition>{{FirstTipXPosition}}</FirstTipXPosition>\n            <FirstTipYPosition>{{FirstTipYPosition}}</FirstTipYPosition>\n\
     \            <LastTipXPosition>{{LastTipXPosition}}</LastTipXPosition>\n     \
     \       <LastTipYPosition>{{LastTipYPosition}}</LastTipYPosition>\n          \
-    \  <Column>0</Column>\n            <Row>0</Row>\n            <RowOffset>0</RowOffset>\n\
-    \            <ColumnOffset>0</ColumnOffset>\n            <OrientationPhi>0</OrientationPhi>\n\
-    \            <OrientationPsi>0</OrientationPsi>\n            <OrientationTheta>0</OrientationTheta>\n\
-    \            <SelectedRowsOrColumns />\n            <SubsequentPipettingDirectionIsRow>False</SubsequentPipettingDirectionIsRow>\n\
+    \  <Column>{{Column}}</Column>\n            <Row>{{Row}}</Row>\n            <RowOffset>{{RowOffset}}</RowOffset>\n\
+    \            <ColumnOffset>{{ColumnOffset}}</ColumnOffset>\n            <OrientationPhi>{{OrientationPhi}}</OrientationPhi>\n\
+    \            <OrientationPsi>{{OrientationPsi}}</OrientationPsi>\n            <OrientationTheta>{{OrientationTheta}}</OrientationTheta>\n\
+    \            <SelectedRowsOrColumns />\n            <SubsequentPipettingDirectionIsRow>{{SubsequentPipettingDirectionIsRow}}</SubsequentPipettingDirectionIsRow>\n\
     \            <LiquidClassVariablesNames />\n            <LiquidClassVariablesValues\
     \ />\n          </Mca384ScriptCommandUsingWellSelectionBaseDataV6>\n        </Data>\n\
     \      </Mca384PartialTipCommandBaseDataV2>\n    </Data>\n  </Mca384PickUpTipsScriptCommandDataV2>\n\

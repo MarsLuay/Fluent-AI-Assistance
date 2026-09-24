@@ -297,12 +297,53 @@ def _parse_drop_head_adapter(command_id: str, obj: ET.Element) -> Step:
     )
 
 def _parse_pick_up_tips(command_id: str, obj: ET.Element) -> Step:
+    # MCA pickup commands carry well-selection coordinates below several
+    # versioned Data wrappers.  Extract by local field name, but parse the
+    # execution values as source expressions so variable-backed offsets remain
+    # typed instead of being coerced to integers.
+    def expression(field_name: str, default: str) -> object:
+        source = _extract_field(obj, field_name)
+        if "/" in field_name:
+            parent_name, child_name = field_name.split("/", 1)
+            parent = _find_first(obj, parent_name)
+            child = _find_first(parent, child_name) if parent is not None else None
+            source = _text(child)
+        return _parse_registered_expression(
+            "Mca384PickUpTips",
+            field_name,
+            source or default,
+        )
+
     return PickUpTipsStep(
         labware_name=_extract_field(obj, "LabwareName") or "",
         partial_columns=_parse_int(_extract_field(obj, "PartialColumns"), default=24),
         partial_rows=_parse_int(_extract_field(obj, "PartialRows"), default=16),
+        partial_column_offset=expression("PartialColumnOffset", "0"),
+        partial_rows_offset=expression("PartialRowsOffset", "0"),
+        well_offset=expression("WellOffset", "0"),
+        position_first_tip_x=expression("PositionFirstTip/X", "0"),
+        position_first_tip_y=expression("PositionFirstTip/Y", "0"),
+        compartment=_parse_int(_extract_field(obj, "Compartment"), default=1),
+        first_tip_x_position=expression("FirstTipXPosition", "1"),
+        first_tip_y_position=expression("FirstTipYPosition", "1"),
+        last_tip_x_position=expression("LastTipXPosition", "0"),
+        last_tip_y_position=expression("LastTipYPosition", "0"),
+        column=expression("Column", "0"),
+        row=expression("Row", "0"),
+        row_offset=expression("RowOffset", "0"),
+        column_offset=expression("ColumnOffset", "0"),
+        orientation_phi=expression("OrientationPhi", "0"),
+        orientation_psi=expression("OrientationPsi", "0"),
+        orientation_theta=expression("OrientationTheta", "0"),
+        remove_rack=_parse_bool(_extract_field(obj, "RemoveRack")),
+        subsequent_pipetting_direction_is_row=_parse_bool(
+            _extract_field(obj, "SubsequentPipettingDirectionIsRow")
+        ),
+        head_position=_extract_field(obj, "HeadPositions") or "Left",
+        blowout_airgap=_parse_int(_extract_field(obj, "BlowoutAirgap"), default=0),
         device_alias=_extract_field(obj, "DeviceAlias"),
         available_id=_extract_available_id(obj),
+        raw_xml=ET.tostring(obj, encoding="unicode"),
     )
 
 def _parse_set_tips_back(command_id: str, obj: ET.Element) -> Step:

@@ -1389,7 +1389,9 @@ class Renderer:
                 })
 
             case StepType.PICK_UP_TIPS:
-                # Use adapter config for defaults if available
+                # Use adapter config for defaults if available.  The reference
+                # template contains additional MCA well-selection fields; do
+                # not replace those source-backed values with static zeros.
                 adapter = self._current_adapter_config
                 default_cols = adapter["partial_columns"] if adapter else 24
                 default_rows = adapter["partial_rows"] if adapter else 16
@@ -1400,8 +1402,31 @@ class Renderer:
                     "BlowoutAirgap": str(step.blowout_airgap),
                     "PartialColumns": str(step.partial_columns if step.partial_columns else default_cols),
                     "PartialRows": str(step.partial_rows if step.partial_rows else default_rows),
+                    "PartialColumnOffset": self._expression_text(step.partial_column_offset),
+                    "PartialRowsOffset": self._expression_text(step.partial_rows_offset),
                     "HeadPosition": step.head_position,
+                    "RemoveRack": str(step.remove_rack).lower().capitalize(),
+                    "WellOffset": self._expression_text(step.well_offset),
+                    "PositionFirstTipX": self._expression_text(step.position_first_tip_x),
+                    "PositionFirstTipY": self._expression_text(step.position_first_tip_y),
+                    "Compartment": str(step.compartment),
+                    "FirstTipXPosition": self._expression_text(step.first_tip_x_position),
+                    "FirstTipYPosition": self._expression_text(step.first_tip_y_position),
+                    "Column": self._expression_text(step.column),
+                    "Row": self._expression_text(step.row),
+                    "RowOffset": self._expression_text(step.row_offset),
+                    "ColumnOffset": self._expression_text(step.column_offset),
+                    "OrientationPhi": self._expression_text(step.orientation_phi),
+                    "OrientationPsi": self._expression_text(step.orientation_psi),
+                    "OrientationTheta": self._expression_text(step.orientation_theta),
+                    "SubsequentPipettingDirectionIsRow": str(
+                        step.subsequent_pipetting_direction_is_row
+                    ).lower().capitalize(),
                 })
+                if step.last_tip_x_position is not None:
+                    params["LastTipXPosition"] = self._expression_text(step.last_tip_x_position)
+                if step.last_tip_y_position is not None:
+                    params["LastTipYPosition"] = self._expression_text(step.last_tip_y_position)
 
             case StepType.SET_TIPS_BACK:
                 # Use adapter config for defaults if available

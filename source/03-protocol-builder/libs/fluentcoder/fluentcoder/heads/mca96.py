@@ -78,8 +78,52 @@ class MCA96Head:
         tip_count: Optional[int] = None,
         partial_columns: Optional[int] = None,
         partial_rows: Optional[int] = None,
+        partial_column_offset: Union[int, float, str, Expression] = 0,
+        partial_rows_offset: Union[int, float, str, Expression] = 0,
+        well_offset: Union[int, float, str, Expression] = 0,
+        position_first_tip_x: Union[int, float, str, Expression] = 0,
+        position_first_tip_y: Union[int, float, str, Expression] = 0,
+        compartment: int = 1,
+        first_tip_x_position: Union[int, float, str, Expression] = 1,
+        first_tip_y_position: Union[int, float, str, Expression] = 1,
+        last_tip_x_position: Optional[Union[int, float, str, Expression]] = None,
+        last_tip_y_position: Optional[Union[int, float, str, Expression]] = None,
+        column: Union[int, float, str, Expression] = 0,
+        row: Union[int, float, str, Expression] = 0,
+        row_offset: Union[int, float, str, Expression] = 0,
+        column_offset: Union[int, float, str, Expression] = 0,
+        orientation_phi: Union[int, float, str, Expression] = 0,
+        orientation_psi: Union[int, float, str, Expression] = 0,
+        orientation_theta: Union[int, float, str, Expression] = 0,
+        remove_rack: bool = False,
+        subsequent_pipetting_direction_is_row: bool = False,
+        blowout_airgap: int = 0,
+        head_position: str = "Left",
     ) -> None:
-        kwargs: dict = {"labware_name": self._label(tip_box)}
+        kwargs: dict = {
+            "labware_name": self._label(tip_box),
+            "partial_column_offset": partial_column_offset,
+            "partial_rows_offset": partial_rows_offset,
+            "well_offset": well_offset,
+            "position_first_tip_x": position_first_tip_x,
+            "position_first_tip_y": position_first_tip_y,
+            "compartment": compartment,
+            "first_tip_x_position": first_tip_x_position,
+            "first_tip_y_position": first_tip_y_position,
+            "last_tip_x_position": last_tip_x_position,
+            "last_tip_y_position": last_tip_y_position,
+            "column": column,
+            "row": row,
+            "row_offset": row_offset,
+            "column_offset": column_offset,
+            "orientation_phi": orientation_phi,
+            "orientation_psi": orientation_psi,
+            "orientation_theta": orientation_theta,
+            "remove_rack": remove_rack,
+            "subsequent_pipetting_direction_is_row": subsequent_pipetting_direction_is_row,
+            "blowout_airgap": blowout_airgap,
+            "head_position": head_position,
+        }
         if tip_columns is not None:
             kwargs["tip_columns"] = tip_columns
         if tip_count is not None:
@@ -88,6 +132,10 @@ class MCA96Head:
             kwargs["partial_columns"] = partial_columns
         if partial_rows is not None:
             kwargs["partial_rows"] = partial_rows
+        if last_tip_x_position is None:
+            kwargs.pop("last_tip_x_position")
+        if last_tip_y_position is None:
+            kwargs.pop("last_tip_y_position")
         self._wt._emit(PickUpTipsStep(**kwargs))
 
     def return_tips(self, tip_box: Optional[Union[Labware, str]] = None) -> None:
