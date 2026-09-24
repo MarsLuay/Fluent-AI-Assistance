@@ -51,6 +51,15 @@ policy, and symbol introspection consume the shared catalog services rather than
 maintaining adapter-specific function lists. FluentControl editor colors and
 unverified forum terminology are discovery-only and never semantic categories.
 
+Target-aware deployment planning is owned by the shared
+`application_services.plan_deployment` service and the
+`tecan.deployment_plan.v1` builder. The CLI is a thin adapter over that service;
+explicit source/target profiles, same-target versus cross-target mode, target
+fingerprints, drift invalidation, and unknown-target blocking therefore have
+one logic owner. Planning is artifact/profile-level and non-mutating: runtime
+state and internal database/SVN metadata remain diagnostic evidence, never
+portable deployment actions.
+
 Canonical Protocol IR v2 exposes the source-backed low-level FluentControl motion
 sequence as `move_axis_command`, `start_move_command`, and
 `wait_for_async_response`. XSCR ingestion preserves typed execution fields,

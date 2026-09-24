@@ -102,6 +102,40 @@ def fluent_explain_expression_symbol(
 
 
 @mcp.tool()
+def fluent_plan_deployment(
+    source_profile: str,
+    target_profile: str | None = None,
+    no_target: bool = False,
+    target_userspecific_dir: str | None = None,
+    target_systemspecific_dir: str | None = None,
+    target_software_family: str | None = None,
+    target_fluentcontrol_version: str | None = None,
+    target_fluentcontrol_build: str | None = None,
+    target_profile_id: str | None = None,
+    current_target_profile: str | None = None,
+    mode: Literal["same_target_dropin", "cross_target_import"] | None = None,
+    external_files: list[dict] | None = None,
+    output_directory: str | None = None,
+) -> dict:
+    """Render a read-only deployment plan from explicit profiles or inventory roots."""
+    return gateway.plan_deployment(
+        source_profile,
+        target_profile=target_profile,
+        no_target=no_target,
+        target_userspecific_dir=target_userspecific_dir,
+        target_systemspecific_dir=target_systemspecific_dir,
+        target_software_family=target_software_family,
+        target_fluentcontrol_version=target_fluentcontrol_version,
+        target_fluentcontrol_build=target_fluentcontrol_build,
+        target_profile_id=target_profile_id,
+        current_target_profile=current_target_profile,
+        mode=mode,
+        external_files=external_files,
+        output_directory=output_directory,
+    )
+
+
+@mcp.tool()
 def fluent_import_project(
     archive: str,
     name: str | None = None,
