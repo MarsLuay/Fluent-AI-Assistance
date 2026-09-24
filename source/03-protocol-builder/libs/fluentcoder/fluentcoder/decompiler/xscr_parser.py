@@ -25,6 +25,7 @@ from typing import Callable, Iterator, Optional, Union
 
 from ..catalog.xcmp import _find, _local, _text
 from ..expressions import is_expression_field, parse_or_preserve_source_expression
+from ..ir.subroutine_semantics import normalize_subroutine_execution_mode
 from ..ir.schema import (
     AddLabwareStep, ApplicationDriverMacroStep, AspirateStep, CgaDropFingersStep, CgaGetFingersStep,
     CommentStep, ConditionalStep, DelayStep, DispenseStep, DropHeadAdapterStep,
@@ -560,7 +561,10 @@ def _parse_mca384_empty_tips(command_id: str, obj: ET.Element) -> Step:
 def _parse_subroutine(command_id: str, obj: ET.Element) -> Step:
     return SubRoutineStep(
         subroutine=_strip_wrapping_quotes(_extract_field(obj, "SubRoutine") or ""),
-        execution_mode=_extract_field(obj, "ExecutionMode") or "Synchronous",
+        execution_mode=normalize_subroutine_execution_mode(
+            _extract_field(obj, "ExecutionMode"),
+            source_preserved=True,
+        ),
         variable_mappings_start=_parse_variable_mappings(obj, "VariableMappingsStart"),
         variable_mappings_end=_parse_variable_mappings(obj, "VariableMappingsEnd"),
     )

@@ -13,6 +13,11 @@ from fluentcoder.expressions import (
     parse_or_preserve_source_expression,
     render_expression,
 )
+from fluentcoder.ir.subroutine_semantics import (
+    KNOWN_SUBROUTINE_EXECUTION_MODES,
+    classify_subroutine_target,
+    normalize_subroutine_execution_mode,
+)
 
 from .types import ApiV2ValidationError
 from ..policies.prompt_text import normalize_operator_prompt_text, prompt_text_is_placeholder
@@ -130,6 +135,11 @@ class Subroutine:
     script_guid: str = ""
     line_number: int = 0
 
+    @property
+    def target_identity(self) -> dict[str, str | None]:
+        """Return conservative target evidence without guessing dynamic names."""
+        return classify_subroutine_target(self.path)
+
     def to_string(self) -> str:
         return f"Subroutine({self.path!r}, mode={self.execution_mode})"
 
@@ -142,13 +152,15 @@ class Subroutine:
                 command="Subroutine",
             )
         mode = str(self.execution_mode or "").strip()
-        allowed = {"JoinSubroutine", "Synchronous", "Asynchronous", "FireAndForget"}
-        if mode and mode not in allowed:
-            raise ApiV2ValidationError(
-                f"execution_mode {mode!r} is not a known Subroutine mode.",
-                field="execution_mode",
-                command="Subroutine",
-            )
+        if mode and mode not in KNOWN_SUBROUTINE_EXECUTION_MODES:
+            try:
+                normalize_subroutine_execution_mode(mode)
+            except ValueError:
+                raise ApiV2ValidationError(
+                    f"execution_mode {mode!r} is not a known Subroutine mode.",
+                    field="execution_mode",
+                    command="Subroutine",
+                ) from None
 
     def to_xml(self) -> str:
         self.validate()
