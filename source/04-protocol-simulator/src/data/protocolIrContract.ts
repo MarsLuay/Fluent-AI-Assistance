@@ -38,6 +38,9 @@ export const PROTOCOL_IR_OPERATIONS = [
   "load_labware",
   "initialize_device",
   "move_plate",
+  "move_axis_command",
+  "start_move_command",
+  "wait_for_async_response",
   "get_head_adapter",
   "drop_head_adapter",
   "pick_up_tips",
@@ -74,177 +77,268 @@ export const PROTOCOL_IR_OPERATION_REQUIREMENTS = {
   "add_labware": {
     "requiresLabwareTarget": true,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "load_labware": {
     "requiresLabwareTarget": true,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "initialize_device": {
     "requiresLabwareTarget": false,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "move_plate": {
     "requiresLabwareTarget": true,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
+  },
+  "move_axis_command": {
+    "requiresLabwareTarget": false,
+    "requiresVolume": false,
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": true,
+    "requiresDeviceIdentity": true
+  },
+  "start_move_command": {
+    "requiresLabwareTarget": false,
+    "requiresVolume": false,
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": true
+  },
+  "wait_for_async_response": {
+    "requiresLabwareTarget": false,
+    "requiresVolume": false,
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "get_head_adapter": {
     "requiresLabwareTarget": false,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "drop_head_adapter": {
     "requiresLabwareTarget": false,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "pick_up_tips": {
     "requiresLabwareTarget": true,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "set_tips_back": {
     "requiresLabwareTarget": true,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "drop_tips": {
     "requiresLabwareTarget": true,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "mca384_get_tips": {
     "requiresLabwareTarget": true,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "mca384_drop_tips": {
     "requiresLabwareTarget": true,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "liha_get_tips": {
     "requiresLabwareTarget": true,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "liha_drop_tips": {
     "requiresLabwareTarget": true,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "aspirate": {
     "requiresLabwareTarget": true,
     "requiresVolume": true,
-    "requiresLiquidClass": true
+    "requiresLiquidClass": true,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "dispense": {
     "requiresLabwareTarget": true,
     "requiresVolume": true,
-    "requiresLiquidClass": true
+    "requiresLiquidClass": true,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "mix": {
     "requiresLabwareTarget": true,
     "requiresVolume": true,
-    "requiresLiquidClass": true
+    "requiresLiquidClass": true,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "mca384_mix": {
     "requiresLabwareTarget": true,
     "requiresVolume": true,
-    "requiresLiquidClass": true
+    "requiresLiquidClass": true,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "liha_aspirate": {
     "requiresLabwareTarget": true,
     "requiresVolume": true,
-    "requiresLiquidClass": true
+    "requiresLiquidClass": true,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "liha_dispense": {
     "requiresLabwareTarget": true,
     "requiresVolume": true,
-    "requiresLiquidClass": true
+    "requiresLiquidClass": true,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "liha_mix": {
     "requiresLabwareTarget": true,
     "requiresVolume": true,
-    "requiresLiquidClass": true
+    "requiresLiquidClass": true,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "wash": {
     "requiresLabwareTarget": false,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "read_worklist": {
     "requiresLabwareTarget": false,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "loop_over_wells": {
     "requiresLabwareTarget": false,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "conditional_branch": {
     "requiresLabwareTarget": false,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "default_branch": {
     "requiresLabwareTarget": false,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "query_variable": {
     "requiresLabwareTarget": false,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "set_variable": {
     "requiresLabwareTarget": false,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "set_remaining_runtime": {
     "requiresLabwareTarget": false,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "runtime_variable_prompt": {
     "requiresLabwareTarget": false,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "prompt_user": {
     "requiresLabwareTarget": false,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "call_subroutine": {
     "requiresLabwareTarget": false,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "execute_application": {
     "requiresLabwareTarget": false,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "execute_vb_script": {
     "requiresLabwareTarget": false,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "application_driver_macro": {
     "requiresLabwareTarget": false,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   },
   "comment": {
     "requiresLabwareTarget": false,
     "requiresVolume": false,
-    "requiresLiquidClass": false
+    "requiresLiquidClass": false,
+    "requiresMotionPosition": false,
+    "requiresDeviceIdentity": false
   }
 } as const;
 
@@ -315,6 +409,16 @@ function hasVolume(step: ProtocolIrRecord): boolean {
   );
 }
 
+function hasParameter(step: ProtocolIrRecord, field: string): boolean {
+  const parameters = isRecord(step.parameters) ? step.parameters : {};
+  const value = parameters[field];
+  return value !== undefined && value !== null && value !== "";
+}
+
+function hasDeviceIdentity(step: ProtocolIrRecord): boolean {
+  return hasParameter(step, "available_id") || hasParameter(step, "id_label");
+}
+
 export function validateProtocolIr(value: unknown): ProtocolIrContractResult {
   const issues: ProtocolIrContractIssue[] = [];
   if (!isRecord(value)) {
@@ -368,6 +472,12 @@ export function validateProtocolIr(value: unknown): ProtocolIrContractResult {
       }
       if (requirements.requiresLiquidClass && !("liquid_class" in step)) {
         issues.push({ path: `${path}.liquid_class`, message: "operation requires liquid_class" });
+      }
+      if (requirements.requiresMotionPosition && !hasParameter(step, "position_expression")) {
+        issues.push({ path: `${path}.parameters.position_expression`, message: "operation requires position_expression" });
+      }
+      if (requirements.requiresDeviceIdentity && !hasDeviceIdentity(step)) {
+        issues.push({ path: `${path}.parameters`, message: "operation requires available_id or id_label" });
       }
     });
   }

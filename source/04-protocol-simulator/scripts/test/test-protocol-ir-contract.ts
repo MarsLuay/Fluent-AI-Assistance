@@ -43,6 +43,46 @@ assert.ok(PROTOCOL_IR_OPERATIONS.includes("query_variable"));
 assert.ok(isProtocolIrDocument(validIr));
 assert.equal(validateProtocolIr(validIr).issues.length, 0);
 
+const motionIr = {
+  ...validIr,
+  steps: [
+    {
+      id: "step_001",
+      index: 1,
+      group: "Motion",
+      operation: "move_axis_command",
+      name: "Move Axis",
+      parameters: {
+        available_id: "axis-available",
+        position_expression: { kind: "variable_reference", name: "AxisTarget" }
+      }
+    },
+    {
+      id: "step_002",
+      index: 2,
+      group: "Motion",
+      operation: "start_move_command",
+      name: "Start Move",
+      parameters: { id_label: "axis-label" }
+    },
+    {
+      id: "step_003",
+      index: 3,
+      group: "Motion",
+      operation: "wait_for_async_response",
+      name: "Wait For Async Response",
+      parameters: {}
+    }
+  ]
+};
+assert.ok(isProtocolIrDocument(motionIr));
+const invalidMotionIssues = validateProtocolIr({
+  ...motionIr,
+  steps: [{ ...motionIr.steps[0], parameters: {} }]
+}).issues;
+assert.ok(invalidMotionIssues.some((issue) => issue.path === "$.steps[0].parameters.position_expression"));
+assert.ok(invalidMotionIssues.some((issue) => issue.path === "$.steps[0].parameters"));
+
 const invalidIr = {
   ...validIr,
   ir_version: "tecan.protocol_ir.v1",

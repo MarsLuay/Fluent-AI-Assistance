@@ -37,7 +37,9 @@
 - `load_labware`: Load Labware; requires labware target.
 - `initialize_device`: Initialize Device; no extra required fields.
 - `move_plate`: Move Plate; requires labware target.
-- `get_head_adapter`: Mount Head Adapter; no extra required fields.
+- `move_axis_command`: Move Axis; requires `parameters.position_expression`, `parameters.available_id` or `parameters.id_label`.
+- `start_move_command`: Start Move; requires `parameters.available_id` or `parameters.id_label`.
+- `wait_for_async_response`: Wait For Async Response; no extra required fields.
 - `drop_head_adapter`: Drop Head Adapter; no extra required fields.
 - `pick_up_tips`: Pick Up Tips; requires labware target.
 - `set_tips_back`: Return Tips; requires labware target.

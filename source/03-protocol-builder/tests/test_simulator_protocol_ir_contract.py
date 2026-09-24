@@ -15,6 +15,8 @@ class SimulatorProtocolIrContractTests(unittest.TestCase):
         self.assertIn(f"export const PROTOCOL_IR_SCHEMA_ID = {json.dumps(schema['$id'])}", rendered)
         self.assertIn('"aspirate"', rendered)
         self.assertIn('"query_variable"', rendered)
+        self.assertIn('"requiresMotionPosition": true', rendered)
+        self.assertIn('"requiresDeviceIdentity": true', rendered)
 
     def test_contract_render_is_deterministic(self):
         self.assertEqual(render_protocol_ir_contract(), render_protocol_ir_contract())
