@@ -57,7 +57,11 @@ sequence as `move_axis_command`, `start_move_command`, and
 ordering, source metadata, and additive XML through generated FluentCoder Python;
 the simulator boundary contract is regenerated from the same Python schema.
 These operations remain structural/offline validation only and do not prove
-physical motion, calibration, alignment, clearance, or collision safety.
+physical motion, calibration, alignment, clearance, or collision safety. The
+simulator's authoring command catalog is the schema-backed
+`source/04-protocol-simulator/src/data/controlBar.ts` catalog; editor toolbox
+and restored-command handling validate operations against the generated
+`PROTOCOL_IR_OPERATIONS` contract and reject or diagnose unknown commands.
 
 The provider-neutral generation-context boundary is
 `tecan.generation_context.v1`. It turns a validated request/spec into

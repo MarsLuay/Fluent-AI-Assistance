@@ -1,3 +1,5 @@
+import type { ProtocolIrOperation } from "./protocolIrContract";
+import { isProtocolIrOperation } from "./protocolIrOperations";
 import type { OperationFamily } from "../types";
 
 export type ControlBarSectionId =
@@ -23,20 +25,22 @@ export type ControlBarCommandsGroupId =
   | "sampleTracking"
   | "communication";
 
+export type ControlBarCommandDefaults = {
+  targetLabware?: string;
+  wells?: string[];
+  volumeUl?: number | null;
+  liquidClass?: string;
+  message?: string;
+  specs?: Record<string, string>;
+};
+
 export type ControlBarCommandTemplate = {
   id: string;
   family: OperationFamily;
   name: string;
-  operation: string;
+  operation: ProtocolIrOperation;
   description: string;
-  defaults?: Partial<{
-    targetLabware: string;
-    wells: string[];
-    volumeUl: number | null;
-    liquidClass: string;
-    message: string;
-    specs: Record<string, string>;
-  }>;
+  defaults?: ControlBarCommandDefaults;
 };
 
 export type ControlBarCommandsGroup = {
@@ -66,126 +70,122 @@ export const CONTROL_BAR_SECTIONS: ControlBarSection[] = [
   { id: "modules", label: "Modules", description: "Reusable synchronous script modules.", kind: "browse" }
 ];
 
+/**
+ * The simulator's only authorable command catalog. Operations are typed from
+ * the generated Protocol IR contract and checked again at runtime by tests and
+ * callers that load this catalog.
+ */
 export const CONTROL_BAR_COMMAND_GROUPS: ControlBarCommandsGroup[] = [
   {
     id: "directCommands",
     label: "Direct Commands",
-    description: "Direct arm and device actions outside normal pipetting groups.",
+    description: "Source-backed FluentControl motion and device operations.",
     commands: [
-      { id: "direct-move-head", family: "motion", name: "Move Head", operation: "move_head", description: "Move the active head to a labware or site position." },
-      { id: "direct-home", family: "motion", name: "Home Axis", operation: "home_axis", description: "Home an axis or device before continuing.", defaults: { specs: { axis: "" } } },
-      { id: "direct-wait", family: "motion", name: "Wait", operation: "wait", description: "Wait for a duration or device state.", defaults: { specs: { seconds: "1" } } }
+      {
+        id: "direct-move-axis",
+        family: "motion",
+        name: "Move Axis",
+        operation: "move_axis_command",
+        description: "Validate a source-backed axis move without claiming physical execution.",
+        defaults: { specs: { available_id: "", id_label: "", position_expression: "" } }
+      },
+      {
+        id: "direct-start-move",
+        family: "motion",
+        name: "Start Move",
+        operation: "start_move_command",
+        description: "Preserve a source-backed asynchronous move start for offline validation.",
+        defaults: { specs: { available_id: "", id_label: "" } }
+      },
+      {
+        id: "direct-wait-async",
+        family: "motion",
+        name: "Wait For Async Response",
+        operation: "wait_for_async_response",
+        description: "Wait for a source-backed asynchronous response during offline validation."
+      }
     ]
   },
   {
     id: "programming",
     label: "Programming",
-    description: "Flow control, variables, comments, and plain operator prompts.",
+    description: "Flow control, variables, comments, and runtime prompts.",
     commands: [
       { id: "prog-comment", family: "comment", name: "Comment", operation: "comment", description: "Add a non-executing script comment.", defaults: { message: "Add note here." } },
-      { id: "prog-section", family: "comment", name: "Section Header", operation: "section_comment", description: "Add a visible section break in the script.", defaults: { message: "New section" } },
-      { id: "prog-user-prompt", family: "prompt", name: "User Prompt", operation: "user_prompt", description: "Show a text message and wait for acknowledgement.", defaults: { message: "Confirm before continuing." } },
-      { id: "prog-pause", family: "prompt", name: "Pause", operation: "pause", description: "Pause execution until the operator continues.", defaults: { message: "Paused." } },
-      { id: "prog-manual-step", family: "prompt", name: "Manual Step", operation: "manual_step", description: "Document a required manual operator action.", defaults: { message: "Perform manual step, then continue." } },
       { id: "prog-set-variable", family: "setup", name: "Set Variable", operation: "set_variable", description: "Create or update a script variable.", defaults: { specs: { variable: "", value: "" } } },
-      { id: "prog-if", family: "flow", name: "If Condition", operation: "if_condition", description: "Branch based on a condition.", defaults: { specs: { condition: "" } } },
-      { id: "prog-loop", family: "flow", name: "Loop", operation: "loop", description: "Repeat commands for a configured count.", defaults: { specs: { count: "1" } } },
-      { id: "prog-subroutine", family: "flow", name: "Call Subroutine", operation: "call_subroutine", description: "Run a named subroutine.", defaults: { specs: { subroutine: "" } } },
-      { id: "prog-label", family: "flow", name: "Label", operation: "label", description: "Mark a location in the script.", defaults: { specs: { label: "" } } },
-      { id: "prog-init", family: "setup", name: "Initialize Script", operation: "initialize_script", description: "Start-of-script setup and instrument preparation." }
+      { id: "prog-if", family: "flow", name: "Conditional Branch", operation: "conditional_branch", description: "Branch based on a source-backed condition.", defaults: { specs: { condition: "" } } },
+      { id: "prog-default-branch", family: "flow", name: "Default Branch", operation: "default_branch", description: "Declare the default branch of a conditional sequence." },
+      { id: "prog-loop", family: "flow", name: "Loop Over Wells", operation: "loop_over_wells", description: "Repeat a source-backed well iteration.", defaults: { specs: { count: "1" } } },
+      { id: "prog-query-variable", family: "flow", name: "Query Variable", operation: "query_variable", description: "Read a source-backed runtime variable.", defaults: { specs: { variable: "" } } },
+      { id: "prog-runtime-prompt", family: "prompt", name: "Runtime Variable Prompt", operation: "runtime_variable_prompt", description: "Request a runtime variable value.", defaults: { message: "Enter required value.", specs: { variable: "" } } },
+      { id: "prog-set-runtime", family: "setup", name: "Set Remaining Runtime", operation: "set_remaining_runtime", description: "Set the source-backed remaining runtime value." },
+      { id: "prog-subroutine", family: "flow", name: "Call Subroutine", operation: "call_subroutine", description: "Run a named source-backed subroutine.", defaults: { specs: { subroutine: "" } } },
+      { id: "prog-user-prompt", family: "prompt", name: "User Prompt", operation: "prompt_user", description: "Show a text message and wait for acknowledgement.", defaults: { message: "Confirm before continuing." } }
     ]
   },
   {
     id: "touchTools",
     label: "Touch Tools",
-    description: "Rich user prompts shown on the TouchTools operator screen.",
+    description: "Rich operator prompts represented by canonical Protocol IR operations.",
     commands: [
-      {
-        id: "tt-standard",
-        family: "prompt",
-        name: "Standard",
-        operation: "user_prompt",
-        description: "Rich prompt with optional image, sound, and progress on TouchTools.",
-        defaults: { message: "Confirm before continuing.", specs: { imagePath: "", screenTitle: "Operator check" } }
-      },
-      {
-        id: "tt-worktable",
-        family: "labware",
-        name: "Worktable",
-        operation: "manual_step",
-        description: "Deck-bound TouchTools prompt with labware highlight and custom detail image.",
-        defaults: { message: "Confirm labware placement.", specs: { customDetailImage: "" } }
-      },
-      {
-        id: "tt-variable",
-        family: "prompt",
-        name: "Variable",
-        operation: "user_prompt",
-        description: "TouchTools runtime variable entry form.",
-        defaults: { message: "Enter required value.", specs: { variableName: "" } }
-      },
-      { id: "tt-wizard-group", family: "flow", name: "Wizard Group", operation: "loop", description: "Group TouchTools loading or verification steps.", defaults: { specs: { count: "1" } } },
-      { id: "tt-get-file", family: "setup", name: "Get File", operation: "manual_step", description: "Prompt the operator to select a file at runtime.", defaults: { message: "Select the required file." } },
-      { id: "tt-select-wells", family: "liquid", name: "Select Wells", operation: "manual_step", description: "TouchTools well-selection screen for sample count.", defaults: { message: "Select wells on TouchTools." } }
+      { id: "tt-standard", family: "prompt", name: "Standard", operation: "prompt_user", description: "Show a canonical operator prompt.", defaults: { message: "Confirm before continuing.", specs: { screenTitle: "Operator check" } } },
+      { id: "tt-variable", family: "prompt", name: "Variable", operation: "runtime_variable_prompt", description: "Request a runtime variable value on the operator screen.", defaults: { message: "Enter required value.", specs: { variable: "" } } },
+      { id: "tt-default-branch", family: "flow", name: "Default Branch", operation: "default_branch", description: "Represent the default branch of a TouchTools sequence." }
     ]
   },
   {
     id: "fca1",
     label: "FCA 1",
-    description: "Flexible Channel Arm 1 pipetting, tips, and wash commands.",
+    description: "Flexible Channel Arm 1 pipetting, tips, and wash operations.",
     commands: [
-      { id: "fca1-get-tip", family: "tips", name: "Get Tip", operation: "get_tip", description: "Pick up tips from the selected tip box.", defaults: { specs: { channels: "all" } } },
-      { id: "fca1-drop-tip", family: "tips", name: "Drop Tip", operation: "drop_tip", description: "Drop active tips to waste or a configured target.", defaults: { specs: { destination: "waste" } } },
-      { id: "fca1-wash-tip", family: "wash", name: "Wash Tips", operation: "wash_tips", description: "Wash active washable tips at a wash station." },
+      { id: "fca1-get-tip", family: "tips", name: "Get Tips", operation: "pick_up_tips", description: "Pick up tips from the selected tip box.", defaults: { specs: { channels: "all" } } },
+      { id: "fca1-drop-tip", family: "tips", name: "Drop Tips", operation: "drop_tips", description: "Drop active tips to waste or a configured target.", defaults: { specs: { destination: "waste" } } },
+      { id: "fca1-wash-tip", family: "wash", name: "Wash Tips", operation: "wash", description: "Wash active washable tips at a wash station." },
       { id: "fca1-get-adapter", family: "tips", name: "Get Head Adapter", operation: "get_head_adapter", description: "Mount a head adapter before special labware steps." },
       { id: "fca1-drop-adapter", family: "tips", name: "Drop Head Adapter", operation: "drop_head_adapter", description: "Return or drop a mounted head adapter." },
       { id: "fca1-aspirate", family: "liquid", name: "Aspirate", operation: "aspirate", description: "Aspirate liquid from selected wells.", defaults: { wells: ["A1"], volumeUl: 10, liquidClass: "Water free dispense" } },
       { id: "fca1-dispense", family: "liquid", name: "Dispense", operation: "dispense", description: "Dispense liquid into selected wells.", defaults: { wells: ["A1"], volumeUl: 10, liquidClass: "Water free dispense" } },
       { id: "fca1-mix", family: "liquid", name: "Mix", operation: "mix", description: "Mix selected wells with repeated aspirate/dispense cycles.", defaults: { wells: ["A1"], volumeUl: 20, liquidClass: "Water free dispense", specs: { cycles: "3" } } },
-      { id: "fca1-detect", family: "liquid", name: "Detect Liquid", operation: "detect_liquid", description: "Run liquid level detection for selected wells.", defaults: { wells: ["A1"], liquidClass: "Water free dispense" } },
-      { id: "fca1-transfer", family: "liquid", name: "Transfer", operation: "transfer_liquid", description: "Move liquid from a source to a destination.", defaults: { volumeUl: 10, liquidClass: "Water free dispense", specs: { source: "", destination: "" } } },
-      { id: "fca1-wash-station", family: "wash", name: "Wash Station", operation: "wash_station", description: "Run a wash station clean step." },
-      { id: "fca1-prime", family: "wash", name: "Prime", operation: "prime", description: "Prime lines or wash system before liquid handling." },
-      { id: "fca1-set-liquid-class", family: "setup", name: "Set Liquid Class", operation: "set_liquid_class", description: "Define the liquid class used by later liquid moves.", defaults: { liquidClass: "Water free dispense" } }
+      { id: "fca1-mca384-get-tip", family: "tips", name: "MCA384 Get Tips", operation: "mca384_get_tips", description: "Pick up an MCA384 tip set from the selected tip box." },
+      { id: "fca1-mca384-drop-tip", family: "tips", name: "MCA384 Drop Tips", operation: "mca384_drop_tips", description: "Drop an MCA384 tip set to the configured destination." },
+      { id: "fca1-mca384-mix", family: "liquid", name: "MCA384 Mix", operation: "mca384_mix", description: "Mix with the source-backed MCA384 operation.", defaults: { volumeUl: 20, liquidClass: "Water free dispense" } }
     ]
   },
   {
     id: "fca2",
     label: "FCA 2",
-    description: "Flexible Channel Arm 2 pipetting commands when dual FCA is configured.",
+    description: "Flexible Channel Arm 2 canonical pipetting operations.",
     commands: [
-      { id: "fca2-get-tip", family: "tips", name: "Get Tip", operation: "get_tip", description: "Pick up tips on FCA 2.", defaults: { specs: { channels: "all", device: "FCA 2" } } },
-      { id: "fca2-drop-tip", family: "tips", name: "Drop Tip", operation: "drop_tip", description: "Drop tips on FCA 2.", defaults: { specs: { destination: "waste", device: "FCA 2" } } },
-      { id: "fca2-aspirate", family: "liquid", name: "Aspirate", operation: "aspirate", description: "Aspirate liquid on FCA 2.", defaults: { wells: ["A1"], volumeUl: 10, liquidClass: "Water free dispense", specs: { device: "FCA 2" } } },
-      { id: "fca2-dispense", family: "liquid", name: "Dispense", operation: "dispense", description: "Dispense liquid on FCA 2.", defaults: { wells: ["A1"], volumeUl: 10, liquidClass: "Water free dispense", specs: { device: "FCA 2" } } }
+      { id: "fca2-get-tip", family: "tips", name: "LiHa Get Tips", operation: "liha_get_tips", description: "Pick up LiHa tips from the selected tip box." },
+      { id: "fca2-drop-tip", family: "tips", name: "LiHa Drop Tips", operation: "liha_drop_tips", description: "Drop LiHa tips to the configured destination." },
+      { id: "fca2-aspirate", family: "liquid", name: "LiHa Aspirate", operation: "liha_aspirate", description: "Aspirate using the canonical LiHa operation.", defaults: { wells: ["A1"], volumeUl: 10, liquidClass: "Water free dispense" } },
+      { id: "fca2-dispense", family: "liquid", name: "LiHa Dispense", operation: "liha_dispense", description: "Dispense using the canonical LiHa operation.", defaults: { wells: ["A1"], volumeUl: 10, liquidClass: "Water free dispense" } },
+      { id: "fca2-mix", family: "liquid", name: "LiHa Mix", operation: "liha_mix", description: "Mix using the canonical LiHa operation.", defaults: { wells: ["A1"], volumeUl: 20, liquidClass: "Water free dispense" } }
     ]
   },
   {
     id: "rga1",
     label: "RGA 1",
-    description: "Robotic gripper arm transfer and plate handling.",
+    description: "Robotic gripper arm labware transfer operations.",
     commands: [
-      { id: "rga1-move-labware", family: "labware", name: "Move Labware (Transfer Labware)", operation: "move_labware", description: "Move selected labware to a site or parent object.", defaults: { specs: { location: "", site: "" } } },
-      { id: "rga1-cover", family: "labware", name: "Cover Labware", operation: "cover_labware", description: "Place a cover or lid onto labware." },
-      { id: "rga1-uncover", family: "labware", name: "Uncover Labware", operation: "uncover_labware", description: "Remove a cover or lid from labware." }
+      { id: "rga1-move-labware", family: "labware", name: "Move Plate", operation: "move_plate", description: "Move labware using the canonical plate-transfer operation.", defaults: { targetLabware: "", specs: { location: "", site: "" } } }
     ]
   },
   {
     id: "worktable",
     label: "Worktable",
-    description: "Worktable setup commands such as add, remove, and set location.",
+    description: "Canonical worktable setup operations.",
     commands: [
-      { id: "wt-add-labware", family: "labware", name: "Add Labware", operation: "register_labware", description: "Declare or add labware for the script worktable.", defaults: { specs: { labwareType: "", location: "" } } },
-      { id: "wt-remove-labware", family: "labware", name: "Remove Labware", operation: "move_labware", description: "Remove labware from the active worktable.", defaults: { specs: { location: "offdeck" } } },
-      { id: "wt-set-location", family: "labware", name: "Set Location", operation: "move_labware", description: "Move labware to a configured deck location.", defaults: { specs: { location: "", site: "" } } }
+      { id: "wt-add-labware", family: "labware", name: "Add Labware", operation: "add_labware", description: "Declare or add labware for the script worktable.", defaults: { targetLabware: "", specs: { labwareType: "", location: "" } } },
+      { id: "wt-load-labware", family: "labware", name: "Load Labware", operation: "load_labware", description: "Load source-backed labware into the script worktable.", defaults: { targetLabware: "" } }
     ]
   },
   {
     id: "worklist",
     label: "Worklist",
-    description: "Worklist-driven pipetting and transfer commands.",
+    description: "Worklist-driven canonical pipetting operations.",
     commands: [
-      { id: "wl-read", family: "liquid", name: "Read Worklist", operation: "read_worklist", description: "Load the next worklist transfer row." },
+      { id: "wl-read", family: "setup", name: "Read Worklist", operation: "read_worklist", description: "Load the next worklist transfer row." },
       { id: "wl-aspirate", family: "liquid", name: "Worklist Aspirate", operation: "aspirate", description: "Aspirate using the active worklist row.", defaults: { volumeUl: 10, liquidClass: "Water free dispense" } },
       { id: "wl-dispense", family: "liquid", name: "Worklist Dispense", operation: "dispense", description: "Dispense using the active worklist row.", defaults: { volumeUl: 10, liquidClass: "Water free dispense" } }
     ]
@@ -193,20 +193,20 @@ export const CONTROL_BAR_COMMAND_GROUPS: ControlBarCommandsGroup[] = [
   {
     id: "sampleTracking",
     label: "Sample Tracking",
-    description: "Barcode registration and sample tracking commands.",
+    description: "Source-backed variable operations for sample tracking workflows.",
     commands: [
-      { id: "st-register", family: "labware", name: "Register Labware", operation: "register_labware", description: "Register labware for sample tracking.", defaults: { specs: { barcode: "" } } },
-      { id: "st-scan", family: "prompt", name: "Manual Scan Labware", operation: "manual_step", description: "Operator barcode scan step on TouchTools.", defaults: { message: "Scan labware barcode." } }
+      { id: "st-query-variable", family: "flow", name: "Query Variable", operation: "query_variable", description: "Query a source-backed sample variable.", defaults: { specs: { variable: "" } } },
+      { id: "st-runtime-prompt", family: "prompt", name: "Runtime Variable Prompt", operation: "runtime_variable_prompt", description: "Request a sample value at runtime.", defaults: { message: "Enter sample value.", specs: { variable: "" } } }
     ]
   },
   {
     id: "communication",
     label: "Communication",
-    description: "External applications, scripts, and reporting hooks.",
+    description: "Canonical external application and driver operations.",
     commands: [
-      { id: "comm-execute-app", family: "setup", name: "Execute Application", operation: "manual_step", description: "Launch an external application during the run.", defaults: { specs: { application: "" } } },
-      { id: "comm-vbscript", family: "setup", name: "Execute VBScript", operation: "manual_step", description: "Run a VBScript hook.", defaults: { specs: { script: "" } } },
-      { id: "comm-report", family: "comment", name: "Generate Report", operation: "comment", description: "Generate a TouchTools or PDF report from a template.", defaults: { message: "Generate report." } }
+      { id: "comm-execute-app", family: "setup", name: "Execute Application", operation: "execute_application", description: "Represent a source-backed external application call.", defaults: { specs: { application: "" } } },
+      { id: "comm-vbscript", family: "setup", name: "Execute VBScript", operation: "execute_vb_script", description: "Represent a source-backed VBScript call.", defaults: { specs: { script: "" } } },
+      { id: "comm-driver-macro", family: "setup", name: "Application Driver Macro", operation: "application_driver_macro", description: "Represent a source-backed application driver macro.", defaults: { specs: { macro: "" } } }
     ]
   }
 ];
@@ -219,8 +219,24 @@ export const CONTROL_BAR_LIQUID_CLASSES = [
   "Mix LC"
 ];
 
+export type ControlBarCatalogDiagnostic = {
+  templateId: string;
+  operation: string;
+  message: string;
+};
+
 export function allControlBarCommandTemplates(): ControlBarCommandTemplate[] {
   return CONTROL_BAR_COMMAND_GROUPS.flatMap((group) => group.commands);
+}
+
+export function controlBarCatalogDiagnostics(): ControlBarCatalogDiagnostic[] {
+  return allControlBarCommandTemplates()
+    .filter((template) => !isProtocolIrOperation(template.operation))
+    .map((template) => ({
+      templateId: template.id,
+      operation: template.operation,
+      message: `Template ${template.id} references unregistered Protocol IR operation ${template.operation}.`
+    }));
 }
 
 export function controlBarCommandTemplateById(templateId: string): ControlBarCommandTemplate | undefined {

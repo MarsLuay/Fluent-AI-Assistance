@@ -30,6 +30,10 @@ import {
 } from "lucide-react";
 import JSZip from "jszip";
 import { fetchSamples, loadFiles, loadSample } from "./data/loaders";
+import { CONTROL_BAR_COMMAND_GROUPS, controlBarCommandTemplateById, type ControlBarCommandTemplate } from "./data/controlBar";
+import { isProtocolIrOperation, protocolIrOperationValidationMessage } from "./data/protocolIrOperations";
+import { PROTOCOL_IR_OPERATION_REQUIREMENTS } from "./data/protocolIrContract";
+import { familyForEditorOperation, scriptEditorCommandFromRecord } from "./data/scriptCommandState";
 import { buildProtocolModel } from "./data/parsers";
 import { rebuildProtocolWithScriptCommands, scriptCommandsFromProtocolCommands } from "./sim/state";
 import { INITIAL_SCRIPT_TITLE_STATE, scriptTitleReducer } from "./state/scriptTitleState";
@@ -207,14 +211,7 @@ type SavedScriptArtifact = {
 
 type ScriptCommandPatch = Partial<Omit<ScriptEditorCommand, "id" | "sourceCommandId" | "validationIssues" | "validationMessages">>;
 
-type CommandToolboxTemplate = {
-  id: string;
-  family: OperationFamily;
-  name: string;
-  operation: string;
-  description: string;
-  defaults?: Partial<Pick<ScriptEditorCommand, "targetLabware" | "wells" | "volumeUl" | "liquidClass" | "message" | "specs">>;
-};
+type CommandToolboxTemplate = ControlBarCommandTemplate;
 
 type CommandToolboxCategory = {
   family: OperationFamily;
@@ -257,102 +254,29 @@ type RestoredSimulatorProjectState = {
 
 const OPERATION_FAMILIES: OperationFamily[] = ["setup", "labware", "tips", "liquid", "motion", "prompt", "flow", "wash", "comment", "opaque"];
 
-const COMMAND_TOOLBOX: CommandToolboxCategory[] = [
-  {
-    family: "setup",
-    label: "Setup",
-    description: "Protocol setup, variables, instrument prep, and initialization.",
-    commands: [
-      { id: "setup-initialize", family: "setup", name: "Initialize Script", operation: "initialize_script", description: "Start-of-script setup and instrument preparation." },
-      { id: "setup-set-variable", family: "setup", name: "Set Variable", operation: "set_variable", description: "Create or update a script variable.", defaults: { specs: { variable: "", value: "" } } },
-      { id: "setup-set-liquid-class", family: "setup", name: "Set Liquid Class", operation: "set_liquid_class", description: "Define the liquid class used by later liquid moves.", defaults: { liquidClass: "Water free dispense" } }
-    ]
-  },
-  {
-    family: "tips",
-    label: "Tips",
-    description: "Pick up, drop, and manage disposable tips and adapters.",
-    commands: [
-      { id: "tips-get-tip", family: "tips", name: "Get Tip", operation: "get_tip", description: "Pick up tips from the selected tip box.", defaults: { specs: { channels: "all" } } },
-      { id: "tips-drop-tip", family: "tips", name: "Drop Tip", operation: "drop_tip", description: "Drop active tips to waste or a configured target.", defaults: { specs: { destination: "waste" } } },
-      { id: "tips-wash-tip", family: "wash", name: "Wash Tips", operation: "wash_tips", description: "Wash active washable tips at a wash station." },
-      { id: "tips-get-adapter", family: "tips", name: "Get Head Adapter", operation: "get_head_adapter", description: "Mount a head adapter before MCA or special labware steps." },
-      { id: "tips-drop-adapter", family: "tips", name: "Drop Head Adapter", operation: "drop_head_adapter", description: "Return or drop a mounted head adapter." }
-    ]
-  },
-  {
-    family: "liquid",
-    label: "Liquid",
-    description: "Aspirate, dispense, mix, detect, and transfer liquid.",
-    commands: [
-      { id: "liquid-aspirate", family: "liquid", name: "Aspirate", operation: "aspirate", description: "Aspirate liquid from selected wells.", defaults: { wells: ["A1"], volumeUl: 10, liquidClass: "Water free dispense" } },
-      { id: "liquid-dispense", family: "liquid", name: "Dispense", operation: "dispense", description: "Dispense liquid into selected wells.", defaults: { wells: ["A1"], volumeUl: 10, liquidClass: "Water free dispense" } },
-      { id: "liquid-mix", family: "liquid", name: "Mix", operation: "mix", description: "Mix selected wells with repeated aspirate/dispense cycles.", defaults: { wells: ["A1"], volumeUl: 20, liquidClass: "Water free dispense", specs: { cycles: "3" } } },
-      { id: "liquid-detect", family: "liquid", name: "Detect Liquid", operation: "detect_liquid", description: "Run liquid level detection for selected wells.", defaults: { wells: ["A1"], liquidClass: "Water free dispense" } },
-      { id: "liquid-transfer", family: "liquid", name: "Transfer", operation: "transfer_liquid", description: "Move liquid from a source to a destination.", defaults: { volumeUl: 10, liquidClass: "Water free dispense", specs: { source: "", destination: "" } } }
-    ]
-  },
-  {
-    family: "labware",
-    label: "Labware",
-    description: "Move plates, nests, carriers, covers, and deck objects.",
-    commands: [
-      { id: "labware-move", family: "labware", name: "Move Labware", operation: "move_labware", description: "Move selected labware to a site or parent object.", defaults: { specs: { location: "", site: "" } } },
-      { id: "labware-cover", family: "labware", name: "Cover Labware", operation: "cover_labware", description: "Place a cover or lid onto labware." },
-      { id: "labware-uncover", family: "labware", name: "Uncover Labware", operation: "uncover_labware", description: "Remove a cover or lid from labware." },
-      { id: "labware-register", family: "labware", name: "Register Labware", operation: "register_labware", description: "Declare or add labware for a newly-created script.", defaults: { specs: { labwareType: "", location: "" } } }
-    ]
-  },
-  {
-    family: "motion",
-    label: "Motion",
-    description: "Move robot arms, heads, and devices without changing liquid state.",
-    commands: [
-      { id: "motion-move-head", family: "motion", name: "Move Head", operation: "move_head", description: "Move the active head to a labware/site position." },
-      { id: "motion-home", family: "motion", name: "Home Axis", operation: "home_axis", description: "Home an axis or device before continuing.", defaults: { specs: { axis: "" } } },
-      { id: "motion-wait", family: "motion", name: "Wait", operation: "wait", description: "Wait for a duration or device state.", defaults: { specs: { seconds: "1" } } }
-    ]
-  },
-  {
-    family: "prompt",
-    label: "Prompts",
-    description: "Pause the run, ask the user, or require manual confirmation.",
-    commands: [
-      { id: "prompt-user", family: "prompt", name: "User Prompt", operation: "user_prompt", description: "Show a message and wait for user acknowledgement.", defaults: { message: "Confirm before continuing." } },
-      { id: "prompt-pause", family: "prompt", name: "Pause", operation: "pause", description: "Pause execution until the operator continues.", defaults: { message: "Paused." } },
-      { id: "prompt-manual-step", family: "prompt", name: "Manual Step", operation: "manual_step", description: "Document a required manual operator action.", defaults: { message: "Perform manual step, then continue." } }
-    ]
-  },
-  {
-    family: "flow",
-    label: "Flow",
-    description: "Control script order with loops, conditions, labels, and subroutines.",
-    commands: [
-      { id: "flow-if", family: "flow", name: "If Condition", operation: "if_condition", description: "Branch based on a condition.", defaults: { specs: { condition: "" } } },
-      { id: "flow-loop", family: "flow", name: "Loop", operation: "loop", description: "Repeat commands for a configured count.", defaults: { specs: { count: "1" } } },
-      { id: "flow-call-subroutine", family: "flow", name: "Call Subroutine", operation: "call_subroutine", description: "Run a named subroutine.", defaults: { specs: { subroutine: "" } } },
-      { id: "flow-label", family: "flow", name: "Label", operation: "label", description: "Mark a location in the script.", defaults: { specs: { label: "" } } }
-    ]
-  },
-  {
-    family: "wash",
-    label: "Wash",
-    description: "Wash station and cleaning commands.",
-    commands: [
-      { id: "wash-station", family: "wash", name: "Wash Station", operation: "wash_station", description: "Run a wash station clean step." },
-      { id: "wash-prime", family: "wash", name: "Prime", operation: "prime", description: "Prime lines or wash system before liquid handling." }
-    ]
-  },
-  {
-    family: "comment",
-    label: "Notes",
-    description: "Non-executing comments and documentation.",
-    commands: [
-      { id: "comment", family: "comment", name: "Comment", operation: "comment", description: "Add a non-executing script comment.", defaults: { message: "Add note here." } },
-      { id: "comment-section", family: "comment", name: "Section Header", operation: "section_comment", description: "Add a visible section break in the command queue.", defaults: { message: "New section" } }
-    ]
-  }
-];
+const COMMAND_TOOLBOX: CommandToolboxCategory[] = buildCommandToolbox();
+
+function buildCommandToolbox(): CommandToolboxCategory[] {
+  const byFamily = new Map<OperationFamily, CommandToolboxCategory>();
+  CONTROL_BAR_COMMAND_GROUPS.flatMap((group) => group.commands)
+    .filter((template) => isProtocolIrOperation(template.operation))
+    .forEach((template) => {
+      const existing = byFamily.get(template.family);
+      if (existing) {
+        existing.commands.push(template);
+        return;
+      }
+      byFamily.set(template.family, {
+        family: template.family,
+        label: template.family[0].toUpperCase() + template.family.slice(1),
+        description: `Canonical ${template.family} commands.`,
+        commands: [template]
+      });
+    });
+  return OPERATION_FAMILIES
+    .map((family) => byFamily.get(family))
+    .filter((category): category is CommandToolboxCategory => Boolean(category));
+}
 
 const OBJECT_LIBRARY: ObjectLibraryItem[] = [
   {
@@ -664,6 +588,8 @@ export default function App() {
   const safeActiveIndex = commandCount ? clampCommandIndex(activeIndex, commandCount) : 0;
   const activeCommand = commandCount ? model.commands[safeActiveIndex] : undefined;
   const scriptValidationIssueCount = scriptCommandsWithValidation.reduce((count, command) => count + (command.enabled ? command.validationMessages.length : 0), 0);
+  const unregisteredScriptOperationCount = scriptCommandsWithValidation.filter((command) => !isProtocolIrOperation(command.operation)).length;
+  const scriptPersistenceBlocked = scriptValidationIssueCount > 0 || unregisteredScriptOperationCount > 0;
   const scriptPlaybackBlocked = scriptValidationIssueCount > 0;
   const visibleScriptCommands = useMemo(
     () => filterScriptEditorCommands(scriptCommandsWithValidation, editorSearch),
@@ -1176,7 +1102,7 @@ export default function App() {
     event.stopPropagation();
     const templateId = event.dataTransfer.getData("application/x-tecan-command-template");
     if (templateId) {
-      const template = commandToolboxTemplateById(templateId);
+      const template = controlBarCommandTemplateById(templateId);
       setDraggedScriptCommandId(null);
       setDropTargetScriptCommandId(null);
       if (!template) return;
@@ -1207,7 +1133,7 @@ export default function App() {
     const templateId = event.dataTransfer.getData("application/x-tecan-command-template");
     if (!templateId) return;
     event.preventDefault();
-    const template = commandToolboxTemplateById(templateId);
+    const template = controlBarCommandTemplateById(templateId);
     setDropTargetScriptCommandId(null);
     if (!template) return;
     const nextCommand = validateScriptEditorCommand(createScriptCommandFromTemplate(template), modelLabware);
@@ -1285,6 +1211,10 @@ export default function App() {
   }
 
   function handleSave() {
+    if (scriptPersistenceBlocked) {
+      setStatus("Cannot save: resolve invalid or unregistered script operations first.");
+      return;
+    }
     try {
       const saved = buildSavedScriptArtifact(artifacts, model, selectedSampleId, assetImageOverrides, scriptCommandsWithValidation, scenePlacementOverrides, placedObjects, {
         editorTab,
@@ -1302,6 +1232,10 @@ export default function App() {
   }
 
   function handleExport() {
+    if (scriptPersistenceBlocked) {
+      setStatus("Cannot export: resolve invalid or unregistered script operations first.");
+      return;
+    }
     try {
     const exportedAt = new Date().toISOString();
     const payload = {
@@ -3056,6 +2990,12 @@ function buildSavedScriptArtifact(
   placedObjects: LabwareModel[],
   uiState: Record<string, unknown>
 ): SavedScriptArtifact {
+  const unregisteredOperations = scriptCommands
+    .map((command) => command.operation.trim())
+    .filter((operation) => !isProtocolIrOperation(operation));
+  if (unregisteredOperations.length) {
+    throw new Error(`Cannot save commands with unregistered Protocol IR operation(s): ${uniqueStrings(unregisteredOperations).join(", ")}`);
+  }
   const title = sanitizeScriptTitle(model.name || "protocol") || "protocol";
   const slug = modelAssetSlug(title);
   const protocolIr = artifacts.find((artifact) => artifact.kind === "protocol-ir" && artifact.text.trim());
@@ -3169,14 +3109,29 @@ function validateScriptEditorCommand(command: ScriptEditorCommand, labware: Labw
   const targetLabware = command.targetLabware.trim();
   const target = targetLabware ? labware.find((item) => labwareLabelMatches(item.label, targetLabware)) : null;
   const headAdapterCommand = isHeadAdapterEditorCommand(operation);
+  const specs = sanitizeCommandSpecs(command.specs);
+  const requirements = isProtocolIrOperation(operation) ? PROTOCOL_IR_OPERATION_REQUIREMENTS[operation] : null;
+  const operationIssue = protocolIrOperationValidationMessage(operation);
 
   if (!name) messages.push("Command name is empty.");
-  if (!operation) messages.push("Operation is empty.");
+  if (operationIssue) messages.push(operationIssue);
   if (targetLabware && !target && !headAdapterCommand) messages.push(`Target labware "${targetLabware}" was not found.`);
+  if (requirements?.requiresLabwareTarget && !targetLabware) {
+    messages.push(`${operation} requires target labware, source labware, or destination labware.`);
+  }
+  if (requirements?.requiresVolume && (command.volumeUl === null || command.volumeUl <= 0)) {
+    messages.push(`${operation} requires a volume greater than 0 uL.`);
+  }
+  if (requirements?.requiresLiquidClass && !command.liquidClass.trim()) {
+    messages.push(`${operation} requires a liquid class.`);
+  }
+  if (requirements?.requiresMotionPosition && !specs.position_expression) {
+    messages.push(`${operation} requires specs.position_expression for offline validation.`);
+  }
+  if (requirements?.requiresDeviceIdentity && !specs.available_id && !specs.id_label) {
+    messages.push(`${operation} requires specs.available_id or specs.id_label for offline validation.`);
+  }
   if (family === "liquid") {
-    if (!targetLabware) messages.push("Liquid command needs target labware.");
-    if (command.volumeUl === null || command.volumeUl <= 0) messages.push("Liquid command needs a volume greater than 0 uL.");
-    if (!command.liquidClass.trim()) messages.push("Liquid command needs a liquid class.");
     if (target && command.wells.length) {
       const targetWells = new Set(target.wells.map((well) => normalizeSearchText(well.id)));
       const missingWells = command.wells.filter((well) => !targetWells.has(normalizeSearchText(well)));
@@ -3186,9 +3141,6 @@ function validateScriptEditorCommand(command: ScriptEditorCommand, labware: Labw
     if (target && command.volumeUl !== null && maxVolume > 0 && command.volumeUl > maxVolume) {
       messages.push(`Volume exceeds ${target.label} well capacity (${maxVolume.toLocaleString()} uL).`);
     }
-  }
-  if ((family === "tips" || family === "motion" || family === "labware") && operation && /tip|labware|move|transfer|adapter/i.test(operation) && !targetLabware) {
-    messages.push(`${family} command should name a target labware/site.`);
   }
 
   return {
@@ -3200,7 +3152,7 @@ function validateScriptEditorCommand(command: ScriptEditorCommand, labware: Labw
     wells: uniqueStrings(command.wells.map((well) => well.trim().toUpperCase()).filter(Boolean)),
     liquidClass: command.liquidClass.trim(),
     message: (command.message || "").trim(),
-    specs: sanitizeCommandSpecs(command.specs),
+    specs,
     validationIssues: generalValidationIssues(messages),
     validationMessages: messages
   };
@@ -3256,22 +3208,6 @@ function createScriptCommandFromTemplate(template: CommandToolboxTemplate): Scri
   };
 }
 
-function commandToolboxTemplateById(templateId: string): CommandToolboxTemplate | undefined {
-  return COMMAND_TOOLBOX.flatMap((category) => category.commands).find((template) => template.id === templateId);
-}
-
-function familyForEditorOperation(operation: string): OperationFamily {
-  const lower = operation.toLowerCase();
-  if (lower.includes("aspirate") || lower.includes("dispense") || lower.includes("mix")) return "liquid";
-  if (lower.includes("tip")) return "tips";
-  if (lower.includes("move") || lower.includes("transfer")) return "motion";
-  if (lower.includes("wash")) return "wash";
-  if (lower.includes("prompt") || lower.includes("user")) return "prompt";
-  if (lower.includes("loop") || lower.includes("if") || lower.includes("goto")) return "flow";
-  if (lower.includes("labware")) return "labware";
-  if (lower.includes("comment")) return "comment";
-  return "opaque";
-}
 
 function filterScriptEditorCommands(commands: ScriptEditorCommand[], query: string): ScriptEditorCommand[] {
   const normalizedQuery = normalizeSearchText(query);
@@ -3577,51 +3513,6 @@ function imageOverridesFromProjectPayload(payload: Record<string, unknown>): Rec
     if (override.assetId && override.imageSrc) restored[override.assetId] = override.imageSrc;
   });
   return restored;
-}
-
-function scriptEditorCommandFromRecord(record: Record<string, unknown>): ScriptEditorCommand {
-  const validationIssues = scriptValidationIssuesFromUnknown(record.validationIssues);
-  const validationMessages =
-    validationIssues.length > 0
-      ? validationIssues.map((issue) => issue.message)
-      : Array.isArray(record.validationMessages)
-        ? record.validationMessages.map((message) => String(message)).filter(Boolean)
-        : [];
-  return {
-    id: String(record.id || uniqueScriptCommandId("restored")),
-    sourceCommandId: typeof record.sourceCommandId === "string" ? record.sourceCommandId : undefined,
-    name: String(record.name || "Restored Command"),
-    operation: String(record.operation || "comment"),
-    family: OPERATION_FAMILIES.includes(record.family as OperationFamily) ? (record.family as OperationFamily) : familyForEditorOperation(String(record.operation || "")),
-    targetLabware: String(record.targetLabware || ""),
-    wells: Array.isArray(record.wells) ? record.wells.map((well) => String(well)).filter(Boolean) : [],
-    volumeUl: typeof record.volumeUl === "number" && Number.isFinite(record.volumeUl) ? record.volumeUl : null,
-    liquidClass: String(record.liquidClass || ""),
-    message: String(record.message || ""),
-    specs: specsFromRecord(record.specs),
-    enabled: typeof record.enabled === "boolean" ? record.enabled : true,
-    dirty: typeof record.dirty === "boolean" ? record.dirty : true,
-    validationIssues,
-    validationMessages
-  };
-}
-
-function scriptValidationIssuesFromUnknown(value: unknown): ScriptValidationIssue[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((entry) => {
-      if (!isRecord(entry) || typeof entry.message !== "string") return null;
-      return {
-        field: typeof entry.field === "string" ? (entry.field as ScriptValidationIssue["field"]) : "general",
-        message: entry.message
-      };
-    })
-    .filter((issue): issue is ScriptValidationIssue => Boolean(issue));
-}
-
-function specsFromRecord(value: unknown): Record<string, string> {
-  if (!isRecord(value)) return {};
-  return Object.fromEntries(Object.entries(value).map(([key, specValue]) => [key, String(specValue ?? "")]));
 }
 
 function imageOverrideEntriesFromUnknown(value: unknown): HardwareAssetImageOverride[] {

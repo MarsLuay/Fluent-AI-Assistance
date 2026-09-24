@@ -76,6 +76,31 @@ const motionIr = {
   ]
 };
 assert.ok(isProtocolIrDocument(motionIr));
+const motionArtifact: SourceArtifact = {
+  id: "valid-motion-protocol-ir",
+  name: "valid-motion.protocol-ir.json",
+  kind: "protocol-ir",
+  source: "test",
+  path: "valid-motion.protocol-ir.json",
+  text: JSON.stringify(motionIr),
+  size: JSON.stringify(motionIr).length
+};
+const motionModel = buildProtocolModel([motionArtifact]);
+assert.deepEqual(motionModel.commands.map((command) => command.operation), [
+  "move_axis_command",
+  "start_move_command",
+  "wait_for_async_response"
+]);
+assert.equal(
+  motionModel.warnings.some((warning) => warning.includes("Protocol IR contract failed")),
+  false,
+  "valid canonical motion should not fail the Protocol IR contract"
+);
+assert.equal(
+  motionModel.commands.every((command) => command.effect === "offline_validation_only"),
+  true,
+  "motion remains an offline validation-only effect"
+);
 const invalidMotionIssues = validateProtocolIr({
   ...motionIr,
   steps: [{ ...motionIr.steps[0], parameters: {} }]
