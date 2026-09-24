@@ -138,16 +138,20 @@ class CommandRegistryTests(unittest.TestCase):
         self.assertEqual(registry_field_value("SubRoutineStatement", "subroutine", fields), '"Demo\\SUB_Get_Fingers_v1.0"')
         self.assertEqual(registry_field_value("SubRoutineStatement", "execution_mode", fields), "JoinSubroutine")
 
-    def test_low_level_hardware_driver_commands_are_approved_passthroughs(self):
-        for command in (
-            "MoveAxisCommandScriptStatement",
-            "StartMoveCommandScriptStatement",
-            "WaitForAsyncResponseScriptStatement",
-            "TeGioSetPWMOutputStatement",
+    def test_typed_motion_commands_are_mapped_and_other_driver_commands_remain_passthroughs(self):
+        for command, operation in (
+            ("MoveAxisCommandScriptStatement", "move_axis_command"),
+            ("StartMoveCommandScriptStatement", "start_move_command"),
+            ("WaitForAsyncResponseScriptStatement", "wait_for_async_response"),
         ):
-            self.assertIsNone(registry_command_operation(command))
-            self.assertEqual(registry_command_support_status(command), "approved_passthrough")
+            self.assertEqual(registry_command_operation(command), operation)
+            self.assertEqual(registry_command_support_status(command), "mapped")
+            self.assertFalse(registry_command_approved_passthrough(command))
             self.assertEqual(registry_command_family(command), "Application driver")
+
+        self.assertIsNone(registry_command_operation("TeGioSetPWMOutputStatement"))
+        self.assertEqual(registry_command_support_status("TeGioSetPWMOutputStatement"), "approved_passthrough")
+        self.assertEqual(registry_command_family("TeGioSetPWMOutputStatement"), "Application driver")
 
     def test_fluentcontrol_name_provenance_is_traceable(self):
         metadata = registry_fluentcontrol_name_metadata("Mca384AspirateScriptCommandDataV2")

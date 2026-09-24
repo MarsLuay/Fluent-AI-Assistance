@@ -84,7 +84,10 @@ source-preserved rather than inferred. The simulator's authoring command
 catalog is the schema-backed
 `source/04-protocol-simulator/src/data/controlBar.ts` catalog; editor toolbox
 and restored-command handling validate operations against the generated
-`PROTOCOL_IR_OPERATIONS` contract and reject or diagnose unknown commands.
+`PROTOCOL_IR_OPERATIONS` contract and reject or diagnose unknown commands. The
+shared command registry maps the three verified motion statement IDs to those
+canonical operations and typed field aliases; unsupported variants remain
+unmapped and low-level non-typed driver commands remain passthrough.
 
 The provider-neutral generation-context boundary is
 `tecan.generation_context.v1`. It turns a validated request/spec into

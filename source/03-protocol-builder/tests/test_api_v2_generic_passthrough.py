@@ -52,7 +52,7 @@ class ApiV2GenericPassthroughTests(unittest.TestCase):
         )
 
         self.assertEqual(api_v2_type, "GenericCommand")
-        self.assertIsNone(operation)
+        self.assertEqual(operation, "move_axis_command")
         self.assertIn("MoveAxisCommandScriptStatement", execute_xml)
         self.assertTrue(
             uses_generic_command_passthrough(
