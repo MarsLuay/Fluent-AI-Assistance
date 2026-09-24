@@ -25,6 +25,12 @@ from .generation_options import GenerationOptions
 from .generation_workflow import GenerationRequest, run_generation_workflow
 from .progress import ProgressCallback
 from .config import READY_TO_IMPORT_DIR, TEMP_FILES_DIRNAME
+from .deployment_plan import (
+    build_deployment_plan,
+    invalidate_for_target_drift,
+    render_deployment_plan_markdown,
+    target_drift_diagnostics,
+)
 from .project_context import (
     ProjectContext,
     active_project_name,
@@ -508,6 +514,50 @@ class LogAnalysisResult:
         }
 
 
+@dataclass(frozen=True)
+class DeploymentPlanRequest:
+    """Explicit source/target evidence for target-aware planning."""
+
+    source_profile: Path | str | Mapping[str, Any]
+    target_profile: Path | str | Mapping[str, Any] | None = None
+    mode: str | None = None
+    external_files: tuple[Mapping[str, Any], ...] = ()
+    current_target_profile: Path | str | Mapping[str, Any] | None = None
+    report_path: Path | None = None
+    json_path: Path | None = None
+
+
+@dataclass(frozen=True)
+class DeploymentPlanResult:
+    request: DeploymentPlanRequest
+    plan: dict[str, Any]
+    drift: tuple[dict[str, Any], ...] = ()
+    report_path: Path | None = None
+    json_path: Path | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.plan.get("status") in {"ready_for_same_target_dropin", "ready_for_import"}
+
+    @property
+    def exit_code(self) -> int:
+        if self.ok:
+            return 0
+        return 1 if self.plan.get("status") == "blocked" else 2
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": "tecan.deployment_plan_result.v1",
+            "ok": self.ok,
+            "status": self.plan.get("status"),
+            "exit_code": self.exit_code,
+            "plan": self.plan,
+            "drift": list(self.drift),
+            "report_path": str(self.report_path) if self.report_path else None,
+            "json_path": str(self.json_path) if self.json_path else None,
+        }
+
+
 def generate_protocol(
     request: GenerationRequest,
     *,
@@ -519,6 +569,47 @@ def generate_protocol(
     return GenerationResult(
         request=request,
         manifest=run_generation_workflow(request, progress_callback=progress_callback),
+    )
+
+
+def plan_deployment(request: DeploymentPlanRequest) -> DeploymentPlanResult:
+    """Build the canonical target-aware plan for CLI and other adapters."""
+    if request.target_profile is None:
+        plan = build_deployment_plan(
+            request.source_profile,
+            mode=request.mode,
+            external_files=list(request.external_files),
+        )
+    else:
+        plan = build_deployment_plan(
+            request.source_profile,
+            request.target_profile,
+            mode=request.mode,
+            external_files=list(request.external_files),
+        )
+
+    drift = tuple(
+        target_drift_diagnostics(plan, request.current_target_profile)
+        if request.current_target_profile is not None
+        else ()
+    )
+    if drift:
+        plan = invalidate_for_target_drift(plan, list(drift))
+
+    report_path = request.report_path
+    if report_path is not None:
+        ensure_parent(report_path)
+        report_path.write_text(render_deployment_plan_markdown(plan), encoding="utf-8")
+    json_path = request.json_path
+    if json_path is not None:
+        ensure_parent(json_path)
+        write_json(json_path, plan)
+    return DeploymentPlanResult(
+        request=request,
+        plan=plan,
+        drift=drift,
+        report_path=report_path,
+        json_path=json_path,
     )
 
 

@@ -196,8 +196,72 @@ def target_drift_diagnostics(plan: Mapping[str, Any], current_target: Path | str
     }]
 
 
+def invalidate_for_target_drift(
+    plan: Mapping[str, Any], diagnostics: list[Mapping[str, Any]]
+) -> dict[str, Any]:
+    """Return a blocked copy of a plan after target evidence drift.
+
+    Planning is intentionally side-effect free.  This helper makes drift part
+    of the returned canonical plan without changing the original mapping.
+    """
+    if not diagnostics:
+        return dict(plan)
+    invalidated = dict(plan)
+    invalidated["findings"] = [
+        *[dict(item) for item in (plan.get("findings") or [])],
+        *[dict(item) for item in diagnostics],
+    ]
+    invalidated["status"] = "blocked"
+    invalidated["fingerprint"] = _fingerprint(invalidated)
+    return invalidated
+
+
+def render_deployment_plan_markdown(plan: Mapping[str, Any]) -> str:
+    """Render a concise, deterministic review report for a deployment plan."""
+    lines = [
+        "# Deployment plan",
+        "",
+        f"- Schema: `{plan.get('schema_version')}`",
+        f"- Status: **{plan.get('status')}**",
+        f"- Mode: `{plan.get('mode')}`",
+        f"- Source fingerprint: `{plan.get('source_fingerprint') or 'unknown'}`",
+        f"- Target fingerprint: `{plan.get('target_fingerprint') or 'unknown-target'}`",
+        f"- Target profile: `{plan.get('target_profile_id') or 'unknown-target'}`",
+        "",
+        "## Actions",
+        "",
+    ]
+    actions = list(plan.get("actions") or [])
+    if not actions:
+        lines.append("- None")
+    else:
+        for action in actions:
+            source = action.get("source") or {}
+            label = source.get("object_name") or source.get("source_path") or "object"
+            lines.append(f"- `{action.get('action')}` — {label} ({action.get('reason', 'no reason')})")
+    lines.extend(["", "## Findings", ""])
+    findings = list(plan.get("findings") or [])
+    if not findings:
+        lines.append("- None")
+    else:
+        for finding in findings:
+            lines.append(f"- `{finding.get('severity')}` `{finding.get('code')}`")
+    lines.extend([
+        "",
+        "## Safety boundary",
+        "",
+        "- Planning only; no FluentControl UI, database, SVN, or target write is performed.",
+        "- `runtime_state_excluded`: `true`",
+        "- `destructive_target_mutation`: `false`",
+        "",
+    ])
+    return "\\n".join(lines)
+
+
 __all__ = [
     "DEPLOYMENT_PLAN_SCHEMA_VERSION",
     "build_deployment_plan",
+    "invalidate_for_target_drift",
+    "render_deployment_plan_markdown",
     "target_drift_diagnostics",
 ]

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from .commands.deployment import _cmd_plan_deployment
 from .commands.diagnostics import _cmd_analyze, _cmd_diagnose, _cmd_map_media, _cmd_parse_fluent_log, _cmd_process_media, _cmd_template_info, _cmd_template_list
 from .commands.doctor import _cmd_bootstrap_status, _cmd_compatibility_matrix, _cmd_doctor, _cmd_setup
 from .commands.generation import _cmd_bundle_lifecycle, _cmd_compile, _cmd_decompile, _cmd_determinism_check, _cmd_generate, _cmd_ir_build, _cmd_ir_export, _cmd_ir_schema, _cmd_repair_draft, _cmd_repair_plan, _cmd_roundtrip
@@ -326,6 +327,32 @@ def _build_parser() -> argparse.ArgumentParser:
     p_worktable_diff.add_argument("-o", "--output", type=Path, default=None)
     p_worktable_diff.add_argument("--json", dest="as_json", action="store_true")
     p_worktable_diff.set_defaults(func=_cmd_worktable_diff)
+
+    p_deployment = sub.add_parser(
+        "plan-deployment",
+        help="render a target-aware, non-mutating deployment plan",
+        description=(
+            "Plan same-target drop-in or cross-target import from explicit source/target profiles. "
+            "With --no-target, produce an unknown-target analysis; no datastore, SVN, or FluentControl write is performed."
+        ),
+    )
+    p_deployment.add_argument("--source-profile", required=True, type=Path, help="explicit tecan.target_datastore.v1 source profile")
+    target_group = p_deployment.add_mutually_exclusive_group()
+    target_group.add_argument("--target-profile", type=Path, help="captured target profile JSON")
+    target_group.add_argument("--no-target", action="store_true", help="make target-unknown analysis explicit")
+    p_deployment.add_argument("--target-userspecific-dir", type=Path, default=None, help="explicit target UserSpecific inventory root")
+    p_deployment.add_argument("--target-systemspecific-dir", type=Path, default=None, help="explicit target SystemSpecific inventory root")
+    p_deployment.add_argument("--target-software-family", default=None, help="software family from explicit target evidence")
+    p_deployment.add_argument("--target-fluentcontrol-version", default=None, help="FluentControl version from explicit target evidence")
+    p_deployment.add_argument("--target-fluentcontrol-build", default=None, help="FluentControl build from explicit target evidence")
+    p_deployment.add_argument("--target-profile-id", default=None, help="stable ID for explicit target evidence")
+    p_deployment.add_argument("--current-target-profile", type=Path, default=None, help="fresh target profile used for drift invalidation")
+    p_deployment.add_argument("--mode", choices=["same_target_dropin", "cross_target_import"], default=None)
+    p_deployment.add_argument("--external-files", type=Path, default=None, help="JSON list of external source/target file mappings")
+    p_deployment.add_argument("--json-out", type=Path, default=None, help="write the canonical plan JSON")
+    p_deployment.add_argument("--report", type=Path, default=None, help="write a Markdown review report")
+    p_deployment.add_argument("--json", dest="as_json", action="store_true", help="print the structured result")
+    p_deployment.set_defaults(func=_cmd_plan_deployment)
 
     p_validate = sub.add_parser(
         "validate",

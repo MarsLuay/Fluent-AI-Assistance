@@ -53,6 +53,7 @@ from .requests import (
     request_spec_create_request_from_cli,
     request_spec_validation_request_from_cli,
 )
+from .commands.deployment import _cmd_plan_deployment
 from .commands.diagnostics import (
     _cmd_analyze,
     _cmd_diagnose,
@@ -189,6 +190,7 @@ __all__ = [
     "_cmd_parse_fluent_log",
     "_cmd_process_media",
     "_cmd_project_find",
+    "_cmd_plan_deployment",
     "_cmd_project_info",
     "_cmd_repair_draft",
     "_cmd_repair_plan",

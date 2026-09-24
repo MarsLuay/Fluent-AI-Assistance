@@ -514,6 +514,15 @@
       "replacement": null
     },
     {
+      "id": "cli.plan-deployment",
+      "class": "supported",
+      "kind": "cli-command",
+      "path": "source/03-protocol-builder/fluent_pipeline/cli/parser.py",
+      "reason": "protocol-builder target-aware, non-mutating deployment planning subcommand.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
       "id": "cli.project-find",
       "class": "supported",
       "kind": "cli-command",
@@ -798,6 +807,15 @@
       "kind": "mcp-tool",
       "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
       "reason": "MCP tool fluent_parse_fluent_log.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "mcp.fluent_plan_deployment",
+      "class": "supported",
+      "kind": "mcp-tool",
+      "path": "source/03-protocol-builder/fluent_pipeline/mcp_server.py",
+      "reason": "MCP tool fluent_plan_deployment for read-only target-aware planning.",
       "supportedVersion": "current",
       "replacement": null
     },

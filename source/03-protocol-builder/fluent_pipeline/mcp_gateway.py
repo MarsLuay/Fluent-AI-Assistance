@@ -16,6 +16,7 @@ from typing import Any
 from .authoring_status import AuthoringState
 from .application_services import (
     BundleVerificationRequest,
+    DeploymentPlanRequest,
     ExpressionSymbolQueryRequest,
     RepairApplyRequest,
     RepairPlanRequest,
@@ -26,6 +27,7 @@ from .application_services import (
     generate_protocol,
     inspect_project,
     import_project as import_project_service,
+    plan_deployment as plan_deployment_service,
     plan_repair as plan_repair_service,
     validate_request_spec as validate_request_spec_service,
     verify_bundle as verify_bundle_service,
@@ -65,6 +67,7 @@ from .request_spec import (
 )
 from .runner import PipelineError
 from .script_analysis import analyze_script
+from .target_datastore import build_target_datastore_profile
 from .worktable_diff import (
     diff_worktable_requirements,
     render_worktable_changes_markdown,
@@ -121,6 +124,7 @@ _CLI_COMMAND_COVERAGE: dict[str, dict[str, str]] = {
     "map-media": {"mode": "bridge", "note": "XSCR in-place rewriting is rejected"},
     "parse-fluent-log": {"mode": "native", "tool": "fluent_parse_fluent_log"},
     "process-media": {"mode": "native", "tool": "fluent_process_media"},
+    "plan-deployment": {"mode": "native", "tool": "fluent_plan_deployment"},
     "project-find": {"mode": "native", "tool": "fluent_project_query"},
     "project-info": {"mode": "native", "tool": "fluent_inspect_project"},
     "repair-draft": {"mode": "native", "tool": "fluent_apply_repair"},
@@ -402,6 +406,70 @@ class ProtocolBuilderGateway:
                 source_examples=tuple(source_examples or ()),
             )
         ).to_dict()
+
+    def plan_deployment(
+        self,
+        source_profile: str,
+        *,
+        target_profile: str | None = None,
+        no_target: bool = False,
+        target_userspecific_dir: str | None = None,
+        target_systemspecific_dir: str | None = None,
+        target_software_family: str | None = None,
+        target_fluentcontrol_version: str | None = None,
+        target_fluentcontrol_build: str | None = None,
+        target_profile_id: str | None = None,
+        current_target_profile: str | None = None,
+        mode: str | None = None,
+        external_files: list[dict[str, Any]] | None = None,
+        output_directory: str | None = None,
+    ) -> dict[str, Any]:
+        """Build a read-only plan from explicit source/target evidence."""
+        identity_fields = (
+            target_userspecific_dir,
+            target_systemspecific_dir,
+            target_software_family,
+            target_fluentcontrol_version,
+            target_fluentcontrol_build,
+            target_profile_id,
+        )
+        if target_profile and any(value not in (None, "") for value in identity_fields):
+            raise PipelineError("target_profile cannot be combined with target inventory or identity fields")
+        if no_target and (target_profile or any(value not in (None, "") for value in identity_fields)):
+            raise PipelineError("no_target cannot be combined with explicit target evidence")
+
+        source_path = self._existing_input(source_profile)
+        selected_target: Path | dict[str, Any] | None = None
+        if not no_target and target_profile:
+            selected_target = self._existing_input(target_profile)
+        elif not no_target and any(value not in (None, "") for value in identity_fields):
+            selected_target = build_target_datastore_profile(
+                userspecific_dir=self._existing_input(target_userspecific_dir) if target_userspecific_dir else None,
+                systemspecific_dir=self._existing_input(target_systemspecific_dir) if target_systemspecific_dir else None,
+                software_family=target_software_family,
+                fluentcontrol_version=target_fluentcontrol_version,
+                fluentcontrol_build=target_fluentcontrol_build,
+                target_profile_id=target_profile_id,
+                provenance={"source": "explicit_mcp_target_input"},
+            )
+
+        output = self._output_path(
+            output_directory,
+            default=READY_TO_IMPORT_DIR / "unscoped" / TEMP_FILES_DIRNAME / "deployment_plans",
+        )
+        current = self._existing_input(current_target_profile) if current_target_profile else None
+        result = plan_deployment_service(
+            DeploymentPlanRequest(
+                source_profile=source_path,
+                target_profile=selected_target,
+                mode=mode,
+                external_files=tuple(external_files or ()),
+                current_target_profile=current,
+                report_path=output / "deployment-plan.md",
+                json_path=output / "deployment-plan.json",
+            )
+        )
+        return result.to_dict()
 
     def project(self, name: str | None = None) -> dict[str, Any]:
         return inspect_project(project_inspection_request_from_mcp(name)).to_dict()
