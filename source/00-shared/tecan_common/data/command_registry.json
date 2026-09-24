@@ -982,6 +982,7 @@
       "confidence": "medium"
     },
     "MoveAxisCommandScriptStatement": {
+      "operation": "move_axis_command",
       "support_status": "approved_passthrough",
       "fluentcontrol_name": "Move Axis",
       "pattern_type": "hardware_motion",
@@ -993,27 +994,38 @@
         "DriverMoveAxisCommand"
       ],
       "field_aliases": {
-        "device_alias": [
-          "DeviceAlias",
+        "available_id": [
           "AvailableID",
-          "Name"
+          "ID"
         ],
-        "axis": [
-          "Axis",
-          "AxisName",
-          "Name"
+        "id_label": [
+          "IdLabel",
+          "IDLabel"
         ],
-        "position": [
+        "position_expression": [
           "Position",
           "TargetPosition"
+        ],
+        "charge_condition_expression": [
+          "ChargeCondition"
+        ],
+        "max_speed": [
+          "MaxSpeed"
+        ],
+        "acceleration": [
+          "Acceleration"
+        ],
+        "deceleration": [
+          "Deceleration"
         ]
       },
-      "passthrough_reason": "Low-level axis movement statement; preserve XML until hardware-driver motion semantics are modeled in protocol IR.",
+      "typed_ir_contract": "protocol_ir.v2",
       "manual_step": "Run configured axis movement",
-      "fluentcontrol_name_source": "manual_curated",
-      "confidence": "medium"
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
     },
     "StartMoveCommandScriptStatement": {
+      "operation": "start_move_command",
       "support_status": "approved_passthrough",
       "fluentcontrol_name": "Start Move",
       "pattern_type": "hardware_motion",
@@ -1025,27 +1037,22 @@
         "DriverStartMoveCommand"
       ],
       "field_aliases": {
-        "device_alias": [
-          "DeviceAlias",
+        "available_id": [
           "AvailableID",
-          "Name"
+          "ID"
         ],
-        "axis": [
-          "Axis",
-          "AxisName",
-          "Name"
-        ],
-        "position": [
-          "Position",
-          "TargetPosition"
+        "id_label": [
+          "IdLabel",
+          "IDLabel"
         ]
       },
-      "passthrough_reason": "Low-level asynchronous hardware movement statement; preserve XML until hardware-driver motion semantics are modeled in protocol IR.",
+      "typed_ir_contract": "protocol_ir.v2",
       "manual_step": "Start configured hardware movement",
-      "fluentcontrol_name_source": "manual_curated",
-      "confidence": "medium"
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
     },
     "WaitForAsyncResponseScriptStatement": {
+      "operation": "wait_for_async_response",
       "support_status": "approved_passthrough",
       "fluentcontrol_name": "Wait For Async Response",
       "pattern_type": "hardware_motion",
@@ -1057,20 +1064,15 @@
         "DriverWaitForAsyncResponse"
       ],
       "field_aliases": {
-        "device_alias": [
-          "DeviceAlias",
-          "AvailableID",
-          "Name"
-        ],
         "timeout": [
           "Timeout",
           "TimeOut"
         ]
       },
-      "passthrough_reason": "Waits for an asynchronous hardware-driver response; preserve XML until driver response semantics are modeled in protocol IR.",
+      "typed_ir_contract": "protocol_ir.v2",
       "manual_step": "Wait for hardware async response",
-      "fluentcontrol_name_source": "manual_curated",
-      "confidence": "medium"
+      "fluentcontrol_name_source": "fluentcontrol_control_bar",
+      "confidence": "verified"
     },
     "TeGioSetPWMOutputStatement": {
       "support_status": "approved_passthrough",
