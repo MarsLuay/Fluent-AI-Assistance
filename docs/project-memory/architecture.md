@@ -66,8 +66,12 @@ sequence as `move_axis_command`, `start_move_command`, and
 ordering, source metadata, and additive XML through generated FluentCoder Python;
 the simulator boundary contract is regenerated from the same Python schema.
 These operations remain structural/offline validation only and do not prove
-physical motion, calibration, alignment, clearance, or collision safety. The
-simulator's authoring command catalog is the schema-backed
+physical motion, calibration, alignment, clearance, or collision safety. MCA
+pickup XSCR ingestion likewise keeps source-backed coordinates, offsets,
+orientation, and tip-position expressions typed through renderer and
+Decompiler round-trips; additive fields outside that contract remain
+source-preserved rather than inferred. The simulator's authoring command
+catalog is the schema-backed
 `source/04-protocol-simulator/src/data/controlBar.ts` catalog; editor toolbox
 and restored-command handling validate operations against the generated
 `PROTOCOL_IR_OPERATIONS` contract and reject or diagnose unknown commands.
