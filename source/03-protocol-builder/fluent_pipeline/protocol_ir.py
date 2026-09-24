@@ -214,6 +214,29 @@ def protocol_ir_from_python(path: Path) -> dict[str, Any]:
             ir["worktable"].update(_python_worktable_metadata(call))
             continue
 
+        if _is_method_call(call, "declare_variable") and call.args:
+            variable_name = _literal_text(call.args[0])
+            if variable_name not in (None, ""):
+                record: dict[str, Any] = {
+                    "name": str(variable_name),
+                    "default_value": _literal_text(call.args[1]) if len(call.args) > 1 else 0,
+                }
+                if len(call.args) > 1:
+                    default_expression = _python_expression_mapping(call.args[1])
+                    if default_expression is not None:
+                        record["default_expression"] = default_expression
+                scope = _keyword_value(call, "scope")
+                type_name = _keyword_value(call, "type_name")
+                if scope not in (None, ""):
+                    record["scope"] = scope
+                if type_name not in (None, ""):
+                    record["type"] = type_name
+                _upsert_item(ir["variables"], record, key="name")
+            continue
+
+        if _is_method_call(call, "set_sim_value"):
+            continue
+
         if _call_name(call) == "Reagent" and target:
             reagent_name = _value_label(call.args[0], reagent_by_var, labware_by_var) if call.args else target
             reagent_by_var[target] = reagent_name
@@ -715,6 +738,15 @@ def _render_python_draft_from_validated_ir(ir: dict[str, Any]) -> str:
         }
         | {"Reagent", "Worktable"}
         | _expression_imports_for_render(steps, ir.get("variables") or [])
+        | (
+            {"MoveAxisConfig"}
+            if any(
+                isinstance(step, dict)
+                and str(step.get("operation") or "") == "move_axis_command"
+                for step in steps
+            )
+            else set()
+        )
         | (
             {"VariableMapping", "parse_expression"}
             if any(
@@ -1781,6 +1813,122 @@ def _python_prompt_step(
     }
 
 
+def _python_motion_step(
+    call: ast.Call,
+    operation: str,
+    draft_name: str,
+    current_group: str,
+    source: str,
+) -> dict[str, Any]:
+    """Parse generated fluentcoder movement calls without evaluating them."""
+    params: dict[str, Any] = {
+        "method": call.func.attr if isinstance(call.func, ast.Attribute) else operation,
+        "source_provenance": {
+            "format": "python",
+            "source_path": _source_path(draft_name, current_group, source, call),
+        },
+    }
+
+    config = call.args[0] if operation == "move_axis_command" and call.args else None
+    value_call = config if isinstance(config, ast.Call) else call
+    command_id = {
+        "move_axis_command": "MoveAxisCommandScriptStatement",
+        "start_move_command": "StartMoveCommandScriptStatement",
+        "wait_for_async_response": "WaitForAsyncResponseScriptStatement",
+    }[operation]
+
+    for key in ("available_id", "id_label", "max_speed", "acceleration", "deceleration", "raw_xml"):
+        value = _keyword_value(value_call, key)
+        if value not in (None, ""):
+            params[key] = value
+
+    if operation == "move_axis_command":
+        position_node = _keyword_node(value_call, "position")
+        position_expression = _python_expression_mapping(position_node)
+        if position_expression is not None:
+            params["position_expression"] = position_expression
+            params["position"] = _expression_source_text(position_expression, fallback=_literal_text(position_node))
+        charge_node = _keyword_node(value_call, "charge_condition")
+        charge_expression = _python_expression_mapping(charge_node)
+        if charge_expression is not None:
+            params["charge_condition_expression"] = charge_expression
+            params["charge_condition"] = _expression_source_text(charge_expression, fallback=_literal_text(charge_node))
+
+    raw_xml = params.get("raw_xml")
+    if raw_xml:
+        try:
+            raw_command = ET.fromstring(str(raw_xml))
+        except ET.ParseError:
+            raw_command = None
+        if raw_command is not None:
+            for key, field in (
+                ("available_id", "AvailableID"),
+                ("id_label", "IdLabel"),
+                ("max_speed", "MaxSpeed"),
+                ("acceleration", "Acceleration"),
+                ("deceleration", "Deceleration"),
+            ):
+                if not _has_value(params.get(key)):
+                    value = _first_text(raw_command, field)
+                    if value not in (None, ""):
+                        params[key] = value
+            for key, field in (("is_breakpoint", "IsBreakpoint"), ("is_disabled_for_execution", "IsDisabledForExecution")):
+                if key not in params:
+                    value = _first_text(raw_command, field)
+                    if value not in (None, ""):
+                        params[key] = _bool_text(value)
+            if "line_number" not in params:
+                line_number = _first_text(raw_command, "LineNumber")
+                if line_number not in (None, ""):
+                    params["line_number"] = _number_or_text(line_number)
+            if operation == "move_axis_command":
+                for key, value in _registered_xscr_expression_parameters(raw_command, command_id).items():
+                    params.setdefault(key, value)
+                if "position_expression" not in params:
+                    position = _first_text(raw_command, "Position")
+                    if position not in (None, ""):
+                        params["position_expression"] = expression_to_mapping(
+                            parse_or_preserve_source_expression(position)
+                        )
+                        params["position"] = position
+                if "charge_condition_expression" not in params:
+                    charge_condition = _first_leaf_text(raw_command, "ChargeCondition")
+                    if charge_condition not in (None, ""):
+                        params["charge_condition_expression"] = expression_to_mapping(
+                            parse_or_preserve_source_expression(charge_condition)
+                        )
+                        params["charge_condition"] = charge_condition
+
+    return {
+        "group": current_group,
+        "operation": operation,
+        "name": _operation_name(operation),
+        "command_id": command_id,
+        "parameters": params,
+        "source_path": _source_path(draft_name, current_group, source, call),
+    }
+
+
+def _python_expression_mapping(node: ast.AST | None) -> dict[str, Any] | None:
+    if node is None:
+        return None
+    if isinstance(node, ast.Call):
+        name = _call_name(node)
+        if name == "parse_expression" and node.args:
+            source = _literal_text(node.args[0])
+            if source is not None:
+                return expression_to_mapping(parse_or_preserve_source_expression(str(source)))
+        if name in {"SourcePreservedExpression", "ReviewedRawExpression"}:
+            fields = {keyword.arg: _literal_text(keyword.value) for keyword in node.keywords if keyword.arg}
+            fields["kind"] = "source_preserved_expression" if name == "SourcePreservedExpression" else "reviewed_raw_expression"
+            if fields.get("source"):
+                return fields
+    value = _literal_text(node)
+    if value is None:
+        value = ast.unparse(node) if hasattr(ast, "unparse") else ""
+    return expression_to_mapping(parse_or_preserve_source_expression(str(value)))
+
+
 def _python_runtime_step(
     call: ast.Call,
     draft_name: str,
@@ -1795,6 +1943,12 @@ def _python_runtime_step(
     operation = _python_operation_for_call(call, head_by_var)
     if not operation:
         return None
+    if operation in {
+        "move_axis_command",
+        "start_move_command",
+        "wait_for_async_response",
+    }:
+        return _python_motion_step(call, operation, draft_name, current_group, source)
     target = _value_label(call.args[0], reagent_by_var, labware_by_var) if call.args else None
     volume = _literal_text(call.args[1]) if len(call.args) > 1 else None
     liquid_class = _keyword_value(call, "liquid_class")
@@ -1880,6 +2034,20 @@ def _xscr_step(
 
     if operation in {"conditional_branch", "default_branch"}:
         return _xscr_branch_step(
+            command_object,
+            group_name,
+            operation,
+            command_id,
+            compiled_path,
+            source_entry=source_entry,
+        )
+
+    if operation in {
+        "move_axis_command",
+        "start_move_command",
+        "wait_for_async_response",
+    }:
+        return _xscr_motion_step(
             command_object,
             group_name,
             operation,
@@ -2081,6 +2249,71 @@ def _xscr_step(
         "volume_ul": volume,
         "liquid_class": liquid_class,
         "parameters": parameters,
+        "compiled_path": compiled_path,
+    }
+
+
+def _xscr_motion_step(
+    command_object: ET.Element,
+    group_name: str,
+    operation: str,
+    command_id: str,
+    compiled_path: str,
+    *,
+    source_entry: str = "",
+) -> dict[str, Any]:
+    """Convert the verified low-level FluentControl motion sequence to IR."""
+    source_object_type = str(command_object.attrib.get("Type") or "")
+    parameters: dict[str, Any] = {
+        "raw_xml": ET.tostring(command_object, encoding="unicode"),
+        "source_object_type": source_object_type,
+        "source_provenance": {
+            "format": "xscr",
+            "command_id": command_id,
+            "object_type": source_object_type,
+            "source_entry": source_entry,
+        },
+    }
+    for key, field in (
+        ("available_id", "AvailableID"),
+        ("id_label", "IdLabel"),
+        ("max_speed", "MaxSpeed"),
+        ("acceleration", "Acceleration"),
+        ("deceleration", "Deceleration"),
+    ):
+        value = _first_text(command_object, field)
+        if value not in (None, ""):
+            parameters[key] = value
+
+    expression_parameters = _registered_xscr_expression_parameters(
+        command_object,
+        command_id,
+        source_entry=source_entry,
+    )
+    parameters.update(expression_parameters)
+    if operation == "move_axis_command":
+        position = _first_text(command_object, "Position")
+        if position not in (None, ""):
+            parameters["position"] = _number_or_text(position)
+        charge_condition = _first_leaf_text(command_object, "ChargeCondition")
+        if charge_condition not in (None, ""):
+            parameters["charge_condition"] = charge_condition
+    for key, field in (
+        ("is_breakpoint", "IsBreakpoint"),
+        ("is_disabled_for_execution", "IsDisabledForExecution"),
+        ("group_line_number", "GroupLineNumber"),
+    ):
+        value = _first_text(command_object, field)
+        if value not in (None, ""):
+            parameters[key] = _bool_text(value) if key.startswith("is_") else _number_or_text(value)
+
+    return {
+        "group": group_name,
+        "operation": operation,
+        "name": _operation_name(operation),
+        "command_id": command_id,
+        "parameters": parameters,
+        "source_path": source_entry,
         "compiled_path": compiled_path,
     }
 
@@ -2505,6 +2738,43 @@ def _render_python_step(step: dict[str, Any], labware_vars: dict[str, str]) -> l
         cycles = params.get("cycles", 10)
         cycles_arg = _expression_python_arg(params.get("cycles_expression"), fallback=cycles)
         return [f"head.mix({target_expr}, {volume_arg}, cycles={cycles_arg}, liquid_class={liquid_class!r})"]
+    if operation == "move_axis_command":
+        parts = []
+        for key in ("available_id", "id_label"):
+            if _has_value(params.get(key)):
+                parts.append(f"{key}={params[key]!r}")
+        parts.append(
+            "position="
+            + _expression_python_arg(
+                params.get("position_expression"),
+                fallback=params.get("position", 0),
+            )
+        )
+        if _has_value(params.get("charge_condition_expression")):
+            parts.append(
+                "charge_condition="
+                + _expression_python_arg(params["charge_condition_expression"])
+            )
+        elif _has_value(params.get("charge_condition")):
+            parts.append(f"charge_condition={params['charge_condition']!r}")
+        for key in ("max_speed", "acceleration", "deceleration"):
+            if _has_value(params.get(key)):
+                parts.append(f"{key}={params[key]!r}")
+        raw_xml = str(params.get("raw_xml") or "").strip()
+        if raw_xml:
+            parts.append(f"raw_xml={raw_xml!r}")
+        return [f"wt.move_axis_command(MoveAxisConfig({', '.join(parts)}))"]
+    if operation == "start_move_command":
+        parts = []
+        for key in ("available_id", "id_label", "raw_xml"):
+            if _has_value(params.get(key)):
+                parts.append(f"{key}={params[key]!r}")
+        return [f"wt.start_move_command({', '.join(parts)})"]
+    if operation == "wait_for_async_response":
+        raw_xml = str(params.get("raw_xml") or "").strip()
+        if raw_xml:
+            return [f"wt.wait_for_async_response(raw_xml={raw_xml!r})"]
+        return ["wt.wait_for_async_response()"]
     if operation == "comment":
         comment = (step.get("parameters") or {}).get("comment") or step.get("comment") or ""
         return [f"wt.add_comment({str(comment)!r})"]
@@ -2974,6 +3244,13 @@ def _format_volume(value: Any) -> str:
 
 
 def _operation_from_command_id(command_id: str) -> str | None:
+    typed_motion_operations = {
+        "MoveAxisCommandScriptStatement": "move_axis_command",
+        "StartMoveCommandScriptStatement": "start_move_command",
+        "WaitForAsyncResponseScriptStatement": "wait_for_async_response",
+    }
+    if command_id in typed_motion_operations:
+        return typed_motion_operations[command_id]
     registry_operation = registry_command_operation(command_id)
     if registry_operation:
         return registry_operation
@@ -3039,6 +3316,9 @@ def _operation_name(operation: str) -> str:
         "set_remaining_runtime": "Set Remaining Runtime",
         "runtime_variable_prompt": "Runtime Variable Prompt",
         "move_plate": "Move Plate",
+        "move_axis_command": "Move Axis",
+        "start_move_command": "Start Move",
+        "wait_for_async_response": "Wait For Async Response",
         "execute_application": "Execute Application",
         "call_subroutine": "Call Subroutine",
         "read_worklist": "Read Worklist",
@@ -3160,11 +3440,16 @@ def _call_name(call: ast.Call) -> str:
     return ""
 
 
-def _keyword_value(call: ast.Call, key: str) -> Any:
+def _keyword_node(call: ast.Call, key: str) -> ast.AST | None:
     for keyword in call.keywords:
         if keyword.arg == key:
-            return _literal_text(keyword.value)
+            return keyword.value
     return None
+
+
+def _keyword_value(call: ast.Call, key: str) -> Any:
+    node = _keyword_node(call, key)
+    return _literal_text(node) if node is not None else None
 
 
 def _value_label(node: ast.AST, reagent_by_var: dict[str, str], labware_by_var: dict[str, str]) -> str:
@@ -3357,6 +3642,17 @@ def _first_nonempty_text(parent: ET.Element, names: list[str]) -> str | None:
 def _first_text(parent: ET.Element, name: str) -> str | None:
     node = _first_descendant(parent, name)
     return _text(node)
+
+
+def _first_leaf_text(parent: ET.Element, name: str) -> str | None:
+    """Return the first non-empty text from a leaf with the given local name."""
+    for element in parent.iter():
+        if _local_name(element.tag) != name or list(element):
+            continue
+        value = _text(element)
+        if value not in (None, ""):
+            return value
+    return None
 
 
 def _direct_text(parent: ET.Element | None, name: str) -> str | None:
@@ -3723,4 +4019,7 @@ _PYTHON_OPERATION_BY_METHOD = {
     "aspirate": "aspirate",
     "dispense": "dispense",
     "mix": "mca384_mix",
+    "move_axis_command": "move_axis_command",
+    "start_move_command": "start_move_command",
+    "wait_for_async_response": "wait_for_async_response",
 }

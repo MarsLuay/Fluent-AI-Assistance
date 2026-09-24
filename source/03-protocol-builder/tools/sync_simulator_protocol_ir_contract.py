@@ -33,7 +33,10 @@ def _root_field_type(property_schema: dict[str, Any]) -> str:
 
 def _rule_operations(rule: dict[str, Any]) -> set[str]:
     operation = rule.get("if", {}).get("properties", {}).get("operation", {})
-    return set(operation.get("enum", []))
+    values = set(operation.get("enum", []))
+    if isinstance(operation.get("const"), str):
+        values.add(operation["const"])
+    return values
 
 
 def _rule_requires(rule: dict[str, Any], field: str) -> bool:
@@ -53,6 +56,8 @@ def _operation_requirements(schema: dict[str, Any], operations: list[str]) -> di
             "requiresLabwareTarget": False,
             "requiresVolume": False,
             "requiresLiquidClass": False,
+            "requiresMotionPosition": False,
+            "requiresDeviceIdentity": False,
         }
         for operation in operations
     }
@@ -66,6 +71,10 @@ def _operation_requirements(schema: dict[str, Any], operations: list[str]) -> di
             )
             requirements[operation]["requiresVolume"] |= _rule_requires(rule, "volume_ul")
             requirements[operation]["requiresLiquidClass"] |= _rule_requires(rule, "liquid_class")
+            requirements[operation]["requiresMotionPosition"] |= _rule_requires(rule, "position_expression")
+            requirements[operation]["requiresDeviceIdentity"] |= any(
+                _rule_requires(rule, field) for field in ("available_id", "id_label")
+            )
     return requirements
 
 
@@ -160,6 +169,16 @@ function hasVolume(step: ProtocolIrRecord): boolean {{
   );
 }}
 
+function hasParameter(step: ProtocolIrRecord, field: string): boolean {{
+  const parameters = isRecord(step.parameters) ? step.parameters : {{}};
+  const value = parameters[field];
+  return value !== undefined && value !== null && value !== "";
+}}
+
+function hasDeviceIdentity(step: ProtocolIrRecord): boolean {{
+  return hasParameter(step, "available_id") || hasParameter(step, "id_label");
+}}
+
 export function validateProtocolIr(value: unknown): ProtocolIrContractResult {{
   const issues: ProtocolIrContractIssue[] = [];
   if (!isRecord(value)) {{
@@ -214,6 +233,12 @@ export function validateProtocolIr(value: unknown): ProtocolIrContractResult {{
       if (requirements.requiresLiquidClass && !("liquid_class" in step)) {{
         issues.push({{ path: `${{path}}.liquid_class`, message: "operation requires liquid_class" }});
       }}
+      if (requirements.requiresMotionPosition && !hasParameter(step, "position_expression")) {{
+        issues.push({{ path: `${{path}}.parameters.position_expression`, message: "operation requires position_expression" }});
+      }}
+      if (requirements.requiresDeviceIdentity && !hasDeviceIdentity(step)) {{
+        issues.push({{ path: `${{path}}.parameters`, message: "operation requires available_id or id_label" }});
+      }}
     }});
   }}
 
@@ -232,7 +257,8 @@ def sync_protocol_ir_contract(output: Path = DEFAULT_OUTPUT, *, check: bool = Fa
     if check:
         return output.is_file() and output.read_text(encoding="utf-8") == rendered
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(rendered, encoding="utf-8")
+    with output.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(rendered)
     return True
 
 

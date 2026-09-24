@@ -66,6 +66,9 @@ class Operation(str, Enum):
     LOAD_LABWARE = "load_labware"
     INITIALIZE_DEVICE = "initialize_device"
     MOVE_PLATE = "move_plate"
+    MOVE_AXIS_COMMAND = "move_axis_command"
+    START_MOVE_COMMAND = "start_move_command"
+    WAIT_FOR_ASYNC_RESPONSE = "wait_for_async_response"
     GET_HEAD_ADAPTER = "get_head_adapter"
     DROP_HEAD_ADAPTER = "drop_head_adapter"
     PICK_UP_TIPS = "pick_up_tips"
@@ -234,6 +237,8 @@ class OperationSpec:
     requires_labware_target: bool = False
     requires_volume_ul: bool = False
     requires_liquid_class: bool = False
+    requires_motion_position: bool = False
+    requires_device_identity: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -242,6 +247,8 @@ class OperationSpec:
             "requires_labware_target": self.requires_labware_target,
             "requires_volume_ul": self.requires_volume_ul,
             "requires_liquid_class": self.requires_liquid_class,
+            "requires_motion_position": self.requires_motion_position,
+            "requires_device_identity": self.requires_device_identity,
         }
 
 
@@ -284,6 +291,11 @@ def operation_specs() -> list[OperationSpec]:
             requires_labware_target=operation in LABWARE_TARGET_OPERATIONS,
             requires_volume_ul=operation in VOLUME_OPERATIONS,
             requires_liquid_class=operation in LIQUID_CLASS_OPERATIONS,
+            requires_motion_position=operation == Operation.MOVE_AXIS_COMMAND.value,
+            requires_device_identity=operation in {
+                Operation.MOVE_AXIS_COMMAND.value,
+                Operation.START_MOVE_COMMAND.value,
+            },
         )
         for operation in OPERATION_VALUES
     ]
@@ -333,6 +345,10 @@ def protocol_ir_schema_markdown(version: str = CURRENT_PROTOCOL_IR_VERSION) -> s
             requirements.append("volume_ul")
         if spec.requires_liquid_class:
             requirements.append("liquid_class")
+        if spec.requires_motion_position:
+            requirements.append("parameters.position_expression")
+        if spec.requires_device_identity:
+            requirements.append("parameters.available_id or parameters.id_label")
         suffix = f" requires {', '.join(requirements)}" if requirements else " no extra required fields"
         lines.append(f"- `{spec.operation}`: {spec.label};{suffix}.")
 
@@ -1739,6 +1755,42 @@ def _validate_steps(
             issues.append(ProtocolIRIssue(f"{path}.liquid_class", f"{operation} requires liquid_class"))
         if operation == Operation.ADD_LABWARE.value:
             _validate_add_labware_parameters(issues, f"{path}.parameters", step.get("parameters"))
+        _validate_motion_parameters(issues, path, operation, step.get("parameters"))
+
+
+def _validate_motion_parameters(
+    issues: list[ProtocolIRIssue],
+    path: str,
+    operation: str,
+    parameters: Any,
+) -> None:
+    """Validate the source-backed fields required by typed motion operations."""
+    if operation not in {
+        Operation.MOVE_AXIS_COMMAND.value,
+        Operation.START_MOVE_COMMAND.value,
+        Operation.WAIT_FOR_ASYNC_RESPONSE.value,
+    }:
+        return
+    if not isinstance(parameters, dict):
+        return
+    if operation == Operation.MOVE_AXIS_COMMAND.value:
+        if not _has_value(parameters.get("position_expression")):
+            issues.append(
+                ProtocolIRIssue(
+                    f"{path}.parameters.position_expression",
+                    "move_axis_command requires position_expression",
+                )
+            )
+    if operation in {
+        Operation.MOVE_AXIS_COMMAND.value,
+        Operation.START_MOVE_COMMAND.value,
+    } and not _has_value(parameters.get("available_id")) and not _has_value(parameters.get("id_label")):
+        issues.append(
+            ProtocolIRIssue(
+                f"{path}.parameters",
+                f"{operation} requires available_id or id_label",
+            )
+        )
 
 
 def _step_has_volume(step: dict[str, Any], *, expression_authoritative: bool) -> bool:
@@ -2389,6 +2441,32 @@ PROTOCOL_IR_V1_JSON_SCHEMA: dict[str, Any] = {
                 {
                     "if": {"properties": {"operation": {"enum": sorted(LIQUID_CLASS_OPERATIONS)}}},
                     "then": {"required": ["liquid_class"]},
+                },
+                {
+                    "if": {"properties": {"operation": {"const": Operation.MOVE_AXIS_COMMAND.value}}},
+                    "then": {
+                        "properties": {
+                            "parameters": {
+                                "required": ["position_expression"],
+                            }
+                        }
+                    },
+                },
+                {
+                    "if": {"properties": {"operation": {"enum": [
+                        Operation.MOVE_AXIS_COMMAND.value,
+                        Operation.START_MOVE_COMMAND.value,
+                    ]}}},
+                    "then": {
+                        "properties": {
+                            "parameters": {
+                                "anyOf": [
+                                    {"required": ["available_id"]},
+                                    {"required": ["id_label"]},
+                                ]
+                            }
+                        }
+                    },
                 },
             ],
         },

@@ -51,6 +51,14 @@ policy, and symbol introspection consume the shared catalog services rather than
 maintaining adapter-specific function lists. FluentControl editor colors and
 unverified forum terminology are discovery-only and never semantic categories.
 
+Canonical Protocol IR v2 exposes the source-backed low-level FluentControl motion
+sequence as `move_axis_command`, `start_move_command`, and
+`wait_for_async_response`. XSCR ingestion preserves typed execution fields,
+ordering, source metadata, and additive XML through generated FluentCoder Python;
+the simulator boundary contract is regenerated from the same Python schema.
+These operations remain structural/offline validation only and do not prove
+physical motion, calibration, alignment, clearance, or collision safety.
+
 The provider-neutral generation-context boundary is
 `tecan.generation_context.v1`. It turns a validated request/spec into
 deterministic task facets and carries only explicitly included evidence with a
