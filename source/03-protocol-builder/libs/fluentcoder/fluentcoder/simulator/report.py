@@ -98,6 +98,7 @@ class SimulationReport:
     state_summary: dict[str, Any] = field(default_factory=dict)
     attribute_lineage: list[dict[str, Any]] = field(default_factory=list)
     physical_limitations: list[dict[str, Any]] = field(default_factory=list)
+    subroutine_lifecycle: dict[str, Any] = field(default_factory=dict)
 
     def add_step(self, coverage: StepCoverage) -> None:
         self.steps.append(coverage)
@@ -206,4 +207,5 @@ class SimulationReport:
             "state_summary": self.state_summary,
             "attribute_lineage": list(self.attribute_lineage),
             "physical_limitations": list(self.physical_limitations),
+            "subroutine_lifecycle": dict(self.subroutine_lifecycle),
         }

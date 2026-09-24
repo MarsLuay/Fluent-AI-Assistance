@@ -48,7 +48,10 @@ Subroutine execution modes are centralized as the verified set
 API values are strict, while decompiled future values remain source-preserved.
 Subroutine targets are classified only from explicit evidence: static paths,
 explicit expression mappings, or unresolved values; dynamic names are never
-inferred.
+inferred. The offline simulator reports deterministic launch/join/detach epochs;
+joins consume matching asynchronous invocations and never launch fresh copies,
+while unknown or unmatched lifecycle states remain reviewable rather than being
+executed by assumption.
 
 FluentControl expression semantics use the versioned
 `tecan.expression_symbols.v1` catalog under FluentCoder's reference assets.
