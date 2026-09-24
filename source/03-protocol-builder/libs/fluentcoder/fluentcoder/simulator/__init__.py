@@ -8,6 +8,11 @@ from .invariants import (
 )
 from .snapshots import Snapshot
 from .report import EffectKind, SimulationFailure, SimulationReport, StepCoverage
+from .subroutine_lifecycle import (
+    LifecycleFinding,
+    SubroutineLifecycleReport,
+    analyze_subroutine_lifecycle,
+)
 from .walk import Simulator
 
 __all__ = [
@@ -16,4 +21,5 @@ __all__ = [
     "MissingTipsError", "InsufficientVolumeError", "OverdrawError",
     "OccupiedSlotError", "CannotAspirateError", "MissingAdapterError",
     "MissingSimValueError", "InvalidSlotError",
+    "LifecycleFinding", "SubroutineLifecycleReport", "analyze_subroutine_lifecycle",
 ]

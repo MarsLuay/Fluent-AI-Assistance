@@ -63,6 +63,7 @@ from .snapshots import (
     take_snapshot,
 )
 from .report import EffectKind, SimulationFailure, SimulationReport, StepCoverage
+from .subroutine_lifecycle import analyze_subroutine_lifecycle
 from .invariants import SimulationError
 
 logger = logging.getLogger(__name__)
@@ -145,6 +146,9 @@ class Simulator:
         self._wt.snapshots.clear()
         self._wt.simulation_report = self._report
         protocol = self._wt.to_protocol()
+        self._report.subroutine_lifecycle = analyze_subroutine_lifecycle(
+            step for group in protocol.groups for step in group.steps
+        ).to_dict()
         try:
             for warning in getattr(self._wt, "_simulation_context_warnings", ()):
                 self._warn(str(warning))
