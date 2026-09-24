@@ -9,6 +9,7 @@ from typing import Any, Optional, Literal, Union
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from enum import Enum
 
+from .subroutine_semantics import classify_subroutine_target
 from ..expressions import (
     Expression,
     IndexExpression,
@@ -879,10 +880,15 @@ class VariableMapping(BaseModel):
 class SubRoutineStep(BaseStep):
     """Call a FluentControl subroutine."""
     step_type: Literal[StepType.SUBROUTINE] = StepType.SUBROUTINE
-    subroutine: str = Field(..., description="Subroutine path")
+    subroutine: str = Field(..., description="Source-backed subroutine target")
     execution_mode: str = Field(default="Synchronous", description="Execution mode")
     variable_mappings_start: list[VariableMapping] = Field(default_factory=list, description="Start mappings")
     variable_mappings_end: list[VariableMapping] = Field(default_factory=list, description="End mappings")
+
+    @property
+    def target_identity(self) -> dict[str, str | None]:
+        """Classify static target evidence without guessing dynamic names."""
+        return classify_subroutine_target(self.subroutine)
 
 
 class MoveAxisCommandStep(BaseStep):

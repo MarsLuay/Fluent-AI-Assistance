@@ -14,6 +14,12 @@ from .command_validate import (
     validate_compiled_xscr_commands,
     validate_command,
 )
+from fluentcoder.ir.subroutine_semantics import (
+    KNOWN_SUBROUTINE_EXECUTION_MODES,
+    SubroutineExecutionMode,
+    classify_subroutine_target,
+    normalize_subroutine_execution_mode,
+)
 from .commands import (
     AddLabware,
     GenericCommand,
@@ -56,12 +62,15 @@ __all__ = [
     "GenericCommandValidationReport",
     "GetFingers",
     "ICommand",
+    "KNOWN_SUBROUTINE_EXECUTION_MODES",
     "NativeToXmlProvider",
     "SetLocation",
+    "SubroutineExecutionMode",
     "Subroutine",
     "TransferLabware",
     "UserPrompt",
     "audit_subroutine_identity",
+    "classify_subroutine_target",
     "command_from_ir_step",
     "command_from_xscr_object",
     "command_to_xml",
@@ -77,6 +86,7 @@ __all__ = [
     "is_verification_recipe_ir",
     "native_to_xml_available",
     "normalize_command_xml",
+    "normalize_subroutine_execution_mode",
     "set_location_from_ir_step",
     "subroutine_from_ir_step",
     "subroutine_identity_summary",
