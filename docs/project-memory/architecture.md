@@ -43,6 +43,14 @@ registries supply contracts, then request specs and protocol IR feed rendering,
 validation, and packaging. Generated outputs and host-derived assets are not
 canonical source files for hand edits.
 
+FluentControl expression semantics use the versioned
+`tecan.expression_symbols.v1` catalog under FluentCoder's reference assets.
+Catalog entries retain canonical spelling, signatures, provenance, contexts, and
+version scope; semantic validation, imported-expression inventory, generation
+policy, and symbol introspection consume the shared catalog services rather than
+maintaining adapter-specific function lists. FluentControl editor colors and
+unverified forum terminology are discovery-only and never semantic categories.
+
 The provider-neutral generation-context boundary is
 `tecan.generation_context.v1`. It turns a validated request/spec into
 deterministic task facets and carries only explicitly included evidence with a
