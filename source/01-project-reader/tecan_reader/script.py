@@ -103,6 +103,8 @@ def inspect_xscr_text(
         "object_subfolder_path": first_text(root, "ObjectSubfolderPath"),
         "script_version": script_version,
         "checksum": checksum,
+        "base_worktable_name": first_text(root, "BaseWorktableName"),
+        "base_worktable_guid": first_text(root, "BaseWorktableGuid"),
         "references": references,
         "variables": variables,
         "startup_variables": startup_variables,

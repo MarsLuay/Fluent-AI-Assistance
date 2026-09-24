@@ -60,6 +60,8 @@ def inspect_xml_object_text(
         "description": first_text(root, "Description"),
         "component_guid": first_text(root, "ComponentGuid"),
         "site_guid": first_text(root, "SiteGuid"),
+        "base_worktable_name": first_text(root, "BaseWorktableName"),
+        "base_worktable_guid": first_text(root, "BaseWorktableGuid"),
         "names": grouped.get("Name", [])[:50],
         "guids": [*grouped.get("Guid", []), *grouped.get("GUID", [])][:20],
         "workspace_guid": Path(str(source_name).replace("\\", "/")).stem

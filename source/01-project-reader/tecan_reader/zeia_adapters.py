@@ -33,9 +33,12 @@ from .project_model import (
     CanonicalProjectModel,
     InspectionReport,
     build_completeness_metadata,
+    derive_base_worktable_identity,
     normalize_record,
 )
 from .script import inspect_xscr_text
+from .scheduler import inspect_scheduler_text, is_scheduler_artifact
+from .task_input import inspect_twl_text
 from .xmlobj import inspect_xml_object_text
 
 
@@ -50,6 +53,7 @@ class ArchiveProbe:
     has_script_structure: bool
     has_script_container_evidence: bool
     has_worklist_structure: bool
+    has_task_input_structure: bool
     has_object_structure: bool
 
 
@@ -166,6 +170,7 @@ class _GenericStructuredAdapter:
             or archive.has_object_structure
             or archive.has_script_container_evidence
             or archive.has_worklist_structure
+            or archive.has_task_input_structure
         ):
             return None
         evidence = []
@@ -177,11 +182,14 @@ class _GenericStructuredAdapter:
             evidence.append("recognized script container contains XML-like content")
         if archive.has_worklist_structure:
             evidence.append("worklist entry contains recognized transfer records")
+        if archive.has_task_input_structure:
+            evidence.append("TWL entry contains Task Input records")
         return AdapterMatch(self.adapter_id, self.format_family, 0.7, False, tuple(evidence))
 
 
 XML_OBJECT_EXTS = {".xcmp", ".xwsp", ".xlqc", ".xlcp", ".xsit", ".xcon", ".xml"}
 ASSET_EXTS = {".bmp", ".gif", ".jpeg", ".jpg", ".png", ".tif", ".tiff"}
+TASK_INPUT_EXTS = {".twl"}
 
 
 ADAPTERS: tuple[ZeiaAdapter, ...] = (
@@ -341,7 +349,10 @@ def ingest_zeia(
     scripts: list[dict[str, Any]] = []
     objects: list[dict[str, Any]] = []
     worklists: list[dict[str, Any]] = []
-    eligible_member_counts = {"scripts": 0, "objects": 0, "worklists": 0}
+    scheduler_processes: list[dict[str, Any]] = []
+    scheduler_tasks: list[dict[str, Any]] = []
+    task_inputs: list[dict[str, Any]] = []
+    eligible_member_counts = {"scripts": 0, "objects": 0, "worklists": 0, "task_inputs": 0}
     oversized_members: list[str] = []
     try:
         archive_context = (
@@ -406,6 +417,22 @@ def ingest_zeia(
                         errors.append(
                             _parse_error(entry, exc, suffix=suffix, parser="xscr", archive_path=archive_path)
                         )
+                elif suffix == ".twl":
+                    try:
+                        data = _read_member_data(zf, info)
+                        task_inputs.append(
+                            normalize_record(
+                                inspect_twl_text(data.decode("utf-8-sig"), source_name=entry),
+                                kind="task_input",
+                                source_archive=archive_path,
+                            )
+                        )
+                    except (OSError, zipfile.BadZipFile):
+                        raise
+                    except Exception as exc:
+                        errors.append(
+                            _parse_error(entry, exc, suffix=suffix, parser="twl", archive_path=archive_path)
+                        )
                 elif suffix == ".gwl":
                     try:
                         data = _read_member_data(zf, info)
@@ -429,9 +456,23 @@ def ingest_zeia(
                     if object_limit is not None and len(objects) >= object_limit:
                         continue
                     try:
+                        raw_data = _read_member_data(zf, info)
+                        raw_text = raw_data.decode("utf-8-sig", errors="replace")
+                        if suffix == ".xml" and is_scheduler_artifact(entry, raw_text):
+                            scheduler = inspect_scheduler_text(raw_text, source_name=entry)
+                            for process in scheduler.get("scheduler_processes", []):
+                                scheduler_processes.append(
+                                    normalize_record(process, kind="scheduler_process", source_archive=archive_path)
+                                )
+                            for task in scheduler.get("scheduler_tasks", []):
+                                scheduler_tasks.append(
+                                    normalize_record(task, kind="scheduler_task", source_archive=archive_path)
+                                )
+                            if scheduler_processes or scheduler_tasks:
+                                continue
                         record = normalize_record(
                             _inspect_object_member(
-                                _read_member_data(zf, info),
+                                raw_data,
                                 entry,
                                 suffix,
                                 size_bytes=info.file_size,
@@ -500,6 +541,7 @@ def ingest_zeia(
         "scripts": len(scripts),
         "objects": len(objects),
         "worklists": len(worklists),
+        "task_inputs": len(task_inputs),
     }
     completeness = build_completeness_metadata(
         script_limit=script_limit,
@@ -519,6 +561,9 @@ def ingest_zeia(
         "complete": completeness["complete"],
         "eligible_member_counts": completeness["eligible_member_counts"],
         "summarized_counts": completeness["summarized_counts"],
+        "scheduler_process_count": len(scheduler_processes),
+        "scheduler_task_count": len(scheduler_tasks),
+        "task_input_count": len(task_inputs),
         "truncated_scripts": completeness["truncated_scripts"],
         "truncated_objects": completeness["truncated_objects"],
     }
@@ -532,6 +577,10 @@ def ingest_zeia(
         errors=errors,
         source_metadata=source_metadata,
         completeness=completeness,
+        scheduler_processes=scheduler_processes,
+        scheduler_tasks=scheduler_tasks,
+        task_inputs=task_inputs,
+        base_worktable_identity=derive_base_worktable_identity([*scripts, *objects]),
     )
 
 
@@ -579,7 +628,7 @@ def _build_probe(
     for member in inventory.members:
         info = member.info
         if info.is_dir() or Path(info.filename).suffix.casefold() not in {
-            ".xscr", ".xcmp", ".xwsp", ".xlqc", ".xlcp", ".xsit", ".xcon", ".xml"
+            ".xscr", ".xcmp", ".xwsp", ".xlqc", ".xlcp", ".xsit", ".xcon", ".xml", ".twl"
         }:
             continue
         if len(samples) >= 32:
@@ -612,14 +661,18 @@ def _build_probe(
         for name, text in samples
     )
     has_worklist_structure = False
+    has_task_input_structure = False
     worklist_samples = 0
     for member in inventory.members:
         info = member.info
-        if info.is_dir() or Path(info.filename).suffix.casefold() != ".gwl":
+        if info.is_dir() or Path(info.filename).suffix.casefold() not in {".gwl", ".twl"}:
             continue
         if worklist_samples >= 32:
             break
         worklist_samples += 1
+        if Path(info.filename).suffix.casefold() == ".twl":
+            has_task_input_structure = True
+            continue
         try:
             text = _read_prefix(zf, info, 128 * 1024).decode(
                 "utf-8-sig", errors="replace"
@@ -637,6 +690,7 @@ def _build_probe(
         has_script_structure=has_script_structure,
         has_script_container_evidence=has_script_container_evidence,
         has_worklist_structure=has_worklist_structure,
+        has_task_input_structure=has_task_input_structure,
         has_object_structure=has_object_structure,
     )
 
@@ -738,6 +792,8 @@ def _inspect_script_member(
         "object_name": object_name,
         "script_version": "",
         "checksum": checksum,
+        "base_worktable_name": _xml_value(text, "BaseWorktableName"),
+        "base_worktable_guid": _xml_value(text, "BaseWorktableGuid"),
         "references": [],
         "variables": [],
         "startup_variables": [],
@@ -782,6 +838,8 @@ def _inspect_object_member(
         "description": "",
         "component_guid": _xml_value(text, "ComponentGuid"),
         "site_guid": _xml_value(text, "SiteGuid"),
+        "base_worktable_name": _xml_value(text, "BaseWorktableName"),
+        "base_worktable_guid": _xml_value(text, "BaseWorktableGuid"),
         "names": [],
         "guids": [],
         "pin_refs": [],
@@ -860,6 +918,7 @@ def _eligible_member_counts(entries: list[str] | tuple[str, ...]) -> dict[str, i
             if Path(entry).suffix.casefold() in XML_OBJECT_EXTS | ASSET_EXTS
         ),
         "worklists": sum(1 for entry in entries if Path(entry).suffix.casefold() == ".gwl"),
+        "task_inputs": sum(1 for entry in entries if Path(entry).suffix.casefold() in TASK_INPUT_EXTS),
     }
 
 

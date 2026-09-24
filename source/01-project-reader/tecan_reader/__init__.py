@@ -14,6 +14,7 @@ from .project_model import (
     CANONICAL_PROJECT_MODEL_SCHEMA_VERSION,
     CanonicalProjectModel,
     build_completeness_metadata,
+    derive_base_worktable_identity,
     InspectionReport,
     SourceProvenance,
 )
@@ -34,6 +35,8 @@ from .diagnostics import (
     sort_diagnostics,
 )
 from .script import inspect_xscr
+from .scheduler import inspect_scheduler, inspect_scheduler_text
+from .task_input import inspect_twl, inspect_twl_text
 from .xmlobj import inspect_xml_object
 from .zeia_adapters import (
     AdapterMatch,
@@ -61,6 +64,7 @@ __all__ = [
     "IdentifierConflict",
     "DetectionResult",
     "build_completeness_metadata",
+    "derive_base_worktable_identity",
     "InspectionReport",
     "ReadinessStatus",
     "SourceProvenance",
@@ -75,6 +79,10 @@ __all__ = [
     "inspect_archive",
     "inspect_canonical_archive",
     "inspect_gwl",
+    "inspect_scheduler",
+    "inspect_scheduler_text",
+    "inspect_twl",
+    "inspect_twl_text",
     "inspect_xml_object",
     "inspect_xscr",
     "mine_script_patterns",

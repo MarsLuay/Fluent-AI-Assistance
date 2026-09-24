@@ -108,11 +108,52 @@ def _identifiers(record: Mapping[str, Any]) -> dict[str, str]:
         "type_id",
         "object_name",
         "checksum",
+        "base_worktable_name",
+        "base_worktable_guid",
     ):
         value = record.get(key)
         if value not in (None, ""):
             identifiers[key] = str(value)
     return identifiers
+
+
+def derive_base_worktable_identity(
+    records: Mapping[str, Any] | list[Mapping[str, Any]] | tuple[Mapping[str, Any], ...],
+) -> dict[str, Any]:
+    """Resolve Base Worktable identity without collapsing conflicting evidence.
+
+    A name is not treated as an identity: the same name with different GUIDs
+    remains ``ambiguous`` and must be reviewed by downstream callers.
+    """
+    candidates: dict[tuple[str, str], dict[str, Any]] = {}
+    values = records.values() if isinstance(records, Mapping) else records
+    for record in values:
+        if not isinstance(record, Mapping):
+            continue
+        name = str(record.get("base_worktable_name") or "").strip()
+        guid = str(record.get("base_worktable_guid") or "").strip()
+        if not name and not guid:
+            continue
+        key = (name, guid)
+        candidate = candidates.setdefault(
+            key,
+            {"name": name, "guid": guid, "provenance": []},
+        )
+        provenance = record.get("provenance")
+        if isinstance(provenance, Mapping) and provenance not in candidate["provenance"]:
+            candidate["provenance"].append(deepcopy(dict(provenance)))
+    ordered = [candidates[key] for key in sorted(candidates)]
+    if not ordered:
+        return {"status": "unknown", "name": None, "guid": None, "candidates": []}
+    if len(ordered) != 1:
+        return {"status": "ambiguous", "name": None, "guid": None, "candidates": ordered}
+    candidate = ordered[0]
+    return {
+        "status": "resolved",
+        "name": candidate["name"] or None,
+        "guid": candidate["guid"] or None,
+        "candidates": ordered,
+    }
 
 
 def normalize_record(
@@ -156,16 +197,32 @@ class CanonicalProjectModel:
     errors: list[dict[str, Any]]
     source_metadata: dict[str, Any]
     completeness: dict[str, Any] = field(default_factory=dict)
+    scheduler_processes: list[dict[str, Any]] = field(default_factory=list)
+    scheduler_tasks: list[dict[str, Any]] = field(default_factory=list)
+    task_inputs: list[dict[str, Any]] = field(default_factory=list)
+    base_worktable_identity: dict[str, Any] = field(default_factory=dict)
 
     @property
     def schema_version(self) -> str:
         return CANONICAL_PROJECT_MODEL_SCHEMA_VERSION
 
     @property
+    def scheduler_entities(self) -> list[dict[str, Any]]:
+        """Return scheduler process/task entities without conflating worklists."""
+        return [*self.scheduler_processes, *self.scheduler_tasks]
+
+    @property
     def entities(self) -> list[dict[str, Any]]:
         """Return compact canonical entities without duplicating full payloads."""
         records: list[dict[str, Any]] = []
-        for record in (*self.scripts, *self.objects, *self.worklists):
+        for record in (
+            *self.scripts,
+            *self.objects,
+            *self.worklists,
+            *self.scheduler_processes,
+            *self.scheduler_tasks,
+            *self.task_inputs,
+        ):
             records.append(
                 {
                     "kind": record.get("kind", ""),
@@ -185,6 +242,11 @@ class CanonicalProjectModel:
             "scripts": deepcopy(self.scripts),
             "objects": deepcopy(self.objects),
             "worklists": deepcopy(self.worklists),
+            "scheduler_processes": deepcopy(self.scheduler_processes),
+            "scheduler_tasks": deepcopy(self.scheduler_tasks),
+            "scheduler_entities": deepcopy(self.scheduler_entities),
+            "task_inputs": deepcopy(self.task_inputs),
+            "base_worktable_identity": deepcopy(self.base_worktable_identity),
             "entities": self.entities,
             "errors": deepcopy(self.errors),
             "source_metadata": deepcopy(self.source_metadata),
@@ -199,6 +261,9 @@ class CanonicalProjectModel:
         scripts = deepcopy(self.scripts)
         objects = deepcopy(self.objects)
         worklists = deepcopy(self.worklists)
+        scheduler_processes = deepcopy(self.scheduler_processes)
+        scheduler_tasks = deepcopy(self.scheduler_tasks)
+        task_inputs = deepcopy(self.task_inputs)
         family_counts: Counter[str] = Counter()
         command_counts: Counter[str] = Counter()
         warning_counts: Counter[str] = Counter()
@@ -240,6 +305,11 @@ class CanonicalProjectModel:
             "scripts": scripts,
             "objects": objects,
             "gwls": worklists,
+            "scheduler_processes": scheduler_processes,
+            "scheduler_tasks": scheduler_tasks,
+            "scheduler_entities": [*scheduler_processes, *scheduler_tasks],
+            "task_inputs": task_inputs,
+            "base_worktable_identity": deepcopy(self.base_worktable_identity),
             "errors": deepcopy(self.errors),
             "complete": bool(completeness.get("complete")),
             "truncated_scripts": int(completeness.get("truncated_scripts") or 0),
@@ -268,7 +338,14 @@ class CanonicalProjectModel:
 
         return (
             [with_context_path(record) for record in self.scripts],
-            [with_context_path(record) for record in self.objects],
+            [
+                with_context_path(record)
+                for record in (
+                    *self.objects,
+                    *self.scheduler_processes,
+                    *self.scheduler_tasks,
+                )
+            ],
             [with_context_path(record) for record in self.worklists],
         )
 
@@ -301,6 +378,21 @@ class CanonicalProjectModel:
             for item in report.get("gwls", [])
             if isinstance(item, Mapping)
         ]
+        scheduler_processes = [
+            normalize_record(item, kind="scheduler_process", source_archive=source_archive)
+            for item in report.get("scheduler_processes", [])
+            if isinstance(item, Mapping)
+        ]
+        scheduler_tasks = [
+            normalize_record(item, kind="scheduler_task", source_archive=source_archive)
+            for item in report.get("scheduler_tasks", [])
+            if isinstance(item, Mapping)
+        ]
+        task_inputs = [
+            normalize_record(item, kind="task_input", source_archive=source_archive)
+            for item in report.get("task_inputs", [])
+            if isinstance(item, Mapping)
+        ]
         metadata = {
             "entry_count": report.get("entry_count", 0),
             "extension_counts": deepcopy(report.get("extension_counts") or {}),
@@ -325,6 +417,9 @@ class CanonicalProjectModel:
                 oversized_members=report.get("oversized_members") or (),
             )
         metadata["completeness"] = deepcopy(completeness)
+        base_worktable_identity = deepcopy(report.get("base_worktable_identity") or {})
+        if not base_worktable_identity:
+            base_worktable_identity = derive_base_worktable_identity([*scripts, *objects])
         return cls(
             source_archive=str(Path(source_archive).resolve()),
             adapter_id=adapter_id,
@@ -335,6 +430,10 @@ class CanonicalProjectModel:
             errors=deepcopy(list(report.get("errors") or [])),
             source_metadata=metadata,
             completeness=completeness,
+            scheduler_processes=scheduler_processes,
+            scheduler_tasks=scheduler_tasks,
+            task_inputs=task_inputs,
+            base_worktable_identity=base_worktable_identity,
         )
 
 

@@ -21,6 +21,7 @@ TECAN_EXTENSIONS = {
     ".xlcp",
     ".xsit",
     ".gwl",
+    ".twl",
     ".xml",
 }
 
