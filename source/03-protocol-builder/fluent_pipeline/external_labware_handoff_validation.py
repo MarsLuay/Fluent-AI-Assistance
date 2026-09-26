@@ -60,9 +60,18 @@ def assess_generated_handoffs(commands: list[Mapping[str, Any]]) -> dict[str, An
         if operation in EXTERNAL_COMMANDS:
             awaiting_guard = True
     simulation = simulate_external_labware_handoffs([
-        {**dict(command), "injected_outcome": command.get("injected_outcome") or "success"}
+        {**dict(command), "injected_outcome": command.get("injected_outcome") or "unknown"}
         for command in evidenced
     ]) if evidenced else None
+    if simulation and any(
+        not handoff["logical_reconciliation"]["reconciled"]
+        for handoff in simulation["handoffs"]
+    ):
+        findings.append({
+            "code": "handoff_not_reconciled",
+            "status": "review",
+            "message": "External outcome does not prove that the logical labware state is reconciled.",
+        })
     report = {
         "status": "review" if findings else ("accepted" if evidenced else "not_applicable"),
         "findings": findings,

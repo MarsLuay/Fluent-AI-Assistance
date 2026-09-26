@@ -69,3 +69,7 @@
   script GUID rewrites and prerequisite checks; without one, package as
   target-unbound, consult no build-host datastore, and record the binding status
   and fingerprint in the handoff metadata and reports.
+- Keep external labware handoff validation conservative: an absent or
+  source-unbacked external outcome remains unknown, so logical Add/Remove/Move
+  state stays reviewable until reconciliation is proven. Offline simulation
+  accepts only injected outcomes and keeps physical verification separate.
