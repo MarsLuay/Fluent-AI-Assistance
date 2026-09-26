@@ -79,6 +79,68 @@ class DeploymentPlanTests(unittest.TestCase):
         self.assertIn("source_target_software_family_unknown", {row["code"] for row in plan["findings"]})
         self.assertNotEqual(plan["status"], "ready_for_import")
 
+    def test_runtime_svn_and_database_replacement_are_not_portable(self) -> None:
+        source = _profile()
+        source["objects"]["userspecific"].extend([
+            {
+                "guid": "c" * 36,
+                "object_name": "Journal",
+                "type_id": "Workspace",
+                "kind": "object",
+                "relative_path": "Method Recovery/journal.xml",
+                "content_fingerprint": "run",
+                "state_classification": {"class": "recovery"},
+            },
+            {
+                "guid": "d" * 36,
+                "object_name": "DataBase.svn",
+                "type_id": "Metadata",
+                "kind": "metadata",
+                "relative_path": "DataBase.svn",
+                "content_fingerprint": "svn",
+            },
+            {
+                "guid": "e" * 36,
+                "object_name": "DataBase",
+                "type_id": "Database",
+                "kind": "database",
+                "relative_path": "DataBase",
+                "content_fingerprint": "db",
+            },
+        ])
+        plan = build_deployment_plan(source, _profile(), mode="cross_target_import")
+        actions = {row["action"] for row in plan["actions"]}
+        self.assertIn("exclude_runtime_state", actions)
+        self.assertIn("exclude_internal_metadata", actions)
+        self.assertNotIn("import_dependency", {row["action"] for row in plan["actions"] if "svn" in str(row.get("source", {}).get("relative_path", "")).casefold()})
+        self.assertEqual(plan["status"], "blocked")
+        self.assertIn("whole_database_replacement_blocked", {row["code"] for row in plan["findings"]})
+
+    def test_disposable_tip_attribute_loss_is_review(self) -> None:
+        source = _profile()
+        source["objects"]["userspecific"].append({
+            "guid": "f" * 36,
+            "object_name": "StandardTip",
+            "type_id": "DisposableTip",
+            "kind": "tip",
+            "relative_path": "tips/standard.xml",
+            "content_fingerprint": "old",
+            "custom_attributes": {},
+        })
+        target = _profile()
+        target["objects"]["userspecific"].append({
+            "guid": "f" * 36,
+            "object_name": "StandardTip",
+            "type_id": "DisposableTip",
+            "kind": "tip",
+            "relative_path": "tips/standard.xml",
+            "content_fingerprint": "new",
+            "custom_attributes": {"PickupOffset": "1"},
+        })
+        plan = build_deployment_plan(source, target, mode="cross_target_import")
+        self.assertEqual(plan["status"], "needs_review")
+        self.assertIn("disposable_tip_attribute_loss", {row["code"] for row in plan["findings"]})
+
     def test_drift_and_external_relocation_are_explicit(self) -> None:
         source = _profile()
         target = _profile()
