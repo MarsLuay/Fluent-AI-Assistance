@@ -1948,7 +1948,15 @@ def _python_runtime_step(
         "start_move_command",
         "wait_for_async_response",
     }:
-        return _python_motion_step(call, operation, draft_name, current_group, source)
+        parameters = _python_motion_parameters(call, operation)
+        return {
+            "group": current_group,
+            "operation": operation,
+            "name": _operation_name(operation),
+            "command_id": call.func.attr,
+            "parameters": parameters,
+            "source_path": _source_path(draft_name, current_group, source, call),
+        }
     target = _value_label(call.args[0], reagent_by_var, labware_by_var) if call.args else None
     volume = _literal_text(call.args[1]) if len(call.args) > 1 else None
     liquid_class = _keyword_value(call, "liquid_class")
@@ -1978,6 +1986,76 @@ def _python_runtime_step(
         "parameters": parameters,
         "source_path": _source_path(draft_name, current_group, source, call),
     }
+
+
+def _python_motion_parameters(call: ast.Call, operation: str) -> dict[str, Any]:
+    """Read typed fluentcoder motion calls without evaluating user code."""
+    config = None
+    if operation == "move_axis_command" and call.args:
+        candidate = call.args[0]
+        if isinstance(candidate, ast.Call) and _call_name(candidate) == "MoveAxisConfig":
+            config = candidate
+    source_call = config or call
+    parameters: dict[str, Any] = {"method": call.func.attr}
+
+    for key in (
+        "available_id",
+        "id_label",
+        "max_speed",
+        "acceleration",
+        "deceleration",
+        "raw_xml",
+    ):
+        value = _keyword_value(source_call, key)
+        if value is not None:
+            parameters[key] = value
+
+    if operation == "move_axis_command":
+        for key in ("position", "charge_condition"):
+            node = _keyword_node(source_call, key)
+            if node is None:
+                continue
+            value, expression = _python_expression_value(node)
+            parameters[key] = value
+            if expression is not None:
+                parameters[f"{key}_expression"] = expression
+
+    raw_xml = parameters.get("raw_xml")
+    if isinstance(raw_xml, str) and raw_xml.strip():
+        try:
+            raw_object = ET.fromstring(raw_xml)
+        except (TypeError, ValueError, ET.ParseError):
+            raw_object = None
+        if raw_object is not None:
+            parameters.setdefault("source_fields", _command_field_map(raw_object))
+            parameters.setdefault("source_command_id", _command_id(raw_object))
+            parameters.setdefault("line_number", _number_or_text(_first_text(raw_object, "LineNumber") or ""))
+
+    return parameters
+
+
+def _python_expression_value(node: ast.AST) -> tuple[Any, dict[str, Any] | None]:
+    literal = _literal_text(node)
+    if literal is not None or isinstance(node, ast.Constant):
+        return literal, None
+    if isinstance(node, ast.Call) and _call_name(node) == "parse_expression" and node.args:
+        source = _literal_text(node.args[0])
+        if isinstance(source, str):
+            expression = expression_to_mapping(parse_or_preserve_source_expression(source))
+            return _expression_python_value(expression, fallback=source), expression
+    if isinstance(node, ast.Call) and _call_name(node) in {"SourcePreservedExpression", "ReviewedRawExpression"}:
+        values = {keyword.arg: _literal_text(keyword.value) for keyword in node.keywords if keyword.arg}
+        kind = "source_preserved_expression" if _call_name(node) == "SourcePreservedExpression" else "reviewed_raw_expression"
+        expression = {"kind": kind, **values}
+        return _expression_python_value(expression), expression
+    return None, None
+
+
+def _keyword_node(call: ast.Call, key: str) -> ast.AST | None:
+    for keyword in call.keywords:
+        if keyword.arg == key:
+            return keyword.value
+    return None
 
 
 def _python_operation_for_call(call: ast.Call, head_by_var: dict[str, str]) -> str | None:
@@ -2087,6 +2165,20 @@ def _xscr_step(
         }
 
     fields = _command_field_map(command_object)
+    if operation in {
+        "move_axis_command",
+        "start_move_command",
+        "wait_for_async_response",
+    }:
+        return _xscr_motion_step(
+            command_object,
+            group_name,
+            operation,
+            command_id,
+            fields,
+            compiled_path,
+            source_entry=source_entry,
+        )
     if operation in {"query_variable", "set_variable", "runtime_variable_prompt"}:
         return _xscr_variable_step(
             command_object,
@@ -2258,62 +2350,87 @@ def _xscr_motion_step(
     group_name: str,
     operation: str,
     command_id: str,
+    fields: dict[str, Any],
     compiled_path: str,
     *,
     source_entry: str = "",
 ) -> dict[str, Any]:
-    """Convert the verified low-level FluentControl motion sequence to IR."""
-    source_object_type = str(command_object.attrib.get("Type") or "")
+    """Project verified fluentcoder driver steps into canonical IR."""
+    raw_xml = ET.tostring(command_object, encoding="unicode")
     parameters: dict[str, Any] = {
-        "raw_xml": ET.tostring(command_object, encoding="unicode"),
-        "source_object_type": source_object_type,
+        "source_fields": copy.deepcopy(fields),
+        "raw_xml": raw_xml,
         "source_provenance": {
-            "format": "xscr",
-            "command_id": command_id,
-            "object_type": source_object_type,
             "source_entry": source_entry,
+            "command_id": command_id,
+            "compiled_path": compiled_path,
         },
     }
-    for key, field in (
-        ("available_id", "AvailableID"),
-        ("id_label", "IdLabel"),
-        ("max_speed", "MaxSpeed"),
-        ("acceleration", "Acceleration"),
-        ("deceleration", "Deceleration"),
-    ):
-        value = _first_text(command_object, field)
-        if value not in (None, ""):
-            parameters[key] = value
+    if source_entry:
+        parameters["source_entry"] = source_entry
 
-    expression_parameters = _registered_xscr_expression_parameters(
-        command_object,
-        command_id,
-        source_entry=source_entry,
+    line_number = _number_or_text(_first_text(command_object, "LineNumber") or "")
+    if line_number is not None:
+        parameters["line_number"] = line_number
+    disabled = _optional_bool(_first_nonempty_text(command_object, ["IsDisabledForExecution", "Disabled"]))
+    if disabled is not None:
+        parameters["is_disabled_for_execution"] = disabled
+    breakpoint_value = _optional_bool(
+        _first_nonempty_text(command_object, ["IsBreakpoint", "IsBreakPoint", "Breakpoint", "BreakPoint"])
     )
-    parameters.update(expression_parameters)
-    if operation == "move_axis_command":
-        position = _first_text(command_object, "Position")
-        if position not in (None, ""):
-            parameters["position"] = _number_or_text(position)
-        charge_condition = _first_leaf_text(command_object, "ChargeCondition")
-        if charge_condition not in (None, ""):
-            parameters["charge_condition"] = charge_condition
-    for key, field in (
-        ("is_breakpoint", "IsBreakpoint"),
-        ("is_disabled_for_execution", "IsDisabledForExecution"),
-        ("group_line_number", "GroupLineNumber"),
-    ):
-        value = _first_text(command_object, field)
-        if value not in (None, ""):
-            parameters[key] = _bool_text(value) if key.startswith("is_") else _number_or_text(value)
+    if breakpoint_value is not None:
+        parameters["is_breakpoint"] = breakpoint_value
+    source_version = _first_nonempty_text(
+        command_object,
+        ["Version", "DataVersion", "SchemaVersion", "VersionNumber"],
+    )
+    if source_version:
+        parameters["source_version"] = source_version
 
+    if operation == "move_axis_command":
+        parameters.update(
+            {
+                "available_id": registry_field_value(command_id, "device_alias", fields)
+                or _first_text(command_object, "AvailableID"),
+                "id_label": _first_nonempty_text(command_object, ["IdLabel", "IDLabel"]),
+                "position": _number_or_text(
+                    registry_field_value(command_id, "position", fields)
+                    or _first_nonempty_text(command_object, ["Position", "TargetPosition"])
+                    or "0"
+                ),
+                "charge_condition": fields.get("ChargeCondition")
+                or _first_nonempty_text(command_object, ["ChargeCondition"]),
+                "max_speed": _first_nonempty_text(command_object, ["MaxSpeed"]),
+                "acceleration": _first_nonempty_text(command_object, ["Acceleration"]),
+                "deceleration": _first_nonempty_text(command_object, ["Deceleration"]),
+                "device_alias": _first_nonempty_text(command_object, ["DeviceAlias"]),
+                "axis": _first_nonempty_text(command_object, ["Axis", "AxisName"]),
+            }
+        )
+    elif operation == "start_move_command":
+        parameters.update(
+            {
+                "available_id": registry_field_value(command_id, "device_alias", fields)
+                or _first_text(command_object, "AvailableID"),
+                "id_label": _first_nonempty_text(command_object, ["IdLabel", "IDLabel"]),
+                "device_alias": _first_nonempty_text(command_object, ["DeviceAlias"]),
+                "axis": _first_nonempty_text(command_object, ["Axis", "AxisName"]),
+            }
+        )
+
+    parameters.update(
+        _registered_xscr_expression_parameters(
+            command_object,
+            command_id,
+            source_entry=source_entry,
+        )
+    )
     return {
         "group": group_name,
         "operation": operation,
         "name": _operation_name(operation),
         "command_id": command_id,
-        "parameters": parameters,
-        "source_path": source_entry,
+        "parameters": {key: value for key, value in parameters.items() if _has_value(value)},
         "compiled_path": compiled_path,
     }
 
@@ -2841,6 +2958,51 @@ def _render_python_step(step: dict[str, Any], labware_vars: dict[str, str]) -> l
     if operation == "execute_vb_script":
         xml = render_execute_vb_script_xml(step.get("parameters") or {})
         return [f"wt.raw_xml_step('ExecuteVbScriptStatement', {xml!r})"]
+    if operation == "move_axis_command":
+        config_parts = []
+        position_expression = params.get("position_expression")
+        if position_expression is not None:
+            config_parts.append(
+                f"position={_expression_python_arg(position_expression, fallback=params.get('position', 0))}"
+            )
+        elif "position" in params:
+            config_parts.append(f"position={params.get('position')!r}")
+        charge_expression = params.get("charge_condition_expression")
+        if charge_expression is not None:
+            config_parts.append(
+                f"charge_condition={_expression_python_arg(charge_expression, fallback=params.get('charge_condition'))}"
+            )
+        elif params.get("charge_condition") is not None:
+            config_parts.append(f"charge_condition={params.get('charge_condition')!r}")
+        for key in (
+            "available_id",
+            "id_label",
+            "max_speed",
+            "acceleration",
+            "deceleration",
+        ):
+            if params.get(key) is not None:
+                config_parts.append(f"{key}={params[key]!r}")
+        raw_xml = str(params.get("raw_xml") or "").strip()
+        if raw_xml:
+            config_parts.append(f"raw_xml={raw_xml!r}")
+        return [f"wt.move_axis_command(MoveAxisConfig({', '.join(config_parts)}))"]
+    if operation == "start_move_command":
+        call_parts = []
+        for key in ("available_id", "id_label"):
+            if params.get(key) is not None:
+                call_parts.append(f"{key}={params[key]!r}")
+        raw_xml = str(params.get("raw_xml") or "").strip()
+        if raw_xml:
+            call_parts.append(f"raw_xml={raw_xml!r}")
+        return [f"wt.start_move_command({', '.join(call_parts)})"]
+    if operation == "wait_for_async_response":
+        raw_xml = str(params.get("raw_xml") or "").strip()
+        return [
+            f"wt.wait_for_async_response(raw_xml={raw_xml!r})"
+            if raw_xml
+            else "wt.wait_for_async_response()"
+        ]
     if operation == "set_variable":
         variable = str(params.get("variable") or "").strip()
         if variable:
@@ -3255,6 +3417,12 @@ def _operation_from_command_id(command_id: str) -> str | None:
     if registry_operation:
         return registry_operation
     lowered = command_id.lower()
+    if "moveaxiscommand" in lowered:
+        return "move_axis_command"
+    if "startmovecommand" in lowered:
+        return "start_move_command"
+    if "waitforasyncresponse" in lowered or "waitasyncresponse" in lowered:
+        return "wait_for_async_response"
     if "addlabware" in lowered:
         return "add_labware"
     if "getheadadapter" in lowered:
@@ -3316,9 +3484,9 @@ def _operation_name(operation: str) -> str:
         "set_remaining_runtime": "Set Remaining Runtime",
         "runtime_variable_prompt": "Runtime Variable Prompt",
         "move_plate": "Move Plate",
-        "move_axis_command": "Move Axis",
-        "start_move_command": "Start Move",
-        "wait_for_async_response": "Wait For Async Response",
+        "move_axis_command": "Move Axis Command",
+        "start_move_command": "Start Move Command",
+        "wait_for_async_response": "Wait for Async Response",
         "execute_application": "Execute Application",
         "call_subroutine": "Call Subroutine",
         "read_worklist": "Read Worklist",
