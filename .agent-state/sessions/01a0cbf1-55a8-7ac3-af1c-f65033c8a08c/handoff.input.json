@@ -1,0 +1,43 @@
+{
+  "schema_version": 2,
+  "task_goal": "Implement exactly MarsLuay/Fluent-AI-Assistance#172 in the assigned isolated worktree.",
+  "acceptance_criteria": "Source-backed issue-scoped change, regression coverage, focused checks, commit/push/open PR if complete; otherwise retryable blocker.",
+  "confirmed_facts": [],
+  "assumptions": [
+    "handoff written from session wrapper"
+  ],
+  "important_files": [
+    "source/03-protocol-builder/fluent_pipeline/worktable_geometry.py",
+    "source/03-protocol-builder/libs/fluentcoder/fluentcoder/ir/schema.py",
+    "source/03-protocol-builder/tests"
+  ],
+  "important_symbols": [],
+  "decisions": [
+    {
+      "decision": "snapshot via agent-session-start",
+      "rationale": "Claimed #172; inspecting source-backed RGA vector/storage evidence."
+    }
+  ],
+  "files_changed": [
+    "source/03-protocol-builder/fluent_pipeline/worktable_geometry.py",
+    "source/03-protocol-builder/libs/fluentcoder/fluentcoder/ir/schema.py",
+    "source/03-protocol-builder/tests"
+  ],
+  "verification_performed": [
+    "focused worktable/RGA tests"
+  ],
+  "baseline_failures": [],
+  "current_failures": [],
+  "unresolved_risks": [],
+  "remaining_steps": [],
+  "next_recommended_action": "Verify whether legitimate sanitized carrier/vector/storage fixtures and exact source contracts exist; block if absent rather than inventing XML/vendor semantics.",
+  "source_session_id": "01a0cbf1-55a8-7ac3-af1c-f65033c8a08c",
+  "active_subproject": ".",
+  "raw_artifact_refs": [],
+  "contract_id": "",
+  "contract_hash": "",
+  "route_id": "",
+  "context_packet_hash": "",
+  "recovery_disposition": "",
+  "trigger": "issue-accept-worker"
+}
