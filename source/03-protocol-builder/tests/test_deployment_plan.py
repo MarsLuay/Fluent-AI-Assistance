@@ -77,6 +77,54 @@ class DeploymentPlanTests(unittest.TestCase):
         self.assertEqual(target_drift_diagnostics(plan, changed)[0]["code"], "target_profile_drift")
         self.assertIn("relocate_external_file", {row["action"] for row in plan["actions"]})
 
+    def test_runtime_and_internal_metadata_are_not_deployable(self) -> None:
+        source = _profile()
+        source["objects"]["userspecific"][0]["state_classification"] = "instrument_local_runtime_state"
+        source["objects"]["systemspecific"] = [{
+            "guid": "b" * 36,
+            "object_name": "Internal",
+            "kind": "metadata",
+            "type_id": "metadata",
+            "relative_path": "SVNRoot/SystemSW_1.0/DataBase.svn",
+            "content_fingerprint": "metadata",
+        }]
+        plan = build_deployment_plan(source, _profile(), mode="cross_target_import")
+        actions = {row["action"] for row in plan["actions"]}
+        findings = {row["code"] for row in plan["findings"]}
+        self.assertIn("exclude_source_object", actions)
+        self.assertIn("internal_svn_metadata_not_deployable", findings)
+        self.assertEqual(plan["status"], "blocked")
+
+    def test_active_recovery_and_whole_database_replacement_fail_closed(self) -> None:
+        source = _profile()
+        source["state_classification"] = {"active_recovery": True}
+        plan = build_deployment_plan(source, _profile(), proposed_database_replacement=True)
+        findings = {row["code"] for row in plan["findings"]}
+        self.assertIn("active_method_recovery_requires_operator_resolution", findings)
+        self.assertIn("whole_database_replacement_refused", findings)
+        self.assertEqual(plan["status"], "blocked")
+
+    def test_disposable_tip_conflict_prefers_verified_target_or_reports_loss(self) -> None:
+        source = _profile()
+        source["objects"]["userspecific"][0].update({
+            "kind": "disposable_tip_labware",
+            "object_name": "Tip Definition",
+            "custom_attributes_fingerprint": "old",
+        })
+        target = copy.deepcopy(source)
+        target["objects"]["userspecific"][0].update({
+            "guid": "b" * 36,
+            "custom_attributes_fingerprint": "current",
+            "vendor_verified": True,
+        })
+        preferred = build_deployment_plan(source, target, mode="cross_target_import")
+        self.assertEqual(preferred["actions"][0]["action"], "reuse_target")
+        self.assertIn("tip_definition_execution_attributes_would_be_lost", {row["code"] for row in preferred["findings"]})
+
+        target["objects"]["userspecific"][0]["vendor_verified"] = False
+        review = build_deployment_plan(source, target, mode="cross_target_import")
+        self.assertEqual(review["status"], "needs_review")
+
 
 if __name__ == "__main__":
     unittest.main()
