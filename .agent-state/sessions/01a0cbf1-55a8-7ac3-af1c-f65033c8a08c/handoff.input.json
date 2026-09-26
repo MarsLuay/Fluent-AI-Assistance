@@ -1,0 +1,53 @@
+﻿{
+    "schema_version":  2,
+    "task_goal":  "Implement exactly MarsLuay/Fluent-AI-Assistance#169 in the assigned isolated worktree.",
+    "acceptance_criteria":  "Implement only issue-scoped, source-backed changes; add regression coverage; focused checks; commit/push/open PR if complete; otherwise record retryable blocker.",
+    "confirmed_facts":  [
+
+                        ],
+    "assumptions":  [
+                        "handoff written from session wrapper"
+                    ],
+    "important_files":  [
+
+                        ],
+    "important_symbols":  [
+
+                          ],
+    "decisions":  [
+                      {
+                          "decision":  "snapshot via agent-session-start",
+                          "rationale":  "claimed; inspecting issue and repository instructions"
+                      }
+                  ],
+    "files_changed":  [
+
+                      ],
+    "verification_performed":  [
+
+                               ],
+    "baseline_failures":  [
+
+                          ],
+    "current_failures":  [
+
+                         ],
+    "unresolved_risks":  [
+
+                         ],
+    "remaining_steps":  [
+
+                        ],
+    "next_recommended_action":  "Read applicable instructions and project-memory context, then inspect issue-backed source and tests.",
+    "source_session_id":  "01a0cbf1-55a8-7ac3-af1c-f65033c8a08c",
+    "active_subproject":  ".",
+    "raw_artifact_refs":  [
+
+                          ],
+    "contract_id":  "",
+    "contract_hash":  "",
+    "route_id":  "",
+    "context_packet_hash":  "",
+    "recovery_disposition":  "",
+    "trigger":  "issue-accept-worker"
+}
