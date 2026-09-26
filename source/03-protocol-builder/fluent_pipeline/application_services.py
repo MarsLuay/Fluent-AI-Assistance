@@ -44,6 +44,7 @@ from .project_context import (
 from .repair import RepairAction, RepairPlan, apply_repair_plan, build_repair_plan, render_repair_markdown
 from .request_spec import build_request_spec, write_request_spec
 from .runner import ensure_parent, write_json
+from .source_family_gate import source_family_gate
 from .readiness import full_export_readiness_to_offline_validation
 from .spec_lint import LintResult, lint_request_spec_file
 from .validation import render_validation_markdown, validate_ready_to_import
@@ -281,6 +282,7 @@ class OneShotRunResult:
         "request_spec": 6,
         "request_validation": 7,
         "generation": 8,
+        "source_family": 9,
     }
 
     @property
@@ -873,6 +875,7 @@ def run_one_shot(request: OneShotRunRequest) -> OneShotRunResult:
 
     base_name = safe_name(request.project_name or request.protocol_name or archives[0].stem)
     context_names: list[str] = []
+    imported_contexts: list[ProjectContext] = []
     try:
         for index, archive in enumerate(archives, start=1):
             name = base_name if len(archives) == 1 else f"{base_name}-{index}"
@@ -883,6 +886,7 @@ def run_one_shot(request: OneShotRunRequest) -> OneShotRunResult:
                 snapshot_archives=[],
             )
             context_names.append(imported.name)
+            imported_contexts.append(imported)
         if len(context_names) == 1:
             context_name = context_names[0]
         else:
@@ -897,6 +901,21 @@ def run_one_shot(request: OneShotRunRequest) -> OneShotRunResult:
             input_archives=archives,
             failed_stage="import_context",
             error=str(exc),
+        )
+
+    family_gates = []
+    for imported in imported_contexts:
+        detection = ((imported.manifest.get("canonical_model") or {}).get("detection") or {})
+        family_gates.append({"context": imported.name, **source_family_gate(detection)})
+    blocked = next((gate for gate in family_gates if not gate["accepted"]), None)
+    if blocked is not None:
+        return OneShotRunResult(
+            request=request,
+            input_archives=archives,
+            context_name=context_name,
+            readiness={"source_family_gates": family_gates},
+            failed_stage="source_family",
+            error=blocked["code"],
         )
 
     try:
