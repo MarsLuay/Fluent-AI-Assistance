@@ -83,6 +83,86 @@ def resolve_mca_pickup_address(step: PickUpTipsStep | Mapping[str, Any]) -> dict
     return record
 
 
+def validate_mca_pickup(
+    step: PickUpTipsStep | Mapping[str, Any],
+    *,
+    loop_bounds: Mapping[str, tuple[int, int]] | None = None,
+    target_orientation: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Static pickup validation. Physical alignment stays unverified."""
+    address = resolve_mca_pickup_address(step)
+    findings: list[dict[str, str]] = []
+    if address["status"] != "resolved":
+        code = "orientation_unproven" if "orientation" in address["reason"] else "unresolved_mapping"
+        findings.append({
+            "code": code,
+            "status": "review",
+            "message": address["reason"],
+        })
+        if loop_bounds and code == "unresolved_mapping":
+            if _range_exceeds_grid(step, loop_bounds):
+                findings.append({
+                    "code": "out_of_bounds",
+                    "status": "review",
+                    "message": "A value inside the known loop range leaves the pickup grid.",
+                })
+        elif code == "unresolved_mapping" and not loop_bounds:
+            findings.append({
+                "code": "unprovable_range",
+                "status": "review",
+                "message": "Variable offset has no proven loop range.",
+            })
+    else:
+        row = address["base"]["row"] + address["offsets"]["row"]
+        column = address["base"]["column"] + address["offsets"]["column"]
+        rows = address["grid"]["rows"]
+        columns = address["grid"]["columns"]
+        if any(not isinstance(value, (int, float)) for value in (row, column, rows, columns)):
+            pass
+        elif row < 0 or column < 0 or row >= rows or column >= columns:
+            findings.append({
+                "code": "out_of_bounds",
+                "status": "review",
+                "message": "Authored row or column offset is outside the pickup grid.",
+            })
+    if target_orientation is not None:
+        source = address["placement_orientation"]
+        for key in ("phi", "psi", "theta"):
+            target = target_orientation.get(key, 0)
+            if source[key] != target:
+                dropped = source[key] not in (0, "0") and target in (0, "0")
+                findings.append({
+                    "code": "semantic_loss" if dropped else "orientation_drift",
+                    "status": "review",
+                    "message": f"Placement orientation {key} changed from {source[key]!r} to {target!r}.",
+                })
+    return {
+        "address": address,
+        "findings": findings,
+        "logical_selection": address["status"],
+        "precise_occupancy_allowed": address["status"] == "resolved" and not any(
+            item["code"] == "out_of_bounds" for item in findings
+        ),
+        "physical_readiness": {"status": "unverified", "owner": "physical_verification"},
+    }
+
+
+def _range_exceeds_grid(step: PickUpTipsStep | Mapping[str, Any], loop_bounds: Mapping[str, tuple[int, int]]) -> bool:
+    rows = _literal(_read(step, "partial_rows"))
+    columns = _literal(_read(step, "partial_columns"))
+    if rows is None or columns is None:
+        return False
+    for name, bounds in loop_bounds.items():
+        low, high = bounds
+        for value in (low, high):
+            if value < 0 or value >= rows or value >= columns:
+                return True
+            if str(_read(step, "row")) == name or str(_read(step, "column")) == name:
+                if value < 0 or value >= (rows if str(_read(step, "row")) == name else columns):
+                    return True
+    return False
+
+
 def _read(step: PickUpTipsStep | Mapping[str, Any], name: str) -> Any:
     if isinstance(step, Mapping):
         return step.get(name)
