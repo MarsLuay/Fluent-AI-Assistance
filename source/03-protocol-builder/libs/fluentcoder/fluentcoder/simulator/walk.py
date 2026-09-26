@@ -644,6 +644,16 @@ class Simulator:
         self._mca_adapter_label = None
 
     def _on_pickup_tips(self, step: PickUpTipsStep) -> None:
+        from ..heads.mca_pickup_address import validate_mca_pickup
+        decision = validate_mca_pickup(step)
+        if not decision["precise_occupancy_allowed"]:
+            raise _with_sim_details(
+                MissingTipsError(
+                    "MCA pickup address is not resolved; refusing an unrotated tip occupancy claim"
+                ),
+                category="pickup_address_unproven",
+                tip_box=step.labware_name,
+            )
         if self._mca_adapter_label is None:
             raise MissingAdapterError(
                 f"PickUpTips({step.labware_name!r}) but no adapter is mounted on the MCA-96 head"
