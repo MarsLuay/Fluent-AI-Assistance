@@ -13,7 +13,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 _GUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
@@ -122,6 +122,58 @@ def build_scripts_inventory(userspecific_dir: Path | None = None) -> dict[str, A
         "script_count": len(rows),
         "name_folder_to_guids": {key: guids for key, guids in sorted(by_key.items())},
         "collisions": collisions,
+        "scripts": rows,
+    }
+
+
+def empty_scripts_inventory(*, target_profile: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Return an explicit empty inventory without consulting the host."""
+    return {
+        "schema": "tecan.fluentcontrol.scripts_inventory.v1",
+        "userspecific_dir": "",
+        "target_profile_fingerprint": str((target_profile or {}).get("fingerprint") or ""),
+        "script_count": 0,
+        "name_folder_to_guids": {},
+        "collisions": {},
+        "scripts": [],
+    }
+
+
+def build_scripts_inventory_from_target_profile(profile: Mapping[str, Any]) -> dict[str, Any]:
+    """Build a script inventory from selected target evidence, never the host."""
+    rows: list[dict[str, str]] = []
+    by_key: dict[str, list[str]] = {}
+    objects = (profile.get("objects") or {}).get("userspecific") or []
+    for item in objects:
+        if not isinstance(item, Mapping):
+            continue
+        kind = str(item.get("kind") or item.get("type_id") or "").casefold()
+        if kind not in {"script", "user_specific", "userspecific"} and not str(item.get("relative_path") or "").casefold().endswith(".xscr"):
+            continue
+        guid = str(item.get("guid") or "").strip()
+        name = str(item.get("object_name") or "").strip()
+        if not guid or not name:
+            continue
+        folder = normalize_script_folder(item.get("object_subfolder_path") or item.get("folder"))
+        key = inventory_key(folder, name)
+        row = {
+            "guid": guid,
+            "object_name": name,
+            "folder": folder,
+            "key": key,
+        }
+        rows.append(row)
+        by_key.setdefault(key, []).append(guid)
+    rows.sort(key=lambda row: (row["key"].casefold(), row["guid"].casefold()))
+    for values in by_key.values():
+        values.sort(key=str.casefold)
+    return {
+        "schema": "tecan.fluentcontrol.scripts_inventory.v1",
+        "userspecific_dir": "",
+        "target_profile_fingerprint": str(profile.get("fingerprint") or ""),
+        "script_count": len(rows),
+        "name_folder_to_guids": {key: values for key, values in sorted(by_key.items())},
+        "collisions": {key: values for key, values in sorted(by_key.items()) if len(values) > 1},
         "scripts": rows,
     }
 
@@ -362,21 +414,63 @@ _TYPE_TO_SUFFIX = {
 }
 
 
+def _index_systemspecific_profile_objects(
+    profile: Mapping[str, Any],
+) -> dict[str, list[dict[str, str]]]:
+    """Index SystemSpecific objects from a selected target profile."""
+    index: dict[str, list[dict[str, str]]] = {}
+    for item in ((profile.get("objects") or {}).get("systemspecific") or []):
+        if not isinstance(item, Mapping):
+            continue
+        kind = str(item.get("kind") or item.get("type_id") or "").casefold()
+        type_id = str(item.get("type_id") or kind)
+        normalized = type_id.replace(" ", "").replace("_", "").casefold()
+        suffix = next(iter(_TYPE_TO_SUFFIX.get(normalized, ())), "")
+        if not suffix:
+            continue
+        name = str(item.get("object_name") or "").strip()
+        if not name:
+            continue
+        index.setdefault(name.casefold(), []).append(
+            {
+                "guid": str(item.get("guid") or ""),
+                "object_name": name,
+                "path": str(item.get("relative_path") or ""),
+                "suffix": suffix,
+                "content_fingerprint": str(item.get("content_fingerprint") or ""),
+            }
+        )
+    return index
+
+
 def report_missing_system_dependencies(
     payload: bytes,
     *,
     systemspecific_dir: Path | None = None,
     base_archive_guids: set[str] | None = None,
+    target_profile: Mapping[str, Any] | None = None,
+    use_local_defaults: bool = True,
 ) -> dict[str, Any]:
-    """Report referenced workspaces/LCs/components missing from SystemSpecific + base."""
-    roots = [systemspecific_dir] if systemspecific_dir is not None else fluentcontrol_systemspecific_dirs()
-    root = next((path for path in roots if path is not None and path.is_dir()), None)
-    suffixes = {".xwsp", ".xlqc", ".xcmp"}
-    index = _index_systemspecific_objects(root, suffixes=suffixes) if root else {}
+    """Report dependencies using explicit target evidence or an opt-in local scan."""
+    if target_profile is not None:
+        root = None
+        index = _index_systemspecific_profile_objects(target_profile)
+        target_binding = "explicit_target_profile"
+    elif use_local_defaults:
+        roots = [systemspecific_dir] if systemspecific_dir is not None else fluentcontrol_systemspecific_dirs()
+        root = next((path for path in roots if path is not None and path.is_dir()), None)
+        suffixes = {".xwsp", ".xlqc", ".xcmp"}
+        index = _index_systemspecific_objects(root, suffixes=suffixes) if root else {}
+        target_binding = "local_inventory"
+    else:
+        root = None
+        index = {}
+        target_binding = "target_unbound"
     base_guids = {guid.casefold() for guid in (base_archive_guids or set()) if guid}
 
     missing: list[dict[str, str]] = []
     present: list[dict[str, str]] = []
+    review: list[dict[str, str]] = []
     skipped: list[dict[str, str]] = []
 
     for ref in extract_typed_references(payload):
@@ -400,13 +494,23 @@ def report_missing_system_dependencies(
             present.append({**ref, "resolved_via": "systemspecific_guid"})
             continue
         if hits:
-            present.append(
-                {
-                    **ref,
-                    "resolved_via": "systemspecific_name",
-                    "local_guid": hits[0]["guid"],
-                }
-            )
+            if target_profile is not None:
+                review.append(
+                    {
+                        **ref,
+                        "status": "TARGET_PREREQ_REVIEW",
+                        "reason": "target_profile_name_match_requires_identity_or_content_evidence",
+                        "target_candidates": hits,
+                    }
+                )
+            else:
+                present.append(
+                    {
+                        **ref,
+                        "resolved_via": "systemspecific_name",
+                        "local_guid": hits[0]["guid"],
+                    }
+                )
             continue
         missing.append(
             {
@@ -416,11 +520,24 @@ def report_missing_system_dependencies(
             }
         )
 
+    if target_binding == "target_unbound":
+        # Do not call an unbound reference missing from an arbitrary host.
+        missing = []
+        review = [
+            {**ref, "status": "TARGET_PREREQ_REVIEW", "reason": "target_profile_not_selected"}
+            for ref in extract_typed_references(payload)
+            if ref["type_id"].replace(" ", "").casefold() in _TYPE_TO_SUFFIX
+        ]
     return {
         "schema": "tecan.fluentcontrol.target_prereq_report.v1",
         "systemspecific_dir": str(root) if root else "",
+        "target_binding": target_binding,
+        "target_profile_fingerprint": str((target_profile or {}).get("fingerprint") or ""),
+        "target_unbound": target_binding == "target_unbound",
         "missing": missing,
         "present": present,
+        "review": review,
         "skipped_untracked_types": skipped,
         "missing_count": len(missing),
+        "review_count": len(review),
     }

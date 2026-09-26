@@ -760,6 +760,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help="FluentControl script folder/ObjectSubfolderPath for the generated main script",
     )
     p_generate.add_argument(
+        "--target-profile",
+        type=Path,
+        default=None,
+        help=(
+            "explicit tecan.target_datastore.v1 profile for target-bound packaging; "
+            "omit for target-unbound packaging without host inventory discovery"
+        ),
+    )
+    p_generate.add_argument(
         "--approve-partial-zeia",
         action="store_true",
         help=(

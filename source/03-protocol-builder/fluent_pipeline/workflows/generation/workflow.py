@@ -349,6 +349,7 @@ def run_generation_workflow(
     fluent_insecure = generation_options.fluent_insecure
     fluent_timeout = generation_options.fluent_timeout
     target_script_folder = generation_options.target_script_folder
+    target_datastore_profile = generation_options.target_datastore_profile
     request_spec_source = request.request_spec_path
     request_spec: dict[str, Any] | None = None
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1493,6 +1494,7 @@ def run_generation_workflow(
                 },
                 validation_context=validation_context,
                 target_script_folder=target_script_folder,
+                target_profile=target_datastore_profile,
                 export_summary=export_summary,
                 publish=False,
             )

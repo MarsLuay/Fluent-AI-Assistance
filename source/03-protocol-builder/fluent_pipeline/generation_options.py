@@ -26,6 +26,7 @@ class GenerationOptions:
     verification_prompt_rup: str = DEFAULT_VERIFICATION_PROMPT_RUP
     target_fluentcontrol_version: str | None = None
     target_script_folder: str | None = None
+    target_datastore_profile: Path | None = field(default=None, metadata={"serialize": False})
     approve_partial_zeia: bool = False
     approve_deck_layout: bool = False
     approve_command_inventory: bool = False
@@ -85,6 +86,7 @@ def normalize_generation_options(
     verification_prompt_rup: str | None = None,
     target_fluentcontrol_version: str | None = None,
     target_script_folder: str | None = None,
+    target_datastore_profile: Path | str | None = None,
     approve_partial_zeia: bool | None = None,
     approve_deck_layout: bool | None = None,
     approve_command_inventory: bool | None = None,
@@ -106,6 +108,9 @@ def normalize_generation_options(
     script_folder = _optional_text(
         base.target_script_folder if target_script_folder is None else target_script_folder
     )
+    datastore_profile = _optional_path(
+        base.target_datastore_profile if target_datastore_profile is None else target_datastore_profile
+    )
     requested_rup = _normalize_verification_prompt_rup(
         base.verification_prompt_rup if verification_prompt_rup is None else verification_prompt_rup
     )
@@ -122,6 +127,7 @@ def normalize_generation_options(
         verification_prompt_rup=effective_rup,
         target_fluentcontrol_version=target_version,
         target_script_folder=script_folder,
+        target_datastore_profile=datastore_profile,
         approve_partial_zeia=base.approve_partial_zeia if approve_partial_zeia is None else bool(approve_partial_zeia),
         approve_deck_layout=base.approve_deck_layout if approve_deck_layout is None else bool(approve_deck_layout),
         approve_command_inventory=(
@@ -212,6 +218,7 @@ def generation_options_from_cli_args(
         apply_modeling=base.apply_modeling or bool(getattr(args, "apply_modeling", False)),
         target_fluentcontrol_version=_optional_attr(args, "target_fluentcontrol_version"),
         target_script_folder=_optional_attr(args, "target_script_folder"),
+        target_datastore_profile=_optional_attr(args, "target_profile"),
         approve_partial_zeia=base.approve_partial_zeia or bool(getattr(args, "approve_partial_zeia", False)),
         approve_deck_layout=base.approve_deck_layout or bool(getattr(args, "approve_deck_layout", False)),
         approve_command_inventory=(
@@ -269,6 +276,9 @@ def _coerce_generation_options(
         ),
         target_fluentcontrol_version=_optional_text(options.get("target_fluentcontrol_version")),
         target_script_folder=_optional_text(options.get("target_script_folder")),
+        target_datastore_profile=_optional_path(
+            options.get("target_datastore_profile", options.get("target_profile"))
+        ),
         approve_partial_zeia=bool(options.get("approve_partial_zeia", False)),
         approve_deck_layout=bool(options.get("approve_deck_layout", False)),
         approve_command_inventory=bool(options.get("approve_command_inventory", False)),
