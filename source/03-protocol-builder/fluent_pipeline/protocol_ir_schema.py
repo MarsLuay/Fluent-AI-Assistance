@@ -66,6 +66,9 @@ class Operation(str, Enum):
     LOAD_LABWARE = "load_labware"
     INITIALIZE_DEVICE = "initialize_device"
     MOVE_PLATE = "move_plate"
+    MOVE_AXIS_COMMAND = "move_axis_command"
+    START_MOVE_COMMAND = "start_move_command"
+    WAIT_FOR_ASYNC_RESPONSE = "wait_for_async_response"
     GET_HEAD_ADAPTER = "get_head_adapter"
     DROP_HEAD_ADAPTER = "drop_head_adapter"
     PICK_UP_TIPS = "pick_up_tips"
@@ -1661,6 +1664,9 @@ def operation_name(operation: str) -> str:
         Operation.LOAD_LABWARE.value: "Load Labware",
         Operation.INITIALIZE_DEVICE.value: "Initialize Device",
         Operation.MOVE_PLATE.value: "Move Plate",
+        Operation.MOVE_AXIS_COMMAND.value: "Move Axis Command",
+        Operation.START_MOVE_COMMAND.value: "Start Move Command",
+        Operation.WAIT_FOR_ASYNC_RESPONSE.value: "Wait for Async Response",
         Operation.GET_HEAD_ADAPTER.value: "Mount Head Adapter",
         Operation.DROP_HEAD_ADAPTER.value: "Drop Head Adapter",
         Operation.PICK_UP_TIPS.value: "Pick Up Tips",
@@ -1737,6 +1743,17 @@ def _validate_steps(
             issues.append(ProtocolIRIssue(f"{path}.volume_ul", f"{operation} requires volume_ul"))
         if strict and operation in LIQUID_CLASS_OPERATIONS and not _has_value(step.get("liquid_class")):
             issues.append(ProtocolIRIssue(f"{path}.liquid_class", f"{operation} requires liquid_class"))
+        if operation == Operation.MOVE_AXIS_COMMAND.value:
+            params = step.get("parameters")
+            if isinstance(params, dict) and not any(
+                _has_value(params.get(key)) for key in ("position", "position_expression")
+            ):
+                issues.append(
+                    ProtocolIRIssue(
+                        f"{path}.parameters.position",
+                        "move_axis_command requires position or position_expression",
+                    )
+                )
         if operation == Operation.ADD_LABWARE.value:
             _validate_add_labware_parameters(issues, f"{path}.parameters", step.get("parameters"))
 
