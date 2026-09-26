@@ -1,7 +1,7 @@
 ﻿{
     "schema_version":  2,
-    "task_goal":  "Implement exactly MarsLuay/Fluent-AI-Assistance#168 in the assigned isolated worktree.",
-    "acceptance_criteria":  "Implement only issue-scoped, source-backed changes; add regression coverage; focused checks; commit/push/PR if complete; otherwise record retryable blocker.",
+    "task_goal":  "Implement exactly MarsLuay/Fluent-AI-Assistance#169 in the assigned isolated worktree.",
+    "acceptance_criteria":  "Implement only issue-scoped, source-backed changes; add regression coverage; focused checks; commit/push/open PR if complete; otherwise record retryable blocker.",
     "confirmed_facts":  [
 
                         ],
