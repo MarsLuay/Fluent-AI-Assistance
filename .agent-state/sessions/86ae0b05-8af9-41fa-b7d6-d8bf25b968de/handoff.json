@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "task_goal": "Implement exactly MarsLuay/Fluent-AI-Assistance#166 only when verified source-backed Sample Transfer evidence exists.",
+  "acceptance_criteria": [
+    "source-backed behavior only",
+    "no invented vendor XML or hardware semantics",
+    "regression coverage if safe",
+    "focused/full checks",
+    "commit/push/PR only if verified"
+  ],
+  "confirmed_facts": [],
+  "assumptions": [
+    "handoff written from session wrapper"
+  ],
+  "important_files": [],
+  "important_symbols": [],
+  "decisions": [
+    {
+      "decision": "snapshot via agent-session-start",
+      "rationale": "Baseline recorded; revalidating current source-backed fixture availability."
+    }
+  ],
+  "files_changed": [],
+  "verification_performed": [],
+  "baseline_failures": [],
+  "current_failures": [],
+  "unresolved_risks": [],
+  "remaining_steps": [],
+  "next_recommended_action": "Inspect origin/main for legitimate sanitized Sample Transfer XSCR/ZEIA evidence and current typed/passthrough coverage.",
+  "timestamp": "2026-09-23T02:35:01+00:00",
+  "source_session_id": "86ae0b05-8af9-41fa-b7d6-d8bf25b968de",
+  "active_subproject": ".",
+  "raw_artifact_refs": [],
+  "contract_id": "",
+  "contract_hash": "",
+  "route_id": "",
+  "context_packet_hash": "",
+  "recovery_disposition": "",
+  "trigger": "issue-accept-worker",
+  "stale": false
+}
