@@ -64,6 +64,46 @@ def _semantic_key(row: Mapping[str, Any]) -> tuple[str, str, str, str]:
     )
 
 
+def _object_path(row: Mapping[str, Any]) -> str:
+    return str(row.get("relative_path") or row.get("object_name") or "").replace("\\", "/").casefold()
+
+
+def _promotion_exclusion(row: Mapping[str, Any]) -> dict[str, str] | None:
+    path = _object_path(row)
+    state = str(
+        (row.get("state_classification") or {}).get("class")
+        or row.get("state_class")
+        or ""
+    ).casefold()
+    if state in {"runtime", "recovery", "active_run", "sample_state"}:
+        return {"action": "exclude_runtime_state", "reason": state or "runtime"}
+    if path.endswith("database.svn") or path == "svnroot" or "/svnroot/" in f"/{path}":
+        return {"action": "exclude_internal_metadata", "reason": "svn_metadata"}
+    if path in {"database", "database.db"} or row.get("replace_database") is True:
+        return {"action": "exclude_database_replacement", "reason": "whole_database"}
+    return None
+
+
+def _tip_attribute_loss(source: Mapping[str, Any], target_rows: list[Mapping[str, Any]]) -> dict[str, Any] | None:
+    if str(source.get("type_id") or "").casefold() != "disposabletip":
+        return None
+    source_attrs = set((source.get("custom_attributes") or {}).keys())
+    for target in target_rows:
+        if str(target.get("type_id") or "").casefold() != "disposabletip":
+            continue
+        if str(target.get("object_name") or "").casefold() != str(source.get("object_name") or "").casefold():
+            continue
+        missing = sorted(set((target.get("custom_attributes") or {}).keys()) - source_attrs)
+        if missing:
+            return {
+                "code": "disposable_tip_attribute_loss",
+                "severity": "review",
+                "source": dict(source),
+                "missing_attributes": missing,
+            }
+    return None
+
+
 def _object_action(source: Mapping[str, Any], target_rows: list[Mapping[str, Any]]) -> dict[str, Any]:
     exact = [
         row for row in target_rows
@@ -133,6 +173,31 @@ def build_deployment_plan(
 
     target_rows = _objects(target or {})
     for source_row in _objects(source):
+        exclusion = _promotion_exclusion(source_row)
+        if exclusion:
+            actions.append({"source": source_row, **exclusion})
+            if exclusion["action"] == "exclude_database_replacement":
+                findings.append({
+                    "code": "whole_database_replacement_blocked",
+                    "severity": "blocked",
+                    "source": source_row,
+                })
+            elif exclusion["action"] == "exclude_internal_metadata":
+                findings.append({
+                    "code": "internal_metadata_not_deployed",
+                    "severity": "excluded",
+                    "source": source_row,
+                })
+            else:
+                findings.append({
+                    "code": "runtime_state_not_portable",
+                    "severity": "excluded",
+                    "source": source_row,
+                })
+            continue
+        tip_loss = _tip_attribute_loss(source_row, target_rows)
+        if tip_loss:
+            findings.append(tip_loss)
         action = _object_action(source_row, target_rows)
         actions.append({"source": source_row, **action})
         if action["action"] == "review_conflict":
