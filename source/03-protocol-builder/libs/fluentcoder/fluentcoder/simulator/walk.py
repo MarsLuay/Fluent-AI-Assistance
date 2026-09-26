@@ -1024,6 +1024,12 @@ class Simulator:
         """
         if step.parameters.get("prompt_only") in {True, "true", "True", "1"}:
             return EffectKind.VALIDATION_ONLY, "prompt-only application driver macro"
+        from ..driver_macro_source import application_driver_macro_has_unmodeled_source
+        if application_driver_macro_has_unmodeled_source(step.raw_xml):
+            return (
+                EffectKind.VALIDATION_ONLY,
+                "application driver macro keeps unmodeled source XML; recovery is not simulated",
+            )
         return (
             EffectKind.VALIDATION_ONLY,
             "application driver macro not modeled (non-motion default for verification)",
