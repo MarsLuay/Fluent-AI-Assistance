@@ -96,7 +96,9 @@ def _software_finding(source: Mapping[str, Any], target: Mapping[str, Any]) -> d
     if not source_family or not target_family:
         return {
             "code": "source_target_software_family_unknown",
-            "severity": "review",
+            "severity": "cannot_determine",
+            "source": source_family or None,
+            "target": target_family or None,
         }
     return None
 
@@ -157,6 +159,8 @@ def build_deployment_plan(
 
     if any(item.get("severity") == "blocked" for item in findings):
         status = "blocked"
+    elif any(item.get("severity") == "cannot_determine" for item in findings):
+        status = "cannot_determine"
     elif any(item.get("severity") == "review" for item in findings):
         status = "needs_review"
     elif selected_mode == "same_target_dropin":
@@ -174,6 +178,10 @@ def build_deployment_plan(
         "actions": actions,
         "findings": findings,
         "status": status,
+        "software_families": {
+            "source": str((source.get("software") or {}).get("family") or "") or None,
+            "target": str((target.get("software") or {}).get("family") or "") or None if target else None,
+        },
         "runtime_state_excluded": True,
         "destructive_target_mutation": False,
     }
