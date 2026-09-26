@@ -9,7 +9,7 @@ import pytest
 from fluentcoder.compiler.renderer import Renderer
 from fluentcoder.decompiler.codegen import emit_python
 from fluentcoder.decompiler.xscr_parser import parse_xscr
-from fluentcoder.ir.schema import Group, PickUpTipsStep, Protocol
+from fluentcoder.ir.schema import AddLabwareStep, Group, PickUpTipsStep, Protocol
 
 
 _WORKSPACE_GUID = "11111111-1234-aaaa-ffff-000000000222"
@@ -96,6 +96,33 @@ def test_mca_pickup_offsets_round_trip_zero_nonzero_and_variable(tmp_path: Path)
         "OrientationPhi": "phi",
     }.items():
         assert f"<{tag}>{value}</{tag}>" in rerendered
+
+
+@pytest.mark.usefixtures("synthetic_catalog")
+def test_tip_box_placement_rotation_survives_xscr_round_trip(tmp_path: Path) -> None:
+    protocol = Protocol(
+        name="mca-placement-rotation",
+        groups=[Group(
+            name="Setup",
+            steps=[AddLabwareStep(
+                labware_type="MCA96, 100ul, Box",
+                label="synthetic tips",
+                location="Nest",
+                position=1,
+                rotation=180,
+            )],
+        )],
+        worktable_guid=_WORKSPACE_GUID,
+        worktable_name=_WORKSPACE_NAME,
+    )
+    rendered = Renderer(deterministic=True).render(protocol)
+    source = tmp_path / "placement-rotation.xscr"
+    source.write_text(rendered, encoding="utf-8")
+
+    reparsed = parse_xscr(source).groups[0].steps[0]
+    assert isinstance(reparsed, AddLabwareStep)
+    assert reparsed.rotation == 180
+    assert "<Rotation>180</Rotation>" in rendered
 
 
 @pytest.mark.usefixtures("synthetic_catalog")

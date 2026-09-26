@@ -133,6 +133,9 @@ class Labware:
     ) -> None:
         self.label: str = label
         self.slot: Optional[tuple[str, int]] = None
+        # None means the source/worktable did not provide a placement rotation.
+        # A literal zero is intentionally distinct: it is known zero orientation.
+        self.placement_rotation: Optional[int] = None
         self.stack_below: list[Labware] = []
 
         # Geometry / wells get filled in by one of two paths.
@@ -380,6 +383,7 @@ class Labware:
             "component": self._component_geometry or None,
             "dimensions_mm": _vec3_to_dict(self.dim_mm),
             "slot": list(self.slot) if self.slot else None,
+            "placement_rotation": self.placement_rotation,
             "grid": self._grid_geometry(),
             "wells": {
                 address: self._well_body_geometry(well)
@@ -505,6 +509,7 @@ class ExternalLabware(Labware):
     def __init__(self, label: str, *, catalog: str, max_well_volume_ul: Optional[float] = None) -> None:
         self.label: str = label
         self.slot: Optional[tuple[str, int]] = None
+        self.placement_rotation: Optional[int] = None
         self.stack_below: list[Labware] = []
         self.catalog_name: str = catalog
         self.dim_mm: Optional[tuple[float, float, float]] = None

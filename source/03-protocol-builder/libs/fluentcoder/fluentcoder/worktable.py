@@ -790,12 +790,15 @@ class Worktable:
         rotation: int = 0,
     ) -> None:
         label = labware.label if isinstance(labware, Labware) else labware
-        self._emit(SetLocationStep(
+        step = SetLocationStep(
             labware=label,
             location=location,
             site=site,
             rotation=rotation,
-        ))
+        )
+        if isinstance(labware, Labware):
+            labware.placement_rotation = step.rotation
+        self._emit(step)
 
     def generic_step(self, step_type: str, **parameters: Any) -> None:
         """Emit a recognized but not yet modeled FluentControl command."""
@@ -951,6 +954,7 @@ class Worktable:
         location: str,
         position: Union[int, str, Expression],
         *,
+        rotation: int = 0,
         allow_occupied: bool = False,
         allow_invalid_slot: bool = False,
     ) -> Labware:
@@ -990,6 +994,7 @@ class Worktable:
         stack = self.slot_map.setdefault(slot, [])
         stack.append(labware)
         labware.slot = slot
+        labware.placement_rotation = rotation
         labware.stack_below = list(stack[:-1])
         self._register_child_valid_slots(labware)
         self._emit(AddLabwareStep(
@@ -997,6 +1002,7 @@ class Worktable:
             label=labware.label,
             location=location,
             position=position,
+            rotation=rotation,
         ))
         return labware
 

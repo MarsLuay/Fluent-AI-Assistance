@@ -30,10 +30,52 @@ def test_out_of_range_and_unprovable_offsets_are_review():
     assert any(item["code"] == "out_of_bounds" for item in bounded["findings"])
 
 
+def test_worktable_rotation_is_reviewed_without_a_verified_transform():
+    decision = validate_mca_pickup(_step(), placement_orientation={"rotation": 180})
+    assert decision["address"]["status"] == "cannot_determine"
+    assert decision["address"]["worktable_orientation"] == {"rotation": 180, "known": True}
+    assert decision["findings"][0]["code"] == "orientation_unproven"
+    assert decision["precise_occupancy_allowed"] is False
+
+
 def test_orientation_drift_is_not_silently_zeroed():
     decision = validate_mca_pickup(_step(orientation_theta=180), target_orientation={"phi": 0, "psi": 0, "theta": 0})
     assert decision["address"]["status"] == "cannot_determine"
     assert any(item["code"] == "semantic_loss" for item in decision["findings"])
+
+
+def test_simulator_refuses_rotated_placement_without_a_verified_transform():
+    wt = Worktable(name="mca-placement-rotation")
+    wt.group("Setup")
+    tips = wt.place(
+        MCA100Box("Tips", catalog="MCA96, 100ul, Box"),
+        "Nest",
+        1,
+        rotation=180,
+    )
+    assert tips.placement_rotation == 180
+    before = tips.available_tip_count
+    wt.group("Pickup")
+    wt.mca96.mount_adapter()
+    wt.mca96.pick_up(tips)
+    with pytest.raises(MissingTipsError, match="unrotated"):
+        wt.simulate()
+    assert tips.available_tip_count == before
+
+
+def test_simulator_tracks_set_location_rotation_before_pickup():
+    wt = Worktable(name="mca-set-location-rotation")
+    wt.group("Setup")
+    tips = wt.place(MCA100Box("Tips", catalog="MCA96, 100ul, Box"), "Nest", 1)
+    wt.set_location(tips, "Site", 2, rotation=180)
+    assert tips.placement_rotation == 180
+    before = tips.available_tip_count
+    wt.group("Pickup")
+    wt.mca96.mount_adapter()
+    wt.mca96.pick_up(tips)
+    with pytest.raises(MissingTipsError, match="unrotated"):
+        wt.simulate()
+    assert tips.available_tip_count == before
 
 
 def test_simulator_refuses_unrotated_occupancy_when_orientation_is_unknown():
