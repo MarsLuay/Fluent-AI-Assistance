@@ -169,6 +169,107 @@ def analyze_subroutine_lifecycle(steps: Iterable[Any]) -> SubroutineLifecycleRep
     return report
 
 
+def handoff_reconcile_allowed(report: SubroutineLifecycleReport, target: str) -> bool:
+    """Logical handoff state is usable only after the matching join.
+
+    This does not claim the physical handoff finished.
+    """
+    normalized = target.strip().strip('"')
+    joined = any(
+        event.get("action") == "join" and event.get("target") == normalized
+        for event in report.events
+    )
+    blocked = any(
+        finding.code in {"unmatched_join", "detached_join", "unjoined_async"}
+        and (finding.target == normalized or str(finding.target or "").startswith(normalized))
+        for finding in report.findings
+    )
+    return joined and not blocked
+
+
+def preserve_source_async_joins(
+    source_steps: Iterable[Any],
+    generated_steps: Iterable[Any],
+) -> list[LifecycleFinding]:
+    """Reject a generated path that drops or retargets a source async/join pair."""
+    source = [_call_record(step) for step in source_steps]
+    generated = [_call_record(step) for step in generated_steps]
+    findings: list[LifecycleFinding] = []
+    for launch_index, launch in enumerate(source):
+        if launch.get("mode") != "Asynchronous":
+            continue
+        join = next(
+            (
+                step for step in source[launch_index + 1:]
+                if step.get("mode") == "JoinSubroutine" and step.get("target") == launch.get("target")
+            ),
+            None,
+        )
+        if join is None:
+            continue
+        generated_launch = next(
+            (step for step in generated if step.get("mode") == "Asynchronous" and step.get("target") == launch.get("target")),
+            None,
+        )
+        generated_join = next(
+            (step for step in generated if step.get("mode") == "JoinSubroutine" and step.get("target") == launch.get("target")),
+            None,
+        )
+        if any(step.get("kind") == "delay" for step in generated):
+            findings.append(LifecycleFinding(
+                code="replaced_with_delay",
+                message="Generated synchronization used a delay instead of the source JoinSubroutine.",
+                step_index=launch_index,
+                target=launch.get("target"),
+            ))
+        if generated_launch is None or generated_join is None:
+            wrong = next((step for step in generated if step.get("mode") == "JoinSubroutine"), None)
+            findings.append(LifecycleFinding(
+                code="wrong_join_target" if wrong and wrong.get("target") != launch.get("target") else "dropped_async_join",
+                message="Generated steps do not keep the source asynchronous subroutine and its named join.",
+                step_index=launch_index,
+                target=launch.get("target"),
+                candidates=tuple(step.get("target") or "" for step in generated if step.get("mode") == "JoinSubroutine"),
+            ))
+            continue
+        if _mapping_key(generated_launch) != _mapping_key(launch) or _mapping_key(generated_join) != _mapping_key(join):
+            findings.append(LifecycleFinding(
+                code="mappings_changed",
+                message="Generated subroutine variable mappings differ from the source pair.",
+                step_index=launch_index,
+                target=launch.get("target"),
+            ))
+    return findings
+
+
+def _call_record(step: Any) -> dict[str, Any]:
+    if isinstance(step, Mapping):
+        kind = str(step.get("kind") or step.get("step_type") or "subroutine")
+        mappings_start = step.get("variable_mappings_start") or ()
+        mappings_end = step.get("variable_mappings_end") or ()
+        return {
+            "kind": kind,
+            "target": str(step.get("target") or step.get("subroutine") or "").strip().strip('"') or None,
+            "mode": str(step.get("execution_mode") or step.get("mode") or ""),
+            "mappings_start": tuple(mappings_start),
+            "mappings_end": tuple(mappings_end),
+        }
+    name = type(step).__name__
+    if name == "DelayStep":
+        return {"kind": "delay", "target": None, "mode": "", "mappings_start": (), "mappings_end": ()}
+    return {
+        "kind": "subroutine",
+        "target": str(getattr(step, "subroutine", "") or "").strip().strip('"') or None,
+        "mode": str(getattr(step, "execution_mode", "") or ""),
+        "mappings_start": tuple(getattr(step, "variable_mappings_start", ()) or ()),
+        "mappings_end": tuple(getattr(step, "variable_mappings_end", ()) or ()),
+    }
+
+
+def _mapping_key(record: Mapping[str, Any]) -> tuple[Any, Any]:
+    return (record.get("mappings_start"), record.get("mappings_end"))
+
+
 def _is_subroutine(step: Any) -> bool:
     return hasattr(step, "subroutine") and hasattr(step, "execution_mode")
 
