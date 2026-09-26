@@ -16,7 +16,9 @@
   `tecan.driver_command_contracts.v1` artifact so incompatible same-macro
   usages are not collapsed. Generation selects an exact source-backed
   contract or fails deterministically on ambiguity; never rewrite
-  `~Variable~` tokens to host absolute paths.
+  `~Variable~` tokens to host absolute paths. Unmodeled driver-macro XML
+  stays on `raw_xml` through codegen so a compile does not drop it.
+  That preservation is not a recovery policy and is not simulated as one.
 - Keep full-export readiness owned by the project-reader canonical model. The
   protocol-builder context, generation, validation, diagnostics, and one-shot
   consumers use its deterministic result rather than maintaining independent
