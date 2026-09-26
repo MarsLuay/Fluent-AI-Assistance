@@ -17,9 +17,6 @@ from pathlib import Path, PureWindowsPath
 from typing import Any, Mapping
 
 from .exports import _script_file_references
-from .external_process_contracts import (
-    extract_external_process_contracts_from_xscr_text,
-)
 from .subroutine_dependencies import clean_subroutine_reference, resolve_subroutine_dependencies
 
 _FILE_TAG_RE = re.compile(r"<File>(.*?)</File>", re.DOTALL | re.IGNORECASE)
@@ -57,16 +54,6 @@ def _extract_paths_from_xscr_text(text: str) -> list[str]:
     for pattern in (_FILE_TAG_RE, _APPLICATION_TAG_RE, _FILE_REF_TAG_RE, _VBSCRIPT_TAG_RE):
         for match in pattern.finditer(text):
             candidate = _normalize_path_text(match.group(1))
-            if _looks_like_windows_path(candidate):
-                paths.append(candidate)
-    # Execute Application arguments can carry the actual script, wrapper,
-    # config, input, or output path.  Use the same conservative contract
-    # parser as diagnostics so the legacy path audit and the new contract do
-    # not drift.  Basenames are intentionally omitted: #156 host evidence is
-    # required before a basename can be resolved to a target executable.
-    for contract in extract_external_process_contracts_from_xscr_text(text):
-        for dependency in contract.get("dependencies") or []:
-            candidate = _normalize_path_text(str(dependency.get("path") or ""))
             if _looks_like_windows_path(candidate):
                 paths.append(candidate)
     return paths
@@ -319,7 +306,6 @@ def audit_external_file_dependencies(
     # Map path -> script labels that reference it (for operator context).
     ref_map: dict[str, list[str]] = {path: [] for path in required}
     script_paths: list[tuple[str, Path]] = []
-    external_contracts: list[dict[str, Any]] = []
     if compiled_xscr is not None and compiled_xscr.is_file():
         script_paths.append(("generated script", compiled_xscr.resolve()))
     if isinstance(protocol_ir, dict) and isinstance(source_manifest, dict):
@@ -335,23 +321,7 @@ def audit_external_file_dependencies(
     for label, path in script_paths:
         if not path.is_file():
             continue
-        source_text = path.read_text(encoding="utf-8", errors="replace")
-        contracts = extract_external_process_contracts_from_xscr_text(
-            source_text,
-            source_script=label,
-            source_path=str(path),
-        )
-        for contract in contracts:
-            # Reports are diagnostics.  Keep the exact authored arguments in
-            # the in-memory contract API, but never write secret-bearing raw
-            # values into this persisted audit report.
-            public_contract = dict(contract)
-            if contract.get("findings"):
-                public_contract["raw_arguments"] = contract.get("redacted_arguments", "")
-                public_contract["parsed_argument_tokens"] = []
-            public_contract.pop("raw_metadata", None)
-            external_contracts.append(public_contract)
-        for item in _dedupe_paths(_extract_paths_from_xscr_text(source_text) + _script_file_references(path)):
+        for item in _dedupe_paths(_extract_paths_from_xscr(path) + _script_file_references(path)):
             ref_map.setdefault(item, [])
             if label not in ref_map[item]:
                 ref_map[item].append(label)
@@ -372,13 +342,6 @@ def audit_external_file_dependencies(
         "found_elsewhere_count": len(found_elsewhere),
         "search_roots": [str(root) for root in deduped_roots],
         "entries": entries,
-        "external_process_contracts": external_contracts,
-        "external_process_findings": [
-            finding
-            for contract in external_contracts
-            for finding in contract.get("findings") or []
-        ],
-        "needs_review": any(contract.get("needs_review") for contract in external_contracts),
     }
 
 
@@ -412,16 +375,7 @@ def render_external_file_dependencies_markdown(report: Mapping[str, Any]) -> str
     actionable = [item for item in entries if item.get("status") != "present"]
     if not actionable:
         lines.append("All scanned external file paths exist at their script-declared locations.")
-    process_findings = report.get("external_process_findings") or []
-    if process_findings:
-        lines.extend(["", "## External process review", ""])
-        for finding in process_findings:
-            code = finding.get("code") or "external_process_review"
-            lines.append(f"- `{code}`: review the source-backed invocation contract.")
-        lines.append("")
-    if report.get("needs_review"):
-        lines.append("Argument parsing remains conservative; unknown shell syntax and dynamic paths are retained for review.")
-    return "\n".join(lines).rstrip() + "\n"
+        return "\n".join(lines).rstrip() + "\n"
 
     lines.append("## Action required")
     lines.append("")

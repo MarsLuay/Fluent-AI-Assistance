@@ -55,39 +55,6 @@ def _objects(profile: Mapping[str, Any]) -> list[dict[str, Any]]:
     ))
 
 
-def _state_for(profile: Mapping[str, Any], row: Mapping[str, Any]) -> str:
-    classification = profile.get("state_classification") or {}
-    by_guid = classification.get("by_guid") or {}
-    by_path = classification.get("by_path") or {}
-    return str(
-        row.get("state_classification")
-        or by_guid.get(str(row.get("guid") or ""))
-        or by_path.get(str(row.get("relative_path") or ""))
-        or "source_managed"
-    )
-
-
-def _unsafe_source_reason(profile: Mapping[str, Any], row: Mapping[str, Any]) -> str | None:
-    state = _state_for(profile, row).casefold()
-    if state in {
-        "instrument_local_runtime_state",
-        "method_recovery_runtime_state",
-        "recovery_journal",
-        "active_run_state",
-        "sample_tracking_state",
-    }:
-        return state
-    relative = str(row.get("relative_path") or "").replace("\\", "/").casefold()
-    if relative.endswith("database.svn") or "/svnroot/" in f"/{relative}/" or relative.startswith("svnroot/"):
-        return "internal_svn_metadata"
-    return None
-
-
-def _is_disposable_tip(row: Mapping[str, Any]) -> bool:
-    text = " ".join(str(row.get(key) or "") for key in ("kind", "type_id", "object_name", "relative_path"))
-    return "tip" in text.casefold()
-
-
 def _semantic_key(row: Mapping[str, Any]) -> tuple[str, str, str, str]:
     return (
         str(row.get("kind") or "").casefold(),
@@ -108,27 +75,10 @@ def _object_action(source: Mapping[str, Any], target_rows: list[Mapping[str, Any
 
     semantic = [row for row in target_rows if _semantic_key(row) == _semantic_key(source)]
     if semantic:
-        if _is_disposable_tip(source):
-            verified = [row for row in semantic if row.get("vendor_verified") is True]
-            source_attrs = source.get("custom_attributes_fingerprint")
-            target_attrs = [row.get("custom_attributes_fingerprint") for row in semantic]
-            if verified and source_attrs not in target_attrs:
-                return {
-                    "action": "reuse_target",
-                    "target": dict(verified[0]),
-                    "reason": "verified_target_disposable_tip_definition",
-                    "finding_code": "tip_definition_execution_attributes_would_be_lost",
-                }
         return {
             "action": "review_conflict",
             "target_candidates": [dict(row) for row in semantic],
             "reason": "same_name_or_role_different_identity_or_content",
-            "finding_code": (
-                "tip_definition_execution_attributes_would_be_lost"
-                if _is_disposable_tip(source)
-                and any(row.get("custom_attributes_fingerprint") != source.get("custom_attributes_fingerprint") for row in semantic)
-                else None
-            ),
         }
     return {"action": "import_dependency", "reason": "missing_target_object"}
 
@@ -157,7 +107,6 @@ def build_deployment_plan(
     *,
     mode: str | None = None,
     external_files: list[Mapping[str, Any]] | None = None,
-    proposed_database_replacement: bool = False,
 ) -> dict[str, Any]:
     """Build a plan from explicit source/target profiles.
 
@@ -179,24 +128,9 @@ def build_deployment_plan(
     family_finding = _software_finding(source, target or {})
     if family_finding:
         findings.append(family_finding)
-    if proposed_database_replacement:
-        findings.append({"code": "whole_database_replacement_refused", "severity": "blocked"})
-    if (source.get("state_classification") or {}).get("active_recovery"):
-        findings.append({"code": "active_method_recovery_requires_operator_resolution", "severity": "blocked"})
 
     target_rows = _objects(target or {})
     for source_row in _objects(source):
-        unsafe_reason = _unsafe_source_reason(source, source_row)
-        if unsafe_reason:
-            action = {
-                "action": "exclude_source_object",
-                "source": source_row,
-                "reason": unsafe_reason,
-            }
-            actions.append(action)
-            if unsafe_reason == "internal_svn_metadata":
-                findings.append({"code": "internal_svn_metadata_not_deployable", "severity": "blocked", "source": source_row})
-            continue
         action = _object_action(source_row, target_rows)
         actions.append({"source": source_row, **action})
         if action["action"] == "review_conflict":
@@ -205,12 +139,6 @@ def build_deployment_plan(
                 "severity": "review",
                 "source": source_row,
                 "target_candidates": action["target_candidates"],
-            })
-        if action.get("finding_code"):
-            findings.append({
-                "code": action["finding_code"],
-                "severity": "review",
-                "source": source_row,
             })
 
     for external in sorted(external_files or [], key=lambda row: json.dumps(_canonical(row), sort_keys=True)):
