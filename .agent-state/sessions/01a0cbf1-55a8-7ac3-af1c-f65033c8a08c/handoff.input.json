@@ -1,0 +1,39 @@
+{
+  "schema_version": 2,
+  "task_goal": "Implement exactly MarsLuay/Fluent-AI-Assistance#170 in the assigned isolated worktree.",
+  "acceptance_criteria": "Source-backed issue-scoped change, regression coverage, focused checks, commit/push/open PR if complete; otherwise retryable blocker.",
+  "confirmed_facts": [],
+  "assumptions": [
+    "handoff written from session wrapper"
+  ],
+  "important_files": [
+    "None (product source)"
+  ],
+  "important_symbols": [],
+  "decisions": [
+    {
+      "rationale": "Blocked and released by issue-accept helper: target datastore/promotion source evidence and legitimate sanitized fixture are unavailable; no product files changed.",
+      "decision": "snapshot via agent-session-start"
+    }
+  ],
+  "files_changed": [
+    "None (product source)"
+  ],
+  "verification_performed": [
+    "python -m pytest source/03-protocol-builder/tests/test_fluentcontrol_inventory.py -q (3 passed)"
+  ],
+  "baseline_failures": [],
+  "current_failures": [],
+  "unresolved_risks": [],
+  "remaining_steps": [],
+  "next_recommended_action": "Retry #170 in a fresh claim after target profile/deployment contract and sanitized source/target fixtures are available; preserve current worktree and fixture/inspiration dirt.",
+  "source_session_id": "01a0cbf1-55a8-7ac3-af1c-f65033c8a08c",
+  "active_subproject": ".",
+  "raw_artifact_refs": [],
+  "contract_id": "",
+  "contract_hash": "",
+  "route_id": "",
+  "context_packet_hash": "",
+  "recovery_disposition": "",
+  "trigger": "issue-accept-worker"
+}
