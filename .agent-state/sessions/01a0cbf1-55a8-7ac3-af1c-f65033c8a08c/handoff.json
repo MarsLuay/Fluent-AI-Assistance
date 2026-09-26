@@ -182,7 +182,9 @@
     "handoff written from session wrapper"
   ],
   "important_files": [
-    "None (product source)"
+    "source/03-protocol-builder/fluent_pipeline/worktable_geometry.py",
+    "source/03-protocol-builder/libs/fluentcoder/fluentcoder/ir/schema.py",
+    "source/03-protocol-builder/tests"
   ],
   "important_symbols": [],
   "decisions": [

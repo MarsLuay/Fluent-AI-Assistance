@@ -2,7 +2,7 @@
 
 schema_version: 2
 trigger: issue-accept-worker
-timestamp: 2026-09-23T03:08:53+00:00
+timestamp: 2026-09-23T03:11:10+00:00
 source_session_id: 01a0cbf1-55a8-7ac3-af1c-f65033c8a08c
 active_subproject: .
 
@@ -22,7 +22,9 @@ Implement exactly MarsLuay/Fluent-AI-Assistance#168 in the assigned isolated wor
 - handoff written from session wrapper
 
 ## Important files
-- None (product source)
+- source/03-protocol-builder/fluent_pipeline/worktable_geometry.py
+- source/03-protocol-builder/libs/fluentcoder/fluentcoder/ir/schema.py
+- source/03-protocol-builder/tests
 
 ## Important symbols
 - None recorded.

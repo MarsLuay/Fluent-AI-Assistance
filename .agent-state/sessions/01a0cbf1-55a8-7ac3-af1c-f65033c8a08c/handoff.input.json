@@ -1,13 +1,15 @@
 {
   "schema_version": 2,
-  "task_goal": "Implement exactly MarsLuay/Fluent-AI-Assistance#170 in the assigned isolated worktree.",
+  "task_goal": "Implement exactly MarsLuay/Fluent-AI-Assistance#172 in the assigned isolated worktree.",
   "acceptance_criteria": "Source-backed issue-scoped change, regression coverage, focused checks, commit/push/open PR if complete; otherwise retryable blocker.",
   "confirmed_facts": [],
   "assumptions": [
     "handoff written from session wrapper"
   ],
   "important_files": [
-    "None (product source)"
+    "source/03-protocol-builder/fluent_pipeline/worktable_geometry.py",
+    "source/03-protocol-builder/libs/fluentcoder/fluentcoder/ir/schema.py",
+    "source/03-protocol-builder/tests"
   ],
   "important_symbols": [],
   "decisions": [
