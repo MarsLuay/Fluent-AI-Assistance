@@ -1293,6 +1293,10 @@ def _emit_application_driver_macro(step: ApplicationDriverMacroStep) -> str:
         parts.append(f"execution_settings={step.execution_settings!r}")
     elif step.parameters:
         parts.append(f"parameters={step.parameters!r}")
+    if step.raw_xml:
+        parts.append(f"raw_xml={step.raw_xml!r}")
+    if step.recovery_policy is not None:
+        parts.append(f"recovery_policy={step.recovery_policy.model_dump(exclude_none=True)!r}")
     return f"wt.application_driver_macro({', '.join(parts)})"
 
 

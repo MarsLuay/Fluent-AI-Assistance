@@ -21,6 +21,7 @@ from .expressions import Expression, IndexExpression, coerce_source_expression, 
 from .fc_variables import (
     FCVariableToken, as_labware_type, is_valid_fc_variable_name,
 )
+from .ir.driver_recovery import DriverRecoveryPolicy, driver_recovery_from_mapping
 from .ir.schema import (
     AddLabwareStep, ApplicationDriverMacroStep, CommentStep, ConditionalStep,
     EndScriptStep, ExecuteApplicationStep, ExportVariableStep, GenericStep, Group,
@@ -843,15 +844,21 @@ class Worktable:
         available_id: Optional[str] = None,
         execution_settings: str = "",
         parameters: Optional[dict[str, str]] = None,
+        recovery_policy: DriverRecoveryPolicy | dict[str, Any] | None = None,
         raw_xml: Optional[str] = None,
     ) -> None:
-        """Emit a VisionX application-driver macro step."""
+        """Emit a driver macro with optional source-backed recovery policy.
+
+        A policy is only compiled when its element name or preserved source XML
+        is available; this keeps unsupported FluentControl variants fail-closed.
+        """
         self._emit(ApplicationDriverMacroStep(
             macro_name=macro_name,
             module_name=module_name,
             available_id=available_id,
             execution_settings=execution_settings,
             parameters=dict(parameters or {}),
+            recovery_policy=driver_recovery_from_mapping(recovery_policy),
             raw_xml=raw_xml,
         ))
 
@@ -1118,6 +1125,7 @@ class Worktable:
             self,
             subroutine_registry=options.subroutine_registry,
             snapshot_mode=effective_snapshot_mode,
+            driver_outcomes=options.driver_outcomes,
         )
         sim.run(
             fail_on_opaque=options.fail_on_opaque,

@@ -7,7 +7,7 @@ import logging
 import math
 import re
 from .. import xml_compat as ET
-from typing import TYPE_CHECKING, Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal, Mapping, Optional
 
 from ..fc_variables import decode_fc_variable
 from ..expressions import (
@@ -89,11 +89,15 @@ class Simulator:
         subroutine_registry: "SubroutineRegistry | None" = None,
         max_subroutine_depth: int = 8,
         snapshot_mode: Literal["full", "final_only", "delta"] = "full",
+        driver_outcomes: Mapping[str, Any] | None = None,
     ) -> None:
         self._wt = worktable
         self._subroutine_registry = subroutine_registry
         self._max_subroutine_depth = max_subroutine_depth
         self._snapshot_mode = snapshot_mode
+        self._driver_outcomes = dict(driver_outcomes or {})
+        self._driver_outcome_positions: dict[str, int] = {}
+        self._driver_step_details: dict[str, Any] = {}
         self._subroutine_call_stack: list[str] = []
         # Per-subroutine sim variable scopes (innermost last).
         self._sim_scope_stack: list[dict[str, Any]] = []
@@ -143,6 +147,7 @@ class Simulator:
         strict: bool = False,
     ) -> None:
         self._strict = strict
+        self._driver_outcome_positions.clear()
         self._wt.snapshots.clear()
         self._wt.simulation_report = self._report
         protocol = self._wt.to_protocol()
@@ -395,18 +400,22 @@ class Simulator:
         self._step_index += 1
 
     def _step_metadata(self, step) -> dict[str, Any]:
-        if not isinstance(step, RgaTransferLabwareStep):
-            return {}
-        return {
-            key: value
-            for key, value in {
-                "route_assessment": step.rga_route_assessment,
-                "topology_transition": step.rga_topology_transition,
-                "logical_occupancy": step.rga_logical_occupancy,
-                "physical_limitations": step.rga_physical_limitations,
-            }.items()
-            if value not in (None, {}, [])
-        }
+        metadata: dict[str, Any] = {}
+        if isinstance(step, RgaTransferLabwareStep):
+            metadata.update({
+                key: value
+                for key, value in {
+                    "route_assessment": step.rga_route_assessment,
+                    "topology_transition": step.rga_topology_transition,
+                    "logical_occupancy": step.rga_logical_occupancy,
+                    "physical_limitations": step.rga_physical_limitations,
+                }.items()
+                if value not in (None, {}, [])
+            })
+        if isinstance(step, ApplicationDriverMacroStep) and self._driver_step_details:
+            metadata.update(self._driver_step_details)
+            self._driver_step_details = {}
+        return metadata
 
     def _validate_rga_evidence(self, step: RgaTransferLabwareStep) -> None:
         route = step.rga_route_assessment or {}
@@ -1016,18 +1025,92 @@ class Simulator:
         self,
         step: ApplicationDriverMacroStep,
     ) -> tuple[EffectKind, str]:
-        """Application-driver macros are non-motion by default (gate 28 / verification safety).
+        """Model only explicitly injected, offline driver outcomes.
 
-        Even macros like ``RGA1_TransferLabware`` or ``RGA1_ExecuteSingleVector`` are
-        not replayed as deck motion in the twin unless explicitly flagged prompt-only
-        (operator-facing verification placeholder).
+        No hardware or vendor error code is inferred.  A policy with unknown
+        action remains preserved and is reported as review-only.
         """
         if step.parameters.get("prompt_only") in {True, "true", "True", "1"}:
             return EffectKind.VALIDATION_ONLY, "prompt-only application driver macro"
-        return (
-            EffectKind.VALIDATION_ONLY,
-            "application driver macro not modeled (non-motion default for verification)",
+
+        outcome = self._next_driver_outcome(step.macro_name)
+        policy = step.recovery_policy
+        details: dict[str, Any] = {"driver_outcome": outcome, "recovery_policy": None}
+        if policy is not None:
+            details["recovery_policy"] = policy.as_dict()
+        if outcome in {None, "success"}:
+            details.update(
+                selected_action="success", retry_attempts=0,
+                execution_continues=True, known_state=True,
+                operator_action_required=False,
+            )
+            self._driver_step_details = details
+            return EffectKind.VALIDATION_ONLY, "application driver macro succeeded or was not injected"
+        if policy is None:
+            details.update(
+                selected_action="unhandled_failure", retry_attempts=0,
+                execution_continues=False, known_state=False,
+                operator_action_required=False,
+            )
+            self._driver_step_details = details
+            return EffectKind.VALIDATION_ONLY, "injected driver failure has no recovery policy"
+
+        action = policy.normalized_action
+        retry_attempts = 0
+        final_outcome = outcome
+        if action == "retry":
+            max_retries = policy.max_retries or 0
+            while retry_attempts < max_retries and final_outcome != "success":
+                retry_attempts += 1
+                final_outcome = self._next_driver_outcome(step.macro_name)
+            selected_action = "retry_success" if final_outcome == "success" else "retry_exhausted"
+            continues = final_outcome == "success"
+            known_state = continues
+            operator_required = False
+        elif action == "continue":
+            selected_action, continues, known_state, operator_required = (
+                "continue", True, False, False
+            )
+        elif action in {"abort", "stop"}:
+            selected_action, continues, known_state, operator_required = (
+                action, False, False, False
+            )
+        elif action == "operator":
+            selected_action, continues, known_state, operator_required = (
+                "operator", False, False, True
+            )
+        elif action == "handler" and policy.handler_target:
+            selected_action, continues, known_state, operator_required = (
+                "handler", False, False, False
+            )
+        else:
+            selected_action, continues, known_state, operator_required = (
+                "unknown", False, False, False
+            )
+        details.update(
+            selected_action=selected_action,
+            retry_attempts=retry_attempts,
+            final_driver_outcome=final_outcome,
+            execution_continues=continues,
+            known_state=known_state,
+            operator_action_required=operator_required,
         )
+        self._driver_step_details = details
+        return EffectKind.VALIDATION_ONLY, f"driver recovery branch: {selected_action}"
+
+    def _next_driver_outcome(self, macro_name: str) -> str | None:
+        configured = self._driver_outcomes.get(macro_name)
+        if configured is None:
+            configured = self._driver_outcomes.get("*")
+        if configured is None:
+            return None
+        if isinstance(configured, (list, tuple)):
+            position = self._driver_outcome_positions.get(macro_name, 0)
+            self._driver_outcome_positions[macro_name] = position + 1
+            if position < len(configured):
+                return str(configured[position]).strip().casefold()
+            return str(configured[-1]).strip().casefold() if configured else None
+        return str(configured).strip().casefold()
 
     def _on_generic_step(self, step: GenericStep) -> tuple[EffectKind, str]:
         raw_xml = step.parameters.get("raw_xml")
