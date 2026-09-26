@@ -80,7 +80,13 @@ physical motion, calibration, alignment, clearance, or collision safety. MCA
 pickup XSCR ingestion likewise keeps source-backed coordinates, offsets,
 orientation, and tip-position expressions typed through renderer and
 Decompiler round-trips; additive fields outside that contract remain
-source-preserved rather than inferred. The simulator's authoring command
+source-preserved rather than inferred. Source AddLabware/SetLocation rotation
+is retained as placement context for MCA pickup validation and simulation.
+Only a proven zero placement rotation resolves the existing authored address
+contract; non-zero or unavailable transforms remain `cannot_determine` rather
+than applying forum-observed 180-degree behavior. The simulator reports only
+modeled logical selection and keeps physical readiness unverified. The
+simulator's authoring command
 catalog is the schema-backed
 `source/04-protocol-simulator/src/data/controlBar.ts` catalog; editor toolbox
 and restored-command handling validate operations against the generated

@@ -602,6 +602,7 @@ class Simulator:
             twin.catalog_name = resolved_catalog
         twin.label = runtime_label
         twin.slot = slot
+        twin.placement_rotation = step.rotation
         twin.stack_below = list(existing_stack)
         existing_stack.append(twin)
         self._twin[runtime_label] = twin
@@ -654,15 +655,6 @@ class Simulator:
 
     def _on_pickup_tips(self, step: PickUpTipsStep) -> None:
         from ..heads.mca_pickup_address import validate_mca_pickup
-        decision = validate_mca_pickup(step)
-        if not decision["precise_occupancy_allowed"]:
-            raise _with_sim_details(
-                MissingTipsError(
-                    "MCA pickup address is not resolved; refusing an unrotated tip occupancy claim"
-                ),
-                category="pickup_address_unproven",
-                tip_box=step.labware_name,
-            )
         if self._mca_adapter_label is None:
             raise MissingAdapterError(
                 f"PickUpTips({step.labware_name!r}) but no adapter is mounted on the MCA-96 head"
@@ -671,6 +663,18 @@ class Simulator:
         if not isinstance(tip_box, TipBox):
             raise MissingTipsError(
                 f"PickUpTips: {step.labware_name!r} is not a tip box"
+            )
+        decision = validate_mca_pickup(
+            step,
+            placement_orientation={"rotation": tip_box.placement_rotation},
+        )
+        if not decision["precise_occupancy_allowed"]:
+            raise _with_sim_details(
+                MissingTipsError(
+                    "MCA pickup address is not resolved; refusing an unrotated tip occupancy claim"
+                ),
+                category="pickup_address_unproven",
+                tip_box=step.labware_name,
             )
         try:
             addresses = tip_box.addresses_for_pickup(
@@ -999,6 +1003,7 @@ class Simulator:
         labware.stack_below = list(dest_stack)
         dest_stack.append(labware)
         labware.slot = dest
+        labware.placement_rotation = step.rotation
 
     def _on_subroutine(self, step: SubRoutineStep) -> tuple[EffectKind, str]:
         mode = str(step.execution_mode or "Synchronous").strip()

@@ -73,3 +73,9 @@
   source-unbacked external outcome remains unknown, so logical Add/Remove/Move
   state stays reviewable until reconciliation is proven. Offline simulation
   accepts only injected outcomes and keeps physical verification separate.
+- Keep MCA pickup placement transforms conservative: preserve source
+  AddLabware/SetLocation rotation through the typed worktable and simulator
+  state, resolve only the source-backed zero-rotation address contract, and
+  report non-zero or unavailable transforms as reviewable rather than applying
+  an unverified 180-degree mirror rule. Physical box orientation remains the
+  responsibility of hardware verification (#160).

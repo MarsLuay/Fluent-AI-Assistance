@@ -279,6 +279,8 @@ def _parse_add_labware(command_id: str, obj: ET.Element) -> Step:
             "Position",
             _extract_field(obj, "Position") or "1",
         ),
+        rotation=_parse_int(_extract_field(obj, "Rotation"), default=0),
+        has_lid=_parse_bool(_extract_field(obj, "HasLid")),
     )
 
 def _parse_remove_labware(command_id: str, obj: ET.Element) -> Step:
