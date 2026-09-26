@@ -62,3 +62,8 @@
   structured logs. Missing version or trigger evidence remains unknown or
   trigger-not-present; motion analysis does not model geometry, physical
   readiness (#160), direct arm workarounds, or pipetting root cause.
+- Keep generation and packaging target datastore identity explicit: an explicit
+  `tecan.target_datastore.v1` profile is the only source for target-dependent
+  script GUID rewrites and prerequisite checks; without one, package as
+  target-unbound, consult no build-host datastore, and record the binding status
+  and fingerprint in the handoff metadata and reports.

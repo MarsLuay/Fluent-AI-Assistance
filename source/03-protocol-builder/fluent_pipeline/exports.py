@@ -30,11 +30,14 @@ from .checksums import (
 )
 from .fluentcontrol_inventory import (
     build_scripts_inventory,
+    build_scripts_inventory_from_target_profile,
     collision_preflight,
+    empty_scripts_inventory,
     find_local_script_guid,
     report_missing_system_dependencies,
     rewrite_script_reference_guids,
 )
+from .target_datastore import load_target_datastore_profile
 from .bundle_media import (
     SOURCE_MEDIA_ORIGINALS_DIR,
     assign_step_label_media_to_final_prompts,
@@ -208,12 +211,32 @@ def export_ready_to_import(
     validation_diff_json: Path | None = None,
     validation_context: dict[str, Any] | None = None,
     target_script_folder: str | None = None,
+    target_profile: Path | str | Mapping[str, Any] | None = None,
     reports: list[Path] | None = None,
     media_dir: Path | None = None,
     publish: bool = True,
     export_summary: dict[str, Any] | None = None,
 ) -> list[ExportedArtifact] | ReadyBundleStage:
     """Copy artifacts into a strict `ready-to-import/<script>/` bundle."""
+    selected_target_profile = (
+        load_target_datastore_profile(target_profile) if target_profile is not None else None
+    )
+    target_is_bound = bool(selected_target_profile and selected_target_profile.get("status") == "bound")
+    target_scripts_inventory = (
+        build_scripts_inventory_from_target_profile(selected_target_profile)
+        if target_is_bound and selected_target_profile is not None
+        else empty_scripts_inventory(target_profile=selected_target_profile)
+    )
+    target_binding = {
+        "status": "bound" if target_is_bound else "unbound",
+        "source": "explicit_target_profile" if selected_target_profile is not None else "target_unbound",
+        "target_profile_id": (
+            selected_target_profile.get("target_profile_id") if selected_target_profile is not None else None
+        ),
+        "fingerprint": (
+            selected_target_profile.get("fingerprint") if target_is_bound and selected_target_profile else None
+        ),
+    }
     finalization_source = (
         protocol_ir
         if protocol_ir is not None and protocol_ir.exists()
@@ -554,6 +577,8 @@ def export_ready_to_import(
                 media_dir=generated_media_dir,
                 media_path_map=media_path_map,
                 target_script_folder=target_script_folder,
+                target_profile=selected_target_profile,
+                target_scripts_inventory=target_scripts_inventory,
                 exports=exports,
                 copied_files=copied_files,
             )
@@ -764,8 +789,43 @@ def export_ready_to_import(
                 source_projects=source_projects or [],
             ),
         )
+        target_datastore_report = {
+            "schema": "tecan.fluentcontrol.target_datastore_binding.v1",
+            **target_binding,
+            "selected_objects": {
+                "userspecific_scripts": target_scripts_inventory.get("script_count", 0),
+                "systemspecific_objects": (
+                    len((selected_target_profile.get("objects") or {}).get("systemspecific") or [])
+                    if selected_target_profile is not None
+                    else 0
+                ),
+            },
+            "host_inventory_consulted": False,
+        }
+        target_datastore_report_dest = reports_dir / "target_datastore.json"
+        ensure_parent(target_datastore_report_dest)
+        target_datastore_report_dest.write_text(
+            json.dumps(target_datastore_report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        exports.append(
+            ExportedArtifact(
+                target_datastore_report_dest,
+                target_datastore_report_dest,
+                "target-datastore-report",
+            )
+        )
+        copied_files.append(
+            _file_record(
+                "target-datastore-report",
+                target_datastore_report_dest,
+                target_datastore_report_dest,
+                bundle_root=bundle_root,
+            )
+        )
         metadata = {
             "bundle_schema_version": BUNDLE_SCHEMA_VERSION,
+            "target_datastore": target_datastore_report,
             "script_name": script_name,
             "context_name": context_name,
             "exported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -887,6 +947,7 @@ def export_ready_to_import(
                 "validation_report": "source/reports/validation_report.md",
                 "validation_report_json": "source/reports/validation_report.json",
                 "physical_verification": "source/reports/physical_verification.json",
+                "target_datastore": "source/reports/target_datastore.json",
                 "metadata": "source/metadata.json",
             },
             "compiled_xscr": "direct-imports/scripts/full-script/generated_script.xscr",
@@ -983,6 +1044,7 @@ def export_ready_to_import(
                 "readiness": readiness,
                 "validation_report_markdown": validation_dest,
                 "validation_report_json": validation_json_dest,
+                "target_datastore": target_datastore_report,
             }
         )
     if not publish:
@@ -2621,6 +2683,8 @@ def _write_project_import_archives(
     exports: list[ExportedArtifact] | None = None,
     copied_files: list[dict[str, str]] | None = None,
     target_script_folder: str | None = None,
+    target_profile: Mapping[str, Any] | None = None,
+    target_scripts_inventory: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     subroutine_artifacts = _dedupe_subroutine_artifacts(subroutine_artifacts)
     exports = exports if exports is not None else []
@@ -2655,6 +2719,8 @@ def _write_project_import_archives(
             media_dir=media_dir,
             media_path_map=media_path_map,
             target_script_folder=target_script_folder,
+            target_profile=target_profile,
+            target_scripts_inventory=target_scripts_inventory,
             filesystem_source_archives=ordered_filesystem_sources,
         )
         exports.append(ExportedArtifact(source_project, destination, "generated-project-archive"))
@@ -2686,6 +2752,8 @@ def _write_generated_project_archive(
     media_dir: Path | None = None,
     media_path_map: dict[str, Any] | None = None,
     target_script_folder: str | None = None,
+    target_profile: Mapping[str, Any] | None = None,
+    target_scripts_inventory: dict[str, Any] | None = None,
     filesystem_source_archives: list[Path] | None = None,
 ) -> dict[str, Any]:
     if _force_full_zeia_copy():
@@ -2701,6 +2769,8 @@ def _write_generated_project_archive(
             media_dir=media_dir,
             media_path_map=media_path_map,
             target_script_folder=target_script_folder,
+            target_profile=target_profile,
+            target_scripts_inventory=target_scripts_inventory,
             filesystem_source_archives=filesystem_source_archives,
         )
     return _write_generated_project_archive_script_scoped(
@@ -2715,6 +2785,8 @@ def _write_generated_project_archive(
         media_dir=media_dir,
         media_path_map=media_path_map,
         target_script_folder=target_script_folder,
+        target_profile=target_profile,
+        target_scripts_inventory=target_scripts_inventory,
         filesystem_source_archives=filesystem_source_archives,
     )
 
@@ -2732,6 +2804,8 @@ def _write_generated_project_archive_with_fluent_writer(
     media_dir: Path | None = None,
     media_path_map: dict[str, Any] | None = None,
     target_script_folder: str | None = None,
+    target_profile: Mapping[str, Any] | None = None,
+    target_scripts_inventory: dict[str, Any] | None = None,
     filesystem_source_archives: list[Path] | None = None,
 ) -> dict[str, Any]:
     """Backward-compatible alias for script-scoped packaging."""
@@ -2747,6 +2821,8 @@ def _write_generated_project_archive_with_fluent_writer(
         media_dir=media_dir,
         media_path_map=media_path_map,
         target_script_folder=target_script_folder,
+        target_profile=target_profile,
+        target_scripts_inventory=target_scripts_inventory,
         filesystem_source_archives=filesystem_source_archives,
     )
 
@@ -2764,6 +2840,8 @@ def _write_generated_project_archive_script_scoped(
     media_dir: Path | None = None,
     media_path_map: dict[str, Any] | None = None,
     target_script_folder: str | None = None,
+    target_profile: Mapping[str, Any] | None = None,
+    target_scripts_inventory: dict[str, Any] | None = None,
     filesystem_source_archives: list[Path] | None = None,
 ) -> dict[str, Any]:
     subroutine_artifacts = _dedupe_subroutine_artifacts(subroutine_artifacts)
@@ -2805,24 +2883,26 @@ def _write_generated_project_archive_script_scoped(
     )
     generated_payload = _postprocess_archive_writer_script_payload(generated_payload)
 
-    local_scripts_inventory = build_scripts_inventory()
+    target_inventory = target_scripts_inventory or empty_scripts_inventory(
+        target_profile=target_profile
+    )
     generated_payload, subroutine_guid_rewrites = rewrite_script_reference_guids(
         generated_payload,
-        local_scripts_inventory,
+        target_inventory,
     )
 
     target_folder = (
         _script_folder_from_payload(generated_payload) or generated_target_folder or source_folder
     )
     main_collision = collision_preflight(
-        local_scripts_inventory,
+        target_inventory,
         generated_name,
         target_folder,
     )
     local_target_guid = find_local_script_guid(
         generated_name,
         target_folder,
-        inventory=local_scripts_inventory,
+        inventory=target_inventory,
     )
     replace_existing = (
         bool(main_record.get("guid"))
@@ -3136,6 +3216,8 @@ def _write_generated_project_archive_script_scoped(
     target_prereq_report = report_missing_system_dependencies(
         generated_payload,
         base_archive_guids=base_archive_guids,
+        target_profile=target_profile,
+        use_local_defaults=False,
     )
     if int(target_prereq_report.get("missing_count") or 0):
         missing_names = ", ".join(
@@ -3216,6 +3298,10 @@ def _write_generated_project_archive_script_scoped(
         "subroutine_audit": subroutine_audit,
         "writer_report": writer_report,
         "warnings": warnings,
+        "target_binding": {
+            "status": "bound" if target_profile and target_profile.get("status") == "bound" else "unbound",
+            "fingerprint": str((target_profile or {}).get("fingerprint") or "") or None,
+        },
         "zip_valid": zipfile.is_zipfile(destination),
         "checksum_note": _checksum_note(checksum_audit),
     }
@@ -3234,6 +3320,8 @@ def _write_generated_project_archive_legacy_zip(
     media_dir: Path | None = None,
     media_path_map: dict[str, Any] | None = None,
     target_script_folder: str | None = None,
+    target_profile: Mapping[str, Any] | None = None,
+    target_scripts_inventory: dict[str, Any] | None = None,
     filesystem_source_archives: list[Path] | None = None,
 ) -> dict[str, Any]:
     subroutine_artifacts = _dedupe_subroutine_artifacts(subroutine_artifacts)
