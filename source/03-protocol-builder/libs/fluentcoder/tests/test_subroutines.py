@@ -145,8 +145,8 @@ def test_simulator_subroutine_variable_mappings_literal_start() -> None:
 
     report = wt.simulation_report
     assert report is not None
-    assert report.total_executed_steps == 4
-    assert report.opaque_noop_steps == 0
+    assert report.total_executed_steps == 2
+    assert any("not executed as a fresh call" in (entry.message or "") for entry in report.steps)
 
 
 def test_simulator_subroutine_variable_mappings_finger_selection() -> None:
@@ -172,8 +172,27 @@ def test_simulator_subroutine_variable_mappings_finger_selection() -> None:
 
     report = wt.simulation_report
     assert report is not None
-    # SubRoutineStep + LoopStep + 3 looped comments + caller wait
-    assert report.total_executed_steps == 6
-    assert report.opaque_noop_steps == 0
-    assert wt.sim_values["OutFinger"] == 3
+    assert report.total_executed_steps == 2
+    assert "OutFinger" not in wt.sim_values
+    assert any("not executed as a fresh call" in (entry.message or "") for entry in report.steps)
+
+
+def test_named_join_synchronizes_only_the_launched_subroutine() -> None:
+    wrong = Worktable(name="wrong-join")
+    wrong.group("Steps")
+    wrong.call_subroutine(r"Scripts\MCA_Copy", execution_mode="Asynchronous")
+    wrong.call_subroutine(r"Scripts\Waitsubroutine", execution_mode="JoinSubroutine")
+    wrong.simulate()
+    wrong_messages = [entry.message or "" for entry in wrong.simulation_report.steps]
+    assert any("Waitsubroutine" in message and "not executed as a fresh call" in message for message in wrong_messages)
+    assert any("body effects wait for the named join" in message for message in wrong_messages)
+
+    corrected = Worktable(name="named-join")
+    corrected.group("Steps")
+    corrected.call_subroutine(r"Scripts\MCA_Copy", execution_mode="Asynchronous")
+    corrected.call_subroutine(r"Scripts\MCA_Copy", execution_mode="JoinSubroutine")
+    corrected.simulate()
+    corrected_messages = [entry.message or "" for entry in corrected.simulation_report.steps]
+    assert any("synchronized" in message and "MCA_Copy" in message for message in corrected_messages)
+    assert not any("not executed as a fresh call" in message for message in corrected_messages)
 

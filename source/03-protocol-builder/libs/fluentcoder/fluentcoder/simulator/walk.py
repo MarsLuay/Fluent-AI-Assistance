@@ -95,6 +95,8 @@ class Simulator:
         self._max_subroutine_depth = max_subroutine_depth
         self._snapshot_mode = snapshot_mode
         self._subroutine_call_stack: list[str] = []
+        self._async_subroutines: dict[str, list[str]] = {}
+        self._detached_subroutines: set[str] = set()
         # Per-subroutine sim variable scopes (innermost last).
         self._sim_scope_stack: list[dict[str, Any]] = []
         self._wt.sim_attribute_lineage.clear()
@@ -980,6 +982,37 @@ class Simulator:
         labware.slot = dest
 
     def _on_subroutine(self, step: SubRoutineStep) -> tuple[EffectKind, str]:
+        mode = str(step.execution_mode or "Synchronous").strip()
+        target = str(step.subroutine or "").strip().strip('"')
+        if mode == "Asynchronous":
+            self._async_subroutines.setdefault(target, []).append(target)
+            return (
+                EffectKind.VALIDATION_ONLY,
+                f"asynchronous launch of {target!r}; body effects wait for the named join",
+            )
+        if mode == "JoinSubroutine":
+            pending = self._async_subroutines.get(target) or []
+            if not pending:
+                return (
+                    EffectKind.VALIDATION_ONLY,
+                    f"JoinSubroutine {target!r} has no matching asynchronous launch and is not executed as a fresh call",
+                )
+            pending.pop(0)
+            return (
+                EffectKind.VALIDATION_ONLY,
+                f"JoinSubroutine synchronized {target!r}; physical body effects remain unverified",
+            )
+        if mode == "FireAndForget":
+            self._detached_subroutines.add(target)
+            return (
+                EffectKind.VALIDATION_ONLY,
+                f"FireAndForget launch of {target!r} is detached and not joinable",
+            )
+        if mode != "Synchronous":
+            return EffectKind.OPAQUE, f"subroutine execution mode {mode!r} is not simulated"
+        return self._inline_subroutine(step)
+
+    def _inline_subroutine(self, step: SubRoutineStep) -> tuple[EffectKind, str]:
         registry = self._subroutine_registry
         path = step.subroutine
         if registry is None:
