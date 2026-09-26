@@ -70,7 +70,7 @@ class ReaderCommandRegistryTests(unittest.TestCase):
 
     def test_reader_approves_low_level_hardware_driver_commands(self):
         self.assertEqual(registry_command_family("TeGioSetPWMOutputStatement"), "Application driver")
-        self.assertEqual(registry_command_support_status("MoveAxisCommandScriptStatement"), "approved_passthrough")
+        self.assertEqual(registry_command_support_status("MoveAxisCommandScriptStatement"), "mapped")
 
 
 if __name__ == "__main__":

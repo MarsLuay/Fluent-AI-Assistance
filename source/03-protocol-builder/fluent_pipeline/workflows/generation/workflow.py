@@ -6906,10 +6906,8 @@ def _recipe_step_to_ir(
         return base
     if step_type == "subroutine":
         sub = data.get("subroutine") if "subroutine" in data else data.get("name")
-        if isinstance(sub, dict):
-            mode = str(sub.get("execution_mode") or "JoinSubroutine")
-        else:
-            mode = str(data.get("execution_mode") or "JoinSubroutine")
+        from fluentcoder.ir.subroutine_semantics import subroutine_generation_mode
+        mode = subroutine_generation_mode(sub if isinstance(sub, dict) else data)
         sub_name = recipe_subroutine_name(data)
         if not sub_name:
             return None

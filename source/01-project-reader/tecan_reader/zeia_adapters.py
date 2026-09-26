@@ -82,6 +82,7 @@ class DetectionResult:
     matches: tuple[AdapterMatch, ...]
     diagnostics: tuple[str, ...] = ()
     diagnostic_records: tuple[dict[str, Any], ...] = ()
+    software_family: dict[str, Any] | None = None
 
     @property
     def selected(self) -> AdapterMatch | None:
@@ -91,12 +92,14 @@ class DetectionResult:
 
     def to_dict(self) -> dict[str, Any]:
         selected = self.selected
+        family = self.software_family or unknown_software_family()
         return {
             "status": self.status,
             "entries": list(self.entries),
             "matches": [match.to_dict() for match in self.matches],
             "selected_adapter": selected.adapter_id if selected else None,
             "format_family": selected.format_family if selected else None,
+            "software_family": family,
             "diagnostics": list(self.diagnostics),
             "diagnostic_records": sort_diagnostics(self.diagnostic_records),
         }
@@ -277,6 +280,53 @@ def probe_zeia(
     return _detection_from_probe(archive, archive_path)
 
 
+def unknown_software_family() -> dict[str, Any]:
+    """Older models omitted family evidence. Absence stays unknown, not FluentControl."""
+    return {
+        "software_family": "unknown",
+        "status": "unknown",
+        "evidence": [],
+        "compatibility": "missing-family-evidence-is-unknown",
+    }
+
+
+def classify_software_family(archive: ArchiveProbe) -> dict[str, Any]:
+    """Classify product family only from explicit names in sampled archive text.
+
+    The ``.zeia`` suffix and structural format never select a family.
+    """
+    markers = (
+        ("fluentcontrol", re.compile(r"FluentControl")),
+        ("vcontrol", re.compile(r"\bvControl\b", re.IGNORECASE)),
+        ("veya", re.compile(r"\bVeya\b")),
+    )
+    evidence: list[dict[str, str]] = []
+    families: list[str] = []
+    for member, text in archive.xml_samples:
+        for family, pattern in markers:
+            if family in families:
+                continue
+            if pattern.search(text):
+                families.append(family)
+                evidence.append({
+                    "family": family,
+                    "member": member,
+                    "marker": pattern.pattern,
+                })
+    if len(families) > 1:
+        family, status = "conflicting", "conflicting"
+    elif len(families) == 1:
+        family, status = families[0], "verified"
+    else:
+        family, status = "unknown", "unknown"
+    return {
+        "software_family": family,
+        "status": status,
+        "evidence": evidence,
+        "compatibility": "explicit-product-name-only",
+    }
+
+
 def _detection_from_probe(archive: ArchiveProbe, archive_path: Path) -> DetectionResult:
     """Resolve adapter matches from one already validated probe."""
     matches = tuple(match for adapter in ADAPTERS if (match := adapter.probe(archive)) is not None)
@@ -296,7 +346,10 @@ def _detection_from_probe(archive: ArchiveProbe, archive_path: Path) -> Detectio
             )
             for match, message in zip(strong, diagnostics)
         )
-        return DetectionResult("ambiguous", archive.entries, matches, diagnostics, records)
+        return DetectionResult(
+            "ambiguous", archive.entries, matches, diagnostics, records,
+            software_family=classify_software_family(archive),
+        )
     if not matches:
         diagnostics = _unsupported_diagnostics(archive)
         return DetectionResult(
@@ -307,8 +360,12 @@ def _detection_from_probe(archive: ArchiveProbe, archive_path: Path) -> Detectio
                 archive_path=str(archive_path),
                 next_action="Provide a supported FluentControl ZEIA export variant.",
             ) for message in diagnostics),
+            software_family=classify_software_family(archive),
         )
-    return DetectionResult("supported", archive.entries, matches)
+    return DetectionResult(
+        "supported", archive.entries, matches,
+        software_family=classify_software_family(archive),
+    )
 
 
 def detect_zeia_format(path: str | Path, **kwargs: Any) -> DetectionResult:
@@ -556,6 +613,7 @@ def ingest_zeia(
         "extension_counts": extension_counts(detection.entries),
         "script_count_total": eligible_member_counts["scripts"],
         "format_family": selected.format_family,
+        "software_family": detection.to_dict()["software_family"],
         "adapter_matches": [match.to_dict() for match in detection.matches],
         "completeness": completeness,
         "complete": completeness["complete"],

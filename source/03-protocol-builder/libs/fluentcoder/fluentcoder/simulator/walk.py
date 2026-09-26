@@ -99,6 +99,8 @@ class Simulator:
         self._driver_outcome_positions: dict[str, int] = {}
         self._driver_step_details: dict[str, Any] = {}
         self._subroutine_call_stack: list[str] = []
+        self._async_subroutines: dict[str, list[str]] = {}
+        self._detached_subroutines: set[str] = set()
         # Per-subroutine sim variable scopes (innermost last).
         self._sim_scope_stack: list[dict[str, Any]] = []
         self._wt.sim_attribute_lineage.clear()
@@ -651,6 +653,16 @@ class Simulator:
         self._mca_adapter_label = None
 
     def _on_pickup_tips(self, step: PickUpTipsStep) -> None:
+        from ..heads.mca_pickup_address import validate_mca_pickup
+        decision = validate_mca_pickup(step)
+        if not decision["precise_occupancy_allowed"]:
+            raise _with_sim_details(
+                MissingTipsError(
+                    "MCA pickup address is not resolved; refusing an unrotated tip occupancy claim"
+                ),
+                category="pickup_address_unproven",
+                tip_box=step.labware_name,
+            )
         if self._mca_adapter_label is None:
             raise MissingAdapterError(
                 f"PickUpTips({step.labware_name!r}) but no adapter is mounted on the MCA-96 head"
@@ -989,6 +1001,37 @@ class Simulator:
         labware.slot = dest
 
     def _on_subroutine(self, step: SubRoutineStep) -> tuple[EffectKind, str]:
+        mode = str(step.execution_mode or "Synchronous").strip()
+        target = str(step.subroutine or "").strip().strip('"')
+        if mode == "Asynchronous":
+            self._async_subroutines.setdefault(target, []).append(target)
+            return (
+                EffectKind.VALIDATION_ONLY,
+                f"asynchronous launch of {target!r}; body effects wait for the named join",
+            )
+        if mode == "JoinSubroutine":
+            pending = self._async_subroutines.get(target) or []
+            if not pending:
+                return (
+                    EffectKind.VALIDATION_ONLY,
+                    f"JoinSubroutine {target!r} has no matching asynchronous launch and is not executed as a fresh call",
+                )
+            pending.pop(0)
+            return (
+                EffectKind.VALIDATION_ONLY,
+                f"JoinSubroutine synchronized {target!r}; physical body effects remain unverified",
+            )
+        if mode == "FireAndForget":
+            self._detached_subroutines.add(target)
+            return (
+                EffectKind.VALIDATION_ONLY,
+                f"FireAndForget launch of {target!r} is detached and not joinable",
+            )
+        if mode != "Synchronous":
+            return EffectKind.OPAQUE, f"subroutine execution mode {mode!r} is not simulated"
+        return self._inline_subroutine(step)
+
+    def _inline_subroutine(self, step: SubRoutineStep) -> tuple[EffectKind, str]:
         registry = self._subroutine_registry
         path = step.subroutine
         if registry is None:
@@ -1032,6 +1075,12 @@ class Simulator:
         """
         if step.parameters.get("prompt_only") in {True, "true", "True", "1"}:
             return EffectKind.VALIDATION_ONLY, "prompt-only application driver macro"
+        from ..driver_macro_source import application_driver_macro_has_unmodeled_source
+        if application_driver_macro_has_unmodeled_source(step.raw_xml):
+            return (
+                EffectKind.VALIDATION_ONLY,
+                "application driver macro keeps unmodeled source XML; recovery is not simulated",
+            )
 
         outcome = self._next_driver_outcome(step.macro_name)
         policy = step.recovery_policy

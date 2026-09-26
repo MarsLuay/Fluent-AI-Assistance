@@ -1282,6 +1282,8 @@ def _emit_end_script(step: EndScriptStep) -> str:
 
 
 def _emit_application_driver_macro(step: ApplicationDriverMacroStep) -> str:
+    from ..driver_macro_source import application_driver_macro_has_unmodeled_source
+
     if step.raw_xml and "LegacyDriverMacro" in step.raw_xml:
         return f"wt.raw_xml_step('LegacyDriverMacro', raw_xml={step.raw_xml!r})"
     parts = [repr(step.macro_name)]
@@ -1293,7 +1295,7 @@ def _emit_application_driver_macro(step: ApplicationDriverMacroStep) -> str:
         parts.append(f"execution_settings={step.execution_settings!r}")
     elif step.parameters:
         parts.append(f"parameters={step.parameters!r}")
-    if step.raw_xml:
+    if application_driver_macro_has_unmodeled_source(step.raw_xml):
         parts.append(f"raw_xml={step.raw_xml!r}")
     if step.recovery_policy is not None:
         parts.append(f"recovery_policy={step.recovery_policy.model_dump(exclude_none=True)!r}")
