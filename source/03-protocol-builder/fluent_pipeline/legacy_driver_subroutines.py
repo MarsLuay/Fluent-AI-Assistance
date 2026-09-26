@@ -9,9 +9,13 @@ hand-build device-specific fallback variants (for example NoBCR prompt-only path
 
 from __future__ import annotations
 
+import json
+
 from . import xml_compat as ET
 from pathlib import Path
 from typing import Any
+
+from fluentcoder.ir.driver_recovery import parse_driver_recovery_policy
 
 from .api_v2.command_summary import enrich_subroutine_load_review_record
 from .subroutine_dependencies import (
@@ -33,7 +37,7 @@ def legacy_driver_macros_in_subroutines(
 ) -> list[dict[str, Any]]:
     """Walk resolved subroutine trees and collect ``LegacyDriverMacro`` findings."""
     findings: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, str, str, str]] = set()
+    seen: set[tuple[str, str, str, str, str, str]] = set()
     scripts = [script for script in (source_manifest or {}).get("scripts") or [] if isinstance(script, dict)]
     for dependency in resolved_dependencies:
         root_ref = clean_subroutine_reference(dependency.get("ref") or dependency.get("object_name"))
@@ -62,12 +66,17 @@ def legacy_driver_macros_in_subroutines(
                 command_name = str(macro.attrib.get("Name") or "").strip()
                 module_name = str(macro.attrib.get("ModuleName") or "").strip()
                 line_number = str(macro.attrib.get("LineNumber") or "").strip()
+                recovery_policy = parse_driver_recovery_policy(macro)
+                recovery_payload = (
+                    recovery_policy.as_dict() if recovery_policy is not None else None
+                )
                 key = (
                     root_ref,
                     actual_ref,
                     command_name,
                     module_name,
                     line_number,
+                    json.dumps(recovery_payload, sort_keys=True),
                 )
                 if key in seen:
                     continue
@@ -81,6 +90,7 @@ def legacy_driver_macros_in_subroutines(
                     "command_name": command_name,
                     "module_name": module_name,
                     "line_number": line_number,
+                    "recovery_policy": recovery_payload,
                     "reason": "called_subroutine_legacy_driver_macro",
                     "detail": (
                         "This local/non-instrument computer may not have the corresponding legacy "

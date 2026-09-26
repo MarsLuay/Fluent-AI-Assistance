@@ -1403,6 +1403,51 @@
       "reason": "Public tecan_reader export summarize_script_patterns.",
       "supportedVersion": "current",
       "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.derive_base_worktable_identity",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export derive_base_worktable_identity.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.inspect_scheduler",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export inspect_scheduler.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.inspect_scheduler_text",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export inspect_scheduler_text.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.inspect_twl",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export inspect_twl.",
+      "supportedVersion": "current",
+      "replacement": null
+    },
+    {
+      "id": "python.tecan_reader.inspect_twl_text",
+      "class": "supported",
+      "kind": "python-export",
+      "path": "source/01-project-reader/tecan_reader/__init__.py",
+      "reason": "Public tecan_reader export inspect_twl_text.",
+      "supportedVersion": "current",
+      "replacement": null
     }
   ]
 }

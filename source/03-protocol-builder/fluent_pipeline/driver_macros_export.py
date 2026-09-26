@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from . import xml_compat as ET
+from fluentcoder.ir.driver_recovery import parse_driver_recovery_policy
+
 from .external_commands import (
     ambiguity_groups_for_contracts,
     build_driver_usage_contracts,
@@ -49,11 +51,7 @@ def build_driver_macros_catalog(
     for path in _script_paths(manifest, context_root):
         try:
             for entry in _macros_from_xscr(path, max_xml_bytes=max_xml_bytes):
-                key = (
-                    str(entry.get("macro_name") or "").casefold(),
-                    str(entry.get("module_name") or "").casefold(),
-                    str(entry.get("macro_kind") or "").casefold(),
-                )
+                key = _macro_catalog_key(entry)
                 if not key[0]:
                     continue
                 entries_by_key.setdefault(key, entry)
@@ -63,11 +61,7 @@ def build_driver_macros_catalog(
     for path in _driver_object_paths(manifest, context_root):
         try:
             for entry in _macros_from_driver_object(path, max_xml_bytes=max_xml_bytes):
-                key = (
-                    str(entry.get("macro_name") or "").casefold(),
-                    str(entry.get("module_name") or "").casefold(),
-                    str(entry.get("macro_kind") or "").casefold(),
-                )
+                key = _macro_catalog_key(entry)
                 if not key[0]:
                     continue
                 entries_by_key.setdefault(key, entry)
@@ -251,6 +245,7 @@ def _macros_from_xscr(path: Path, *, max_xml_bytes: int) -> list[dict[str, Any]]
         if not macro_name:
             continue
         kind = "legacy" if local.casefold() == "legacydrivermacro" else "application"
+        recovery_policy = parse_driver_recovery_policy(elem)
         rows.append(
             _clean(
                 {
@@ -259,6 +254,9 @@ def _macros_from_xscr(path: Path, *, max_xml_bytes: int) -> list[dict[str, Any]]
                     "macro_kind": kind,
                     "source_kind": "script",
                     "source_path": str(path),
+                    "recovery_policy": (
+                        recovery_policy.as_dict() if recovery_policy is not None else None
+                    ),
                 }
             )
         )
@@ -285,6 +283,7 @@ def _macros_from_driver_object(path: Path, *, max_xml_bytes: int) -> list[dict[s
         if not macro_name:
             continue
         kind = "legacy" if "legacy" in lowered else "application"
+        recovery_policy = parse_driver_recovery_policy(elem)
         rows.append(
             _clean(
                 {
@@ -293,6 +292,9 @@ def _macros_from_driver_object(path: Path, *, max_xml_bytes: int) -> list[dict[s
                     "macro_kind": kind,
                     "source_kind": "datastore_object",
                     "source_path": str(path),
+                    "recovery_policy": (
+                        recovery_policy.as_dict() if recovery_policy is not None else None
+                    ),
                 }
             )
         )
@@ -413,6 +415,15 @@ def _child_text(elem: ET.Element | None, local_name: str) -> str:
         if isinstance(child.tag, str) and _local_name(child.tag) == local_name:
             return _text(child)
     return ""
+
+
+def _macro_catalog_key(entry: Mapping[str, Any]) -> tuple[str, str, str, str]:
+    return (
+        str(entry.get("macro_name") or "").casefold(),
+        str(entry.get("module_name") or "").casefold(),
+        str(entry.get("macro_kind") or "").casefold(),
+        json.dumps(entry.get("recovery_policy"), sort_keys=True),
+    )
 
 
 def _clean(payload: dict[str, Any]) -> dict[str, Any]:

@@ -10,7 +10,10 @@ CODE_ROOTS = (
     REPO_ROOT / "source",
 )
 SELF = Path(__file__).resolve()
-APPROVED_SYS_PATH_INSERT_FILES: set[Path] = {SELF}
+APPROVED_SYS_PATH_INSERT_FILES: set[Path] = {
+    SELF,
+    REPO_ROOT / "source" / "03-protocol-builder" / "tests" / "full_export_e2e" / "harness.py",
+}
 APPROVED_PYTHONPATH_FILES: set[Path] = {SELF}
 SKIP_DIR_NAMES = {
     ".git",

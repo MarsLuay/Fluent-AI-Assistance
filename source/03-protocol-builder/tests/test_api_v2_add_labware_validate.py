@@ -323,7 +323,7 @@ class AddLabwareValidateTests(unittest.TestCase):
                     "id": "step_001",
                     "operation": "add_labware",
                     "parameters": {
-                        "catalog": "[VAR_FROM_STEP]",
+                        "catalog": "[UNDECLARED_CAT]",
                         "label": "[GLOBAL_VAR]",
                         "location": "NestPlatform",
                         "position": 1,

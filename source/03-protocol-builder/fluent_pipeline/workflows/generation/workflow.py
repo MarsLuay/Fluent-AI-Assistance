@@ -54,6 +54,8 @@ from ...external_commands import (
     DriverCommandContractNotFoundError,
     select_driver_usage_contract,
 )
+from fluentcoder.ir.driver_recovery import driver_recovery_from_mapping
+
 from ...driver_macros_export import (
     DRIVER_COMMAND_CONTRACTS_FILENAME,
     load_driver_command_contracts,
@@ -6483,6 +6485,16 @@ def _seconds_to_iso_duration(seconds: int) -> str:
     return f"PT{secs}S"
 
 
+def _driver_recovery_xml(policy: Mapping[str, Any] | None) -> str:
+    if not policy:
+        return ""
+    recovery = driver_recovery_from_mapping(policy)
+    if recovery is None:
+        return ""
+    rendered = recovery.to_xml()
+    return "".join(f"    {line}\n" for line in rendered.splitlines())
+
+
 def _legacy_driver_macro_execution_time(*, macro_name: str, execution_settings: str) -> str:
     if macro_name.endswith("_WaitFinished"):
         settings = str(execution_settings or "").strip().strip("~")
@@ -6499,6 +6511,7 @@ def _legacy_driver_macro_raw_xml(
     execution_settings: str,
     execution_time: str | None = None,
     disabled: bool = False,
+    recovery_policy: Mapping[str, Any] | None = None,
 ) -> str:
     resolved_time = execution_time or _legacy_driver_macro_execution_time(
         macro_name=macro_name,
@@ -6511,6 +6524,7 @@ def _legacy_driver_macro_raw_xml(
         f'ExecutionTime="{resolved_time}" IsBreakpoint="false" IsDisabledForExecution="{disabled_text}" '
         'LineNumber="0">\n'
         f"    <ExecutionSettings>{execution_settings}</ExecutionSettings>\n"
+        f"{_driver_recovery_xml(recovery_policy)}"
         "  </LegacyDriverMacro>\n"
         "</Object>"
     )
@@ -6523,6 +6537,7 @@ def _application_driver_macro_raw_xml(
     execution_settings: str,
     execution_time: str | None = None,
     disabled: bool = False,
+    recovery_policy: Mapping[str, Any] | None = None,
 ) -> str:
     resolved_time = execution_time or "PT2S"
     disabled_text = "true" if disabled else "false"
@@ -6532,6 +6547,7 @@ def _application_driver_macro_raw_xml(
         f'ExecutionTime="{resolved_time}" IsBreakpoint="false" IsDisabledForExecution="{disabled_text}" '
         'LineNumber="0">\n'
         f"    <ExecutionSettings>{execution_settings}</ExecutionSettings>\n"
+        f"{_driver_recovery_xml(recovery_policy)}"
         "  </ApplicationDriverMacro>\n"
         "</Object>"
     )
@@ -6651,6 +6667,7 @@ def _driver_macro_ir_steps_from_contract(
     command_kind = str(contract.get("command_kind") or "LegacyDriverMacro")
     execution_time = str(contract.get("execution_time") or "") or None
     disabled = bool(contract.get("disabled"))
+    recovery_policy = contract.get("recovery_policy")
     if command_kind.casefold() == "applicationdrivermacro":
         raw_xml = _application_driver_macro_raw_xml(
             macro_name=macro_name,
@@ -6658,6 +6675,7 @@ def _driver_macro_ir_steps_from_contract(
             execution_settings=execution_settings,
             execution_time=execution_time,
             disabled=disabled,
+            recovery_policy=recovery_policy,
         )
         command_id = "ApplicationDriverMacro"
     else:
@@ -6667,6 +6685,7 @@ def _driver_macro_ir_steps_from_contract(
             execution_settings=execution_settings,
             execution_time=execution_time,
             disabled=disabled,
+            recovery_policy=recovery_policy,
         )
         command_id = "LegacyDriverMacro"
     _append(
@@ -6678,6 +6697,7 @@ def _driver_macro_ir_steps_from_contract(
             "module_name": module_name,
             "execution_settings": execution_settings,
             "contract_id": contract.get("contract_id"),
+            "recovery_policy": recovery_policy,
             "raw_xml": raw_xml,
         },
     )
@@ -7206,6 +7226,7 @@ def _recipe_step_to_ir(
                 "disabled": bool(source.get("disabled")),
                 "variable_declarations": [],
                 "following_companion": None,
+                "recovery_policy": source.get("recovery_policy"),
             }
         include_companion = bool(source.get("include_companion", True))
         include_variable_defaults = bool(source.get("include_variable_defaults", True))

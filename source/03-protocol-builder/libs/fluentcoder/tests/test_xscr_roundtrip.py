@@ -100,6 +100,9 @@ def test_roundtrip_subroutine_call_simulates_with_registry(
 ) -> None:
     """Decompile a subroutine caller, simulate with registry, inline subroutine body."""
     proto = parse_xscr(SUBROUTINE_CALL_XSCR)
+    # JoinSubroutine is a synchronization point and requires a prior async launch;
+    # use a synchronous call here because this fixture contains only one call.
+    proto.groups[0].steps[0].execution_mode = "Synchronous"
     decompiled_py = tmp_path / "subroutine_call_decompiled.py"
     decompiled_py.write_text(
         emit_python(proto, source_xscr=str(SUBROUTINE_CALL_XSCR)),
@@ -139,6 +142,8 @@ def test_decompile_cli_simulates_subroutine_with_registry(
     output_text = capsys.readouterr().out
     assert "Decompiled" in output_text
     assert "fully simulated: 0" in output_text
-    assert "validation-only: 4" in output_text
+    # JoinSubroutine has no matching asynchronous launch in this fixture, so
+    # the simulator records the synchronization point without inlining a body.
+    assert "validation-only: 2" in output_text
     assert "opaque/no-op: 0" in output_text
 

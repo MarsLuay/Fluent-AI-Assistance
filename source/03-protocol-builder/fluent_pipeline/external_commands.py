@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 from .xml_compat import ET
+from fluentcoder.ir.driver_recovery import parse_driver_recovery_policy
 
 
 _VARIABLE_TOKEN = re.compile(r"~([^~]+)~")
@@ -129,6 +130,7 @@ def build_usage_contract_from_macro(
     dependency_variables = _dependency_closure(direct_variables, assignments, declarations)
     companion = _following_companion(list(macros), macro_index, macro.get("ModuleName"))
     command_kind = _local_name(macro.tag)
+    recovery_policy = parse_driver_recovery_policy(macro)
     contract: dict[str, Any] = {
         "schema_version": DRIVER_USAGE_CONTRACT_SCHEMA,
         "source_script": object_name,
@@ -142,6 +144,7 @@ def build_usage_contract_from_macro(
         "disabled": str(macro.get("IsDisabledForExecution") or "false").casefold() == "true",
         "line_number": macro.get("LineNumber") or "",
         "command_index": macro_index,
+        "recovery_policy": recovery_policy.as_dict() if recovery_policy is not None else None,
         "referenced_variables": direct_variables,
         "dependency_variables": dependency_variables,
         "variable_declarations": [
@@ -168,6 +171,7 @@ def fingerprint_driver_usage_contract(contract: Mapping[str, Any]) -> str:
         "disabled": bool(contract.get("disabled")),
         "execution_settings": str(contract.get("execution_settings") or ""),
         "execution_time": str(contract.get("execution_time") or ""),
+        "recovery_policy": contract.get("recovery_policy"),
         "following_companion": {
             "execution_settings": str(companion.get("execution_settings") or ""),
             "execution_time": str(companion.get("execution_time") or ""),

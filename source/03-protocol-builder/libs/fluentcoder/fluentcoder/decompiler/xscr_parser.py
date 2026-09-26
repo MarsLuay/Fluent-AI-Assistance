@@ -26,6 +26,7 @@ from typing import Callable, Iterator, Optional, Union
 from ..catalog.xcmp import _find, _local, _text
 from ..expressions import is_expression_field, parse_or_preserve_source_expression
 from ..ir.subroutine_semantics import normalize_subroutine_execution_mode
+from ..ir.driver_recovery import parse_driver_recovery_policy
 from ..ir.schema import (
     AddLabwareStep, ApplicationDriverMacroStep, AspirateStep, CgaDropFingersStep, CgaGetFingersStep,
     CommentStep, ConditionalStep, DelayStep, DispenseStep, DropHeadAdapterStep,
@@ -1150,7 +1151,13 @@ def _parse_driver_macro_element(
     macro_name = ""
     module_name = ""
     execution_settings = ""
+    recovery_policy = None
     if macro_el is not None:
+        recovery_policy = parse_driver_recovery_policy(macro_el)
+        if recovery_policy is None:
+            recovery_policy = parse_driver_recovery_policy(obj)
+            if recovery_policy is not None:
+                recovery_policy.source_metadata["placement"] = "object"
         macro_name = (macro_el.attrib.get("Name") or "").strip()
         # Exact ModuleName from XSCR only — never invent "RGA 1".
         module_name = (macro_el.attrib.get("ModuleName") or "").strip()
@@ -1167,6 +1174,7 @@ def _parse_driver_macro_element(
         available_id=available_id,
         execution_settings=execution_settings,
         parameters=parameters,
+        recovery_policy=recovery_policy,
         raw_xml=ET.tostring(obj, encoding="unicode"),
     )
 

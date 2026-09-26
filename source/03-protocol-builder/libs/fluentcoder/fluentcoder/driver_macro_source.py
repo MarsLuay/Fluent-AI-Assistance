@@ -19,7 +19,7 @@ _KNOWN_ATTRIBUTES = {
     "IsDisabledForExecution",
     "LineNumber",
 }
-_KNOWN_CHILDREN = {"ExecutionSettings", "AvailableID"}
+_KNOWN_CHILDREN = {"ExecutionSettings", "AvailableID", "ErrorHandling"}
 
 
 def _local(tag: str) -> str:
