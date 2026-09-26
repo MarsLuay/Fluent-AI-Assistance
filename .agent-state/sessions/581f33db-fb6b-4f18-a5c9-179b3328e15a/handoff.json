@@ -1,0 +1,45 @@
+{
+  "schema_version": 2,
+  "task_goal": "Implement exactly MarsLuay/Fluent-AI-Assistance#170 in the assigned issue-accept worktree.",
+  "acceptance_criteria": [
+    "No mega-diff; precise decomposition blocker reported to parent",
+    "No product files changed",
+    "Issue identity, worktree, branch, and plan SHA preserved"
+  ],
+  "confirmed_facts": [],
+  "assumptions": [
+    "handoff written from session wrapper"
+  ],
+  "important_files": [
+    "'source/03-protocol-builder/fluent_pipeline/fluentcontrol_inventory.py','source/03-protocol-builder/fluent_pipeline/exports.py','source/03-protocol-builder/tests/test_fluentcontrol_inventory.py','source/03-protocol-builder/libs/fluentcoder/docs/deployment.md'"
+  ],
+  "important_symbols": [],
+  "decisions": [
+    {
+      "decision": "snapshot via agent-session-start",
+      "rationale": "Architecture-sized issue confirmed; no product edits. Synthetic reproduction proves implicit local-host inventory selection. Retryable blocker: parent must decompose #170 into dependent child issues and assign a bounded child before implementation."
+    }
+  ],
+  "files_changed": [
+    "'source/03-protocol-builder/fluent_pipeline/fluentcontrol_inventory.py','source/03-protocol-builder/fluent_pipeline/exports.py','source/03-protocol-builder/tests/test_fluentcontrol_inventory.py','source/03-protocol-builder/libs/fluentcoder/docs/deployment.md'"
+  ],
+  "verification_performed": [
+    "python3 -m unittest discover -s source/03-protocol-builder/tests -p test_fluentcontrol_inventory.py -v (3 passed); synthetic two-host implicit-vs-explicit inventory probe (passed); python3 bootstrap-status (blocked: missing defusedxml)"
+  ],
+  "baseline_failures": [],
+  "current_failures": [],
+  "unresolved_risks": [],
+  "remaining_steps": [],
+  "next_recommended_action": "Parent decomposes #170 and assigns a bounded child issue; preserve this clean worktree and do not implement a mega-diff.",
+  "timestamp": "2026-09-23T09:54:06+00:00",
+  "source_session_id": "581f33db-fb6b-4f18-a5c9-179b3328e15a",
+  "active_subproject": ".",
+  "raw_artifact_refs": [],
+  "contract_id": "",
+  "contract_hash": "",
+  "route_id": "",
+  "context_packet_hash": "",
+  "recovery_disposition": "",
+  "trigger": "issue-accept-worker",
+  "stale": false
+}
