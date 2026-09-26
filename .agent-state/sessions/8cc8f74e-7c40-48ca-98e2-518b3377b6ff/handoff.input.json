@@ -1,0 +1,59 @@
+﻿{
+    "schema_version":  2,
+    "task_goal":  "Implement exactly MarsLuay/Fluent-AI-Assistance#166 only when a verified source-backed Sample Transfer contract exists.",
+    "acceptance_criteria":  [
+                                "source-backed behavior only",
+                                "no invented vendor XML or hardware semantics",
+                                "regression coverage if safe",
+                                "focused checks",
+                                "commit/push/PR only if verified"
+                            ],
+    "confirmed_facts":  [
+
+                        ],
+    "assumptions":  [
+                        "handoff written from session wrapper"
+                    ],
+    "important_files":  [
+                            "none; no product or test files changed"
+                        ],
+    "important_symbols":  [
+
+                          ],
+    "decisions":  [
+                      {
+                          "decision":  "snapshot via agent-session-start",
+                          "rationale":  "Blocked: origin/main has no legitimate sanitized Sample Transfer XSCR/ZEIA fixture or complete versioned contract; safe typed implementation and regression fixture would require guessed vendor semantics."
+                      }
+                  ],
+    "files_changed":  [
+                          "none; no product or test files changed"
+                      ],
+    "verification_performed":  [
+                                   "pytest focused passthrough/validation/registry: 21 passed"
+                               ],
+    "baseline_failures":  [
+
+                          ],
+    "current_failures":  [
+
+                         ],
+    "unresolved_risks":  [
+
+                         ],
+    "remaining_steps":  [
+
+                        ],
+    "next_recommended_action":  "Report retryable source-backed fixture blocker; wait for legitimate sanitized Sample Transfer XSCR/ZEIA evidence or an authoritative contract.",
+    "source_session_id":  "8cc8f74e-7c40-48ca-98e2-518b3377b6ff",
+    "active_subproject":  ".",
+    "raw_artifact_refs":  [
+
+                          ],
+    "contract_id":  "pytest full-export command corpus: 5 passed, 1 skipped (imported full export absent)",
+    "contract_hash":  "agent-completion-gate -Path assigned worktree -RunChecks: PASS",
+    "route_id":  "git diff --check: PASS",
+    "context_packet_hash":  "",
+    "recovery_disposition":  "",
+    "trigger":  "issue-accept-worker"
+}
