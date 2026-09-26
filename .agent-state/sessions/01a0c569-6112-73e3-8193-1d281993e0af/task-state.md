@@ -2,18 +2,19 @@
 
 schema_version: 2
 trigger: milestone
-timestamp: 2026-09-22T23:31:52+00:00
+timestamp: 2026-09-23T04:21:57+00:00
 source_session_id: 01a0c569-6112-73e3-8193-1d281993e0af
-active_subproject: .
+active_subproject: source/03-protocol-builder
 
 ## Task goal
-Audit issue 166 and implement only if a verified source-backed Sample Transfer contract exists.
+Accept only MarsLuay/Fluent-AI-Assistance#170 in the leased worktree; implement only evidence-backed target datastore profile/state and promotion/deployment behavior.
 
 ## Acceptance criteria
-- source-backed behavior only
-- no invented vendor XML, IDs, versions, or hardware semantics
-- focused checks and completion gate
-- commit/push/PR only if safe and verified
+- Work only in issue-170 worktree and requested branch
+- No invented FluentControl semantics or synthetic-lab contracts
+- If target-backed evidence is absent, make no product edits and report precise retryable blocker
+- If bounded implementation is supported, add tests/docs, commit, push, open PR without merge/close
+- Clean generated artifacts before final report
 
 ## Confirmed facts
 - None recorded.
@@ -59,4 +60,4 @@ context_packet_hash: (none)
 recovery_disposition: (none)
 
 ## Next recommended action
-Report the precise evidence blocker and wait for legitimate sanitized source evidence or an authoritative contract before implementation.
+Inspect issue #170 context and current source/contracts for target profiles, state classification, mapping, deployment, promotion, exclusions, SVN, and drift evidence.
