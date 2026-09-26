@@ -65,6 +65,20 @@ class DeploymentPlanTests(unittest.TestCase):
         self.assertEqual(mismatch["status"], "blocked")
         self.assertIn("source_target_software_family_mismatch", {row["code"] for row in mismatch["findings"]})
 
+    def test_unknown_family_cannot_determine_and_match_stays_ready(self) -> None:
+        source = _profile(family="FluentControl")
+        target = _profile(family="FluentControl")
+        matched = build_deployment_plan(source, target, mode="cross_target_import")
+        self.assertNotIn("cannot_determine", matched["status"])
+        self.assertEqual(matched["software_families"], {"source": "FluentControl", "target": "FluentControl"})
+
+        unknown = dict(source)
+        unknown["software"] = {"family": "", "version": "3.8", "build": "3.8.16"}
+        plan = build_deployment_plan(unknown, target, mode="cross_target_import")
+        self.assertEqual(plan["status"], "cannot_determine")
+        self.assertIn("source_target_software_family_unknown", {row["code"] for row in plan["findings"]})
+        self.assertNotEqual(plan["status"], "ready_for_import")
+
     def test_drift_and_external_relocation_are_explicit(self) -> None:
         source = _profile()
         target = _profile()
