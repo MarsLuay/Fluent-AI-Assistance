@@ -23,6 +23,7 @@ from .expression_provenance import (
     verify_expression_provenance_ledger,
     verify_protocol_ir_expression_provenance,
 )
+from .external_labware_handoff_validation import assess_generated_handoffs
 from .gates import ValidationContext, readiness_evaluator
 from .gates.evaluators import (
     evaluate_checksums,
@@ -299,6 +300,9 @@ def validate_ready_to_import(
         for gate in gates
         if gate["status"] == "passed" and (gate.get("details") or {}).get("trivial")
     ]
+    extra: dict[str, Any] = {}
+    if "handoff_commands" in context:
+        extra["external_labware_handoffs"] = assess_generated_handoffs(list(context.get("handoff_commands") or []))
     return {
         "validation_version": READY_VALIDATION_VERSION,
         "ready_policy": ready_policy_name,
@@ -355,6 +359,7 @@ def validate_ready_to_import(
         "host_instrument_configuration": host_config or None,
         "host_instrument_config_blocking": host_config_blocking,
         "gates": gates,
+        **extra,
     }
 
 

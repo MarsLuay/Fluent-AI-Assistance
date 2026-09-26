@@ -16,7 +16,19 @@ from fluent_pipeline.cli.parser import _build_parser
 
 
 def _context(name: str) -> SimpleNamespace:
-    return SimpleNamespace(name=name)
+    return SimpleNamespace(
+        name=name,
+        manifest={
+            "canonical_model": {
+                "detection": {
+                    "software_family": {
+                        "software_family": "fluentcontrol",
+                        "status": "verified",
+                    }
+                }
+            }
+        },
+    )
 
 
 def _ready() -> FullExportReadinessResult:

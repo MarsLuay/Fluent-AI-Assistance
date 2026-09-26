@@ -38,6 +38,24 @@ class DriverMacrosExportTests(unittest.TestCase):
         self.assertIn(("Demo_WaitFinished", "DemoModule"), names)
         self.assertEqual(catalog["schema_version"], DRIVER_MACROS_SCHEMA_VERSION)
 
+    def test_catalog_keeps_distinct_recovery_policies(self) -> None:
+        xml = """<root>
+  <ApplicationDriverMacro Name="Demo_Run" ModuleName="DemoModule">
+    <ErrorHandling><Action>Retry</Action><MaxRetries>1</MaxRetries></ErrorHandling>
+  </ApplicationDriverMacro>
+  <ApplicationDriverMacro Name="Demo_Run" ModuleName="DemoModule">
+    <ErrorHandling><Action>Stop</Action></ErrorHandling>
+  </ApplicationDriverMacro>
+</root>"""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "script.xscr"
+            path.write_text(xml, encoding="utf-8")
+            catalog = build_driver_macros_catalog(
+                manifest={"scripts": [{"object_name": "Demo", "extracted_path": str(path)}]},
+            )
+        assert catalog["entry_count"] == 2
+        assert {entry["recovery_policy"]["action"] for entry in catalog["entries"]} == {"Retry", "Stop"}
+
     def test_empty_when_no_macros(self) -> None:
         catalog = build_driver_macros_catalog(manifest={"scripts": []})
         self.assertEqual(catalog["entry_count"], 0)

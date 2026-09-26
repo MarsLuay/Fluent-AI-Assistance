@@ -39,6 +39,7 @@ from tecan_common.worklist_contract import (
     build_execution_contract,
     normalize_load_worklist,
 )
+from fluentcoder.ir.driver_recovery import parse_driver_recovery_policy
 from fluentcoder.expressions import (
     canonical_expression_key,
     expression_fields_for_command,
@@ -2211,6 +2212,10 @@ def _xscr_step(
             source_entry=source_entry,
         )
     )
+    if operation == "application_driver_macro":
+        recovery_policy = _xscr_driver_recovery_policy(command_object)
+        if recovery_policy is not None:
+            parameters["recovery_policy"] = recovery_policy.as_dict()
     if operation == "prompt_user" and command_id == "RUPWorktableStatement":
         worktable_labware = {
             "selected_labware_name": str(labware or ""),
@@ -3517,6 +3522,16 @@ def _command_id(command_object: ET.Element) -> str:
     for child in list(command_object):
         return _local_name(child.tag)
     return str(command_object.attrib.get("Type") or "").rsplit(".", 1)[-1]
+
+
+def _xscr_driver_recovery_policy(command_object: ET.Element):
+    for element in command_object.iter():
+        if not isinstance(element.tag, str):
+            continue
+        local = element.tag.rsplit("}", 1)[-1]
+        if local in {"ApplicationDriverMacro", "LegacyDriverMacro"}:
+            return parse_driver_recovery_policy(element)
+    return None
 
 
 def _application_driver_macro_name(command_object: ET.Element) -> str:

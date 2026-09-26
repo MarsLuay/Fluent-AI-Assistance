@@ -808,9 +808,20 @@ def export_ready_to_import(
             json.dumps(target_datastore_report, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        exports.append(ExportedArtifact(target_datastore_report_dest, target_datastore_report_dest, "target-datastore-report"))
+        exports.append(
+            ExportedArtifact(
+                target_datastore_report_dest,
+                target_datastore_report_dest,
+                "target-datastore-report",
+            )
+        )
         copied_files.append(
-            _file_record("target-datastore-report", target_datastore_report_dest, target_datastore_report_dest, bundle_root=bundle_root)
+            _file_record(
+                "target-datastore-report",
+                target_datastore_report_dest,
+                target_datastore_report_dest,
+                bundle_root=bundle_root,
+            )
         )
         metadata = {
             "bundle_schema_version": BUNDLE_SCHEMA_VERSION,
@@ -936,6 +947,7 @@ def export_ready_to_import(
                 "validation_report": "source/reports/validation_report.md",
                 "validation_report_json": "source/reports/validation_report.json",
                 "physical_verification": "source/reports/physical_verification.json",
+                "target_datastore": "source/reports/target_datastore.json",
                 "metadata": "source/metadata.json",
             },
             "compiled_xscr": "direct-imports/scripts/full-script/generated_script.xscr",
@@ -1032,6 +1044,7 @@ def export_ready_to_import(
                 "readiness": readiness,
                 "validation_report_markdown": validation_dest,
                 "validation_report_json": validation_json_dest,
+                "target_datastore": target_datastore_report,
             }
         )
     if not publish:
@@ -2870,7 +2883,9 @@ def _write_generated_project_archive_script_scoped(
     )
     generated_payload = _postprocess_archive_writer_script_payload(generated_payload)
 
-    target_inventory = target_scripts_inventory or empty_scripts_inventory(target_profile=target_profile)
+    target_inventory = target_scripts_inventory or empty_scripts_inventory(
+        target_profile=target_profile
+    )
     generated_payload, subroutine_guid_rewrites = rewrite_script_reference_guids(
         generated_payload,
         target_inventory,
@@ -3283,6 +3298,10 @@ def _write_generated_project_archive_script_scoped(
         "subroutine_audit": subroutine_audit,
         "writer_report": writer_report,
         "warnings": warnings,
+        "target_binding": {
+            "status": "bound" if target_profile and target_profile.get("status") == "bound" else "unbound",
+            "fingerprint": str((target_profile or {}).get("fingerprint") or "") or None,
+        },
         "zip_valid": zipfile.is_zipfile(destination),
         "checksum_note": _checksum_note(checksum_audit),
     }

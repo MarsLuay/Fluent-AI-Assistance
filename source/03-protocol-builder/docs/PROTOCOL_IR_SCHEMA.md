@@ -69,6 +69,10 @@
 - `execute_application`: Execute Application; no extra required fields.
 - `execute_vb_script`: Execute VBScript; no extra required fields.
 - `application_driver_macro`: Application Driver Macro; no extra required fields.
+  - `parameters.recovery_policy` is optional and source-backed. It carries the
+    normalized error category/code/source, recovery action, bounded retry count,
+    handler target, provenance, and preserved vendor XML. Unknown actions are
+    retained for review and are not simulated.
 - `comment`: Comment; no extra required fields.
 
 ## Migrations

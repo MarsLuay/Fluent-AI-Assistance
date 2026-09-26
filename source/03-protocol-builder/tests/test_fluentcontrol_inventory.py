@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fluent_pipeline.fluentcontrol_inventory import (
     build_scripts_inventory,
+    build_scripts_inventory_from_target_profile,
     collision_preflight,
     find_unique_guid,
     load_scripts_inventory,
@@ -74,6 +75,62 @@ class FluentControlInventoryTests(unittest.TestCase):
             self.assertEqual(rewrites[0]["to_guid"], "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
             self.assertIn(b"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", rewritten)
             self.assertNotIn(b"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", rewritten)
+
+    def test_explicit_target_profile_isolation_and_unbound_prereq(self) -> None:
+        target_a = {
+            "fingerprint": "target-a",
+            "objects": {
+                "userspecific": [
+                    {
+                        "guid": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                        "object_name": "SUB_Demo",
+                        "object_subfolder_path": "Target A",
+                        "kind": "user_specific",
+                    }
+                ],
+                "systemspecific": [],
+            },
+        }
+        target_b = {
+            "fingerprint": "target-b",
+            "objects": {
+                "userspecific": [
+                    {
+                        "guid": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                        "object_name": "SUB_Demo",
+                        "object_subfolder_path": "Target B",
+                        "kind": "user_specific",
+                    }
+                ],
+                "systemspecific": [],
+            },
+        }
+        inventory_a = build_scripts_inventory_from_target_profile(target_a)
+        inventory_b = build_scripts_inventory_from_target_profile(target_b)
+        self.assertEqual(
+            find_unique_guid(inventory_a, "SUB_Demo", "Target A"),
+            target_a["objects"]["userspecific"][0]["guid"],
+        )
+        self.assertIsNone(find_unique_guid(inventory_a, "SUB_Demo", "Target B"))
+        self.assertEqual(inventory_b["target_profile_fingerprint"], "target-b")
+        reference = (
+            b"<Reference><Guid>cccccccc-cccc-cccc-cccc-cccccccccccc</Guid>"
+            b"<TypeId>Script</TypeId><ObjectName>SUB_Demo</ObjectName></Reference>"
+        )
+        rewritten_a, _ = rewrite_script_reference_guids(reference, inventory_a)
+        rewritten_b, _ = rewrite_script_reference_guids(reference, inventory_b)
+        self.assertIn(target_a["objects"]["userspecific"][0]["guid"].encode(), rewritten_a)
+        self.assertIn(target_b["objects"]["userspecific"][0]["guid"].encode(), rewritten_b)
+        self.assertNotEqual(rewritten_a, rewritten_b)
+
+        payload = (
+            b"<Reference><Guid>cccccccc-cccc-cccc-cccc-cccccccccccc</Guid>"
+            b"<TypeId>WorktableWorkspace</TypeId><ObjectName>Unknown_WT</ObjectName></Reference>"
+        )
+        report = report_missing_system_dependencies(payload, use_local_defaults=False)
+        self.assertTrue(report["target_unbound"])
+        self.assertEqual(report["missing_count"], 0)
+        self.assertEqual(report["review"][0]["reason"], "target_profile_not_selected")
 
     def test_missing_system_dependency_report(self) -> None:
         with tempfile.TemporaryDirectory(prefix="fc_sys_") as tmp:

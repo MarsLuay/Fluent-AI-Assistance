@@ -402,6 +402,21 @@ def test_cli_entry_points_against_full_export(full_export_env: dict) -> None:
                 str(env["paths"]["ready"] / CONTEXT_NAME / "temp_files" / "build" / "e2e.compiled.xscr"),
             ],
         )
+    deployment_profile = env["paths"]["ready"] / CONTEXT_NAME / "temp_files" / "deployment.source-profile.json"
+    deployment_profile.write_text(
+        json.dumps({"schema_version": "tecan.target_datastore.v1", "objects": {}}),
+        encoding="utf-8",
+    )
+    invoke(
+        "plan-deployment",
+        [
+            "plan-deployment",
+            "--source-profile",
+            str(deployment_profile),
+            "--no-target",
+            "--json",
+        ],
+    )
     invoke(
         "parse-fluent-log",
         [

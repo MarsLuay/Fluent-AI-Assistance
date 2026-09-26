@@ -18,6 +18,19 @@ class SubroutineExecutionMode(str, Enum):
 KNOWN_SUBROUTINE_EXECUTION_MODES = frozenset(item.value for item in SubroutineExecutionMode)
 
 
+def subroutine_generation_mode(source: Mapping[str, Any]) -> str:
+    """Use a source mode when present. Never invent JoinSubroutine or a delay."""
+    nested = source.get("subroutine")
+    raw = None
+    if isinstance(nested, Mapping):
+        raw = nested.get("execution_mode") or nested.get("mode")
+    if raw is None:
+        raw = source.get("execution_mode") if "execution_mode" in source else source.get("mode")
+    if raw is None or not str(raw).strip():
+        return SubroutineExecutionMode.SYNCHRONOUS.value
+    return normalize_subroutine_execution_mode(raw, source_preserved=True)
+
+
 def normalize_subroutine_execution_mode(
     value: Any,
     *,

@@ -420,10 +420,17 @@ class CanonicalProjectModel:
         base_worktable_identity = deepcopy(report.get("base_worktable_identity") or {})
         if not base_worktable_identity:
             base_worktable_identity = derive_base_worktable_identity([*scripts, *objects])
+        copied = deepcopy(dict(detection or {}))
+        copied.setdefault("software_family", {
+            "software_family": "unknown",
+            "status": "unknown",
+            "evidence": [],
+            "compatibility": "missing-family-evidence-is-unknown",
+        })
         return cls(
             source_archive=str(Path(source_archive).resolve()),
             adapter_id=adapter_id,
-            detection=deepcopy(dict(detection or {})),
+            detection=copied,
             scripts=scripts,
             objects=objects,
             worklists=worklists,

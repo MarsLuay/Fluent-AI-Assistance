@@ -16,7 +16,9 @@
   `tecan.driver_command_contracts.v1` artifact so incompatible same-macro
   usages are not collapsed. Generation selects an exact source-backed
   contract or fails deterministically on ambiguity; never rewrite
-  `~Variable~` tokens to host absolute paths.
+  `~Variable~` tokens to host absolute paths. Unmodeled driver-macro XML
+  stays on `raw_xml` through codegen so a compile does not drop it.
+  That preservation is not a recovery policy and is not simulated as one.
 - Keep full-export readiness owned by the project-reader canonical model. The
   protocol-builder context, generation, validation, diagnostics, and one-shot
   consumers use its deterministic result rather than maintaining independent
@@ -62,3 +64,18 @@
   structured logs. Missing version or trigger evidence remains unknown or
   trigger-not-present; motion analysis does not model geometry, physical
   readiness (#160), direct arm workarounds, or pipetting root cause.
+- Keep generation and packaging target datastore identity explicit: an explicit
+  `tecan.target_datastore.v1` profile is the only source for target-dependent
+  script GUID rewrites and prerequisite checks; without one, package as
+  target-unbound, consult no build-host datastore, and record the binding status
+  and fingerprint in the handoff metadata and reports.
+- Keep external labware handoff validation conservative: an absent or
+  source-unbacked external outcome remains unknown, so logical Add/Remove/Move
+  state stays reviewable until reconciliation is proven. Offline simulation
+  accepts only injected outcomes and keeps physical verification separate.
+- Keep MCA pickup placement transforms conservative: preserve source
+  AddLabware/SetLocation rotation through the typed worktable and simulator
+  state, resolve only the source-backed zero-rotation address contract, and
+  report non-zero or unavailable transforms as reviewable rather than applying
+  an unverified 180-degree mirror rule. Physical box orientation remains the
+  responsibility of hardware verification (#160).

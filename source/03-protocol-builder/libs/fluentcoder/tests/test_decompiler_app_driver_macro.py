@@ -286,3 +286,50 @@ def test_prompt_only_macro_stays_validation_only() -> None:
     coverage = wt.simulation_report.steps[0]
     assert coverage.effect == EffectKind.VALIDATION_ONLY
     assert "prompt-only" in (coverage.message or "")
+
+
+PRESERVED_SOURCE_OBJECT = TRANSFER_OBJECT.replace(
+    "</ApplicationDriverMacro>",
+    "  <PreservedSourceNode Keep=\"1\"></PreservedSourceNode>\n          </ApplicationDriverMacro>",
+    1,
+)
+
+
+def test_unmodeled_driver_xml_survives_codegen_and_is_not_simulated(tmp_path: Path) -> None:
+    src = tmp_path / "preserved.xscr"
+    src.write_text(_minimal_xscr(PRESERVED_SOURCE_OBJECT), encoding="utf-8")
+    proto = parse_xscr(src)
+    step = proto.groups[0].steps[0]
+    assert isinstance(step, ApplicationDriverMacroStep)
+
+    py_src = emit_python(proto, source_xscr=str(src))
+    assert "raw_xml=" in py_src
+    assert "PreservedSourceNode" in py_src
+
+    from fluentcoder.compiler.renderer import Renderer
+    from fluentcoder.ir.schema import Group, Protocol
+
+    rendered = Renderer()._render_step(step, Protocol(name="t"), Group(name="Steps"))
+    assert "PreservedSourceNode" in rendered
+
+    plain = emit_python(parse_xscr(_write_plain(tmp_path)), source_xscr=str(tmp_path / "plain.xscr"))
+    assert "raw_xml=" not in plain
+
+    wt = Worktable(name="preserved")
+    wt.group("Steps")
+    wt.application_driver_macro(
+        step.macro_name,
+        module_name=step.module_name,
+        execution_settings=step.execution_settings,
+        raw_xml=step.raw_xml,
+    )
+    Simulator(wt).run(fail_on_opaque=True)
+    coverage = wt.simulation_report.steps[0]
+    assert coverage.effect == EffectKind.VALIDATION_ONLY
+    assert "not simulated" in (coverage.message or "")
+
+
+def _write_plain(tmp_path: Path) -> Path:
+    path = tmp_path / "plain.xscr"
+    path.write_text(_minimal_xscr(TRANSFER_OBJECT), encoding="utf-8")
+    return path

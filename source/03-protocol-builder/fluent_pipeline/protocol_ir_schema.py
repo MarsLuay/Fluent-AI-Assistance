@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable
 
+from fluentcoder.ir.driver_recovery import driver_recovery_from_mapping
 from fluentcoder.expressions import (
     canonical_expression_key,
     expression_to_mapping,
@@ -1755,7 +1756,27 @@ def _validate_steps(
             issues.append(ProtocolIRIssue(f"{path}.liquid_class", f"{operation} requires liquid_class"))
         if operation == Operation.ADD_LABWARE.value:
             _validate_add_labware_parameters(issues, f"{path}.parameters", step.get("parameters"))
+        if operation == Operation.APPLICATION_DRIVER_MACRO.value:
+            _validate_driver_recovery_policy(issues, f"{path}.parameters", step.get("parameters"))
         _validate_motion_parameters(issues, path, operation, step.get("parameters"))
+
+
+def _validate_driver_recovery_policy(
+    issues: list[ProtocolIRIssue],
+    path: str,
+    parameters: Any,
+) -> None:
+    if not isinstance(parameters, dict) or "recovery_policy" not in parameters:
+        return
+    try:
+        policy = driver_recovery_from_mapping(parameters.get("recovery_policy"))
+    except (TypeError, ValueError) as exc:
+        issues.append(ProtocolIRIssue(f"{path}.recovery_policy", str(exc)))
+        return
+    if policy is None:
+        return
+    for message in policy.validation_issues():
+        issues.append(ProtocolIRIssue(f"{path}.recovery_policy", message))
 
 
 def _validate_motion_parameters(

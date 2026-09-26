@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from enum import Enum
 
 from .subroutine_semantics import classify_subroutine_target
+from .driver_recovery import DriverRecoveryPolicy, driver_recovery_from_mapping
 from ..expressions import (
     Expression,
     IndexExpression,
@@ -956,10 +957,19 @@ class ApplicationDriverMacroStep(BaseStep):
         default_factory=dict,
         description="Parsed inner ExecutionSettings fields (Labware, Location, VectorName, …)",
     )
+    recovery_policy: DriverRecoveryPolicy | None = Field(
+        default=None,
+        description="Source-backed driver error/recovery policy, when present",
+    )
     raw_xml: Optional[str] = Field(
         default=None,
         description="Full <Object> XML preserved for byte-exact round-trip when set",
     )
+
+    @field_validator("recovery_policy", mode="before")
+    @classmethod
+    def _coerce_recovery_policy(cls, value: Any) -> DriverRecoveryPolicy | None:
+        return driver_recovery_from_mapping(value)
 
 
 class GenericStep(BaseModel):

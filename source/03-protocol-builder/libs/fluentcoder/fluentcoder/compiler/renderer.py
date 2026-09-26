@@ -843,6 +843,14 @@ class Renderer:
         # transfer parameters become XML children and loses the RGA labware
         # target on the next parse.
         settings = self._xml_escape(step.execution_settings or "")
+        recovery_xml = ""
+        if step.recovery_policy is not None:
+            try:
+                recovery_xml = "\n".join(
+                    f"    {line}" for line in step.recovery_policy.to_xml().splitlines()
+                ) + "\n"
+            except ValueError as exc:
+                raise RenderError(str(exc)) from exc
         xml = (
             '<Object Type="Tecan.VisionX.ApplicationDriver.ApplicationDriverBase.ApplicationDriverMacro">\n'
             f'  <ApplicationDriverMacro Version="1" Name="{sanitize_text(step.macro_name)}" '
@@ -851,6 +859,7 @@ class Renderer:
             f'IsDisabledForExecution="{params["IsDisabledForExecution"]}" '
             f'LineNumber="{params["LineNumber"]}">\n'
             f"    <ExecutionSettings>{settings}</ExecutionSettings>\n"
+            f"{recovery_xml}"
             "  </ApplicationDriverMacro>\n"
             "</Object>"
         )
