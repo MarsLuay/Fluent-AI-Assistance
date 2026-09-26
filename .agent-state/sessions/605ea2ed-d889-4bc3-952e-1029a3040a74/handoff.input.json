@@ -1,0 +1,53 @@
+﻿{
+    "schema_version":  2,
+    "task_goal":  "Implement exactly MarsLuay/Fluent-AI-Assistance#166 only when source-backed Sample Transfer evidence exists.",
+    "acceptance_criteria":  "No invented FluentControl semantics; add regression and implementation only if supported by legitimate sanitized XSCR/ZEIA evidence; otherwise block.",
+    "confirmed_facts":  [
+
+                        ],
+    "assumptions":  [
+                        "handoff written from session wrapper"
+                    ],
+    "important_files":  [
+
+                        ],
+    "important_symbols":  [
+
+                          ],
+    "decisions":  [
+                      {
+                          "decision":  "snapshot via agent-session-start",
+                          "rationale":  "claimed; inspecting issue and repository instructions"
+                      }
+                  ],
+    "files_changed":  [
+
+                      ],
+    "verification_performed":  [
+
+                               ],
+    "baseline_failures":  [
+
+                          ],
+    "current_failures":  [
+
+                         ],
+    "unresolved_risks":  [
+
+                         ],
+    "remaining_steps":  [
+
+                        ],
+    "next_recommended_action":  "Read applicable instructions and project-memory context, then verify source-backed fixture availability.",
+    "source_session_id":  "605ea2ed-d889-4bc3-952e-1029a3040a74",
+    "active_subproject":  ".",
+    "raw_artifact_refs":  [
+
+                          ],
+    "contract_id":  "",
+    "contract_hash":  "",
+    "route_id":  "",
+    "context_packet_hash":  "",
+    "recovery_disposition":  "",
+    "trigger":  "issue-accept-worker"
+}
