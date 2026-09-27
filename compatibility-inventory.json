@@ -109,6 +109,33 @@
       "replacement": null
     },
     {
+      "id": "persist.rga_routing",
+      "class": "supported",
+      "kind": "persisted-artifact",
+      "path": "source/03-protocol-builder/fluent_pipeline/rga_routing.py",
+      "reason": "Source-backed RGA robot-vector routing capability catalog.",
+      "supportedVersion": "tecan.rga_routing.v1",
+      "replacement": null
+    },
+    {
+      "id": "persist.rga_topology",
+      "class": "supported",
+      "kind": "persisted-artifact",
+      "path": "source/03-protocol-builder/fluent_pipeline/rga_topology.py",
+      "reason": "Source-backed RGA stacked-labware and storage-carrier topology.",
+      "supportedVersion": "tecan.rga_topology.v1",
+      "replacement": null
+    },
+    {
+      "id": "persist.rga_transfer_assessment",
+      "class": "supported",
+      "kind": "persisted-artifact",
+      "path": "source/03-protocol-builder/fluent_pipeline/rga_transfer.py",
+      "reason": "RGA transfer assessment at validation, generation, and simulation boundaries.",
+      "supportedVersion": "tecan.rga_transfer_assessment.v1",
+      "replacement": null
+    },
+    {
       "id": "compact.project_query",
       "class": "supported",
       "kind": "output-contract",

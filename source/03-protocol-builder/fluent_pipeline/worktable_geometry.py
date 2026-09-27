@@ -506,9 +506,13 @@ def _component_rga_routing(
         template,
         {"regripstation", "regripsite", "regripnest"},
     )
-    storage_nodes = _named_descendants(
+    site_storage_nodes = _named_descendants(
         template,
-        {"storagecarrier", "storageposition", "carouselposition", "stackersite", "hotelsite"},
+        {"storageposition", "carouselposition", "stackersite", "hotelsite"},
+    )
+    storage_nodes = site_storage_nodes if site_storage_nodes else _named_descendants(
+        template,
+        {"storagecarrier"},
     )
     explicit_members = _named_descendants(
         template,
@@ -534,7 +538,7 @@ def _component_rga_routing(
         "vectors": [_rga_vector_record(node) for node in vector_nodes],
         "site_capabilities": site_capabilities,
         "regrip_stations": [_rga_source_record(node, kind="regrip_station") for node in regrip_nodes],
-        "storage_sites": [_rga_source_record(node, kind="storage_site") for node in storage_nodes],
+        "storage_sites": [_rga_storage_record(node) for node in storage_nodes],
         "provenance": {"source_path": source_path},
     }
     fingerprint_input = {key: value for key, value in records.items() if key != "provenance"}
@@ -585,6 +589,21 @@ def _rga_vector_record(node: ET.Element) -> dict[str, Any]:
             "end_position": _first_named_vec(node, {"endposition", "endpoint"}),
             "orientation": _first_named_vec(node, {"orientation"}),
             "waypoints": _vector_waypoints(node),
+        }
+    )
+    return _clean(record)
+
+
+def _rga_storage_record(node: ET.Element) -> dict[str, Any]:
+    record = _rga_source_record(node, kind="storage_site")
+    order = _first_named_text(node, {"order", "sequence", "siteorder", "index"})
+    site_index = _first_named_text(node, {"siteindex", "slotindex", "positionindex"})
+    record.update(
+        {
+            "order": int(order) if order.isdigit() else None,
+            "site_index": int(site_index) if site_index.isdigit() else None,
+            "group_id": _first_named_text(node, {"groupid", "labwaregroupid", "group"}),
+            "transfer_site_id": _first_named_text(node, {"transfersiteid", "transfersiteguid", "transfersite"}),
         }
     )
     return _clean(record)

@@ -79,6 +79,9 @@ def test_installed_and_python_exports_are_classified() -> None:
         "python.application_services",
         "persist.project_manifest",
         "persist.project_index",
+        "persist.rga_routing",
+        "persist.rga_topology",
+        "persist.rga_transfer_assessment",
         "compact.project_query",
     ):
         assert by_id[key]["class"] == "supported", key

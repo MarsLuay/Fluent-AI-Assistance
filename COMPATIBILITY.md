@@ -122,3 +122,21 @@ The v2 summary fields (`name`, `guid`, `profiles[]` section names / command-type
 lists, flattened `aspirate`/`dispense`/`mix`) remain as compatibility views.
 Unknown catalog schema versions are marked unsupported and require re-import.
 Do not invent pressure threshold defaults such as community `±1000` values.
+
+### RGA routing and topology metadata
+
+Current schemas:
+- `tecan.rga_routing.v1`
+- `tecan.rga_topology.v1`
+- `tecan.rga_transfer_assessment.v1`
+
+RGA route and storage assessments are conservative, source-backed metadata
+carried alongside protocol IR and worktable geometry. They classify available
+vectors, grip modes, regrip paths, storage order, occupancy, and ambiguity from
+imported evidence. They do not mutate `TransferLabware` command XML or claim
+unverified physical hardware readiness.
+
+Unsupported variants or missing vector evidence fail closed (`route_unknown_missing_vector_evidence`,
+`needs_review`), while unmodeled vendor fields and additive XML structures
+remain source-preserved in raw metadata.
+
