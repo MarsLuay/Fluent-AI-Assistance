@@ -66,6 +66,7 @@ def build_motion_compatibility_report(
     registry = load_motion_defect_registry()
     host = _host_evidence(host_environment)
     protocol_evidence = _protocol_motion_evidence(protocol_ir)
+    vector_boundaries = _rga_vector_boundaries(protocol_ir)
     log_correlation = correlate_motion_logs(log_records or ())
     feature_evidence: dict[str, list[dict[str, Any]]] = {
         feature: list(protocol_evidence.get(feature, ())) for feature in MOTION_FEATURES
@@ -145,6 +146,7 @@ def build_motion_compatibility_report(
                 for feature in MOTION_FEATURES
                 if protocol_evidence.get(feature)
             },
+            "vector_boundaries": vector_boundaries,
         },
         "log_correlation": log_correlation,
         "findings": findings,
@@ -261,6 +263,78 @@ def _protocol_motion_evidence(protocol_ir: Mapping[str, Any] | None) -> dict[str
             "evidence": "canonical protocol IR operation mca384_move_arm",
         })
     return evidence
+
+
+def extract_rga_vector_boundaries(protocol_ir: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """Extract RGA vector-boundary evidence from protocol IR for motion diagnostics (#163)."""
+    return _rga_vector_boundaries(protocol_ir)
+
+
+def _rga_vector_boundaries(protocol_ir: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    boundaries: list[dict[str, Any]] = []
+    steps = protocol_ir.get("steps") if isinstance(protocol_ir, Mapping) else ()
+    for index, step in enumerate(steps or ()):
+        if not isinstance(step, Mapping):
+            continue
+        operation = str(step.get("operation") or "").casefold()
+        params = step.get("parameters") if isinstance(step.get("parameters"), Mapping) else {}
+        assessment = params.get("rga_assessment") if isinstance(params.get("rga_assessment"), Mapping) else None
+        route = (
+            params.get("rga_route_assessment")
+            or (assessment.get("route_assessment") if assessment else None)
+            or params.get("rga_route_input")
+        )
+        if operation != "move_plate" and not route and not assessment:
+            continue
+        route = route if isinstance(route, Mapping) else {}
+        assessment = assessment or {}
+        logical = assessment.get("logical_occupancy") if isinstance(assessment.get("logical_occupancy"), Mapping) else {}
+        source_site = route.get("source_site") if isinstance(route.get("source_site"), Mapping) else {}
+        dest_site = route.get("destination_site") if isinstance(route.get("destination_site"), Mapping) else {}
+        selected = route.get("selected_route") if isinstance(route.get("selected_route"), Mapping) else {}
+        regrip = route.get("regrip_path") if isinstance(route.get("regrip_path"), Mapping) else {}
+
+        boundary: dict[str, Any] = {
+            "kind": "rga_vector_boundary",
+            "step_index": index,
+            "step_id": step.get("id") or f"step_{index + 1:03d}",
+            "device": str(step.get("device") or params.get("module_name") or params.get("device") or "RGA 1"),
+            "source": {
+                "carrier": str(params.get("source_location") or (logical.get("source") or {}).get("location") or ""),
+                "site": params.get("source_site_index") or params.get("source_site_number") or (logical.get("source") or {}).get("site"),
+                "site_identity": str(source_site.get("identity") or (logical.get("source") or {}).get("site_id") or ""),
+            },
+            "destination": {
+                "carrier": str(params.get("destination_location") or params.get("to_location") or (logical.get("destination") or {}).get("location") or ""),
+                "site": params.get("destination_site") or params.get("to_site") or (logical.get("destination") or {}).get("site"),
+                "site_identity": str(dest_site.get("identity") or (logical.get("destination") or {}).get("site_id") or ""),
+            },
+            "route_status": str(route.get("status") or "not_evaluated"),
+            "candidate_vectors": list(route.get("candidate_vectors") or []),
+            "shared_vectors": list(route.get("shared_vectors") or []),
+            "catalog_fingerprint": route.get("catalog_fingerprint") or (assessment.get("source_dependencies") or {}).get("route_catalog_fingerprint"),
+            "pathfinder_boundary": {
+                "status": "not_evaluated",
+                "owner": "#163",
+                "note": "RGA vector governs movement into/out of the carrier/object region; PathFinder governs free-space movement outside bounding boxes.",
+            },
+            "physical_verification": {
+                "status": "required",
+                "owner": "#160",
+                "note": "Route compatibility does not evaluate physical finger alignment or plate retention.",
+            },
+        }
+        if source_site.get("placement_adjustment"):
+            boundary["source"]["placement_adjustment"] = source_site["placement_adjustment"]
+        if dest_site.get("placement_adjustment"):
+            boundary["destination"]["placement_adjustment"] = dest_site["placement_adjustment"]
+        if selected.get("vector_id"):
+            boundary["selected_vector_id"] = selected["vector_id"]
+        if regrip.get("station_id"):
+            boundary["regrip_station_id"] = regrip["station_id"]
+
+        boundaries.append(boundary)
+    return boundaries
 
 
 def _version_status(version: str | None, fixed_in: str) -> str:

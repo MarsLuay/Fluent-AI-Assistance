@@ -179,6 +179,52 @@ def build_interaction_profiles(
             "status": PHYSICAL_STATUS_UNKNOWN if unmodeled else PHYSICAL_STATUS_SUPPORTED,
             "fingerprint": canonical_fingerprint(interaction_material),
         }
+        if kind == "rga_transfer":
+            assessment = params.get("rga_assessment") if isinstance(params.get("rga_assessment"), Mapping) else None
+            route = (
+                params.get("rga_route_assessment")
+                or (assessment.get("route_assessment") if assessment else None)
+                or params.get("rga_route_input")
+            )
+            topology = (
+                params.get("rga_topology_transition")
+                or (assessment.get("topology_transition") if assessment else None)
+                or params.get("rga_topology_input")
+            )
+            route = route if isinstance(route, Mapping) else None
+            topology = topology if isinstance(topology, Mapping) else None
+            if route or topology or params.get("rga_source_dependencies"):
+                selected_route = (
+                    route.get("selected_route")
+                    if isinstance(route.get("selected_route"), Mapping)
+                    else None
+                ) if route else None
+                rga_evidence = {
+                    "source_carrier": str(
+                        params.get("source_location")
+                        or ((route.get("source_site") or {}).get("name") if route else "")
+                        or ""
+                    ),
+                    "destination_carrier": str(
+                        params.get("destination_location")
+                        or params.get("to_location")
+                        or ((route.get("destination_site") or {}).get("name") if route else "")
+                        or ""
+                    ),
+                    "source_site": (route.get("source_site") if route else None) or params.get("source_site_id") or params.get("source_site"),
+                    "destination_site": (route.get("destination_site") if route else None) or params.get("destination_site_id") or params.get("destination_site"),
+                    "candidate_grip_modes": list(route.get("grip_mode_intersection") or []) if route else [],
+                    "selected_grip_mode": selected_route.get("grip_mode") if selected_route else None,
+                    "candidate_vectors": list(route.get("candidate_vectors") or []) if route else [],
+                    "shared_vectors": list(route.get("shared_vectors") or []) if route else [],
+                    "regrip_path": route.get("regrip_path") if route else None,
+                    "route_status": route.get("status") if route else "not_evaluated",
+                    "stack_topology": topology,
+                    "target_configuration_fingerprint": (route.get("catalog_fingerprint") if route else None) or profile.get("fingerprint"),
+                    "physical_verification_authority": "#160",
+                    "requires_hardware_verification": True,
+                }
+                interaction["rga_evidence"] = {k: v for k, v in rga_evidence.items() if v not in (None, [], {})}
         interactions.append(interaction)
     return interactions
 

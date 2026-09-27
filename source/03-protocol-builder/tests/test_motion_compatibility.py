@@ -108,3 +108,55 @@ def test_markdown_rendering_is_deterministic() -> None:
     report = build_motion_compatibility_report(**fixture)
 
     assert render_motion_compatibility_markdown(report) == render_motion_compatibility_markdown(report)
+
+
+def test_rga_vector_boundary_evidence_is_provided_to_motion_report_and_pathfinder_remains_separate() -> None:
+    protocol_ir = {
+        "steps": [
+            {
+                "id": "move-1",
+                "operation": "move_plate",
+                "target_labware": "Plate1",
+                "parameters": {
+                    "labware": "Plate1",
+                    "source_location": "HotelCarrier",
+                    "source_site_index": 1,
+                    "destination_location": "NestCarrier",
+                    "destination_site": 2,
+                    "rga_route_assessment": {
+                        "status": "direct_supported_by_source",
+                        "catalog_fingerprint": "catalog-fingerprint-xyz",
+                        "candidate_vectors": ["vector-1", "vector-2"],
+                        "shared_vectors": ["vector-1"],
+                        "selected_route": {"vector_id": "vector-1", "grip_mode": "Wide"},
+                        "source_site": {"identity": "site-hotel-1", "name": "HotelSite1"},
+                        "destination_site": {"identity": "site-nest-2", "name": "NestSite2"},
+                    },
+                },
+            }
+        ]
+    }
+    report = build_motion_compatibility_report(protocol_ir)
+
+    vector_boundaries = report["protocol_motion"]["vector_boundaries"]
+    assert len(vector_boundaries) == 1
+    boundary = vector_boundaries[0]
+    assert boundary["kind"] == "rga_vector_boundary"
+    assert boundary["step_id"] == "move-1"
+    assert boundary["source"]["carrier"] == "HotelCarrier"
+    assert boundary["source"]["site_identity"] == "site-hotel-1"
+    assert boundary["destination"]["carrier"] == "NestCarrier"
+    assert boundary["destination"]["site_identity"] == "site-nest-2"
+    assert boundary["route_status"] == "direct_supported_by_source"
+    assert boundary["selected_vector_id"] == "vector-1"
+    assert boundary["candidate_vectors"] == ["vector-1", "vector-2"]
+    assert boundary["shared_vectors"] == ["vector-1"]
+    assert boundary["catalog_fingerprint"] == "catalog-fingerprint-xyz"
+    assert boundary["pathfinder_boundary"] == {
+        "status": "not_evaluated",
+        "owner": "#163",
+        "note": "RGA vector governs movement into/out of the carrier/object region; PathFinder governs free-space movement outside bounding boxes.",
+    }
+    assert boundary["physical_verification"]["status"] == "required"
+    assert boundary["physical_verification"]["owner"] == "#160"
+

@@ -240,3 +240,60 @@ def test_no_physical_interaction_is_not_applicable() -> None:
     assert report["status"] == "not_applicable"
     assert report["checks"] == []
     assert report["hardware_run_ready"] is False
+
+
+def test_rga_transfer_provides_route_grip_and_stack_evidence_to_physical_verification() -> None:
+    ir = _ir(include_rga=False)
+    ir["steps"].append(
+        {
+            "id": "move-stack",
+            "operation": "move_plate",
+            "target_labware": "Plate",
+            "parameters": {
+                "labware": "Plate",
+                "source_location": "HotelCarrier",
+                "source_site_index": 1,
+                "destination_location": "NestCarrier",
+                "destination_site": 2,
+                "rga_route_assessment": {
+                    "status": "direct_supported_by_source",
+                    "catalog_fingerprint": "rga-cat-1",
+                    "candidate_vectors": ["v1"],
+                    "shared_vectors": ["v1"],
+                    "grip_mode_intersection": ["Wide"],
+                    "selected_route": {"vector_id": "v1", "grip_mode": "Wide"},
+                    "source_site": {"identity": "site-1", "name": "HotelSite1"},
+                    "destination_site": {"identity": "site-2", "name": "NestSite2"},
+                },
+                "rga_topology_transition": {
+                    "status": "logical_transition_supported_by_source",
+                    "topology_fingerprint": "topo-1",
+                    "source_site_id": "site-1",
+                    "destination_site_id": "site-2",
+                },
+            },
+        }
+    )
+    report = build_physical_verification(ir, _manifest())
+
+    rga_interactions = [item for item in report["interactions"] if item["kind"] == "rga_transfer"]
+    assert len(rga_interactions) == 1
+    interaction = rga_interactions[0]
+    assert "rga_evidence" in interaction
+    evidence = interaction["rga_evidence"]
+    assert evidence["source_carrier"] == "HotelCarrier"
+    assert evidence["destination_carrier"] == "NestCarrier"
+    assert evidence["candidate_grip_modes"] == ["Wide"]
+    assert evidence["selected_grip_mode"] == "Wide"
+    assert evidence["candidate_vectors"] == ["v1"]
+    assert evidence["shared_vectors"] == ["v1"]
+    assert evidence["route_status"] == "direct_supported_by_source"
+    assert evidence["stack_topology"]["status"] == "logical_transition_supported_by_source"
+    assert evidence["physical_verification_authority"] == "#160"
+    assert evidence["requires_hardware_verification"] is True
+
+    # #160 remains the authority: checks are required, not hardware run ready
+    assert report["hardware_run_ready"] is False
+    assert any(item["effect"] == "nest_retention" for item in report["checks"])
+    assert any(item["effect"] == "gripper_clearance" for item in report["checks"])
+
