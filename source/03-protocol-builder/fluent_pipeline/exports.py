@@ -4917,10 +4917,11 @@ def _update_nodedescription_script_identity(
 
 def _replace_or_insert_simple_tag(block: str, tag: str, value: str, *, after_tag: str) -> str:
     escaped = _xml_escape_text(value)
-    if re.search(rf"<{tag}>.*?</{tag}>", block, flags=re.DOTALL):
+    pattern = rf"<{tag}(?:>.*?</{tag}>|(?:\s+)?/>)"
+    if re.search(pattern, block, flags=re.DOTALL):
         replacement = f"<{tag}>{escaped}</{tag}>"
         return re.sub(
-            rf"<{tag}>.*?</{tag}>",
+            pattern,
             lambda _match: replacement,
             block,
             count=1,
@@ -4970,10 +4971,9 @@ def _restore_windows_datastore_zip_names(archive_path: Path) -> None:
             for i in range(len(data) - 22, search_stop, -1):
                 if data[i : i + 4] == b"PK\x05\x06":
                     comment_len = int.from_bytes(data[i + 20 : i + 22], "little")
-                    if i + 22 + comment_len == len(data) or (eocd_offset == -1 and i + 22 + comment_len <= len(data)):
+                    if i + 22 + comment_len == len(data):
                         eocd_offset = i
-                        if i + 22 + comment_len == len(data):
-                            break
+                        break
 
             if eocd_offset != -1:
                 cd_offset = int.from_bytes(data[eocd_offset + 16 : eocd_offset + 20], "little")

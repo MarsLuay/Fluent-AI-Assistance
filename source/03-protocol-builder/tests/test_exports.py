@@ -3458,6 +3458,20 @@ class ArchiveWindowsNameRestorationTests(unittest.TestCase):
             data = p.read_bytes()
             self.assertIn(b"DataStore\\file1.txt", data)
 
+    def test_replace_or_insert_simple_tag_handles_empty_tags(self):
+        """
+        Verify that `_replace_or_insert_simple_tag` correctly matches and replaces self-closing empty tags.
+        """
+        from fluent_pipeline.exports import _replace_or_insert_simple_tag
+
+        block = "<N>Name</N>\r\n<P/>\r\n"
+        updated = _replace_or_insert_simple_tag(block, "P", "NewFolder", after_tag="N")
+        self.assertIn("<P>NewFolder</P>", updated)
+
+        block2 = "<N>Name</N>\r\n<P />\r\n"
+        updated2 = _replace_or_insert_simple_tag(block2, "P", "NewFolder", after_tag="N")
+        self.assertIn("<P>NewFolder</P>", updated2)
+
     def test_rewrite_zip_filename_records_false_eocd_signature(self):
         """
         Verify that `_restore_windows_datastore_zip_names` correctly rejects spoofed EOCD
