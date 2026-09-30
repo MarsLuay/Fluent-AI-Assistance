@@ -68,9 +68,11 @@ class ReaderCommandRegistryTests(unittest.TestCase):
         self.assertEqual(registry_command_family("LihaWashScriptCommand"), "LiHa/FCA")
         self.assertEqual(registry_pattern_type("FcaWash"), "wash")
 
-    def test_reader_approves_low_level_hardware_driver_commands(self):
+    def test_reader_distinguishes_typed_and_passthrough_hardware_driver_commands(self):
         self.assertEqual(registry_command_family("TeGioSetPWMOutputStatement"), "Application driver")
-        self.assertEqual(registry_command_support_status("MoveAxisCommandScriptStatement"), "approved_passthrough")
+        # Typed motion commands are mapped; unmodeled driver commands remain approved passthroughs.
+        self.assertEqual(registry_command_support_status("MoveAxisCommandScriptStatement"), "mapped")
+        self.assertEqual(registry_command_support_status("TeGioSetPWMOutputStatement"), "approved_passthrough")
 
 
 if __name__ == "__main__":
