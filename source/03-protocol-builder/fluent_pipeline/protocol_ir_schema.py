@@ -56,6 +56,21 @@ _REGISTERED_LEGACY_KEYS: dict[str, tuple[str, ...]] = {
     "Source": ("source",),
     "DutyCycle": ("duty_cycle",),
     "ChargeCondition": ("charge_condition",),
+    "PartialColumnOffset": ("partial_column_offset",),
+    "PartialRowsOffset": ("partial_rows_offset",),
+    "PositionFirstTip/X": ("position_first_tip_x",),
+    "PositionFirstTip/Y": ("position_first_tip_y",),
+    "FirstTipXPosition": ("first_tip_x_position",),
+    "FirstTipYPosition": ("first_tip_y_position",),
+    "LastTipXPosition": ("last_tip_x_position",),
+    "LastTipYPosition": ("last_tip_y_position",),
+    "Column": ("column",),
+    "Row": ("row",),
+    "RowOffset": ("row_offset",),
+    "ColumnOffset": ("column_offset",),
+    "OrientationPhi": ("orientation_phi",),
+    "OrientationPsi": ("orientation_psi",),
+    "OrientationTheta": ("orientation_theta",),
 }
 _SITE_EXPRESSION_KEY = "site_expression"
 _SITE_EXPRESSION_ALIAS_KEYS = ("destination_site_expression", "to_site_expression")
@@ -2201,6 +2216,21 @@ def _step_expression_expected_type(
         "iterations_expression",
         "number_of_loops_expression",
         "count_expression",
+        "partial_column_offset_expression",
+        "partial_rows_offset_expression",
+        "position_first_tip_x_expression",
+        "position_first_tip_y_expression",
+        "first_tip_x_position_expression",
+        "first_tip_y_position_expression",
+        "last_tip_x_position_expression",
+        "last_tip_y_position_expression",
+        "column_expression",
+        "row_expression",
+        "row_offset_expression",
+        "column_offset_expression",
+        "orientation_phi_expression",
+        "orientation_psi_expression",
+        "orientation_theta_expression",
     }:
         return "number", None
     if key == "position_expression" or key in _SITE_EXPRESSION_KEYS:

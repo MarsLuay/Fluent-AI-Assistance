@@ -1930,6 +1930,55 @@ def _python_expression_mapping(node: ast.AST | None) -> dict[str, Any] | None:
     return expression_to_mapping(parse_or_preserve_source_expression(str(value)))
 
 
+def _python_pickup_parameters(
+    call: ast.Call,
+    target: str | None,
+) -> dict[str, Any]:
+    """Capture the complete MCA pickup call without evaluating expressions."""
+
+    parameters: dict[str, Any] = {
+        "method": call.func.attr,
+        "target": target,
+    }
+    for key in ("tip_columns", "tip_count", "partial_columns", "partial_rows", "compartment", "blowout_airgap", "head_position"):
+        value = _keyword_value(call, key)
+        if value is not None:
+            parameters[key] = value
+
+    for key in ("remove_rack", "subsequent_pipetting_direction_is_row"):
+        value = _keyword_value(call, key)
+        if value is not None:
+            parameters[key] = value
+
+    expression_defaults = {
+        "partial_column_offset": 0,
+        "partial_rows_offset": 0,
+        "well_offset": 0,
+        "position_first_tip_x": 0,
+        "position_first_tip_y": 0,
+        "first_tip_x_position": 1,
+        "first_tip_y_position": 1,
+        "column": 0,
+        "row": 0,
+        "row_offset": 0,
+        "column_offset": 0,
+        "orientation_phi": 0,
+        "orientation_psi": 0,
+        "orientation_theta": 0,
+    }
+    for key in (*expression_defaults, "last_tip_x_position", "last_tip_y_position"):
+        node = _keyword_node(call, key)
+        if node is None:
+            continue
+        expression = _python_expression_mapping(node)
+        if expression is None:
+            continue
+        parameters[f"{key}_expression"] = expression
+        literal = _literal_text(node)
+        parameters[key] = literal if literal is not None else _expression_source_text(expression)
+    return parameters
+
+
 def _python_runtime_step(
     call: ast.Call,
     draft_name: str,
@@ -1951,6 +2000,21 @@ def _python_runtime_step(
     }:
         return _python_motion_step(call, operation, draft_name, current_group, source)
     target = _value_label(call.args[0], reagent_by_var, labware_by_var) if call.args else None
+    if operation == "pick_up_tips":
+        parameters = _python_pickup_parameters(call, target)
+        return {
+            "group": current_group,
+            "operation": operation,
+            "name": _operation_name(operation),
+            "command_id": "Mca384PickUpTips",
+            "target_labware": target,
+            "source_labware": target,
+            "destination_labware": None,
+            "volume_ul": None,
+            "liquid_class": None,
+            "parameters": parameters,
+            "source_path": _source_path(draft_name, current_group, source, call),
+        }
     volume = _literal_text(call.args[1]) if len(call.args) > 1 else None
     liquid_class = _keyword_value(call, "liquid_class")
     tip_channels = _keyword_value(call, "tip_channels")
@@ -1966,11 +2030,15 @@ def _python_runtime_step(
     }
     if operation == "liha_drop_tips":
         parameters["tip_channels"] = tip_channels
+    command_ids = {
+        "mca384_get_tips": "Mca384GetTips",
+        "mca384_drop_tips": "Mca384DropTips",
+    }
     return {
         "group": current_group,
         "operation": operation,
         "name": _operation_name(operation),
-        "command_id": call.func.attr,
+        "command_id": command_ids.get(operation, call.func.attr),
         "target_labware": target,
         "source_labware": target if operation == "aspirate" else None,
         "destination_labware": target if operation == "dispense" else None,
@@ -2212,6 +2280,25 @@ def _xscr_step(
             source_entry=source_entry,
         )
     )
+    if operation == "pick_up_tips":
+        pickup_scalars = (
+            ("partial_columns", "PartialColumns", False),
+            ("partial_rows", "PartialRows", False),
+            ("compartment", "Compartment", False),
+            ("blowout_airgap", "BlowoutAirgap", False),
+            ("remove_rack", "RemoveRack", True),
+            ("subsequent_pipetting_direction_is_row", "SubsequentPipettingDirectionIsRow", True),
+        )
+        for key, field_name, is_bool in pickup_scalars:
+            raw_value = _first_text(command_object, field_name)
+            if raw_value in (None, ""):
+                continue
+            parameters[key] = _bool_text(raw_value) if is_bool else _number_or_text(raw_value)
+        parameters["head_position"] = (
+            _first_text(command_object, "HeadPosition")
+            or _first_text(command_object, "HeadPositions")
+            or parameters.get("head_position")
+        )
     if operation == "application_driver_macro":
         recovery_policy = _xscr_driver_recovery_policy(command_object)
         if recovery_policy is not None:
@@ -2721,10 +2808,55 @@ def _render_python_step(step: dict[str, Any], labware_vars: dict[str, str]) -> l
         return ["head.mount_adapter()"]
     if operation == "drop_head_adapter":
         return ["head.drop_adapter()"]
-    if operation in {"pick_up_tips", "mca384_get_tips"}:
-        return [f"head.pick_up({target_expr})"]
-    if operation in {"set_tips_back", "mca384_drop_tips"}:
-        return [f"head.return_tips({target_expr})"]
+    if operation == "pick_up_tips":
+        parts = [target_expr]
+        expression_defaults = {
+            "partial_column_offset": 0,
+            "partial_rows_offset": 0,
+            "well_offset": 0,
+            "position_first_tip_x": 0,
+            "position_first_tip_y": 0,
+            "first_tip_x_position": 1,
+            "first_tip_y_position": 1,
+            "column": 0,
+            "row": 0,
+            "row_offset": 0,
+            "column_offset": 0,
+            "orientation_phi": 0,
+            "orientation_psi": 0,
+            "orientation_theta": 0,
+        }
+        for key in ("tip_columns", "tip_count", "partial_columns", "partial_rows"):
+            if params.get(key) is not None:
+                parts.append(f"{key}={params[key]!r}")
+        for key, default in expression_defaults.items():
+            expression = params.get(f"{key}_expression")
+            if expression is not None:
+                parts.append(f"{key}={_expression_python_arg(expression, fallback=params.get(key, default))}")
+            elif key in params and params[key] != default:
+                parts.append(f"{key}={params[key]!r}")
+        for key in ("last_tip_x_position", "last_tip_y_position"):
+            if params.get(key) is not None:
+                expression = params.get(f"{key}_expression")
+                value = _expression_python_arg(expression, fallback=params[key]) if expression is not None else repr(params[key])
+                parts.append(f"{key}={value}")
+        for key, default in (
+            ("compartment", 1),
+            ("blowout_airgap", 0),
+            ("head_position", "Left"),
+        ):
+            if params.get(key) is not None and params[key] != default:
+                parts.append(f"{key}={params[key]!r}")
+        for key in ("remove_rack", "subsequent_pipetting_direction_is_row"):
+            if params.get(key):
+                parts.append(f"{key}=True")
+        return [f"head.pick_up({', '.join(parts)})"]
+    if operation == "mca384_get_tips":
+        return [f"head.get_tips({target_expr if target else 'None'})"]
+    if operation == "set_tips_back":
+        return [f"head.return_tips({target_expr if target else 'None'})"]
+    if operation == "mca384_drop_tips":
+        return [f"head.drop_tips({target_expr if target else 'None'})"]
     if operation == "liha_drop_tips":
         raw_xml = str(params.get("raw_xml") or "").strip()
         if raw_xml:

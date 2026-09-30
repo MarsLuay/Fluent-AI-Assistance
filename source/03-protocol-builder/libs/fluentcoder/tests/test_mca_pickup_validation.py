@@ -30,6 +30,20 @@ def test_out_of_range_and_unprovable_offsets_are_review():
     assert any(item["code"] == "out_of_bounds" for item in bounded["findings"])
 
 
+def test_loop_bounds_use_the_referenced_pickup_axis_only():
+    valid_column_loop = validate_mca_pickup(
+        _step(column="tip_column"),
+        loop_bounds={"tip_column": (0, 11)},
+    )
+    assert [item["code"] for item in valid_column_loop["findings"]] == ["unresolved_mapping"]
+
+    unrelated_loop = validate_mca_pickup(
+        _step(),
+        loop_bounds={"other_index": (0, 100)},
+    )
+    assert [item["code"] for item in unrelated_loop["findings"]] == []
+
+
 def test_worktable_rotation_is_reviewed_without_a_verified_transform():
     decision = validate_mca_pickup(_step(), placement_orientation={"rotation": 180})
     assert decision["address"]["status"] == "cannot_determine"

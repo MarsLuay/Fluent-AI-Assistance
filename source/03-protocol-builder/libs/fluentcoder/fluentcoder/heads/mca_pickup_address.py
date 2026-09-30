@@ -201,15 +201,40 @@ def _range_exceeds_grid(step: PickUpTipsStep | Mapping[str, Any], loop_bounds: M
     columns = _literal(_read(step, "partial_columns"))
     if rows is None or columns is None:
         return False
+
+    # A loop variable only constrains an axis when it is actually used by
+    # that axis.  Comparing every bound with both grid dimensions produces
+    # false positives for valid MCA-384 column loops on a 16-row grid.
+    axes = (
+        ("row", "row_offset", rows),
+        ("column", "column_offset", columns),
+    )
     for name, bounds in loop_bounds.items():
         low, high = bounds
-        for value in (low, high):
-            if value < 0 or value >= rows or value >= columns:
-                return True
-            if str(_read(step, "row")) == name or str(_read(step, "column")) == name:
-                if value < 0 or value >= (rows if str(_read(step, "row")) == name else columns):
+        for base_field, offset_field, size in axes:
+            base = _read(step, base_field)
+            offset = _read(step, offset_field)
+            if _variable_name(base) == name:
+                shift = _literal(offset)
+                if shift is not None and (low + shift < 0 or high + shift >= size):
+                    return True
+                if shift is None and (low < 0 or high >= size):
+                    return True
+            elif _variable_name(offset) == name:
+                origin = _literal(base)
+                if origin is not None and (low + origin < 0 or high + origin >= size):
                     return True
     return False
+
+
+def _variable_name(value: Any) -> str | None:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, Mapping) and value.get("kind") == "variable_reference":
+        return str(value.get("name") or "") or None
+    if getattr(value, "kind", None) == "variable_reference":
+        return str(getattr(value, "name", "") or "") or None
+    return None
 
 
 def _read(step: PickUpTipsStep | Mapping[str, Any], name: str) -> Any:

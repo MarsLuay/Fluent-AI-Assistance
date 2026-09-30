@@ -307,6 +307,100 @@ def build_worktable() -> Worktable:
             write_protocol_ir(ir, ir_path)
             self.assertEqual(load_protocol_ir(ir_path)["ir_version"], CANONICAL_IR_VERSION)
 
+    def test_python_draft_preserves_mca_pickup_fields_and_expressions(self):
+        draft_text = """
+from fluentcoder import MCA100Box, Worktable
+
+
+def build_worktable() -> Worktable:
+    wt = Worktable.from_workspace('780_Empty', auto_place=False, protocol_name='MCA pickup')
+    wt.group('Setup')
+    wt.declare_variable('tip_row_offset', 0)
+    wt.declare_variable('phi', 0)
+    tips = wt.place(MCA100Box('Tips', catalog='MCA96, 100ul, Box'), 'Site', 4)
+    wt.group('Transfer')
+    head = wt.mca96
+    head.pick_up(
+        tips,
+        partial_columns=12,
+        partial_rows=8,
+        row_offset=tip_row_offset,
+        column_offset=2,
+        orientation_phi=phi,
+        remove_rack=True,
+    )
+    return wt
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            draft = Path(tmp) / 'mca_pickup.py'
+            draft.write_text(draft_text, encoding='utf-8')
+            ir = protocol_ir_from_python(draft)
+
+        step = next(item for item in ir['steps'] if item['operation'] == 'pick_up_tips')
+        self.assertEqual(step['command_id'], 'Mca384PickUpTips')
+        params = step['parameters']
+        self.assertEqual(params['partial_columns'], 12)
+        self.assertEqual(params['partial_rows'], 8)
+        self.assertEqual(params['column_offset'], 2)
+        self.assertEqual(params['row_offset'], 'tip_row_offset')
+        self.assertEqual(params['row_offset_expression']['kind'], 'variable_reference')
+        self.assertEqual(params['row_offset_expression']['name'], 'tip_row_offset')
+        self.assertEqual(params['orientation_phi'], 'phi')
+        self.assertTrue(params['remove_rack'])
+
+        rendered = render_python_draft(ir)
+        self.assertIn('head.pick_up(tips, partial_columns=12, partial_rows=8', rendered)
+        self.assertIn("row_offset=parse_expression('tip_row_offset')", rendered)
+        self.assertIn("orientation_phi=parse_expression('phi')", rendered)
+        self.assertIn('remove_rack=True', rendered)
+
+    def test_mca_pickup_expression_fields_migrate_and_project_as_scalars(self):
+        from fluent_pipeline.protocol_ir_schema import migrate_protocol_ir
+
+        legacy = {
+            "ir_version": "tecan.protocol_ir.v1",
+            "id": "pickup_migration",
+            "protocol": {"name": "MCA pickup migration"},
+            "source": {"format": "test"},
+            "worktable": {"name": "780_Empty"},
+            "labware": [],
+            "reagents": [],
+            "liquid_classes": [],
+            "variables": [],
+            "worklists": [],
+            "dependencies": [],
+            "safety_assumptions": [],
+            "steps": [
+                {
+                    "id": "step_001",
+                    "index": 1,
+                    "group": "Transfer",
+                    "operation": "pick_up_tips",
+                    "command_id": "Mca384PickUpTips",
+                    "name": "Pick Up Tips",
+                    "target_labware": "Tips",
+                    "parameters": {
+                        "partial_column_offset": 3,
+                        "position_first_tip_x": 0.5,
+                        "orientation_phi": 0,
+                    },
+                }
+            ],
+        }
+
+        current = migrate_protocol_ir(legacy)
+        params = current["steps"][0]["parameters"]
+        self.assertEqual(params["partial_column_offset_expression"]["value"], 3)
+        self.assertEqual(params["position_first_tip_x_expression"]["value"], 0.5)
+        self.assertEqual(params["orientation_phi_expression"]["value"], 0)
+
+        projected = migrate_protocol_ir(current, to_version="tecan.protocol_ir.v1")
+        projected_params = projected["steps"][0]["parameters"]
+        self.assertEqual(projected_params["partial_column_offset"], 3)
+        self.assertEqual(projected_params["position_first_tip_x"], 0.5)
+        self.assertEqual(projected_params["orientation_phi"], 0)
+        self.assertNotIn("partial_column_offset_expression", projected_params)
+
     def test_python_draft_validates_before_rendering(self):
         ir = {
             "ir_version": CANONICAL_IR_VERSION,
