@@ -45,6 +45,7 @@ def analyze_rga_route(
         "destination_site": destination,
         "candidate_vectors": [],
         "shared_vectors": [],
+        "vector_definitions": [],
         "grip_mode_intersection": [],
         "route_candidates": [],
         "selected_route": None,
@@ -87,6 +88,7 @@ def analyze_rga_route(
         return result
 
     vector_records = _vector_records(catalog)
+    result["vector_definitions"] = _vector_boundary_records(result["candidate_vectors"], vector_records)
     shared = result["shared_vectors"]
     missing_records = [vector_id for vector_id in shared if vector_id not in vector_records]
     if missing_records:
@@ -175,6 +177,37 @@ def _vector_records(catalog: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
         if identity:
             records[identity] = item
     return records
+
+
+def _vector_boundary_records(
+    vector_ids: list[str],
+    records: Mapping[str, Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Expose only explicit geometry needed by motion-boundary diagnostics."""
+
+    fields = (
+        "id",
+        "guid",
+        "vector_id",
+        "name",
+        "robot_or_device",
+        "safe_position",
+        "start_position",
+        "end_position",
+        "orientation",
+        "waypoints",
+        "source_member",
+        "source_provenance",
+    )
+    result: list[dict[str, Any]] = []
+    for vector_id in vector_ids:
+        record = records.get(vector_id)
+        if not record:
+            continue
+        boundary = {key: record[key] for key in fields if key in record and record[key] not in (None, "", [], {})}
+        boundary.setdefault("id", vector_id)
+        result.append(boundary)
+    return result
 
 
 def _regrip_candidates(
