@@ -3549,5 +3549,14 @@ class ArchiveWindowsNameRestorationTests(unittest.TestCase):
             self.assertIn(b"DataStore\\file1.txt", data)
 
 
+    def test_replace_or_insert_simple_tag_handles_empty_self_closing_tag(self):
+        block1 = "<Id>123</Id>\n<N/>"
+        updated1 = exports._replace_or_insert_simple_tag(block1, "N", "NewName", after_tag="Id")
+        self.assertIn("<N>NewName</N>", updated1)
+
+        block2 = "<Id>123</Id>\n<N />"
+        updated2 = exports._replace_or_insert_simple_tag(block2, "N", "NewName", after_tag="Id")
+        self.assertIn("<N>NewName</N>", updated2)
+
 if __name__ == "__main__":
     unittest.main()

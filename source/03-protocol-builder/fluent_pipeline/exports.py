@@ -4917,6 +4917,14 @@ def _update_nodedescription_script_identity(
 
 def _replace_or_insert_simple_tag(block: str, tag: str, value: str, *, after_tag: str) -> str:
     escaped = _xml_escape_text(value)
+    if re.search(rf"<{tag}\s*/>", block):
+        replacement = f"<{tag}>{escaped}</{tag}>"
+        return re.sub(
+            rf"<{tag}\s*/>",
+            lambda _match: replacement,
+            block,
+            count=1
+        )
     if re.search(rf"<{tag}>.*?</{tag}>", block, flags=re.DOTALL):
         replacement = f"<{tag}>{escaped}</{tag}>"
         return re.sub(
