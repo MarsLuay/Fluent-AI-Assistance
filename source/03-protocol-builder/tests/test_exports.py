@@ -3549,5 +3549,64 @@ class ArchiveWindowsNameRestorationTests(unittest.TestCase):
             self.assertIn(b"DataStore\\file1.txt", data)
 
 
+    def test_rewrite_zip_filename_records_false_eocd_signature_valid_comment_len(self):
+        """
+        Verify that `_restore_windows_datastore_zip_names` correctly rejects spoofed EOCD
+        signatures when they have a comment length that perfectly matches the remaining
+        bytes in the file, but an invalid cd_offset.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "test.zip"
+
+            # Pass 1: generate with dummy comment_len
+            dummy_payload = bytearray(b"hello PK\x05\x06")
+            dummy_payload.extend(b"\x00" * 12)
+            dummy_payload.extend((9999).to_bytes(4, "little"))
+            dummy_payload.extend((0).to_bytes(2, "little"))
+            dummy_payload.extend(b"\x00" * 14)
+            dummy_payload.extend(b"DataStore/false_file1.txt")
+            dummy_payload.extend(b"\x00" * 1200)
+
+            with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_STORED) as zf:
+                zf.writestr("DataStore/file1.txt", dummy_payload)
+                zf.writestr("meta/file2.txt", b"world")
+
+            data = bytearray(p.read_bytes())
+
+            fake_eocd_idx = data.find(b"hello PK\x05\x06") + 6
+            target_len = len(data) + 8
+            correct_comment_len = target_len - fake_eocd_idx - 22
+
+            final_payload = bytearray(dummy_payload)
+            final_payload[20:22] = correct_comment_len.to_bytes(2, "little")
+
+            with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_STORED) as zf:
+                zf.writestr("DataStore/file1.txt", final_payload)
+                zf.writestr("meta/file2.txt", b"world")
+
+            data = bytearray(p.read_bytes())
+
+            real_eocd_idx = data.rfind(b"PK\x05\x06")
+            real_comment_len = int.from_bytes(data[real_eocd_idx+20:real_eocd_idx+22], "little")
+            data[real_eocd_idx+20:real_eocd_idx+22] = (real_comment_len + 8).to_bytes(2, "little")
+            data.extend(b"padding!")
+
+            p.write_bytes(data)
+
+            # Make sure it's valid zip before
+            with zipfile.ZipFile(p, "r") as zf:
+                self.assertIsNone(zf.testzip())
+
+            from fluent_pipeline.exports import _restore_windows_datastore_zip_names
+            _restore_windows_datastore_zip_names(p)
+
+            # Make sure it's still valid zip after
+            with zipfile.ZipFile(p, "r") as zf:
+                self.assertIsNone(zf.testzip())
+
+            data = p.read_bytes()
+            self.assertIn(b"meta\\file2.txt", data)
+            self.assertIn(b"DataStore\\file1.txt", data)
+
 if __name__ == "__main__":
     unittest.main()

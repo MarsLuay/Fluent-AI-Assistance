@@ -4971,9 +4971,13 @@ def _restore_windows_datastore_zip_names(archive_path: Path) -> None:
                 if data[i : i + 4] == b"PK\x05\x06":
                     comment_len = int.from_bytes(data[i + 20 : i + 22], "little")
                     if i + 22 + comment_len == len(data) or (eocd_offset == -1 and i + 22 + comment_len <= len(data)):
-                        eocd_offset = i
-                        if i + 22 + comment_len == len(data):
-                            break
+                        # Ensure the EOCD offset is valid, meaning the central directory offset is before this EOCD.
+                        # This prevents false positives from EOCD signatures embedded in payloads.
+                        cd_offset_candidate = int.from_bytes(data[i + 16 : i + 20], "little")
+                        if cd_offset_candidate <= i:
+                            eocd_offset = i
+                            if i + 22 + comment_len == len(data):
+                                break
 
             if eocd_offset != -1:
                 cd_offset = int.from_bytes(data[eocd_offset + 16 : eocd_offset + 20], "little")
