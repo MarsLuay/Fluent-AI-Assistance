@@ -4974,7 +4974,18 @@ def _restore_windows_datastore_zip_names(archive_path: Path) -> None:
                         # Ensure the EOCD offset is valid, meaning the central directory offset is before this EOCD.
                         # This prevents false positives from EOCD signatures embedded in payloads.
                         cd_offset_candidate = int.from_bytes(data[i + 16 : i + 20], "little")
-                        if cd_offset_candidate <= i or cd_offset_candidate == 0xFFFFFFFF:
+
+                        is_valid_eocd = False
+                        if cd_offset_candidate <= i:
+                            # A real central directory should have PK\x01\x02 at the offset, or be empty
+                            if cd_offset_candidate == i:
+                                is_valid_eocd = True
+                            elif data[cd_offset_candidate : cd_offset_candidate + 4] == b"PK\x01\x02":
+                                is_valid_eocd = True
+                        elif cd_offset_candidate == 0xFFFFFFFF:
+                            is_valid_eocd = True
+
+                        if is_valid_eocd:
                             eocd_offset = i
                             if i + 22 + comment_len == len(data):
                                 break
