@@ -55,6 +55,24 @@ def canonical_json(value: Any) -> str | None:
         return None
 
 
+def compact_list(values: Any, limit: Any = 20) -> list[str] | None:
+    """Deduplicate exact string sequences natively, preserving order and limit rules."""
+    if (
+        not enabled()
+        or type(values) not in (list, tuple)
+        or not all(type(value) is str for value in values)
+        or type(limit) is not int
+    ):
+        return None
+    try:
+        result = _native.compact_list(list(values), limit)
+        if type(result) is list and all(type(value) is str for value in result):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, OverflowError, UnicodeError):
+        return None
+
+
 def command_short_name(type_name: Any) -> str | None:
     """Shorten supported ASCII command type names natively, or request fallback."""
     if not enabled() or type(type_name) is not str or not type_name.isascii():

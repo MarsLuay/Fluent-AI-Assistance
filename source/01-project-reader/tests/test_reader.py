@@ -11,7 +11,7 @@ from tecan_common import native_acceleration
 from tecan_common import xml_compat as ET
 import tecan_reader.common as reader_common
 from tecan_reader.archive import inspect_archive
-from tecan_reader.common import command_short_name, parse_xml_text
+from tecan_reader.common import command_short_name, compact_list, parse_xml_text
 from tecan_reader.gwl import inspect_gwl_lines
 from tecan_reader.pattern_library import mine_script_patterns, search_script_patterns, summarize_script_patterns
 import sqlite3
@@ -219,6 +219,48 @@ class ReaderTests(unittest.TestCase):
                         actual = command_short_name(type_name)
                 self.assertEqual(python_result, expected)
                 self.assertEqual(actual, expected)
+
+    def test_native_compact_list_matches_python_order_and_limit_behavior(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "compact_list"
+        ):
+            self.skipTest("optional Rust compact-list helper is not built")
+        cases = [
+            (["alpha", "", "beta", "alpha", "gamma"], 2, ["alpha", "beta"]),
+            (("alpha", "beta", "alpha"), 20, ["alpha", "beta"]),
+            (["alpha", "beta"], 0, ["alpha"]),
+            (["", "alpha"], 0, []),
+            (["alpha", "alpha", "beta"], -1, ["alpha"]),
+            ([], 0, []),
+        ]
+        for values, limit, expected in cases:
+            with self.subTest(limit=limit, count=len(values)):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    python_result = compact_list(values, limit=limit)
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    with patch.object(
+                        reader_common,
+                        "_native_compact_list",
+                        wraps=native_acceleration.compact_list,
+                    ) as native_call:
+                        actual = compact_list(values, limit=limit)
+                    native_call.assert_called_once()
+                self.assertEqual(python_result, expected)
+                self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                reader_common,
+                "_native_compact_list",
+                wraps=native_acceleration.compact_list,
+            ) as native_call:
+                self.assertEqual(compact_list(iter(["alpha", "alpha", "beta"])), ["alpha", "beta"])
+                self.assertEqual(compact_list(["alpha", "beta"], limit=True), ["alpha"])
+            self.assertEqual(native_call.call_count, 2)
 
     def test_inspect_xscr_text(self) -> None:
         report = inspect_xscr_text(SAMPLE_XSCR, source_name="sample.xscr")

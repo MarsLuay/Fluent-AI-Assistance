@@ -13,6 +13,7 @@ from tecan_common import xml_compat as ET
 from tecan_common.native_acceleration import (
     canonical_json as _native_canonical_json,
     command_short_name as _native_command_short_name,
+    compact_list as _native_compact_list,
 )
 
 from .command_registry import registry_command_family
@@ -119,6 +120,9 @@ def command_family(type_name: str) -> str:
 
 
 def compact_list(values: Iterable[str], *, limit: int = 20) -> list[str]:
+    native = _native_compact_list(values, limit)
+    if native is not None:
+        return native
     out: list[str] = []
     for value in values:
         if value and value not in out:

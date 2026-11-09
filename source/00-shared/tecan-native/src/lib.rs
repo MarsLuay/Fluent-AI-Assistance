@@ -629,6 +629,23 @@ fn command_short_name(type_name: &str) -> Option<String> {
 }
 
 #[pyfunction]
+fn compact_list(values: Vec<String>, limit: i64) -> Vec<String> {
+    let mut output = Vec::new();
+    for value in values {
+        if !value.is_empty() && !output.contains(&value) {
+            output.push(value);
+        }
+        let reached_limit = usize::try_from(limit)
+            .map(|bound| output.len() >= bound)
+            .unwrap_or(false);
+        if limit <= 0 || reached_limit {
+            break;
+        }
+    }
+    output
+}
+
+#[pyfunction]
 fn worklist_execution_contract(commands_json: &str) -> PyResult<String> {
     let commands: Value = serde_json::from_str(commands_json)
         .map_err(|error| PyValueError::new_err(error.to_string()))?;
@@ -1127,6 +1144,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(catalog_content_fingerprints, module)?)?;
     module.add_function(wrap_pyfunction!(canonical_json, module)?)?;
     module.add_function(wrap_pyfunction!(command_short_name, module)?)?;
+    module.add_function(wrap_pyfunction!(compact_list, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_execution_contract, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_load_contract, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_validate_transfers, module)?)?;
