@@ -12,6 +12,8 @@ import xml.etree.ElementTree as _StdET
 from defusedxml import ElementTree as _SafeET
 from defusedxml.common import DefusedXmlException
 
+from .native_acceleration import parse_xml as _native_parse_xml
+
 
 MAX_XML_BYTES = 4 * 1024 * 1024
 MAX_XML_DEPTH = 256
@@ -86,10 +88,17 @@ def _check_size_limit(data: bytes, *, max_bytes: int) -> None:
         _raise_parse_error(f"XML document exceeds the safe size limit of {max_bytes} bytes")
 
 
-def _parse_bytes(data: bytes, *, max_bytes: int, max_depth: int) -> Element:
+def _parse_bytes(
+    data: bytes, *, max_bytes: int, max_depth: int, use_native: bool = True
+) -> Element:
     _check_size_limit(data, max_bytes=max_bytes)
     if max_depth <= 0:
         _raise_parse_error("XML nesting depth limit must be positive")
+
+    if use_native:
+        native_root = _native_parse_xml(data, max_bytes, max_depth)
+        if native_root is not None:
+            return native_root
 
     depth = 0
     root: Element | None = None
@@ -145,10 +154,16 @@ def parse(
     *,
     max_bytes: int = MAX_XML_BYTES,
     max_depth: int = MAX_XML_DEPTH,
+    use_native: bool = True,
 ) -> ElementTree:
     """Parse XML from a path or file-like object."""
     del parser
-    root = _parse_bytes(_read_source_bytes(source), max_bytes=max_bytes, max_depth=max_depth)
+    root = _parse_bytes(
+        _read_source_bytes(source),
+        max_bytes=max_bytes,
+        max_depth=max_depth,
+        use_native=use_native,
+    )
     return ElementTree(root)
 
 

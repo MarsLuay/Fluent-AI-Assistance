@@ -22,6 +22,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from tecan_common.native_acceleration import (
+    catalog_content_fingerprints as _native_catalog_content_fingerprints,
+    catalog_source_paths as _native_catalog_source_paths,
+    catalog_stat_fingerprint as _native_catalog_stat_fingerprint,
+    source_content_fingerprint as _native_source_content_fingerprint,
+)
+
 from .catalog import open_index
 from .paths import index_db_path_default, install_path_key
 from .inference import component_taxonomy, infer_category
@@ -106,6 +113,17 @@ def build_index(
 
         existing_sources = _load_indexed_sources(conn, install_key)
         seen_paths: set[str] = set()
+        content_fingerprints = _native_catalog_content_fingerprints(
+            install, index_all_connectors
+        )
+
+        def content_fingerprint(path: Path) -> str:
+            relative_path = _relative_install_path(path, install)
+            if content_fingerprints is not None:
+                fingerprint = content_fingerprints.get(relative_path)
+                if fingerprint is not None:
+                    return fingerprint
+            return _source_content_fingerprint(path, install)
 
         existing_components = {
             row["guid"]: row["category"]
@@ -121,7 +139,7 @@ def build_index(
         for path in sorted(components_dir.glob("*.xcmp"), key=lambda p: p.as_posix()):
             rel = _relative_install_path(path, install)
             seen_paths.add(rel)
-            content_fp = _source_content_fingerprint(path, install)
+            content_fp = content_fingerprint(path)
             cached = existing_sources.get(rel)
             if (
                 cached
@@ -206,7 +224,7 @@ def build_index(
             ):
                 rel = _relative_install_path(path, install)
                 seen_paths.add(rel)
-                content_fp = _source_content_fingerprint(path, install)
+                content_fp = content_fingerprint(path)
                 cached = existing_sources.get(rel)
                 if (
                     cached
@@ -275,7 +293,7 @@ def build_index(
             for path in sorted(sites_dir.glob("*.xsit"), key=lambda p: p.as_posix()):
                 rel = _relative_install_path(path, install)
                 seen_paths.add(rel)
-                content_fp = _source_content_fingerprint(path, install)
+                content_fp = content_fingerprint(path)
                 cached = existing_sources.get(rel)
                 guid = path.stem
                 if (
@@ -320,6 +338,7 @@ def build_index(
                     connectors_dir=connectors_dir,
                     seen_paths=seen_paths,
                     existing_sources=existing_sources,
+                    content_fingerprints=content_fingerprints,
                 )
             elif sites_dir.exists():
                 _index_site_referenced_connectors(
@@ -330,6 +349,7 @@ def build_index(
                     connectors_dir=connectors_dir,
                     seen_paths=seen_paths,
                     existing_sources=existing_sources,
+                    content_fingerprints=content_fingerprints,
                 )
 
         if liquid_classes_dir.exists():
@@ -351,7 +371,7 @@ def build_index(
             ):
                 rel = _relative_install_path(path, install)
                 seen_paths.add(rel)
-                content_fp = _source_content_fingerprint(path, install)
+                content_fp = content_fingerprint(path)
                 cached = existing_sources.get(rel)
                 if (
                     cached
@@ -484,13 +504,18 @@ def _index_connector_file(
     path: Path,
     seen_paths: set[str],
     existing_sources: dict[str, dict[str, str]],
+    content_fingerprints: dict[str, str] | None = None,
 ) -> None:
     """Parse and upsert one ``.xcon`` connector file when changed or missing."""
     from .xcon import load_xcon
 
     rel = _relative_install_path(path, install)
     seen_paths.add(rel)
-    content_fp = _source_content_fingerprint(path, install)
+    content_fp = (
+        content_fingerprints[rel]
+        if content_fingerprints is not None and rel in content_fingerprints
+        else _source_content_fingerprint(path, install)
+    )
     cached = existing_sources.get(rel)
     if (
         cached
@@ -539,6 +564,7 @@ def _index_site_referenced_connectors(
     connectors_dir: Path,
     seen_paths: set[str],
     existing_sources: dict[str, dict[str, str]],
+    content_fingerprints: dict[str, str] | None = None,
 ) -> None:
     """Index only connectors referenced by indexed site definitions."""
     connector_guids: set[str] = set()
@@ -560,6 +586,7 @@ def _index_site_referenced_connectors(
             path=path,
             seen_paths=seen_paths,
             existing_sources=existing_sources,
+            content_fingerprints=content_fingerprints,
         )
 
 
@@ -571,6 +598,7 @@ def _index_all_connectors(
     connectors_dir: Path,
     seen_paths: set[str],
     existing_sources: dict[str, dict[str, str]],
+    content_fingerprints: dict[str, str] | None = None,
 ) -> None:
     """Walk every ``.xcon`` under the install connectors directory."""
     for path in sorted(connectors_dir.glob("*.xcon"), key=lambda item: item.as_posix()):
@@ -581,6 +609,7 @@ def _index_all_connectors(
             path=path,
             seen_paths=seen_paths,
             existing_sources=existing_sources,
+            content_fingerprints=content_fingerprints,
         )
 
 
@@ -603,6 +632,9 @@ def _relative_install_path(path: Path, install: Path) -> str:
 
 def _source_content_fingerprint(path: Path, install: Path) -> str:
     """Content hash for one catalog source file (path + size + bytes)."""
+    native_fingerprint = _native_source_content_fingerprint(path, install)
+    if native_fingerprint is not None:
+        return native_fingerprint
     digest = hashlib.sha256()
     digest.update(b"fluentcoder.catalog.content.v1")
     digest.update(_relative_install_path(path, install).encode("utf-8"))
@@ -623,6 +655,11 @@ def _install_stat_fingerprint(
     Uses relative path + size (not mtime) so re-extracting an unchanged ZEIA
     still matches the indexed install.
     """
+    native_fingerprint = _native_catalog_stat_fingerprint(
+        install, include_all_connectors
+    )
+    if native_fingerprint is not None:
+        return native_fingerprint
     digest = hashlib.sha256()
     digest.update(b"fluentcoder.install.stat.v1")
     digest.update(b"connectors:all" if include_all_connectors else b"connectors:site")
@@ -644,6 +681,9 @@ def _catalog_source_paths(
     *,
     include_all_connectors: bool = False,
 ) -> list[str]:
+    native_paths = _native_catalog_source_paths(install, include_all_connectors)
+    if native_paths is not None:
+        return native_paths
     paths: list[str] = []
     for subdir, pattern in (
         ("SystemSpecific/Worktable/Components", "*.xcmp"),

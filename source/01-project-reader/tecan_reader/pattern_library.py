@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from .command_registry import registry_manual_step, registry_pattern_type
-from .common import _connect, _connection_arg, to_jsonable
+from .common import _connect, _connection_arg, fast_json_dumps, to_jsonable
+from tecan_common.native_acceleration import pattern_windows as _native_pattern_windows
 from .project_index import DEFAULT_INDEX_PATH
 
 PATTERN_SCHEMA_VERSION = "1"
@@ -86,29 +87,66 @@ def mine_script_patterns(
             conn.execute("DELETE FROM script_patterns")
 
         mined = 0
-        seen: set[tuple[int, str, int, int, str]] = set()
-        for script in _load_indexed_scripts(conn):
-            commands = script["commands"]
-            for anchor_position, command in enumerate(commands):
-                for pattern_type in classify_command_pattern(command):
-                    start_pos = max(0, anchor_position - max(context_before, 0))
-                    end_pos = min(
-                        len(commands) - 1, anchor_position + max(context_after, 0)
-                    )
-                    window = commands[start_pos : end_pos + 1]
-                    signature = " > ".join(step["command_type"] for step in window)
-                    key = (
-                        int(script["script_id"]),
-                        pattern_type,
-                        int(window[0]["command_index"]),
-                        int(window[-1]["command_index"]),
-                        signature,
-                    )
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                    _insert_pattern(conn, script, pattern_type, window, signature)
-                    mined += 1
+        scripts = _load_indexed_scripts(conn)
+        classifications = [
+            [classify_command_pattern(command) for command in script["commands"]]
+            for script in scripts
+        ]
+        step_summary_cache: dict[int, str] = {}
+        candidates = _native_pattern_windows(
+            scripts, classifications, context_before, context_after
+        )
+        if candidates is not None:
+            for candidate in candidates:
+                script = scripts[int(candidate["script_index"])]
+                start_pos = int(candidate["start_pos"])
+                end_pos = int(candidate["end_pos"])
+                _insert_pattern(
+                    conn,
+                    script,
+                    str(candidate["pattern_type"]),
+                    script["commands"][start_pos : end_pos + 1],
+                    str(candidate["signature"]),
+                    confidence_override=float(candidate["confidence"]),
+                    step_summary_cache=step_summary_cache,
+                )
+                mined += 1
+        else:
+            seen: set[tuple[int, str, int, int, str]] = set()
+            for script_index, script in enumerate(scripts):
+                commands = script["commands"]
+                for anchor_position, _command in enumerate(commands):
+                    for pattern_type in classifications[script_index][anchor_position]:
+                        start_pos = max(0, anchor_position - max(context_before, 0))
+                        end_pos = min(
+                            len(commands) - 1, anchor_position + max(context_after, 0)
+                        )
+                        window = commands[start_pos : end_pos + 1]
+                        signature = " > ".join(step["command_type"] for step in window)
+                        key = (
+                            int(script["script_id"]),
+                            pattern_type,
+                            int(window[0]["command_index"]),
+                            int(window[-1]["command_index"]),
+                            signature,
+                        )
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                        confidence = 1.0 if any(
+                            pattern_type in command_types
+                            for command_types in classifications[script_index][start_pos : end_pos + 1]
+                        ) else 0.75
+                        _insert_pattern(
+                            conn,
+                            script,
+                            pattern_type,
+                            window,
+                            signature,
+                            confidence_override=confidence,
+                            step_summary_cache=step_summary_cache,
+                        )
+                        mined += 1
         conn.commit()
         summary = summarize_script_patterns(conn)
         return {
@@ -357,6 +395,9 @@ def _insert_pattern(
     pattern_type: str,
     steps: list[dict[str, Any]],
     signature: str,
+    *,
+    confidence_override: float | None = None,
+    step_summary_cache: dict[int, str] | None = None,
 ) -> None:
     specifications = _collect_specifications(steps)
     cursor = conn.execute(
@@ -380,7 +421,9 @@ def _insert_pattern(
             steps[-1]["command_index"],
             len(steps),
             signature,
-            _confidence(pattern_type, steps),
+            confidence_override
+            if confidence_override is not None
+            else _confidence(pattern_type, steps),
             _dump(specifications),
             _dump(_safety_notes(pattern_type, steps, specifications)),
             _dump({"zeia_file": script["zeia_file"]}),
@@ -395,7 +438,7 @@ def _insert_pattern(
             command["command_type"],
             command["family"],
             command["line"],
-            summarize_pattern_step(command),
+            _cached_pattern_step_summary(command, step_summary_cache),
             _dump(command["fields"]),
         )
         for step_number, command in enumerate(steps, start=1)
@@ -410,6 +453,17 @@ def _insert_pattern(
         """,
         step_params,
     )
+
+
+def _cached_pattern_step_summary(
+    command: dict[str, Any], cache: dict[int, str] | None
+) -> str:
+    if cache is None:
+        return summarize_pattern_step(command)
+    identity = id(command)
+    if identity not in cache:
+        cache[identity] = summarize_pattern_step(command)
+    return cache[identity]
 
 
 def summarize_pattern_step(command: dict[str, Any]) -> str:
@@ -724,7 +778,7 @@ def _count(conn: sqlite3.Connection, table: str) -> int:
 
 
 def _dump(value: Any) -> str:
-    return json.dumps(to_jsonable(value), ensure_ascii=False, sort_keys=True)
+    return fast_json_dumps(to_jsonable(value))
 
 
 def _loads(value: str) -> Any:

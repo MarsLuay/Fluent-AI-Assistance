@@ -13,7 +13,7 @@ import json
 import re
 import sqlite3
 
-from .common import _connect, _connection_arg, to_jsonable
+from .common import _connect, _connection_arg, fast_json_dumps, to_jsonable
 from .project_model import CanonicalProjectModel
 from .zeia_adapters import ingest_zeia
 
@@ -1257,7 +1257,7 @@ def _sha256(path: Path) -> str:
 
 
 def _dump(value: Any) -> str:
-    return json.dumps(to_jsonable(value), ensure_ascii=False, sort_keys=True)
+    return fast_json_dumps(to_jsonable(value))
 
 
 def _loads(value: str) -> Any:

@@ -67,10 +67,26 @@ class WorkspacePackage:
         return _requirement_spec(self.distribution, self.extras)
 
 
-def workspace_packages() -> tuple[WorkspacePackage, ...]:
-    """Return the canonical local install graph."""
+def _native_acceleration_requested(default: bool) -> bool:
+    setting = os.environ.get("TECAN_RUST_ACCELERATION", "auto").strip().lower()
+    if setting in {"", "auto"}:
+        return default
+    return setting in {"1", "true", "yes", "on", "enabled"}
 
-    return (
+
+def _native_acceleration_required() -> bool:
+    setting = os.environ.get("TECAN_RUST_ACCELERATION", "auto").strip().lower()
+    return setting in {"1", "true", "yes", "on", "enabled"}
+
+
+def workspace_packages(
+    *, include_native: bool | None = None
+) -> tuple[WorkspacePackage, ...]:
+    """Return the local install graph, optionally including the Rust extension."""
+    if include_native is None:
+        include_native = _native_acceleration_requested(shutil.which("cargo") is not None)
+
+    packages = (
         WorkspacePackage("tecan-common", TECAN_AI_DIR / "source" / "00-shared"),
         WorkspacePackage(
             "tecan-worklist-builder",
@@ -95,6 +111,10 @@ def workspace_packages() -> tuple[WorkspacePackage, ...]:
             dependencies=("fluentcoder", "tecan-protocol-builder"),
         ),
     )
+    native_package = WorkspacePackage(
+        "tecan-native", TECAN_AI_DIR / "source" / "00-shared" / "tecan-native"
+    )
+    return ((native_package,) if include_native else ()) + packages
 
 
 def bootstrap_workspace(
@@ -121,10 +141,15 @@ def install_editable_workspace(python: Path, *, cwd: Path = PROJECT_DIR) -> None
     packages = workspace_packages()
     _validate_workspace_package_order(packages)
     for package in packages:
-        _run_setup_command(
-            [str(python), "-m", "pip", "install", "-e", package.editable_requirement()],
-            cwd=cwd,
-        )
+        try:
+            _run_setup_command(
+                [str(python), "-m", "pip", "install", "-e", package.editable_requirement()],
+                cwd=cwd,
+            )
+        except PipelineError as exc:
+            if package.distribution != "tecan-native" or _native_acceleration_required():
+                raise
+            print(f"Warning: optional Rust acceleration was not installed: {exc}", file=sys.stderr)
 
 
 def build_workspace_wheelhouse(python: Path, wheelhouse: Path, *, cwd: Path = PROJECT_DIR) -> None:
@@ -143,21 +168,26 @@ def build_workspace_wheelhouse(python: Path, wheelhouse: Path, *, cwd: Path = PR
         stage_root = Path(raw_stage_root)
         for index, package in enumerate(packages, start=1):
             staged_package = _stage_wheel_source(package.path, stage_root, index=index)
-            _run_setup_command(
-                [
-                    str(python),
-                    "-m",
-                    "pip",
-                    "wheel",
-                    "--no-cache-dir",
-                    "--wheel-dir",
-                    str(wheelhouse),
-                    "--find-links",
-                    str(wheelhouse),
-                    _requirement_spec(staged_package, package.extras),
-                ],
-                cwd=cwd,
-            )
+            try:
+                _run_setup_command(
+                    [
+                        str(python),
+                        "-m",
+                        "pip",
+                        "wheel",
+                        "--no-cache-dir",
+                        "--wheel-dir",
+                        str(wheelhouse),
+                        "--find-links",
+                        str(wheelhouse),
+                        _requirement_spec(staged_package, package.extras),
+                    ],
+                    cwd=cwd,
+                )
+            except PipelineError as exc:
+                if package.distribution != "tecan-native" or _native_acceleration_required():
+                    raise
+                print(f"Warning: optional Rust wheel was not built: {exc}", file=sys.stderr)
 
 
 def _stage_wheel_source(source: Path, stage_root: Path, *, index: int) -> Path:
@@ -174,6 +204,7 @@ def _stage_wheel_source(source: Path, stage_root: Path, *, index: int) -> Path:
             ".pytest_cache",
             ".mypy_cache",
             ".venv",
+            "target",
         ),
     )
     _rewrite_staged_setuptools_build_base(destination, package_name=source.name)
@@ -209,25 +240,32 @@ def install_workspace_from_wheelhouse(
     *,
     cwd: Path = PROJECT_DIR,
 ) -> None:
-    packages = workspace_packages()
-    _validate_workspace_package_order(packages)
     if not wheelhouse.exists():
         raise PipelineError(f"workspace wheelhouse does not exist: {wheelhouse}")
+    has_native_wheel = any(wheelhouse.glob("tecan_native-*.whl"))
+    include_native = _native_acceleration_requested(has_native_wheel)
+    packages = workspace_packages(include_native=include_native)
+    _validate_workspace_package_order(packages)
     for package in packages:
-        _run_setup_command(
-            [
-                str(python),
-                "-m",
-                "pip",
-                "install",
-                "--no-cache-dir",
-                "--no-index",
-                "--find-links",
-                str(wheelhouse),
-                package.wheel_requirement(),
-            ],
-            cwd=cwd,
-        )
+        try:
+            _run_setup_command(
+                [
+                    str(python),
+                    "-m",
+                    "pip",
+                    "install",
+                    "--no-cache-dir",
+                    "--no-index",
+                    "--find-links",
+                    str(wheelhouse),
+                    package.wheel_requirement(),
+                ],
+                cwd=cwd,
+            )
+        except PipelineError as exc:
+            if package.distribution != "tecan-native" or _native_acceleration_required():
+                raise
+            print(f"Warning: optional Rust wheel was not installed: {exc}", file=sys.stderr)
 
 
 def install_desktop_automation_dependencies(python: Path, *, cwd: Path = PROJECT_DIR) -> None:

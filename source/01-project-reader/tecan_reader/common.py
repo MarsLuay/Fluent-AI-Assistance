@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from collections import Counter
 from pathlib import Path
+import json
 import sqlite3
 from typing import Any, Iterable
 import re
 
 from tecan_common import xml_compat as ET
+from tecan_common.native_acceleration import canonical_json as _native_canonical_json
 
 from .command_registry import registry_command_family
 
@@ -118,6 +120,14 @@ def compact_list(values: Iterable[str], *, limit: int = 20) -> list[str]:
         if len(out) >= limit:
             break
     return out
+
+
+def fast_json_dumps(value: Any) -> str:
+    """Use Rust for canonical JSON when available, with the original fallback."""
+    encoded = _native_canonical_json(value)
+    if encoded is not None:
+        return encoded
+    return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
 
 def to_jsonable(value: Any) -> Any:

@@ -19,9 +19,12 @@ airgaps) are recomputed by the renderer at re-emit time.
 from __future__ import annotations
 
 import re
+from contextvars import ContextVar
 from .. import xml_compat as ET
 from pathlib import Path
-from typing import Callable, Iterator, Optional, Union
+from typing import Any, Callable, Iterator, Optional, Union
+
+from tecan_common.native_acceleration import xscr_object_fields as _native_xscr_object_fields
 
 from ..catalog.xcmp import _find, _local, _text
 from ..expressions import is_expression_field, parse_or_preserve_source_expression
@@ -93,13 +96,24 @@ RAW_PRESERVE_COMMAND_IDS = {
 
 # Suffix-strip regex: '<Cmd>ScriptCommandDataV2' → '<Cmd>'
 _CMD_ID_RE = re.compile(r"(ScriptCommand)?DataV?\d*$")
+_ACTIVE_XSCR_FIELDS: ContextVar[dict[Any, dict[str, dict[str, Any]]] | None] = ContextVar(
+    "fluentcoder_active_xscr_fields", default=None
+)
 
 
 def parse_xscr(path: Union[Path, str]) -> Protocol:
     """Parse a .xscr file into a ``Protocol``."""
-    tree = ET.parse(str(path))
-    root = tree.getroot()
+    # ElementTree's bounded safe parser avoids Python-node construction overhead;
+    # the optional Rust batch index accelerates repeated step-field extraction.
+    root = ET.parse(str(path), use_native=False).getroot()
+    token = _ACTIVE_XSCR_FIELDS.set(_native_xscr_object_fields(root))
+    try:
+        return _parse_xscr_root(root)
+    finally:
+        _ACTIVE_XSCR_FIELDS.reset(token)
 
+
+def _parse_xscr_root(root: ET.Element) -> Protocol:
     payload = _find(root, "Payload")
     name = _text(_find(payload, "ObjectName")) or "Untitled Protocol"
     comment = _text(_find(payload, "Comment")) or ""
@@ -1272,10 +1286,18 @@ def _parse_rga_transfer(obj: ET.Element) -> RgaTransferLabwareStep:
 # ── XML helpers ─────────────────────────────────────────────────────
 
 
+def _indexed_object_fields(obj: ET.Element) -> dict[str, dict[str, Any]] | None:
+    index = _ACTIVE_XSCR_FIELDS.get()
+    return None if index is None else index.get(obj)
+
+
 def _extract_field(obj: ET.Element, field_name: str) -> Optional[str]:
     """Return the text of the first descendant with the given local name,
     *not* descending into nested step ``<Object>`` siblings of the body.
     """
+    indexed = _indexed_object_fields(obj)
+    if indexed is not None:
+        return indexed["texts"].get(field_name)
     for sub in _walk_skipping_objects(obj):
         if not isinstance(sub.tag, str):
             continue
@@ -1291,6 +1313,9 @@ def _extract_step_metadata(obj: ET.Element, field_name: str) -> Optional[str]:
     value = _extract_field(obj, field_name)
     if value is not None:
         return value
+    indexed = _indexed_object_fields(obj)
+    if indexed is not None:
+        return indexed["attributes"].get(field_name)
     for sub in _walk_skipping_objects(obj):
         value = sub.attrib.get(field_name)
         if value is not None:
@@ -1317,6 +1342,9 @@ def _find_first(obj: ET.Element, local_name: str) -> Optional[ET.Element]:
     """First descendant of ``obj`` (in document order) with the given
     local name, *not* descending into nested step ``<Object>`` siblings.
     """
+    indexed = _indexed_object_fields(obj)
+    if indexed is not None:
+        return indexed["elements"].get(local_name)
     for child in _walk_skipping_objects(obj):
         if isinstance(child.tag, str) and _local(child.tag) == local_name:
             return child

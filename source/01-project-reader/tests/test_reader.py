@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import shutil
 import tempfile
 import unittest
 import zipfile
 from pathlib import Path
 
+from tecan_common import native_acceleration
 from tecan_common import xml_compat as ET
 from tecan_reader.archive import inspect_archive
 from tecan_reader.common import parse_xml_text
@@ -408,13 +410,55 @@ class ReaderTests(unittest.TestCase):
             db_path = root / "build" / "project.sqlite"
             build_project_index([root], db_path, force=True)
 
+            fallback_db = root / "build" / "project-python.sqlite"
+            shutil.copy2(db_path, fallback_db)
             mine_report = mine_script_patterns(db_path)
+            with patch.object(native_acceleration, "_native", None):
+                fallback_report = mine_script_patterns(fallback_db)
             summary = summarize_script_patterns(db_path)
+
+            def rows(database: Path, query: str) -> list[tuple]:
+                connection = sqlite3.connect(database)
+                try:
+                    return connection.execute(query).fetchall()
+                finally:
+                    connection.close()
+
+            native_patterns = rows(
+                db_path,
+                "SELECT pattern_type, name, source_script, source_path, "
+                "start_command_index, end_command_index, step_count, "
+                "command_signature, confidence, specifications_json, "
+                "safety_notes_json, metadata_json FROM script_patterns ORDER BY id",
+            )
+            fallback_patterns = rows(
+                fallback_db,
+                "SELECT pattern_type, name, source_script, source_path, "
+                "start_command_index, end_command_index, step_count, "
+                "command_signature, confidence, specifications_json, "
+                "safety_notes_json, metadata_json FROM script_patterns ORDER BY id",
+            )
+            native_steps = rows(
+                db_path,
+                "SELECT pattern_id, step_number, command_index, command_name, "
+                "command_family, line, summary, fields_json "
+                "FROM script_pattern_steps ORDER BY id",
+            )
+            fallback_steps = rows(
+                fallback_db,
+                "SELECT pattern_id, step_number, command_index, command_name, "
+                "command_family, line, summary, fields_json "
+                "FROM script_pattern_steps ORDER BY id",
+            )
             tip_hits = search_script_patterns(db_path, "MCA384TipBox", pattern_type="pick_up_tips")
             aspirate_hits = search_script_patterns(db_path, "Water Free Single", pattern_type="aspirate")
             drop_hits = search_script_patterns(db_path, "Waste", pattern_type="drop_tips")
             gripper_hits = search_script_patterns(db_path, "AdapterA200", pattern_type="gripper")
 
+        self.assertEqual(mine_report["mined_pattern_count"], fallback_report["mined_pattern_count"])
+        self.assertEqual(mine_report["pattern_type_counts"], fallback_report["pattern_type_counts"])
+        self.assertEqual(native_patterns, fallback_patterns)
+        self.assertEqual(native_steps, fallback_steps)
         self.assertGreaterEqual(mine_report["pattern_type_counts"]["pick_up_tips"], 1)
         self.assertGreaterEqual(mine_report["pattern_type_counts"]["gripper"], 1)
         self.assertGreaterEqual(summary["pattern_type_counts"]["aspirate"], 1)

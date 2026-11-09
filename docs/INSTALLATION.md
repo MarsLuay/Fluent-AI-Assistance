@@ -22,7 +22,10 @@ repository root. The Rust helper:
 
 1. Creates a repository-local `.venv` with Python 3.11 or newer when missing.
 2. Invokes the Python bootstrap to install the protocol-builder package and its
-   `mcp` dependency group.
+   `mcp` dependency group. When Cargo is available it also builds the optional
+   `tecan-native` acceleration package; set `TECAN_RUST_ACCELERATION=0` to skip
+   that build. The Python implementations remain available, and
+   `TECAN_DISABLE_RUST_ACCELERATION=1` disables native dispatch at runtime.
 3. Runs the server self-test (required tools + in-process bootstrap `next_step`).
 4. Starts a real stdio MCP session: `fluent_status` then
    `fluent_bootstrap_status` (fails if required tools are missing or

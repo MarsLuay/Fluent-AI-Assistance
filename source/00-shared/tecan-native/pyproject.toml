@@ -1,0 +1,16 @@
+[build-system]
+requires = ["maturin>=1.9,<2"]
+build-backend = "maturin"
+
+[project]
+name = "tecan-native"
+version = "0.1.0"
+description = "Optional Rust acceleration kernels for Fluent AI-Assistance"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+[tool.maturin]
+manifest-path = "Cargo.toml"
+python-source = "python"
+module-name = "tecan_native._native"
+features = ["extension-module"]

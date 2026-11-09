@@ -73,7 +73,8 @@ def test_wheel_build_and_non_editable_install_smoke(tmp_path: Path, capfd) -> No
         bootstrap.install_workspace_from_wheelhouse(install_python, wheelhouse, cwd=offline_cwd)
         bootstrap.run_pip_check(install_python, cwd=offline_cwd)
 
-    for package in bootstrap.workspace_packages():
+    native_built = any(wheelhouse.glob("tecan_native-*.whl"))
+    for package in bootstrap.workspace_packages(include_native=native_built):
         requires_dist = (
             line
             for line in _wheel_metadata(wheelhouse, package.distribution).splitlines()

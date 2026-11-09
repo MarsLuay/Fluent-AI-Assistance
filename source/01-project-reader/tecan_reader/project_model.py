@@ -8,11 +8,21 @@ existing consumers can migrate without learning an adapter's private types.
 from __future__ import annotations
 
 from collections import Counter
-from copy import deepcopy
+from copy import deepcopy as _python_deepcopy
 from dataclasses import dataclass, field
 import json
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
+
+from tecan_common.native_acceleration import deepcopy_json as _native_deepcopy_json
+
+
+def deepcopy(value: Any) -> Any:
+    """Use the native container copier for JSON data, preserving Python fallback."""
+    copied = _native_deepcopy_json(value)
+    if copied is not None or value is None:
+        return copied
+    return _python_deepcopy(value)
 
 
 CANONICAL_PROJECT_MODEL_SCHEMA_VERSION = "tecan.canonical_project.v1"
