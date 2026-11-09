@@ -599,6 +599,24 @@ def worklist_parse_gwl_text_records(
         return None
 
 
+def worklist_clean_field(value: Any) -> str | None:
+    """Trim supported ASCII GWL fields natively, preserving Python fallback cases."""
+    if not enabled() or (
+        value is not None
+        and (
+            type(value) is not str
+            or not value.isascii()
+            or any(0x1C <= ord(character) <= 0x1F for character in value)
+        )
+    ):
+        return None
+    try:
+        result = _native.worklist_clean_field(value)
+        return result if isinstance(result, str) else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def worklist_serialize_gwl_lines(lines: Any) -> str | None:
     """Join exact text records natively, or request Python string-join fallback."""
     if (

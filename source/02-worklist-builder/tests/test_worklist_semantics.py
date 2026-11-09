@@ -15,6 +15,7 @@ from tecan_common.worklist_contract import (
     normalize_load_worklist,
 )
 from tecan_worklist.cli import main
+from tecan_common.gwl import _clean as clean_gwl_field
 from tecan_worklist.gwl import (
     Break,
     Comment,
@@ -240,6 +241,46 @@ class WorklistSemanticsTests(unittest.TestCase):
             ) as native_call:
                 self.assertEqual(non_string_types.counts(), {7: 1})
             native_call.assert_not_called()
+
+    def test_native_gwl_field_cleaner_matches_python_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_clean_field"
+        ):
+            self.skipTest("optional Rust GWL field cleaner is not built")
+        class StringSubclass(str):
+            pass
+
+        values = [
+            None,
+            "",
+            "  rack label  ",
+            "\t plate\r\n",
+            "café",
+            "\x1c edge ",
+            StringSubclass("  subclass  "),
+            42,
+        ]
+        for value in values:
+            with self.subTest(value_type=type(value).__name__):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    expected = clean_gwl_field(value)
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    native = native_acceleration.worklist_clean_field(value)
+                    if value is None or (
+                        type(value) is str
+                        and value.isascii()
+                        and not any(0x1C <= ord(character) <= 0x1F for character in value)
+                    ):
+                        self.assertIsNotNone(native)
+                    else:
+                        self.assertIsNone(native)
+                    self.assertEqual(clean_gwl_field(value), expected)
+                    if native is not None:
+                        self.assertEqual(native, expected)
 
     def test_native_gwl_serializer_matches_python_output(self):
         if not native_acceleration.available() or not hasattr(
