@@ -603,6 +603,47 @@ fn python_json_spacing(compact: &str) -> String {
     output
 }
 
+fn decode_utf16_bytes(bytes: &[u8], little_endian: bool) -> Option<String> {
+    if bytes.len() % 2 != 0 {
+        return None;
+    }
+    let units = bytes.chunks_exact(2).map(|pair| {
+        let pair = [pair[0], pair[1]];
+        if little_endian {
+            u16::from_le_bytes(pair)
+        } else {
+            u16::from_be_bytes(pair)
+        }
+    });
+    char::decode_utf16(units)
+        .collect::<Result<String, _>>()
+        .ok()
+}
+
+#[pyfunction]
+fn decode_text_bytes(data: &Bound<'_, PyBytes>) -> String {
+    let bytes = data.as_bytes();
+    let utf8_payload = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(bytes);
+    if let Ok(text) = std::str::from_utf8(utf8_payload) {
+        return text.to_owned();
+    }
+    if let Ok(text) = std::str::from_utf8(bytes) {
+        return text.to_owned();
+    }
+
+    let decoded_utf16 = if let Some(payload) = bytes.strip_prefix(&[0xff, 0xfe]) {
+        decode_utf16_bytes(payload, true)
+    } else if let Some(payload) = bytes.strip_prefix(&[0xfe, 0xff]) {
+        decode_utf16_bytes(payload, false)
+    } else {
+        decode_utf16_bytes(bytes, cfg!(target_endian = "little"))
+    };
+    if let Some(text) = decoded_utf16 {
+        return text;
+    }
+    bytes.iter().map(|byte| char::from(*byte)).collect()
+}
+
 #[pyfunction]
 fn canonical_json(value: &Bound<'_, PyAny>) -> PyResult<String> {
     let json = py_to_json(value)?;
@@ -1147,6 +1188,7 @@ fn pattern_windows<'py>(
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(parse_xml, module)?)?;
+    module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(catalog_source_paths, module)?)?;
     module.add_function(wrap_pyfunction!(catalog_stat_fingerprint, module)?)?;
     module.add_function(wrap_pyfunction!(source_content_fingerprint, module)?)?;

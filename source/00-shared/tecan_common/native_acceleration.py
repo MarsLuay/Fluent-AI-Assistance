@@ -35,6 +35,17 @@ def parse_xml(data: bytes, max_bytes: int, max_depth: int) -> Any | None:
         return None
 
 
+def decode_text_bytes(data: Any) -> str | None:
+    """Decode the reader's supported text encodings natively when possible."""
+    if not enabled() or type(data) is not bytes:
+        return None
+    try:
+        result = _native.decode_text_bytes(data)
+        return result if isinstance(result, str) else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def deepcopy_json(value: Any) -> Any | None:
     """Clone JSON-like containers natively, or request ``copy.deepcopy`` fallback."""
     if not enabled():

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import random
 import shutil
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -16,6 +18,7 @@ from tecan_reader.common import (
     compact_list,
     extension_counts,
     parse_xml_text,
+    read_text,
 )
 from tecan_reader.gwl import inspect_gwl_lines
 from tecan_reader.pattern_library import mine_script_patterns, search_script_patterns, summarize_script_patterns
@@ -305,6 +308,50 @@ class ReaderTests(unittest.TestCase):
                     extension_counts(iter(["a.X", "b.X", "c.Y"])),
                     {".x": 2, ".y": 1},
                 )
+
+    def test_native_reader_text_decode_matches_python_encoding_order(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "decode_text_bytes"
+        ):
+            self.skipTest("optional Rust text decoder is not built")
+
+        def python_decode(data: bytes) -> str:
+            for encoding in ("utf-8-sig", "utf-8", "utf-16"):
+                try:
+                    return data.decode(encoding)
+                except UnicodeDecodeError:
+                    continue
+            return data.decode("latin-1", errors="replace")
+
+        native_endian = "utf-16-le" if sys.byteorder == "little" else "utf-16-be"
+        samples = [
+            b"",
+            b"plain ASCII",
+            b"\xef\xbb\xbfUTF-8 BOM",
+            "naïve café".encode("utf-8"),
+            "αβ".encode("utf-16"),
+            "αβ".encode(native_endian),
+            b"\xfe\xff\x00a",
+            b"\xff\xfe\x00",
+            b"\xff\xfe\x00\xd8",
+            b"\xff\xfe",
+            b"\xef\xbb\xbf\xff",
+        ]
+        generator = random.Random(0x54454341)
+        samples.extend(
+            generator.randbytes(generator.randrange(0, 33)) for _ in range(300)
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            for data in samples:
+                with self.subTest(length=len(data), prefix=data[:4]):
+                    expected = python_decode(data)
+                    self.assertEqual(native_acceleration.decode_text_bytes(data), expected)
+
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp) / "sample.txt"
+                for data in samples[:11]:
+                    target.write_bytes(data)
+                    self.assertEqual(read_text(target), python_decode(data))
 
     def test_inspect_xscr_text(self) -> None:
         report = inspect_xscr_text(SAMPLE_XSCR, source_name="sample.xscr")

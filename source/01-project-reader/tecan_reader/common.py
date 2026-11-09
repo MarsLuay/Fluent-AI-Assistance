@@ -12,6 +12,7 @@ import re
 from tecan_common import xml_compat as ET
 from tecan_common.native_acceleration import (
     canonical_json as _native_canonical_json,
+    decode_text_bytes as _native_decode_text_bytes,
     command_short_name as _native_command_short_name,
     compact_list as _native_compact_list,
     extension_counts as _native_extension_counts,
@@ -36,6 +37,9 @@ TECAN_EXTENSIONS = {
 def read_text(path: str | Path) -> str:
     p = Path(path)
     data = p.read_bytes()
+    native = _native_decode_text_bytes(data)
+    if native is not None:
+        return native
     for encoding in ("utf-8-sig", "utf-8", "utf-16"):
         try:
             return data.decode(encoding)
