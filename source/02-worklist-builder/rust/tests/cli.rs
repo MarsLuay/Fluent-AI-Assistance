@@ -356,3 +356,95 @@ fn optimize_preserves_shared_state_and_refuses_semantic_errors() {
     assert!(!invalid_output.exists());
     let _ = fs::remove_dir_all(&directory);
 }
+
+#[test]
+fn contract_cli_preserves_vendor_fields_and_execute_boundaries_with_markers() {
+    let directory = temp_dir();
+    let input = directory.join("commands.json");
+    let commands = json!([
+        {
+            "command_id": "LoadWorklist",
+            "parameters": {
+                "WorklistName": "x.gwl",
+                "SelectedTipsIndexes": "5",
+                "TipSystem": "Fixed Tips",
+                "VendorField": "retain",
+                "options": { "retry": false },
+            },
+            "provenance": { "origin": "synthetic" },
+        },
+        {
+            "command_id": "ExecuteWorklist",
+            "parameters": {
+                "Unknown": "kept",
+                "line_number": 12,
+                "empty": [],
+                "zero": 0,
+                "disabled": false,
+            },
+            "provenance": { "origin": "test" },
+        },
+        { "command_id": "Other", "parameters": { "untouched": true } },
+    ]);
+    fs::write(&input, serde_json::to_vec(&commands).unwrap()).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_tecan-worklist"))
+        .arg("contract")
+        .arg(&input)
+        .arg("--json")
+        .env("TECAN_PERFORMANCE_MARKERS", "1")
+        .output()
+        .expect("run Rust contract CLI");
+    let _ = fs::remove_dir_all(&directory);
+
+    assert!(output.status.success());
+    let payload: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        payload,
+        json!([
+            {
+                "schema_version": "tecan.worklist.contract.v2",
+                "kind": "load_worklist",
+                "worklist": "x.gwl",
+                "selected_tip_mask": "5",
+                "selected_arm": null,
+                "default_liquid_class": null,
+                "tip_system": "fixed_tip",
+                "selected_tip_mask_value": 5,
+                "selected_tip_mask_status": "valid",
+                "selected_tip_channels": [1, 3],
+                "options": { "retry": false },
+                "extra_fields": { "VendorField": "retain" },
+                "command_id": "LoadWorklist",
+                "command_version": "",
+                "provenance": { "origin": "synthetic" },
+            },
+            {
+                "schema_version": "tecan.worklist.contract.v2",
+                "kind": "execute_worklist",
+                "loads_before_execute": ["x.gwl"],
+                "command_id": "ExecuteWorklist",
+                "extra_fields": { "Unknown": "kept", "zero": 0, "disabled": false },
+                "provenance": { "origin": "test" },
+            },
+            { "command_id": "Other", "parameters": { "untouched": true } },
+        ])
+    );
+    let markers = String::from_utf8(output.stderr)
+        .unwrap()
+        .lines()
+        .filter(|line| line.starts_with("PERF "))
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    assert_eq!(markers.len(), 2);
+    assert!(markers.iter().all(|line| !line.contains("commands.json")));
+    assert!(
+        markers
+            .iter()
+            .any(|line| line.contains("worklist.contract_json_load"))
+    );
+    assert!(
+        markers
+            .iter()
+            .any(|line| line.contains("worklist.execution_contract"))
+    );
+}

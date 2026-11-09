@@ -18,6 +18,7 @@ USAGE:
   tecan-worklist summarize <gwl> [--json]
   tecan-worklist analyze <gwl> [--enabled-tip-mask MASK] [--supported-channels N] [--json]
   tecan-worklist optimize <gwl> --output <gwl> [--enabled-tip-mask MASK] [--supported-channels N] [--json]
+  tecan-worklist contract <commands.json> [--json]
 ";
 
 fn main() {
@@ -49,6 +50,9 @@ fn run() -> Result<i32, String> {
     }
     if command == "optimize" {
         return run_optimize(&args[1..]);
+    }
+    if command == "contract" {
+        return run_contract(&args[1..]);
     }
     if command != "convert" && command != "validate" {
         return Err(format!(
@@ -278,6 +282,47 @@ fn run_optimize(args: &[String]) -> Result<i32, String> {
     }
     emit(&payload, as_json, false);
     Ok(if ok { 0 } else { 1 })
+}
+
+fn run_contract(args: &[String]) -> Result<i32, String> {
+    let mut input = None;
+    for argument in args {
+        match argument.as_str() {
+            "--json" => {}
+            "--help" | "-h" => {
+                println!("Usage: tecan-worklist contract <commands.json> [--json]");
+                process::exit(0);
+            }
+            value if value.starts_with('-') => {
+                return Err(format!("unknown contract argument: {value}"));
+            }
+            path => {
+                if input.replace(PathBuf::from(path)).is_some() {
+                    return Err(format!("unexpected extra positional argument: {path}"));
+                }
+            }
+        }
+    }
+    let input = input.ok_or("contract requires a JSON command-list path.")?;
+    let text = std::fs::read_to_string(&input)
+        .map_err(|error| format!("could not read contract JSON: {error}"))?;
+    let commands: Value = performance::measure("worklist.contract_json_load", json!({}), || {
+        serde_json::from_str(&text).map_err(|error| format!("invalid contract JSON: {error}"))
+    })?;
+    let command_list = commands
+        .as_array()
+        .ok_or("contract JSON must contain a command array.")?;
+    let contracts = performance::measure(
+        "worklist.execution_contract",
+        json!({ "command_count": command_list.len() }),
+        || tecan_worklist_builder::contracts::build_execution_contract(command_list),
+    )?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&contracts)
+            .map_err(|error| format!("could not serialize execution contracts: {error}"))?
+    );
+    Ok(0)
 }
 
 fn run_summarize(args: &[String]) -> Result<i32, String> {

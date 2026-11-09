@@ -1,3 +1,5 @@
+pub mod contracts;
+
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Read;
 use std::path::Path;
