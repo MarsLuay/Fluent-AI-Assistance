@@ -747,6 +747,15 @@ fn worklist_serialize_gwl_lines(lines_json: &str) -> PyResult<Option<String>> {
 }
 
 #[pyfunction]
+fn worklist_count_record_types(types_json: &str) -> PyResult<Option<String>> {
+    let Ok(types) = serde_json::from_str::<Vec<String>>(types_json) else {
+        return Ok(None);
+    };
+    let counts = tecan_worklist_builder::count_record_types_in_order(&types);
+    Ok(serde_json::to_string(&counts).ok())
+}
+
+#[pyfunction]
 fn worklist_build_transfers(
     transfers_json: &str,
     name: &str,
@@ -1103,6 +1112,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_parse_gwl, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_gwl_records, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_serialize_gwl_lines, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_count_record_types, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_analyze_lines, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_optimize_lines, module)?)?;
     module.add_function(wrap_pyfunction!(deepcopy_json, module)?)?;

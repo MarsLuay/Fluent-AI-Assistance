@@ -533,6 +533,45 @@ def worklist_serialize_gwl_lines(lines: Any) -> str | None:
         return None
 
 
+def worklist_count_record_types(types: Any) -> dict[str, int] | None:
+    """Count exact string record types natively, preserving first-seen order."""
+    if (
+        not enabled()
+        or type(types) not in (list, tuple)
+        or not all(type(record_type) is str for record_type in types)
+    ):
+        return None
+    try:
+        encoded = _native.worklist_count_record_types(_encode_json(types))
+        if encoded is None:
+            return None
+        pairs = json.loads(encoded)
+        if not isinstance(pairs, list):
+            return None
+        counts: dict[str, int] = {}
+        for pair in pairs:
+            if (
+                not isinstance(pair, list)
+                or len(pair) != 2
+                or not isinstance(pair[0], str)
+                or type(pair[1]) is not int
+                or pair[1] < 0
+                or pair[0] in counts
+            ):
+                return None
+            counts[pair[0]] = pair[1]
+        return counts
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def worklist_analyze_lines(
     lines: Any,
     enabled_tip_mask: str | None,

@@ -88,6 +88,23 @@ pub fn serialize_gwl_lines(lines: &[String]) -> String {
     text
 }
 
+pub fn count_record_types_in_order(types: &[String]) -> Vec<(String, usize)> {
+    let mut positions = HashMap::new();
+    let mut counts = Vec::new();
+    for record_type in types {
+        let index = if let Some(index) = positions.get(record_type.as_str()) {
+            *index
+        } else {
+            let index = counts.len();
+            positions.insert(record_type.as_str(), index);
+            counts.push((record_type.clone(), 0));
+            index
+        };
+        counts[index].1 += 1;
+    }
+    counts
+}
+
 impl Worklist {
     pub fn to_text(&self) -> String {
         serialize_gwl_lines(&self.lines)

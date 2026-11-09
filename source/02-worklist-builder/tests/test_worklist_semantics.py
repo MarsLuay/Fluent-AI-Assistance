@@ -201,6 +201,45 @@ class WorklistSemanticsTests(unittest.TestCase):
         self.assertIsInstance(worklist.records[2], RawRecord)
         self.assertEqual(worklist.to_text(), "\n".join(lines) + "\n")
 
+    def test_native_worklist_counts_preserve_first_seen_order(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_count_record_types"
+        ):
+            self.skipTest("optional Rust record counter is not built")
+        worklist = Worklist(
+            records=[
+                Comment("note"),
+                Pipette("A", "Source", "Plate", 1, 10),
+                Pipette("D", "Destination", "Plate", 1, 10),
+                Comment("second"),
+                Wash(),
+                Break(),
+                RawRecord("X", "X;opaque"),
+            ]
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = worklist.counts()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_count_record_types",
+                wraps=native_acceleration.worklist_count_record_types,
+            ) as native_call:
+                actual = worklist.counts()
+        native_call.assert_called_once()
+        self.assertEqual(list(actual.items()), list(expected.items()))
+        self.assertEqual(actual, {"C": 2, "A": 1, "D": 1, "W": 1, "B": 1, "X": 1})
+
+        non_string_types = Worklist(records=[Comment("note", type_character=7)])
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_count_record_types",
+                side_effect=AssertionError("non-string record types must stay on Python"),
+            ) as native_call:
+                self.assertEqual(non_string_types.counts(), {7: 1})
+            native_call.assert_not_called()
+
     def test_native_gwl_serializer_matches_python_output(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "worklist_serialize_gwl_lines"
