@@ -234,7 +234,7 @@ def _inspect_directory(path: Path, *, script_limit: int | None, object_limit: in
         "kind": "directory",
         "source": str(path),
         "file_count": len(files),
-        "extension_counts": extension_counts(str(item) for item in files),
+        "extension_counts": extension_counts(files),
         "script_names": script_names,
         "family_counts": dict(family_counts.most_common()),
         "command_counts": dict(command_counts.most_common(40)),

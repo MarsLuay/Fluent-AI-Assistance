@@ -73,6 +73,35 @@ def compact_list(values: Any, limit: Any = 20) -> list[str] | None:
         return None
 
 
+def extension_counts(suffixes: Any) -> dict[str, int] | None:
+    """Count exact string suffixes natively and return them in sorted order."""
+    if (
+        not enabled()
+        or type(suffixes) not in (list, tuple)
+        or not all(type(suffix) is str for suffix in suffixes)
+    ):
+        return None
+    try:
+        pairs = _native.extension_counts(list(suffixes))
+        if type(pairs) is not list:
+            return None
+        counts: dict[str, int] = {}
+        for pair in pairs:
+            if (
+                type(pair) is not tuple
+                or len(pair) != 2
+                or type(pair[0]) is not str
+                or type(pair[1]) is not int
+                or pair[1] < 0
+                or pair[0] in counts
+            ):
+                return None
+            counts[pair[0]] = pair[1]
+        return counts
+    except (AttributeError, TypeError, ValueError, OverflowError, UnicodeError):
+        return None
+
+
 def command_short_name(type_name: Any) -> str | None:
     """Shorten supported ASCII command type names natively, or request fallback."""
     if not enabled() or type(type_name) is not str or not type_name.isascii():

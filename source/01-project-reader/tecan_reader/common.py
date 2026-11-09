@@ -14,6 +14,7 @@ from tecan_common.native_acceleration import (
     canonical_json as _native_canonical_json,
     command_short_name as _native_command_short_name,
     compact_list as _native_compact_list,
+    extension_counts as _native_extension_counts,
 )
 
 from .command_registry import registry_command_family
@@ -52,7 +53,13 @@ def parse_xml_text(
     return ET.fromstring(text, max_bytes=max_bytes, max_depth=max_depth)
 
 
-def extension_counts(names: Iterable[str]) -> dict[str, int]:
+def extension_counts(names: Iterable[str | Path]) -> dict[str, int]:
+    if type(names) in (list, tuple):
+        suffixes = [Path(name).suffix.lower() or "<none>" for name in names]
+        native = _native_extension_counts(suffixes)
+        if native is not None:
+            return native
+        return dict(sorted(Counter(suffixes).items()))
     counts: Counter[str] = Counter()
     for name in names:
         suffix = Path(name).suffix.lower() or "<none>"

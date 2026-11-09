@@ -11,7 +11,12 @@ from tecan_common import native_acceleration
 from tecan_common import xml_compat as ET
 import tecan_reader.common as reader_common
 from tecan_reader.archive import inspect_archive
-from tecan_reader.common import command_short_name, compact_list, parse_xml_text
+from tecan_reader.common import (
+    command_short_name,
+    compact_list,
+    extension_counts,
+    parse_xml_text,
+)
 from tecan_reader.gwl import inspect_gwl_lines
 from tecan_reader.pattern_library import mine_script_patterns, search_script_patterns, summarize_script_patterns
 import sqlite3
@@ -261,6 +266,45 @@ class ReaderTests(unittest.TestCase):
                 self.assertEqual(compact_list(iter(["alpha", "alpha", "beta"])), ["alpha", "beta"])
                 self.assertEqual(compact_list(["alpha", "beta"], limit=True), ["alpha"])
             self.assertEqual(native_call.call_count, 2)
+
+    def test_native_extension_counts_match_path_suffix_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "extension_counts"
+        ):
+            self.skipTest("optional Rust extension counter is not built")
+        names = [
+            Path("script.XSCR"),
+            "archive.tar.GZ",
+            ".profile",
+            "trailing.",
+            "folder/name.XML",
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = extension_counts(names)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                reader_common,
+                "_native_extension_counts",
+                wraps=native_acceleration.extension_counts,
+            ) as native_call:
+                actual = extension_counts(names)
+            native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            list(actual.items()),
+            [(".gz", 1), (".xml", 1), (".xscr", 1), ("<none>", 2)],
+        )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                reader_common,
+                "_native_extension_counts",
+                side_effect=AssertionError("generic iterables must retain streaming fallback"),
+            ):
+                self.assertEqual(
+                    extension_counts(iter(["a.X", "b.X", "c.Y"])),
+                    {".x": 2, ".y": 1},
+                )
 
     def test_inspect_xscr_text(self) -> None:
         report = inspect_xscr_text(SAMPLE_XSCR, source_name="sample.xscr")
