@@ -388,6 +388,56 @@ class WorklistSemanticsTests(unittest.TestCase):
             )
             self.assertEqual(Comment(TextSubclass("text")).to_line(), "C;custom replacement")
 
+    def test_native_gwl_record_field_join_matches_python_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_join_gwl_fields"
+        ):
+            self.skipTest("optional Rust GWL field joiner is not built")
+        records = [
+            Pipette(
+                "A",
+                " Source ",
+                "plàte",
+                " A1 ",
+                "1e1",
+                rack_id=" R1 ",
+                tip_mask=" 01 ",
+                forced_rack_type=" forced ",
+            ),
+            Flush(parameters=(" alpha ", None, "β;tail")),
+            SetDiTiType(parameters=("\tA\r", " one\n two ")),
+            Flush(raw_line="F; raw ;line "),
+        ]
+        with patch.dict(
+            "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+        ):
+            expected = [record.to_line() for record in records]
+        class FieldText(str):
+            pass
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_join_gwl_fields",
+                wraps=native_acceleration.worklist_join_gwl_fields,
+            ) as native_call:
+                actual = [record.to_line() for record in records]
+            self.assertEqual(actual, expected)
+            self.assertEqual(native_call.call_count, 3)
+            self.assertIsNone(
+                native_acceleration.worklist_join_gwl_fields(["F", FieldText("value")])
+            )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_subclass = Flush(
+                parameters=(" field ",), type_character=FieldText("F")
+            ).to_line()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual_subclass = Flush(
+                parameters=(" field ",), type_character=FieldText("F")
+            ).to_line()
+        self.assertEqual(actual_subclass, expected_subclass)
+
     def test_native_gwl_serializer_matches_python_output(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "worklist_serialize_gwl_lines"

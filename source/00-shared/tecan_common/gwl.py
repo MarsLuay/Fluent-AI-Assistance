@@ -162,6 +162,9 @@ class Pipette:
         # (including intentional surrounding whitespace) while normalizing the
         # other structured fields as before.
         serialized[9] = "" if self.tip_mask is None else str(self.tip_mask)
+        native = native_acceleration.worklist_join_gwl_fields(serialized)
+        if native is not None:
+            return native
         return ";".join(serialized)
 
     @property
@@ -217,7 +220,11 @@ class Flush:
     def to_line(self) -> str:
         if self.raw_line is not None:
             return self.raw_line
-        return ";".join((self.type_character, *(_clean(value) for value in self.parameters)))
+        fields = (self.type_character, *(_clean(value) for value in self.parameters))
+        native = native_acceleration.worklist_join_gwl_fields(fields)
+        if native is not None:
+            return native
+        return ";".join(fields)
 
 
 @dataclass(frozen=True)
@@ -231,7 +238,11 @@ class SetDiTiType:
     def to_line(self) -> str:
         if self.raw_line is not None:
             return self.raw_line
-        return ";".join((self.type_character, *(_clean(value) for value in self.parameters)))
+        fields = (self.type_character, *(_clean(value) for value in self.parameters))
+        native = native_acceleration.worklist_join_gwl_fields(fields)
+        if native is not None:
+            return native
+        return ";".join(fields)
 
 
 @dataclass

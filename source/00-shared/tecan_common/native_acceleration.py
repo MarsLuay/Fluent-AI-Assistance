@@ -657,6 +657,27 @@ def worklist_clean_field(value: Any) -> str | None:
         return None
 
 
+def worklist_join_gwl_fields(fields: Any) -> str | None:
+    """Join exact-text GWL fields natively, or request Python fallback."""
+    if (
+        not enabled()
+        or type(fields) not in (list, tuple)
+        or not all(type(field) is str for field in fields)
+    ):
+        return None
+    try:
+        result = _native.worklist_join_gwl_fields(_encode_json(fields))
+        return result if isinstance(result, str) else None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+    ):
+        return None
+
+
 def worklist_serialize_gwl_lines(lines: Any) -> str | None:
     """Join exact text records natively, or request Python string-join fallback."""
     if (
