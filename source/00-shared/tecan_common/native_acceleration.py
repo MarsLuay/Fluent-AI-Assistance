@@ -46,6 +46,19 @@ def decode_text_bytes(data: Any) -> str | None:
         return None
 
 
+def to_jsonable_containers(value: Any) -> tuple[bool, Any] | None:
+    """Convert supported exact JSON containers natively, or request Python fallback."""
+    if not enabled():
+        return None
+    try:
+        supported, result = _native.to_jsonable_containers(value)
+        if type(supported) is bool and supported:
+            return True, result
+        return None
+    except (AttributeError, TypeError, ValueError, OverflowError, UnicodeError):
+        return None
+
+
 def deepcopy_json(value: Any) -> Any | None:
     """Clone JSON-like containers natively, or request ``copy.deepcopy`` fallback."""
     if not enabled():

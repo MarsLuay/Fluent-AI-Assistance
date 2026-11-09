@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 import json
 import random
 import shutil
@@ -19,6 +20,7 @@ from tecan_reader.common import (
     extension_counts,
     parse_xml_text,
     read_text,
+    to_jsonable,
 )
 from tecan_reader.gwl import inspect_gwl_lines
 from tecan_reader.pattern_library import mine_script_patterns, search_script_patterns, summarize_script_patterns
@@ -352,6 +354,75 @@ class ReaderTests(unittest.TestCase):
                 for data in samples[:11]:
                     target.write_bytes(data)
                     self.assertEqual(read_text(target), python_decode(data))
+
+    def test_native_jsonable_containers_match_python_recursive_conversion(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "to_jsonable_containers"
+        ):
+            self.skipTest("optional Rust JSON-container converter is not built")
+        cases = [
+            (
+                {"items": (1, ["two", {"three": (3,)}]), "empty": []},
+                {"items": [1, ["two", {"three": (3,)}]], "empty": []},
+            ),
+            (
+                (None, True, 4, 2.5, "text", b"raw"),
+                [None, True, 4, 2.5, "text", b"raw"],
+            ),
+            ([], []),
+            ({}, {}),
+        ]
+        for value, expected in cases:
+            with self.subTest(value_type=type(value).__name__):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    python_result = to_jsonable(value)
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    native = native_acceleration.to_jsonable_containers(value)
+                    self.assertIsNotNone(native)
+                    actual = to_jsonable(value)
+                self.assertEqual(python_result, expected)
+                self.assertEqual(actual, expected)
+
+        fallback_values = [
+            Path("sample.xscr"),
+            Counter({"warning": 2}),
+            {2, 1},
+            {1: ("value",)},
+            {"path": Path("nested.xml"), "values": (1, 2)},
+        ]
+        for value in fallback_values:
+            with self.subTest(fallback_type=type(value).__name__):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    self.assertIsNone(
+                        native_acceleration.to_jsonable_containers(value)
+                    )
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    expected = to_jsonable(value)
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    actual = to_jsonable(value)
+                self.assertEqual(actual, expected)
+
+        nested_list: list[object] = []
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            converted_tuple = to_jsonable((nested_list,))
+        self.assertIs(converted_tuple[0], nested_list)
+
+        cyclic: list[object] = []
+        cyclic.append(cyclic)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.to_jsonable_containers(cyclic))
+            with self.assertRaises(RecursionError):
+                to_jsonable(cyclic)
 
     def test_inspect_xscr_text(self) -> None:
         report = inspect_xscr_text(SAMPLE_XSCR, source_name="sample.xscr")

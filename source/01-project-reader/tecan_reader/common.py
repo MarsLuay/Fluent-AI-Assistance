@@ -12,6 +12,7 @@ import re
 from tecan_common import xml_compat as ET
 from tecan_common.native_acceleration import (
     canonical_json as _native_canonical_json,
+    to_jsonable_containers as _native_to_jsonable_containers,
     decode_text_bytes as _native_decode_text_bytes,
     command_short_name as _native_command_short_name,
     compact_list as _native_compact_list,
@@ -152,6 +153,9 @@ def fast_json_dumps(value: Any) -> str:
 
 
 def to_jsonable(value: Any) -> Any:
+    native = _native_to_jsonable_containers(value)
+    if native is not None:
+        return native[1]
     if isinstance(value, Path):
         return str(value)
     if isinstance(value, Counter):

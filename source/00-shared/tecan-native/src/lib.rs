@@ -510,6 +510,85 @@ fn clone_json_value<'py>(
     )))
 }
 
+fn try_to_jsonable_containers<'py>(
+    py: Python<'py>,
+    value: &Bound<'py, PyAny>,
+    active: &mut HashSet<usize>,
+    depth: usize,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if depth > 256 {
+        return Ok(None);
+    }
+    let value_type = value.get_type();
+    if value.is_none()
+        || value_type.is(py.get_type::<PyBool>())
+        || value_type.is(py.get_type::<PyInt>())
+        || value_type.is(py.get_type::<PyFloat>())
+        || value_type.is(py.get_type::<PyString>())
+        || value_type.is(py.get_type::<PyBytes>())
+    {
+        return Ok(Some(value.clone()));
+    }
+
+    if value_type.is(py.get_type::<PyTuple>()) {
+        let items = value.cast::<PyTuple>()?;
+        let output = PyList::empty(py);
+        for item in items.iter() {
+            output.append(item)?;
+        }
+        return Ok(Some(output.into_any()));
+    }
+
+    let pointer = value.as_ptr() as usize;
+    if value_type.is(py.get_type::<PyList>()) {
+        if !active.insert(pointer) {
+            return Ok(None);
+        }
+        let items = value.cast::<PyList>()?;
+        let output = PyList::empty(py);
+        for item in items.iter() {
+            let Some(converted) = try_to_jsonable_containers(py, &item, active, depth + 1)? else {
+                active.remove(&pointer);
+                return Ok(None);
+            };
+            output.append(converted)?;
+        }
+        active.remove(&pointer);
+        return Ok(Some(output.into_any()));
+    }
+
+    if value_type.is(py.get_type::<PyDict>()) {
+        if !active.insert(pointer) {
+            return Ok(None);
+        }
+        let items = value.cast::<PyDict>()?;
+        let output = PyDict::new(py);
+        for (key, item) in items.iter() {
+            if !key.get_type().is(py.get_type::<PyString>()) {
+                active.remove(&pointer);
+                return Ok(None);
+            }
+            let Some(converted) = try_to_jsonable_containers(py, &item, active, depth + 1)? else {
+                active.remove(&pointer);
+                return Ok(None);
+            };
+            output.set_item(key, converted)?;
+        }
+        active.remove(&pointer);
+        return Ok(Some(output.into_any()));
+    }
+
+    Ok(None)
+}
+
+#[pyfunction]
+fn to_jsonable_containers(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<(bool, Py<PyAny>)> {
+    match try_to_jsonable_containers(py, value, &mut HashSet::new(), 0)? {
+        Some(converted) => Ok((true, converted.unbind())),
+        None => Ok((false, py.None())),
+    }
+}
+
 #[pyfunction]
 fn deepcopy_json<'py>(py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     clone_json_value(py, value, &mut HashMap::new(), &mut HashSet::new(), 0)
@@ -1262,6 +1341,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_analyze_lines, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_optimize_lines, module)?)?;
     module.add_function(wrap_pyfunction!(deepcopy_json, module)?)?;
+    module.add_function(wrap_pyfunction!(to_jsonable_containers, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_object_fields, module)?)?;
     module.add_function(wrap_pyfunction!(pattern_windows, module)?)?;
     Ok(())
