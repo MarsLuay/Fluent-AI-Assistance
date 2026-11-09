@@ -1,10 +1,9 @@
 # Logic-level performance markers
 
-The processing paths profiled for the optional native acceleration can emit
-stage timings without comparing Python time against Rust time. Each marker names
-a logical operation (archive validation, command classification, component
-inference, and so on); it remains the same marker if that operation's
-implementation changes.
+Instrumented processing paths can emit opt-in stage timings without comparing
+Python execution against Rust execution. Each marker names a logical operation
+(archive validation, command classification, component inference, and so on);
+it remains the same marker if that operation's implementation changes.
 
 Markers are off by default. Enable them for one process with:
 
@@ -56,6 +55,8 @@ costs.
   stale-source cleanup/commit, and final count queries.
 - **Worktable geometry:** manifest object selection, component/site/connector
   parsing, workspace resolution, and derived geometry/output shaping.
+- **Rust worklist CLI:** CSV loading, transfer validation, GWL record assembly
+  and writing, GWL parsing and summary, and worklist semantic analysis.
 
 These are stage timings, not proof that a particular backend was selected and
 not guarantees of performance on production exports or installations. Use

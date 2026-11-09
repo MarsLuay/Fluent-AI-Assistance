@@ -94,7 +94,14 @@ impl Worklist {
 }
 
 pub fn parse_gwl_file(path: impl AsRef<Path>) -> Result<Worklist, String> {
-    let path = path.as_ref();
+    parse_gwl_file_mode(path.as_ref(), false)
+}
+
+pub fn parse_gwl_file_permissive(path: impl AsRef<Path>) -> Result<Worklist, String> {
+    parse_gwl_file_mode(path.as_ref(), true)
+}
+
+fn parse_gwl_file_mode(path: &Path, permissive: bool) -> Result<Worklist, String> {
     let mut text = String::new();
     std::fs::File::open(path)
         .and_then(|mut file| file.read_to_string(&mut text))
@@ -106,10 +113,18 @@ pub fn parse_gwl_file(path: impl AsRef<Path>) -> Result<Worklist, String> {
         .file_stem()
         .and_then(|stem| stem.to_str())
         .unwrap_or("worklist");
-    parse_gwl_text(&text, name)
+    parse_gwl_text_mode(&text, name, permissive)
 }
 
 pub fn parse_gwl_text(text: &str, name: &str) -> Result<Worklist, String> {
+    parse_gwl_text_mode(text, name, false)
+}
+
+pub fn parse_gwl_text_permissive(text: &str, name: &str) -> Result<Worklist, String> {
+    parse_gwl_text_mode(text, name, true)
+}
+
+fn parse_gwl_text_mode(text: &str, name: &str, permissive: bool) -> Result<Worklist, String> {
     let mut worklist = Worklist {
         name: name.to_owned(),
         ..Worklist::default()
@@ -125,7 +140,7 @@ pub fn parse_gwl_text(text: &str, name: &str) -> Result<Worklist, String> {
         let prefix = format!("Line {line_number}: ");
         match operation.as_str() {
             "A" | "D" => {
-                if parts.len() != 11 {
+                if !permissive && parts.len() != 11 {
                     return Err(format!(
                         "{prefix}pipette record has {} fields, expected 11.",
                         parts.len()
@@ -133,7 +148,7 @@ pub fn parse_gwl_text(text: &str, name: &str) -> Result<Worklist, String> {
                 }
             }
             "W" | "W1" | "W2" | "W3" | "W4" | "B" => {
-                if parts.len() != 2 {
+                if !permissive && parts.len() != 2 {
                     let record_name = if operation.starts_with('W') {
                         "wash"
                     } else {
@@ -146,7 +161,7 @@ pub fn parse_gwl_text(text: &str, name: &str) -> Result<Worklist, String> {
                 }
             }
             "C" => {
-                if parts.len() < 2 {
+                if !permissive && parts.len() < 2 {
                     return Err(format!(
                         "{prefix}comment record has {} fields, expected at least 2.",
                         parts.len()
@@ -154,6 +169,7 @@ pub fn parse_gwl_text(text: &str, name: &str) -> Result<Worklist, String> {
                 }
             }
             "F" | "S" => {}
+            _ if permissive => {}
             _ => {
                 return Err(format!(
                     "{prefix}unsupported record type {}.",
