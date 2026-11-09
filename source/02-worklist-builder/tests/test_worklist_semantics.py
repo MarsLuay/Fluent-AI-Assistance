@@ -281,7 +281,10 @@ class WorklistSemanticsTests(unittest.TestCase):
             ("C;first\vC;second", False, False),
             ("C;first\rC;second", False, False),
             ("X;opaque;field\nW5;extra", True, True),
-            ("C;naïve", False, False),
+            ("C;naïve", False, True),
+            ("A;Réagent;id;plàte;A1;;10;liquïde;;1;", False, True),
+            ("C;first\u2028C;second", False, False),
+            ("ſ;opaque", True, False),
             ("", False, True),
         ]
         for text, permissive, native_supported in cases:

@@ -216,7 +216,10 @@ fn parse_gwl_text_mode(text: &str, name: &str, permissive: bool) -> Result<Workl
 pub fn parse_gwl_records_for_python(lines: &[String], permissive: bool) -> Option<Vec<Value>> {
     let mut records = Vec::new();
     for raw_line in lines {
-        if !raw_line.is_ascii() || raw_line.bytes().any(|byte| (0x1c..=0x1f).contains(&byte)) {
+        if raw_line
+            .chars()
+            .any(|character| ('\u{001c}'..='\u{001f}').contains(&character))
+        {
             return None;
         }
         let line = raw_line.trim_end_matches(['\r', '\n']);
@@ -224,7 +227,11 @@ pub fn parse_gwl_records_for_python(lines: &[String], permissive: bool) -> Optio
             continue;
         }
         let parts = line.split(';').collect::<Vec<_>>();
-        let operation = parts[0].trim().to_ascii_uppercase();
+        let raw_operation = parts[0].trim();
+        if !raw_operation.is_ascii() {
+            return None;
+        }
+        let operation = raw_operation.to_ascii_uppercase();
         match operation.as_str() {
             "A" | "D" => {
                 if !permissive && parts.len() != 11 {
@@ -290,15 +297,17 @@ pub fn parse_gwl_records_for_python(lines: &[String], permissive: bool) -> Optio
 }
 
 pub fn parse_gwl_text_records_for_python(text: &str, permissive: bool) -> Option<Vec<Value>> {
-    if !text.is_ascii()
-        || text
-            .chars()
-            .any(|character| matches!(character, '\u{000b}' | '\u{000c}' | '\u{001c}'..='\u{001f}'))
-        || text
-            .as_bytes()
-            .iter()
-            .enumerate()
-            .any(|(index, byte)| *byte == b'\r' && text.as_bytes().get(index + 1) != Some(&b'\n'))
+    if text.chars().any(|character| {
+        matches!(
+            character,
+            '\u{000b}' | '\u{000c}' | '\u{001c}'
+                ..='\u{001f}' | '\u{0085}' | '\u{2028}' | '\u{2029}'
+        )
+    }) || text
+        .as_bytes()
+        .iter()
+        .enumerate()
+        .any(|(index, byte)| *byte == b'\r' && text.as_bytes().get(index + 1) != Some(&b'\n'))
     {
         return None;
     }
@@ -843,7 +852,12 @@ mod tests {
         );
         assert!(parse_gwl_text_records_for_python("C;first\u{000b}C;second", false).is_none());
         assert!(parse_gwl_text_records_for_python("C;first\rC;second", false).is_none());
-        assert!(parse_gwl_text_records_for_python("C;naïve", false).is_none());
+        assert!(parse_gwl_text_records_for_python("C;first\u{2028}C;second", false).is_none());
+        assert_eq!(
+            parse_gwl_text_records_for_python("C;naïve", false).unwrap()[0]["text"],
+            "naïve"
+        );
+        assert!(parse_gwl_text_records_for_python("ſ;opaque", true).is_none());
     }
 
     #[test]
