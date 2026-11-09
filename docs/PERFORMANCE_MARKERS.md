@@ -55,10 +55,10 @@ costs.
   stale-source cleanup/commit, and final count queries.
 - **Worktable geometry:** manifest object selection, component/site/connector
   parsing, workspace resolution, and derived geometry/output shaping.
-- **Rust worklist CLI:** CSV loading, transfer validation, GWL record assembly
-  and writing, GWL parsing and summary, semantic analysis, dependency-safe
-  optimization with semantic-equivalence verification, and execution-contract
-  JSON loading/normalization.
+- **Worklist processing:** CSV loading, transfer validation, GWL record
+  assembly and writing, GWL parsing and summary, semantic analysis,
+  dependency-safe optimization with semantic-equivalence verification, and
+  Load/Execute contract normalization through the Python API or Rust CLI.
 
 These are stage timings, not proof that a particular backend was selected and
 not guarantees of performance on production exports or installations. Use

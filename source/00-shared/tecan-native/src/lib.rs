@@ -78,8 +78,7 @@ fn make_element<'py>(
         let normalized = decoded
             .replace("\r\n", "\n")
             .replace('\r', "\n")
-            .replace('\n', " ")
-            .replace('\t', " ");
+            .replace(['\n', '\t'], " ");
         let value = quick_xml::escape::unescape(&normalized)
             .map_err(|error| py_error(error.to_string()))?;
         validate_xml10_chars(value.as_ref()).map_err(py_error)?;
@@ -612,6 +611,40 @@ fn canonical_json(value: &Bound<'_, PyAny>) -> PyResult<String> {
     Ok(python_json_spacing(&compact))
 }
 
+#[pyfunction]
+fn worklist_execution_contract(commands_json: &str) -> PyResult<String> {
+    let commands: Value = serde_json::from_str(commands_json)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let commands = commands
+        .as_array()
+        .ok_or_else(|| PyValueError::new_err("worklist commands must be a JSON array"))?;
+    let contracts = tecan_worklist_builder::contracts::build_execution_contract(commands)
+        .map_err(PyValueError::new_err)?;
+    serde_json::to_string(&contracts).map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+#[pyfunction]
+fn worklist_load_contract(
+    fields_json: &str,
+    command_id: &str,
+    command_version: &str,
+    provenance_json: &str,
+) -> PyResult<String> {
+    let fields: Value = serde_json::from_str(fields_json)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let provenance: Value = serde_json::from_str(provenance_json)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let provenance = (!provenance.is_null()).then_some(&provenance);
+    let contract = tecan_worklist_builder::contracts::normalize_load_worklist(
+        &fields,
+        command_id,
+        command_version,
+        provenance,
+    )
+    .map_err(PyValueError::new_err)?;
+    serde_json::to_string(&contract).map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
 fn window_has_pattern_type(
     classifications: &Bound<'_, PyList>,
     start: usize,
@@ -836,6 +869,8 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(source_content_fingerprint, module)?)?;
     module.add_function(wrap_pyfunction!(catalog_content_fingerprints, module)?)?;
     module.add_function(wrap_pyfunction!(canonical_json, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_execution_contract, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_load_contract, module)?)?;
     module.add_function(wrap_pyfunction!(deepcopy_json, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_object_fields, module)?)?;
     module.add_function(wrap_pyfunction!(pattern_windows, module)?)?;

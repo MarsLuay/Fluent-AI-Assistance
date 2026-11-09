@@ -4,7 +4,9 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from tecan_common import native_acceleration
 from tecan_common.worklist_contract import (
     ExecuteWorklistContract,
     LoadWorklistContract,
@@ -106,6 +108,91 @@ class WorklistSemanticsTests(unittest.TestCase):
         self.assertEqual(result[2].loads_before_execute, ("first.gwl", "second.gwl"))
         self.assertEqual(result[2].extra_fields, {"Unknown": "kept"})
         self.assertIsInstance(result[3], LoadWorklistContract)
+
+    def test_native_execution_contract_matches_python_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_execution_contract"
+        ):
+            self.skipTest("optional Rust worklist-contract kernel is not built")
+        commands = [
+            {
+                "command_id": "LoadWorklist",
+                "parameters": {
+                    "WorklistName": "synthetic.gwl",
+                    "SelectedTipsIndexes": [2, 0, 2],
+                    "options": {"z_option": 1, "a_option": 2},
+                    "VendorZ": {"z": 1, "a": 2},
+                    "VendorA": "kept",
+                },
+                "provenance": {"z_source": "synthetic", "a_source": "test"},
+            },
+            {
+                "command_id": "ExecuteWorklist",
+                "parameters": {
+                    "vendorZ": {"z": 1, "a": 2},
+                    "vendorA": "kept",
+                    "line_number": 4,
+                    "empty": [],
+                    "zero": 0,
+                },
+            },
+            {"command_id": "Unknown", "parameters": {"z": 1, "a": 2}},
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = build_execution_contract(commands)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_execution_contract",
+                wraps=native_acceleration.worklist_execution_contract,
+            ) as native_call:
+                actual = build_execution_contract(commands)
+        native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(list(actual[0].options), ["z_option", "a_option"])
+        self.assertEqual(list(actual[0].extra_fields), ["VendorZ", "VendorA"])
+        self.assertEqual(list(actual[1].extra_fields), ["vendorZ", "vendorA", "zero"])
+        self.assertIs(actual[0].extra_fields["VendorZ"], commands[0]["parameters"]["VendorZ"])
+        self.assertIs(actual[1].extra_fields["vendorZ"], commands[1]["parameters"]["vendorZ"])
+        self.assertIs(actual[2], commands[2])
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_load_contract",
+                wraps=native_acceleration.worklist_load_contract,
+            ) as native_load_call:
+                load = normalize_load_worklist(
+                    commands[0]["parameters"],
+                    command_id="LoadWorklist",
+                    provenance=commands[0]["provenance"],
+                )
+        native_load_call.assert_called_once()
+        self.assertEqual(load, expected[0])
+        self.assertIs(load.extra_fields["VendorZ"], commands[0]["parameters"]["VendorZ"])
+
+    def test_execution_contract_markers_are_opt_in_and_value_free(self):
+        commands = [
+            {"command_id": "LoadWorklist", "parameters": {"WorklistName": "synthetic.gwl", "private": "not-logged"}}
+        ]
+        disabled = io.StringIO()
+        with patch.dict("os.environ", {"TECAN_PERFORMANCE_MARKERS": "0"}):
+            with contextlib.redirect_stderr(disabled):
+                build_execution_contract(commands)
+        self.assertEqual(disabled.getvalue(), "")
+
+        enabled = io.StringIO()
+        with patch.dict("os.environ", {"TECAN_PERFORMANCE_MARKERS": "1"}):
+            with contextlib.redirect_stderr(enabled):
+                build_execution_contract(commands)
+        lines = enabled.getvalue().splitlines()
+        self.assertEqual(len(lines), 1)
+        self.assertTrue(lines[0].startswith("PERF "))
+        marker = json.loads(lines[0][5:])
+        self.assertEqual(marker["name"], "worklist.execution_contract")
+        self.assertEqual(marker["metrics"], {"command_count": 1})
+        self.assertNotIn("synthetic.gwl", lines[0])
+        self.assertNotIn("not-logged", lines[0])
 
     def test_analysis_reports_explicit_and_automatic_units_and_barriers(self):
         first_a, first_d = _transfer(1, tip="1")

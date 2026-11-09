@@ -8,8 +8,12 @@ XML names or hardware semantics.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping
+
+from . import native_acceleration
+from .performance import performance_marker
 
 
 SCHEMA_VERSION = "tecan.worklist.contract.v2"
@@ -158,54 +162,100 @@ class ExecuteWorklistContract:
         }
 
 
-def normalize_load_worklist(
+def _native_json_compatible(value: Any, active: set[int] | None = None) -> bool:
+    if value is None or type(value) in (str, bool, int):
+        return True
+    if type(value) is float:
+        return math.isfinite(value)
+    if type(value) not in (dict, list):
+        return False
+    active = set() if active is None else active
+    identity = id(value)
+    if identity in active:
+        return False
+    active.add(identity)
+    try:
+        if type(value) is dict:
+            return all(
+                type(key) is str and _native_json_compatible(item, active)
+                for key, item in value.items()
+            )
+        return all(_native_json_compatible(item, active) for item in value)
+    finally:
+        active.remove(identity)
+
+
+def _supports_native(value: Any) -> bool:
+    try:
+        return _native_json_compatible(value)
+    except RecursionError:
+        return False
+
+
+def _load_contract_from_native(
+    payload: Mapping[str, Any],
+    fields: Mapping[str, Any],
+    command_id: str,
+    command_version: str,
+    provenance: Mapping[str, Any] | None,
+) -> LoadWorklistContract:
+    known_names = {
+        "worklist", "WorklistName", "FileName", "Path", "selected_tip_mask",
+        "selected_tip_indexes", "SelectedTipsIndexes", "SerializedTipsIndexes", "TipMask",
+        "selected_arm", "DeviceAlias", "Arm", "ArmName", "default_liquid_class",
+        "LiquidClass", "DefaultLiquidClass", "tip_system", "TipSystem", "options",
+        "command_id", "command_version", "provenance", "LineNumber",
+    }
+    options = fields.get("options") if isinstance(fields.get("options"), dict) else {}
+    extra = {str(key): value for key, value in fields.items() if str(key) not in known_names}
+    return LoadWorklistContract(
+        worklist=_first(fields, ("worklist", "WorklistName", "FileName", "Path")),
+        selected_tip_mask=_first(
+            fields, ("selected_tip_mask", "SelectedTipsIndexes", "SerializedTipsIndexes", "TipMask")
+        ),
+        selected_arm=_first(fields, ("selected_arm", "DeviceAlias", "Arm", "ArmName")),
+        default_liquid_class=_first(fields, ("default_liquid_class", "LiquidClass", "DefaultLiquidClass")),
+        tip_system=payload.get("tip_system", "unknown"),
+        selected_tip_mask_value=payload.get("selected_tip_mask_value"),
+        selected_tip_mask_status=payload.get("selected_tip_mask_status", "unavailable"),
+        selected_tip_channels=tuple(payload.get("selected_tip_channels") or ()),
+        options=dict(options),
+        extra_fields=extra,
+        command_id=command_id or str(fields.get("command_id") or ""),
+        command_version=command_version or str(fields.get("command_version") or ""),
+        provenance=dict(provenance or fields.get("provenance") or {}),
+    )
+
+
+def _normalize_load_worklist_python(
     fields: Mapping[str, Any],
     *,
     command_id: str = "",
     command_version: str = "",
     provenance: Mapping[str, Any] | None = None,
 ) -> LoadWorklistContract:
-    """Normalize observed fields while keeping unknown/additive fields lossless."""
-
     known_names = {
-        "worklist",
-        "WorklistName",
-        "FileName",
-        "Path",
-        "selected_tip_mask",
-        "selected_tip_indexes",
-        "SelectedTipsIndexes",
-        "SerializedTipsIndexes",
-        "TipMask",
-        "selected_arm",
-        "DeviceAlias",
-        "Arm",
-        "ArmName",
-        "default_liquid_class",
-        "LiquidClass",
-        "DefaultLiquidClass",
-        "tip_system",
-        "TipSystem",
-        "options",
-        "command_id",
-        "command_version",
-        "provenance",
-        "LineNumber",
+        "worklist", "WorklistName", "FileName", "Path", "selected_tip_mask",
+        "selected_tip_indexes", "SelectedTipsIndexes", "SerializedTipsIndexes", "TipMask",
+        "selected_arm", "DeviceAlias", "Arm", "ArmName", "default_liquid_class",
+        "LiquidClass", "DefaultLiquidClass", "tip_system", "TipSystem", "options",
+        "command_id", "command_version", "provenance", "LineNumber",
     }
     worklist = _first(fields, ("worklist", "WorklistName", "FileName", "Path"))
-    selected_tip_mask = _first(fields, ("selected_tip_mask", "SelectedTipsIndexes", "SerializedTipsIndexes", "TipMask"))
+    selected_tip_mask = _first(
+        fields, ("selected_tip_mask", "SelectedTipsIndexes", "SerializedTipsIndexes", "TipMask")
+    )
     selected_arm = _first(fields, ("selected_arm", "DeviceAlias", "Arm", "ArmName"))
     default_liquid_class = _first(fields, ("default_liquid_class", "LiquidClass", "DefaultLiquidClass"))
-    tip_system_value = _first(fields, ("tip_system", "TipSystem"))
-    tip_system = _normalize_tip_system(tip_system_value)
+    tip_system = _normalize_tip_system(_first(fields, ("tip_system", "TipSystem")))
     selected_tip_indexes = _first(fields, ("selected_tip_indexes", "SelectedTipIndexes"))
     if selected_tip_indexes is not None:
-        selected_tip_mask_value, selected_tip_mask_status, selected_tip_channels = parse_selected_tip_indexes(
-            selected_tip_indexes
+        selected_tip_mask_value, selected_tip_mask_status, selected_tip_channels = (
+            parse_selected_tip_indexes(selected_tip_indexes)
         )
     else:
-        selected_tip_mask_value, selected_tip_mask_status, selected_tip_channels = parse_command_tip_mask(
-            selected_tip_mask
+        selected_tip_mask_value, selected_tip_mask_status, selected_tip_channels = (
+            parse_command_tip_mask(selected_tip_mask)
         )
     options = fields.get("options") if isinstance(fields.get("options"), dict) else {}
     extra = {str(key): value for key, value in fields.items() if str(key) not in known_names}
@@ -226,19 +276,67 @@ def normalize_load_worklist(
     )
 
 
-def build_execution_contract(commands: Iterable[Mapping[str, Any]]) -> list[LoadWorklistContract | ExecuteWorklistContract | Mapping[str, Any]]:
-    """Keep load order and Execute boundaries explicit for later IR consumers."""
+def normalize_load_worklist(
+    fields: Mapping[str, Any],
+    *,
+    command_id: str = "",
+    command_version: str = "",
+    provenance: Mapping[str, Any] | None = None,
+) -> LoadWorklistContract:
+    """Normalize observed fields while keeping unknown/additive fields lossless."""
 
+    field_count = len(fields) if type(fields) is dict else None
+    with performance_marker(
+        "worklist.load_contract_normalization", field_count=field_count
+    ):
+        if type(fields) is dict and _supports_native(fields):
+            native = native_acceleration.worklist_load_contract(
+                fields, command_id, command_version, provenance
+            )
+            if native is not None:
+                try:
+                    return _load_contract_from_native(
+                        native, fields, command_id, command_version, provenance
+                    )
+                except (AttributeError, KeyError, TypeError, ValueError):
+                    pass
+        return _normalize_load_worklist_python(
+            fields,
+            command_id=command_id,
+            command_version=command_version,
+            provenance=provenance,
+        )
+
+
+def _contracts_from_native(
+    payload: list[dict[str, Any]], commands: list[Mapping[str, Any]]
+) -> list[LoadWorklistContract | ExecuteWorklistContract | Mapping[str, Any]] | None:
+    if len(payload) != len(commands):
+        return None
     loaded: list[LoadWorklistContract] = []
     result: list[LoadWorklistContract | ExecuteWorklistContract | Mapping[str, Any]] = []
-    for command in commands:
+    for command, contract in zip(commands, payload):
         command_id = str(command.get("command_id") or command.get("id") or "")
-        fields = command.get("parameters") if isinstance(command.get("parameters"), Mapping) else command
+        fields = (
+            command.get("parameters")
+            if isinstance(command.get("parameters"), Mapping)
+            else command
+        )
         if command_id in LOAD_COMMAND_IDS:
-            contract = normalize_load_worklist(fields, command_id=command_id, provenance=command.get("provenance"))
-            loaded.append(contract)
-            result.append(contract)
+            if contract.get("kind") != "load_worklist":
+                return None
+            load_contract = _load_contract_from_native(
+                contract, fields, command_id, "", command.get("provenance")
+            )
+            loaded.append(load_contract)
+            result.append(load_contract)
         elif command_id in EXECUTE_COMMAND_IDS:
+            if contract.get("kind") != "execute_worklist":
+                return None
+            expected_loads = tuple(str(item.worklist or "") for item in loaded)
+            native_loads = tuple(contract.get("loads_before_execute") or ())
+            if native_loads != expected_loads:
+                return None
             extra_fields = {
                 str(key): value
                 for key, value in fields.items()
@@ -247,7 +345,7 @@ def build_execution_contract(commands: Iterable[Mapping[str, Any]]) -> list[Load
             }
             result.append(
                 ExecuteWorklistContract(
-                    loads_before_execute=tuple(str(item.worklist or "") for item in loaded),
+                    loads_before_execute=expected_loads,
                     command_id=command_id,
                     extra_fields=extra_fields,
                     provenance=dict(command.get("provenance") or {}),
@@ -257,6 +355,63 @@ def build_execution_contract(commands: Iterable[Mapping[str, Any]]) -> list[Load
         else:
             result.append(command)
     return result
+
+
+def build_execution_contract(
+    commands: Iterable[Mapping[str, Any]],
+) -> list[LoadWorklistContract | ExecuteWorklistContract | Mapping[str, Any]]:
+    """Keep load order and Execute boundaries explicit for later IR consumers."""
+
+    with performance_marker("worklist.execution_contract") as metrics:
+        if type(commands) is list and all(type(command) is dict for command in commands):
+            if _supports_native(commands):
+                native = native_acceleration.worklist_execution_contract(commands)
+                if native is not None:
+                    try:
+                        converted = _contracts_from_native(native, commands)
+                    except (AttributeError, KeyError, TypeError, ValueError):
+                        converted = None
+                    if converted is not None:
+                        metrics["command_count"] = len(commands)
+                        return converted
+
+        loaded: list[LoadWorklistContract] = []
+        result: list[LoadWorklistContract | ExecuteWorklistContract | Mapping[str, Any]] = []
+        command_count = 0
+        for command in commands:
+            command_count += 1
+            command_id = str(command.get("command_id") or command.get("id") or "")
+            fields = (
+                command.get("parameters")
+                if isinstance(command.get("parameters"), Mapping)
+                else command
+            )
+            if command_id in LOAD_COMMAND_IDS:
+                contract = _normalize_load_worklist_python(
+                    fields, command_id=command_id, provenance=command.get("provenance")
+                )
+                loaded.append(contract)
+                result.append(contract)
+            elif command_id in EXECUTE_COMMAND_IDS:
+                extra_fields = {
+                    str(key): value
+                    for key, value in fields.items()
+                    if str(key) not in {"command_id", "provenance", *_IR_CONTEXT_FIELDS}
+                    and value not in (None, "", [], {})
+                }
+                result.append(
+                    ExecuteWorklistContract(
+                        loads_before_execute=tuple(str(item.worklist or "") for item in loaded),
+                        command_id=command_id,
+                        extra_fields=extra_fields,
+                        provenance=dict(command.get("provenance") or {}),
+                    )
+                )
+                loaded.clear()
+            else:
+                result.append(command)
+        metrics["command_count"] = command_count
+        return result
 
 
 __all__ = [

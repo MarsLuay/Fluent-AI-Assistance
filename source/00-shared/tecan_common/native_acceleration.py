@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -113,4 +114,59 @@ def pattern_windows(
     try:
         return _native.pattern_windows(scripts, classifications, context_before, context_after)
     except (ValueError, TypeError, UnicodeError, OverflowError):
+        return None
+
+
+def _encode_json(value: Any) -> str:
+    return json.dumps(
+        value, ensure_ascii=False, separators=(",", ":"), allow_nan=False
+    )
+
+
+def worklist_execution_contract(commands: Any) -> list[dict[str, Any]] | None:
+    """Build JSON-compatible Load/Execute contracts natively when available."""
+    if not enabled():
+        return None
+    try:
+        encoded = _encode_json(commands)
+        result = json.loads(_native.worklist_execution_contract(encoded))
+        return result if isinstance(result, list) else None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
+def worklist_load_contract(
+    fields: Any,
+    command_id: str,
+    command_version: str,
+    provenance: Any,
+) -> dict[str, Any] | None:
+    """Normalize one JSON-compatible Load Worklist contract natively."""
+    if not enabled():
+        return None
+    try:
+        result = json.loads(
+            _native.worklist_load_contract(
+                _encode_json(fields),
+                command_id,
+                command_version,
+                _encode_json(provenance),
+            )
+        )
+        return result if isinstance(result, dict) else None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
         return None
