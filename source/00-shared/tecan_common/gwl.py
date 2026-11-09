@@ -335,6 +335,17 @@ def parse_gwl_lines(lines: Iterable[str], *, name: str = "worklist", permissive:
 
 
 def parse_gwl_line(raw_line: str, *, line_no: int | None = None, permissive: bool = False) -> Record | None:
+    if (
+        type(raw_line) is str
+        and (line_no is None or type(line_no) is int)
+        and type(permissive) is bool
+    ):
+        native = native_acceleration.worklist_parse_gwl_records([raw_line], permissive)
+        if native is not None and len(native) <= 1:
+            if not native:
+                return None
+            return _worklist_from_native_gwl_records(native, "").records[0]
+
     if not raw_line.strip():
         return None
 
