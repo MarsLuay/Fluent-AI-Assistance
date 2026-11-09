@@ -68,6 +68,7 @@ pub struct Worklist {
     pub name: String,
     pub lines: Vec<String>,
     pub counts: BTreeMap<String, usize>,
+    pub count_order: Vec<String>,
 }
 
 impl Worklist {
@@ -77,6 +78,92 @@ impl Worklist {
         }
         format!("{}\n", self.lines.join("\n"))
     }
+
+    pub fn counts_repr(&self) -> String {
+        let entries = self
+            .count_order
+            .iter()
+            .filter_map(|record_type| {
+                self.counts
+                    .get(record_type)
+                    .map(|count| format!("{}: {count}", python_repr(record_type)))
+            })
+            .collect::<Vec<_>>();
+        format!("{{{}}}", entries.join(", "))
+    }
+}
+
+pub fn parse_gwl_file(path: impl AsRef<Path>) -> Result<Worklist, String> {
+    let path = path.as_ref();
+    let mut text = String::new();
+    std::fs::File::open(path)
+        .and_then(|mut file| file.read_to_string(&mut text))
+        .map_err(|error| format!("could not read GWL file: {error}"))?;
+    if let Some(without_bom) = text.strip_prefix('\u{feff}') {
+        text = without_bom.to_owned();
+    }
+    let name = path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or("worklist");
+    parse_gwl_text(&text, name)
+}
+
+pub fn parse_gwl_text(text: &str, name: &str) -> Result<Worklist, String> {
+    let mut worklist = Worklist {
+        name: name.to_owned(),
+        ..Worklist::default()
+    };
+    for (line_index, raw_line) in text.lines().enumerate() {
+        let line = raw_line.trim_end_matches(['\r', '\n']);
+        if line.trim().is_empty() {
+            continue;
+        }
+        let parts = line.split(';').collect::<Vec<_>>();
+        let operation = parts[0].trim().to_ascii_uppercase();
+        let line_number = line_index + 1;
+        let prefix = format!("Line {line_number}: ");
+        match operation.as_str() {
+            "A" | "D" => {
+                if parts.len() != 11 {
+                    return Err(format!(
+                        "{prefix}pipette record has {} fields, expected 11.",
+                        parts.len()
+                    ));
+                }
+            }
+            "W" | "W1" | "W2" | "W3" | "W4" | "B" => {
+                if parts.len() != 2 {
+                    let record_name = if operation.starts_with('W') {
+                        "wash"
+                    } else {
+                        "break"
+                    };
+                    return Err(format!(
+                        "{prefix}{record_name} record has {} fields, expected 2.",
+                        parts.len()
+                    ));
+                }
+            }
+            "C" => {
+                if parts.len() < 2 {
+                    return Err(format!(
+                        "{prefix}comment record has {} fields, expected at least 2.",
+                        parts.len()
+                    ));
+                }
+            }
+            "F" | "S" => {}
+            _ => {
+                return Err(format!(
+                    "{prefix}unsupported record type {}.",
+                    python_repr(&operation)
+                ));
+            }
+        }
+        push_record(&mut worklist, line.to_owned(), &operation);
+    }
+    Ok(worklist)
 }
 
 pub fn load_transfers(path: impl AsRef<Path>, well_rows: i64) -> Result<Vec<Transfer>, String> {
@@ -373,6 +460,9 @@ pub fn total_volume(transfers: &[Transfer]) -> f64 {
 
 fn push_record(worklist: &mut Worklist, line: String, record_type: &str) {
     worklist.lines.push(line);
+    if !worklist.counts.contains_key(record_type) {
+        worklist.count_order.push(record_type.to_owned());
+    }
     *worklist.counts.entry(record_type.to_owned()).or_default() += 1;
 }
 
@@ -542,6 +632,34 @@ mod tests {
         assert_eq!(well_to_position("A2", 8).unwrap(), 9);
         assert_eq!(well_to_position("H12", 8).unwrap(), 96);
         assert_eq!(well_to_position("A2", 16).unwrap(), 17);
+    }
+
+    #[test]
+    fn strict_gwl_parser_counts_supported_records_in_source_order() {
+        let text = "A;src;;plate;1;;20;lc;;1;\nD;dst;;plate;2;;20;lc;;1;\nW;\nC;note;detail\nB;\nF;opaque\nS;setting;value\n";
+        let worklist = parse_gwl_text(text, "sample").unwrap();
+        assert_eq!(worklist.counts.get("A"), Some(&1));
+        assert_eq!(worklist.counts.get("D"), Some(&1));
+        assert_eq!(worklist.counts.get("W"), Some(&1));
+        assert_eq!(worklist.counts.get("C"), Some(&1));
+        assert_eq!(worklist.counts.get("B"), Some(&1));
+        assert_eq!(worklist.count_order, ["A", "D", "W", "C", "B", "F", "S"]);
+        assert_eq!(
+            worklist.counts_repr(),
+            "{'A': 1, 'D': 1, 'W': 1, 'C': 1, 'B': 1, 'F': 1, 'S': 1}"
+        );
+    }
+
+    #[test]
+    fn strict_gwl_parser_reports_record_shape_and_unknown_types() {
+        assert_eq!(
+            parse_gwl_text("A;src", "sample").unwrap_err(),
+            "Line 1: pipette record has 2 fields, expected 11."
+        );
+        assert_eq!(
+            parse_gwl_text("  \nW5;", "sample").unwrap_err(),
+            "Line 2: unsupported record type 'W5'."
+        );
     }
 
     #[test]

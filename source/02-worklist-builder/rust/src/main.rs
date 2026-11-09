@@ -1,17 +1,19 @@
 mod performance;
 
 use serde_json::{Value, json};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process;
 use tecan_worklist_builder::{
-    WashPolicy, build_worklist, load_transfers, total_volume, validate_transfers,
+    WashPolicy, build_worklist, load_transfers, parse_gwl_file, total_volume, validate_transfers,
 };
 
-const USAGE: &str = "Rust worklist conversion and validation
+const USAGE: &str = "Rust worklist conversion, validation, and summary
 
 USAGE:
   tecan-worklist convert <csv> --output <gwl> [--wash-policy <each|none>] [--batch-size N] [--well-rows N] [--strict] [--json]
   tecan-worklist validate <csv> [--well-rows N] [--strict] [--json]
+  tecan-worklist summarize <gwl> [--json]
 ";
 
 fn main() {
@@ -34,6 +36,9 @@ fn run() -> Result<i32, String> {
     if matches!(command, "help" | "--help" | "-h") {
         print!("{USAGE}");
         return Ok(0);
+    }
+    if command == "summarize" {
+        return run_summarize(&args[1..]);
     }
     if command != "convert" && command != "validate" {
         return Err(format!(
@@ -97,6 +102,7 @@ fn run() -> Result<i32, String> {
         json!({ "record_count": worklist.lines.len() }),
         || write_output(output, &text),
     )?;
+    let counts_repr = worklist.counts_repr();
     let payload = json!({
         "ok": true,
         "input_csv": python_path_display(input),
@@ -106,7 +112,51 @@ fn run() -> Result<i32, String> {
         "record_counts": worklist.counts,
         "warnings": validation.warnings,
     });
-    emit(&payload, options.as_json, false);
+    emit_with_counts(&payload, options.as_json, false, Some(&counts_repr));
+    Ok(0)
+}
+
+fn run_summarize(args: &[String]) -> Result<i32, String> {
+    let mut input = None;
+    let mut as_json = false;
+    for argument in args {
+        match argument.as_str() {
+            "--json" => as_json = true,
+            "--help" | "-h" => {
+                println!("Usage: tecan-worklist summarize <gwl> [--json]");
+                process::exit(0);
+            }
+            value if value.starts_with('-') => {
+                return Err(format!("unknown summarize argument: {value}"));
+            }
+            path => {
+                if input.replace(PathBuf::from(path)).is_some() {
+                    return Err(format!("unexpected extra positional argument: {path}"));
+                }
+            }
+        }
+    }
+    let input = input.ok_or("summarize requires a GWL path.")?;
+    let worklist =
+        performance::measure("worklist.gwl_parse", json!({}), || parse_gwl_file(&input))?;
+    let (pipette_records, transfer_pairs_estimate) = performance::measure(
+        "worklist.gwl_summary",
+        json!({ "record_count": worklist.lines.len() }),
+        || {
+            let aspirates = *worklist.counts.get("A").unwrap_or(&0);
+            let dispenses = *worklist.counts.get("D").unwrap_or(&0);
+            Ok((aspirates + dispenses, aspirates.min(dispenses)))
+        },
+    )?;
+    let counts_repr = worklist.counts_repr();
+    let payload = json!({
+        "ok": true,
+        "gwl": python_path_display(&input),
+        "record_counts": worklist.counts,
+        "pipette_records": pipette_records,
+        "transfer_pairs_estimate": transfer_pairs_estimate,
+    });
+    emit_with_counts(&payload, as_json, false, Some(&counts_repr));
     Ok(0)
 }
 
@@ -222,6 +272,10 @@ fn finite_json_number(value: f64) -> Value {
 }
 
 fn emit(payload: &Value, as_json: bool, to_stderr: bool) {
+    emit_with_counts(payload, as_json, to_stderr, None);
+}
+
+fn emit_with_counts(payload: &Value, as_json: bool, to_stderr: bool, counts_repr: Option<&str>) {
     let output = if as_json {
         serde_json::to_string_pretty(payload).unwrap_or_else(|_| "{}".to_owned())
     } else if payload["ok"] == false {
@@ -243,28 +297,48 @@ fn emit(payload: &Value, as_json: bool, to_stderr: bool) {
         lines.join("\n")
     } else if let Some(output_gwl) = payload["output_gwl"].as_str() {
         let mut lines = vec![format!("Wrote {output_gwl}")];
-        append_summary_lines(&mut lines, payload);
+        append_summary_lines(&mut lines, payload, counts_repr);
         lines.extend(warnings(payload));
         lines.join("\n")
     } else if let Some(input_csv) = payload["input_csv"].as_str() {
         let mut lines = vec![format!("Validated {input_csv}")];
-        append_summary_lines(&mut lines, payload);
+        append_summary_lines(&mut lines, payload, counts_repr);
         lines.extend(warnings(payload));
+        lines.join("\n")
+    } else if let Some(gwl) = payload["gwl"].as_str() {
+        let mut lines = vec![format!("Summarized {gwl}")];
+        append_summary_lines(&mut lines, payload, counts_repr);
         lines.join("\n")
     } else {
         String::new()
     };
+    #[cfg(windows)]
+    let output = format!("{}\r\n", output.replace('\n', "\r\n"));
+    #[cfg(not(windows))]
+    let output = format!("{output}\n");
     if to_stderr {
-        eprintln!("{output}");
+        let _ = std::io::stderr().lock().write_all(output.as_bytes());
     } else {
-        println!("{output}");
+        let _ = std::io::stdout().lock().write_all(output.as_bytes());
     }
 }
 
-fn append_summary_lines(lines: &mut Vec<String>, payload: &Value) {
-    for key in ["transfer_count", "total_volume_ul", "record_counts"] {
+fn append_summary_lines(lines: &mut Vec<String>, payload: &Value, counts_repr: Option<&str>) {
+    for key in [
+        "transfer_count",
+        "total_volume_ul",
+        "record_counts",
+        "transfer_pairs_estimate",
+    ] {
         if let Some(value) = payload.get(key) {
-            lines.push(format!("{key}: {value}"));
+            let rendered = if key == "record_counts" {
+                counts_repr
+                    .map(str::to_owned)
+                    .unwrap_or_else(|| value.to_string())
+            } else {
+                value.to_string()
+            };
+            lines.push(format!("{key}: {rendered}"));
         }
     }
 }
