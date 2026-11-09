@@ -90,6 +90,16 @@ fn fast_suite(paths: &RepoPaths, python: &Path) -> Result<(), String> {
         &paths.package,
         &["-m", "tools.sync_readiness_gate_registry", "--check"],
     )?;
+    run_checked(
+        Path::new("cargo"),
+        &paths.root,
+        &python_args(&[
+            "test",
+            "--locked",
+            "--manifest-path",
+            "source/02-worklist-builder/rust/Cargo.toml",
+        ]),
+    )?;
     invoke_python(
         python,
         &paths.root,

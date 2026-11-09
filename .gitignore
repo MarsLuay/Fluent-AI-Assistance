@@ -13,6 +13,7 @@ dist/
 source/**/build/
 source/**/dist/
 source/00-shared/tecan-native/target/
+source/02-worklist-builder/rust/target/
 source/00-shared/tecan-native/python/tecan_native/*.pdb
 ready-to-import/*
 !ready-to-import/README.md
