@@ -159,6 +159,31 @@ impl TipSelection {
     }
 }
 
+pub fn parse_tip_selection_json(raw: &str, supported_channels: Option<usize>) -> Option<Value> {
+    if !raw.is_ascii() || raw.bytes().any(|byte| (0x1c..=0x1f).contains(&byte)) {
+        return None;
+    }
+    let text = raw.trim();
+    if has_python_decimal_syntax(text) && parse_decimal_i128(text).is_none() {
+        return None;
+    }
+    let selection = TipSelection::parse(raw, supported_channels.unwrap_or(usize::MAX));
+    if selection
+        .value
+        .is_some_and(|value| value < i64::MIN as i128 || value > u64::MAX as i128)
+    {
+        return None;
+    }
+    Some(json!({
+        "raw": selection.raw,
+        "mode": selection.mode,
+        "value": selection.value,
+        "channel": selection.channel,
+        "status": selection.status,
+        "diagnostic_code": selection.diagnostic_code,
+    }))
+}
+
 #[derive(Clone, Debug)]
 struct Unit {
     unit_index: usize,
@@ -843,6 +868,28 @@ fn parse_decimal_i128(text: &str) -> Option<i128> {
         normalized.push(character);
     }
     normalized.parse().ok()
+}
+
+fn has_python_decimal_syntax(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    let start = usize::from(matches!(bytes.first(), Some(b'+' | b'-')));
+    if start == bytes.len() {
+        return false;
+    }
+    for index in start..bytes.len() {
+        if bytes[index] == b'_' {
+            if index == start
+                || index + 1 == bytes.len()
+                || !bytes[index - 1].is_ascii_digit()
+                || !bytes[index + 1].is_ascii_digit()
+            {
+                return false;
+            }
+        } else if !bytes[index].is_ascii_digit() {
+            return false;
+        }
+    }
+    true
 }
 
 fn clean(value: &str) -> String {

@@ -67,6 +67,65 @@ class WorklistSemanticsTests(unittest.TestCase):
         self.assertEqual(parse_tip_selection("3").diagnostic_code, "tip_mask_not_one_hot")
         self.assertEqual(parse_tip_selection("256").diagnostic_code, "tip_mask_channel_out_of_range")
 
+    def test_native_tip_selection_matches_python_and_falls_back_on_edges(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_parse_tip_selection"
+        ):
+            self.skipTest("optional Rust tip-mask parser is not built")
+        common_cases = [
+            ("", "", 8),
+            (" 01 ", " 01 ", 8),
+            ("1_0", "1_0", None),
+            ("256", "256", 8),
+            ("0", "0", None),
+            ("-1", "-1", 8),
+            ("3", "3", 8),
+            ("not-an-int", "not-an-int", 8),
+            (None, "", 8),
+            (17, "17", 8),
+        ]
+        for raw, rust_raw, channels in common_cases:
+            with self.subTest(raw=raw, channels=channels):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    expected = parse_tip_selection(raw, supported_channels=channels)
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    native = native_acceleration.worklist_parse_tip_selection(
+                        rust_raw, channels
+                    )
+                    self.assertIsNotNone(native)
+                    actual = parse_tip_selection(raw, supported_channels=channels)
+                self.assertEqual(native, expected.to_dict())
+                self.assertEqual(actual, expected)
+
+        fallback_cases = [
+            ("١", "١", 8),
+            (str(1 << 130), str(1 << 130), 8),
+            ("\x1c", "\x1c", 8),
+            ("1", "1", -1),
+            ("1", "1", True),
+            ("1", "1", 10**100),
+        ]
+        for raw, rust_raw, channels in fallback_cases:
+            with self.subTest(fallback=raw, channels=channels):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    expected = parse_tip_selection(raw, supported_channels=channels)
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    self.assertIsNone(
+                        native_acceleration.worklist_parse_tip_selection(
+                            rust_raw, channels
+                        )
+                    )
+                    actual = parse_tip_selection(raw, supported_channels=channels)
+                self.assertEqual(actual, expected)
+
     def test_typed_f_and_s_records_and_unknown_records_round_trip_losslessly(self):
         lines = [
             "F;  vendor-field ;two",

@@ -646,6 +646,19 @@ fn worklist_load_contract(
 }
 
 #[pyfunction]
+fn worklist_parse_tip_selection(
+    raw: &str,
+    supported_channels: Option<usize>,
+) -> PyResult<Option<String>> {
+    let Some(selection) =
+        tecan_worklist_builder::semantics::parse_tip_selection_json(raw, supported_channels)
+    else {
+        return Ok(None);
+    };
+    Ok(serde_json::to_string(&selection).ok())
+}
+
+#[pyfunction]
 fn worklist_well_to_position(value: &str, rows: i64) -> PyResult<Option<u64>> {
     Ok(tecan_worklist_builder::well_to_position(value, rows).ok())
 }
@@ -1050,6 +1063,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_validate_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_load_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_well_to_position, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_parse_tip_selection, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_build_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_build_schedule, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_gwl, module)?)?;

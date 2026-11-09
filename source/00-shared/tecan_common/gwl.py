@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Literal, Protocol
 
+from . import native_acceleration
+
 
 class Record(Protocol):
     type_character: str
@@ -71,6 +73,27 @@ def parse_tip_selection(
     """Parse a record-level one-hot tip selection without changing its raw text."""
 
     raw_text = "" if raw is None else str(raw)
+    if (
+        type(raw_text) is str
+        and raw_text.isascii()
+        and not any(0x1C <= ord(character) <= 0x1F for character in raw_text)
+        and (
+            supported_channels is None
+            or (type(supported_channels) is int and supported_channels >= 0)
+        )
+    ):
+        native = native_acceleration.worklist_parse_tip_selection(
+            raw_text, supported_channels
+        )
+        if native is not None:
+            return TipSelection(
+                raw=native["raw"],
+                mode=native["mode"],
+                value=native["value"],
+                channel=native["channel"],
+                status=native["status"],
+                diagnostic_code=native["diagnostic_code"],
+            )
     text = raw_text.strip()
     if not text:
         return TipSelection(raw_text, "automatic", None, None, "valid")

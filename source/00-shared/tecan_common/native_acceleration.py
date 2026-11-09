@@ -219,6 +219,51 @@ def worklist_well_to_position(value: str, rows: int) -> int | None:
         return None
 
 
+def worklist_parse_tip_selection(
+    raw: str, supported_channels: int | None
+) -> dict[str, Any] | None:
+    """Parse common ASCII tip masks natively, or request Python fallback."""
+    if (
+        not enabled()
+        or type(raw) is not str
+        or (
+            supported_channels is not None
+            and (type(supported_channels) is not int or supported_channels < 0)
+        )
+    ):
+        return None
+    try:
+        encoded = _native.worklist_parse_tip_selection(raw, supported_channels)
+        if encoded is None:
+            return None
+        result = json.loads(encoded)
+        if (
+            not isinstance(result, dict)
+            or not {"raw", "mode", "value", "channel", "status", "diagnostic_code"}.issubset(result)
+            or result.get("raw") != raw
+            or result.get("mode") not in {"automatic", "explicit"}
+            or result.get("status")
+            not in {"valid", "malformed", "invalid", "non_one_hot", "out_of_range"}
+            or (result.get("value") is not None and type(result["value"]) is not int)
+            or (result.get("channel") is not None and type(result["channel"]) is not int)
+            or (
+                result.get("diagnostic_code") is not None
+                and not isinstance(result["diagnostic_code"], str)
+            )
+        ):
+            return None
+        return result
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def worklist_load_transfers(
     path: str | Path, well_rows: int
 ) -> list[dict[str, Any]] | None:
