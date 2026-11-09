@@ -660,6 +660,42 @@ fn worklist_load_transfers(path: &str, well_rows: i64) -> PyResult<Option<String
 }
 
 #[pyfunction]
+fn worklist_parse_gwl(path: &str) -> PyResult<Option<String>> {
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return Ok(None);
+    };
+    if text.chars().any(|character| {
+        matches!(
+            character,
+            '\u{000b}'
+                | '\u{000c}'
+                | '\u{001c}'
+                | '\u{001d}'
+                | '\u{001e}'
+                | '\u{0085}'
+                | '\u{2028}'
+                | '\u{2029}'
+        )
+    }) || text
+        .as_bytes()
+        .iter()
+        .enumerate()
+        .any(|(index, byte)| *byte == b'\r' && text.as_bytes().get(index + 1) != Some(&b'\n'))
+    {
+        return Ok(None);
+    }
+    let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
+    let Ok(worklist) = tecan_worklist_builder::parse_gwl_text(text, "worklist") else {
+        return Ok(None);
+    };
+    let payload = serde_json::json!({
+        "counts": worklist.counts,
+        "count_order": worklist.count_order,
+    });
+    Ok(serde_json::to_string(&payload).ok())
+}
+
+#[pyfunction]
 fn worklist_build_transfers(
     transfers_json: &str,
     name: &str,
@@ -935,6 +971,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_validate_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_load_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_build_transfers, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_parse_gwl, module)?)?;
     module.add_function(wrap_pyfunction!(deepcopy_json, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_object_fields, module)?)?;
     module.add_function(wrap_pyfunction!(pattern_windows, module)?)?;

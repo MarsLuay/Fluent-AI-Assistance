@@ -22,6 +22,7 @@ from tecan_worklist.gwl import (
     Pipette,
     RawRecord,
     SetDiTiType,
+    parse_gwl,
     parse_gwl_lines,
     parse_tip_selection,
 )
@@ -342,6 +343,77 @@ class WorklistSemanticsTests(unittest.TestCase):
                         for marker in markers
                     )
                 )
+
+    def test_native_gwl_summary_matches_python_and_preserves_splitlines_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_parse_gwl"
+        ):
+            self.skipTest("optional Rust GWL parser kernel is not built")
+        with tempfile.TemporaryDirectory() as raw:
+            source = Path(raw) / "synthetic.gwl"
+            text = (
+                "C;first comment\r\n"
+                "a;Source;source-id;Plate;1;tube;10;Water;;1;forced\r\n"
+                "D;Destination;dest-id;Plate;2;tube;10;Water;;1;forced\r\n"
+                "W;\r\nB;\r\nF;opaque;field\r\nS;type\r\n"
+            )
+            with source.open("w", encoding="utf-8", newline="") as handle:
+                handle.write("\ufeff" + text)
+            arguments = ["summarize", str(source), "--json"]
+            fallback_stdout = io.StringIO()
+            with patch.dict(
+                "os.environ",
+                {
+                    "TECAN_DISABLE_RUST_ACCELERATION": "1",
+                    "TECAN_PERFORMANCE_MARKERS": "0",
+                },
+            ):
+                with contextlib.redirect_stdout(fallback_stdout):
+                    self.assertEqual(main(arguments), 0)
+
+            native_stdout = io.StringIO()
+            marker_output = io.StringIO()
+            with patch.dict(
+                "os.environ",
+                {
+                    "TECAN_DISABLE_RUST_ACCELERATION": "0",
+                    "TECAN_PERFORMANCE_MARKERS": "1",
+                },
+            ):
+                with contextlib.redirect_stdout(native_stdout):
+                    with contextlib.redirect_stderr(marker_output):
+                        with patch(
+                            "tecan_worklist.cli.parse_gwl",
+                            side_effect=AssertionError("native parser fell back to Python"),
+                        ) as python_fallback:
+                            with patch.object(
+                                native_acceleration,
+                                "worklist_parse_gwl",
+                                wraps=native_acceleration.worklist_parse_gwl,
+                            ) as native_call:
+                                self.assertEqual(main(arguments), 0)
+            native_call.assert_called_once()
+            python_fallback.assert_not_called()
+            self.assertEqual(native_stdout.getvalue(), fallback_stdout.getvalue())
+            markers = [
+                json.loads(line[5:]) for line in marker_output.getvalue().splitlines()
+            ]
+            self.assertEqual(
+                [marker["name"] for marker in markers],
+                ["worklist.gwl_parse", "worklist.gwl_summary"],
+            )
+            self.assertTrue(all(marker["metrics"] == {"record_count": 7} for marker in markers))
+            self.assertNotIn(str(source), marker_output.getvalue())
+
+            splitlines_source = Path(raw) / "python-splitlines.gwl"
+            splitlines_source.write_text(
+                "B;\vA;Source;source-id;Plate;1;tube;10;Water;;1;forced\n",
+                encoding="utf-8",
+            )
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                self.assertIsNone(native_acceleration.worklist_parse_gwl(splitlines_source))
+                expected_counts = parse_gwl(splitlines_source).counts()
+            self.assertEqual(expected_counts, {"B": 1, "A": 1})
 
     def test_native_transfer_validation_matches_python_fallback(self):
         if not native_acceleration.available() or not hasattr(

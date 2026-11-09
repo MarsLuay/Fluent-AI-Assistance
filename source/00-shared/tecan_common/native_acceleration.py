@@ -270,3 +270,42 @@ def worklist_build_transfers(
         RecursionError,
     ):
         return None
+
+
+def worklist_parse_gwl(path: str | Path) -> dict[str, Any] | None:
+    """Parse a strict GWL file natively, or request the Python fallback."""
+    if not enabled():
+        return None
+    try:
+        encoded = _native.worklist_parse_gwl(str(path))
+        if encoded is None:
+            return None
+        result = json.loads(encoded)
+        if not isinstance(result, dict):
+            return None
+        counts = result.get("counts")
+        order = result.get("count_order")
+        if (
+            not isinstance(counts, dict)
+            or not all(isinstance(key, str) and type(value) is int for key, value in counts.items())
+            or not isinstance(order, list)
+            or not all(isinstance(key, str) for key in order)
+            or len(order) != len(set(order))
+            or set(order) != set(counts)
+        ):
+            return None
+        ordered_counts = {key: counts[key] for key in order}
+        return {
+            "counts": ordered_counts,
+            "record_count": sum(ordered_counts.values()),
+        }
+    except (
+        AttributeError,
+        OSError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None

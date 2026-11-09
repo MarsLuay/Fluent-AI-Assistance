@@ -122,15 +122,27 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
 
 def _cmd_summarize(args: argparse.Namespace) -> int:
-    worklist = parse_gwl(args.gwl)
-    counts = worklist.counts()
-    pipette_records = counts.get("A", 0) + counts.get("D", 0)
+    with performance_marker("worklist.gwl_parse") as metrics:
+        native = native_acceleration.worklist_parse_gwl(args.gwl)
+        if native is None:
+            worklist = parse_gwl(args.gwl)
+            counts = worklist.counts()
+            record_count = sum(counts.values())
+        else:
+            counts = native["counts"]
+            record_count = native["record_count"]
+        metrics["record_count"] = record_count
+
+    with performance_marker("worklist.gwl_summary") as metrics:
+        pipette_records = counts.get("A", 0) + counts.get("D", 0)
+        transfer_pairs_estimate = min(counts.get("A", 0), counts.get("D", 0))
+        metrics["record_count"] = record_count
     payload = {
         "ok": True,
         "gwl": str(args.gwl),
         "record_counts": counts,
         "pipette_records": pipette_records,
-        "transfer_pairs_estimate": min(counts.get("A", 0), counts.get("D", 0)),
+        "transfer_pairs_estimate": transfer_pairs_estimate,
     }
     _emit(payload, as_json=args.as_json)
     return 0
