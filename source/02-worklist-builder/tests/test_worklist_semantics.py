@@ -198,6 +198,74 @@ class WorklistSemanticsTests(unittest.TestCase):
         self.assertIsInstance(worklist.records[2], RawRecord)
         self.assertEqual(worklist.to_text(), "\n".join(lines) + "\n")
 
+    def test_native_gwl_parser_matches_typed_python_records(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_parse_gwl_records"
+        ):
+            self.skipTest("optional Rust GWL parser is not built")
+        inputs = [
+            (
+                [
+                    "  a; src ;id; plate ;01;tube;10.00;water;reserved; 01 ;forced  ",
+                    "D;dst;did;plate;B1;tube;10;water;;1;",
+                    "W1;",
+                    "B;",
+                    "C;comment;with;semicolons",
+                    "F;  vendor-field ;two",
+                    "S;DiTiType; 42 ",
+                    "",
+                    "   ",
+                ],
+                False,
+            ),
+            (
+                [
+                    "a;short",
+                    "W4;ignored-extra",
+                    "B;ignored-extra",
+                    "C;permissive;comment",
+                    "X;opaque;field",
+                    "W5;unrecognized-wash",
+                ],
+                True,
+            ),
+        ]
+        for lines, permissive in inputs:
+            with self.subTest(permissive=permissive):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    expected = parse_gwl_lines(
+                        lines, name="typed-parse", permissive=permissive
+                    )
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    with patch.object(
+                        native_acceleration,
+                        "worklist_parse_gwl_records",
+                        wraps=native_acceleration.worklist_parse_gwl_records,
+                    ) as native_call:
+                        actual = parse_gwl_lines(
+                            lines, name="typed-parse", permissive=permissive
+                        )
+                native_call.assert_called_once()
+                self.assertEqual(actual, expected)
+                self.assertEqual(actual.to_text(), expected.to_text())
+                self.assertEqual(actual.counts(), expected.counts())
+
+        invalid_lines = ["A;short"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.worklist_parse_gwl_records(invalid_lines, False)
+            )
+            with self.assertRaises(ValueError) as expected_error:
+                parse_gwl_lines(invalid_lines, name="invalid")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with self.assertRaises(ValueError) as python_error:
+                parse_gwl_lines(invalid_lines, name="invalid")
+        self.assertEqual(str(expected_error.exception), str(python_error.exception))
+
     def test_csv_tip_mask_validation_rejects_non_one_hot(self):
         valid = Transfer("S", "Plate", 1, "D", "Plate", 1, 10, tip_mask="4")
         invalid = Transfer("S", "Plate", 2, "D", "Plate", 2, 10, tip_mask="3")

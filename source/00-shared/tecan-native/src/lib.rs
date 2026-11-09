@@ -727,6 +727,18 @@ fn worklist_parse_gwl(path: &str) -> PyResult<Option<String>> {
 }
 
 #[pyfunction]
+fn worklist_parse_gwl_records(lines_json: &str, permissive: bool) -> PyResult<Option<String>> {
+    let Ok(lines) = serde_json::from_str::<Vec<String>>(lines_json) else {
+        return Ok(None);
+    };
+    let Some(records) = tecan_worklist_builder::parse_gwl_records_for_python(&lines, permissive)
+    else {
+        return Ok(None);
+    };
+    Ok(serde_json::to_string(&records).ok())
+}
+
+#[pyfunction]
 fn worklist_build_transfers(
     transfers_json: &str,
     name: &str,
@@ -1081,6 +1093,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_build_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_build_schedule, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_gwl, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_parse_gwl_records, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_analyze_lines, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_optimize_lines, module)?)?;
     module.add_function(wrap_pyfunction!(deepcopy_json, module)?)?;

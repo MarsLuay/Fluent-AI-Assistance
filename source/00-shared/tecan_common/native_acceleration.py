@@ -436,6 +436,81 @@ def worklist_parse_gwl(path: str | Path) -> dict[str, Any] | None:
         return None
 
 
+def worklist_parse_gwl_records(
+    lines: Any, permissive: bool
+) -> list[dict[str, Any]] | None:
+    """Parse supported GWL lines natively, preserving Python record adapters."""
+    if not enabled() or type(permissive) is not bool:
+        return None
+    try:
+        encoded = _native.worklist_parse_gwl_records(_encode_json(lines), permissive)
+        if encoded is None:
+            return None
+        records = json.loads(encoded)
+        if not isinstance(records, list):
+            return None
+        for record in records:
+            if not isinstance(record, dict):
+                return None
+            kind = record.get("kind")
+            if kind == "pipette":
+                fields = (
+                    "operation",
+                    "rack_label",
+                    "rack_id",
+                    "rack_type",
+                    "position",
+                    "tube_id",
+                    "volume",
+                    "liquid_class",
+                    "tip_mask",
+                    "forced_rack_type",
+                )
+                if (
+                    record.get("operation") not in {"A", "D"}
+                    or not all(isinstance(record.get(field), str) for field in fields)
+                ):
+                    return None
+            elif kind == "wash":
+                scheme = record.get("scheme")
+                if "scheme" not in record or (
+                    scheme is not None
+                    and (type(scheme) is not int or scheme not in {1, 2, 3, 4})
+                ):
+                    return None
+            elif kind == "break":
+                continue
+            elif kind == "comment":
+                if not isinstance(record.get("text"), str):
+                    return None
+            elif kind in {"flush", "set_diti_type"}:
+                expected_type = "F" if kind == "flush" else "S"
+                if (
+                    record.get("type_character") != expected_type
+                    or not isinstance(record.get("raw_line"), str)
+                    or not isinstance(record.get("parameters"), list)
+                    or not all(isinstance(item, str) for item in record["parameters"])
+                ):
+                    return None
+            elif kind == "raw":
+                if not isinstance(record.get("type_character"), str) or not isinstance(
+                    record.get("raw_line"), str
+                ):
+                    return None
+            else:
+                return None
+        return records
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def worklist_analyze_lines(
     lines: Any,
     enabled_tip_mask: str | None,

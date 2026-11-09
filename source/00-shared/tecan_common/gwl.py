@@ -268,7 +268,64 @@ def parse_gwl_text(text: str, *, name: str = "worklist", permissive: bool = Fals
     return parse_gwl_lines(text.splitlines(), name=name, permissive=permissive)
 
 
+def _worklist_from_native_gwl_records(
+    records: list[dict[str, object]], name: str
+) -> Worklist:
+    worklist = Worklist(name=name)
+    for record in records:
+        kind = record["kind"]
+        if kind == "pipette":
+            worklist.add(
+                Pipette(
+                    operation=record["operation"],
+                    rack_label=record["rack_label"],
+                    rack_id=record["rack_id"],
+                    rack_type=record["rack_type"],
+                    position=record["position"],
+                    tube_id=record["tube_id"],
+                    volume=record["volume"],
+                    liquid_class=record["liquid_class"],
+                    tip_mask=record["tip_mask"],
+                    forced_rack_type=record["forced_rack_type"],
+                )
+            )
+        elif kind == "wash":
+            worklist.add(Wash(scheme=record["scheme"]))
+        elif kind == "break":
+            worklist.add(Break())
+        elif kind == "comment":
+            worklist.add(Comment(record["text"]))
+        elif kind == "flush":
+            worklist.add(
+                Flush(
+                    tuple(record["parameters"]),
+                    raw_line=record["raw_line"],
+                )
+            )
+        elif kind == "set_diti_type":
+            worklist.add(
+                SetDiTiType(
+                    tuple(record["parameters"]),
+                    raw_line=record["raw_line"],
+                )
+            )
+        elif kind == "raw":
+            worklist.add(
+                RawRecord(
+                    type_character=record["type_character"],
+                    raw_line=record["raw_line"],
+                )
+            )
+    return worklist
+
+
 def parse_gwl_lines(lines: Iterable[str], *, name: str = "worklist", permissive: bool = False) -> Worklist:
+    if type(lines) in (list, tuple) and type(permissive) is bool and all(
+        type(line) is str for line in lines
+    ):
+        native = native_acceleration.worklist_parse_gwl_records(lines, permissive)
+        if native is not None:
+            return _worklist_from_native_gwl_records(native, name)
     worklist = Worklist(name=name)
     for line_no, raw_line in enumerate(lines, start=1):
         record = parse_gwl_line(raw_line, line_no=line_no, permissive=permissive)

@@ -5,6 +5,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Read;
 use std::path::Path;
 
+use serde_json::{Value, json};
+
 const REQUIRED_COLUMNS: [&str; 7] = [
     "source_label",
     "source_type",
@@ -189,6 +191,82 @@ fn parse_gwl_text_mode(text: &str, name: &str, permissive: bool) -> Result<Workl
         push_record(&mut worklist, line.to_owned(), &operation);
     }
     Ok(worklist)
+}
+
+pub fn parse_gwl_records_for_python(lines: &[String], permissive: bool) -> Option<Vec<Value>> {
+    let mut records = Vec::new();
+    for raw_line in lines {
+        if !raw_line.is_ascii() || raw_line.bytes().any(|byte| (0x1c..=0x1f).contains(&byte)) {
+            return None;
+        }
+        let line = raw_line.trim_end_matches(['\r', '\n']);
+        if line.trim().is_empty() {
+            continue;
+        }
+        let parts = line.split(';').collect::<Vec<_>>();
+        let operation = parts[0].trim().to_ascii_uppercase();
+        match operation.as_str() {
+            "A" | "D" => {
+                if !permissive && parts.len() != 11 {
+                    return None;
+                }
+                let mut fields = parts.clone();
+                fields.resize(11, "");
+                fields.truncate(11);
+                records.push(json!({
+                    "kind": "pipette",
+                    "operation": operation,
+                    "rack_label": fields[1],
+                    "rack_id": fields[2],
+                    "rack_type": fields[3],
+                    "position": fields[4],
+                    "tube_id": fields[5],
+                    "volume": fields[6],
+                    "liquid_class": fields[7],
+                    "tip_mask": fields[9],
+                    "forced_rack_type": fields[10],
+                }));
+            }
+            "W" | "W1" | "W2" | "W3" | "W4" => {
+                if !permissive && parts.len() != 2 {
+                    return None;
+                }
+                let scheme = operation
+                    .strip_prefix('W')
+                    .filter(|suffix| !suffix.is_empty())
+                    .and_then(|suffix| suffix.parse::<u8>().ok());
+                records.push(json!({"kind": "wash", "scheme": scheme}));
+            }
+            "B" => {
+                if !permissive && parts.len() != 2 {
+                    return None;
+                }
+                records.push(json!({"kind": "break"}));
+            }
+            "C" => {
+                if !permissive && parts.len() < 2 {
+                    return None;
+                }
+                records.push(json!({
+                    "kind": "comment",
+                    "text": parts[1..].join(";"),
+                }));
+            }
+            "F" | "S" => records.push(json!({
+                "kind": if operation == "F" { "flush" } else { "set_diti_type" },
+                "type_character": operation,
+                "parameters": parts[1..].to_vec(),
+                "raw_line": line,
+            })),
+            _ if permissive => records.push(json!({
+                "kind": "raw",
+                "type_character": operation,
+                "raw_line": line,
+            })),
+            _ => return None,
+        }
+    }
+    Some(records)
 }
 
 pub fn load_transfers(path: impl AsRef<Path>, well_rows: i64) -> Result<Vec<Transfer>, String> {
