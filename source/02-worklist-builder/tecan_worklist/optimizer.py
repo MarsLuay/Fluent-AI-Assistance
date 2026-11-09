@@ -12,6 +12,8 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from typing import Iterable
 
+from tecan_common import native_acceleration
+
 from .gwl import (
     Break,
     Comment,
@@ -158,6 +160,12 @@ def parse_enabled_tip_mask(value: object, *, supported_channels: int = 8) -> int
 
     if value in (None, ""):
         return None
+    if type(value) is str and type(supported_channels) is int:
+        native = native_acceleration.worklist_parse_enabled_tip_mask(
+            value, supported_channels
+        )
+        if native is not None:
+            return native
     try:
         mask = int(str(value).strip(), 10)
     except (TypeError, ValueError) as exc:

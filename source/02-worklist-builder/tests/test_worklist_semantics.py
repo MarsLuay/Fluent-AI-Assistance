@@ -26,7 +26,12 @@ from tecan_worklist.gwl import (
     parse_gwl_lines,
     parse_tip_selection,
 )
-from tecan_worklist.optimizer import analyze_worklist, optimize_worklist, semantic_equivalent
+from tecan_worklist.optimizer import (
+    analyze_worklist,
+    optimize_worklist,
+    parse_enabled_tip_mask,
+    semantic_equivalent,
+)
 from tecan_worklist.transfer import (
     Transfer,
     build_worklist,
@@ -66,6 +71,61 @@ class WorklistSemanticsTests(unittest.TestCase):
         self.assertEqual(parse_tip_selection("0").diagnostic_code, "tip_mask_non_positive")
         self.assertEqual(parse_tip_selection("3").diagnostic_code, "tip_mask_not_one_hot")
         self.assertEqual(parse_tip_selection("256").diagnostic_code, "tip_mask_channel_out_of_range")
+
+    def test_native_enabled_tip_mask_matches_python_and_falls_back(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_parse_enabled_tip_mask"
+        ):
+            self.skipTest("optional Rust command-mask parser is not built")
+        cases = [
+            ("1", 8),
+            (" 03 ", 8),
+            ("1_0", 8),
+            ("1", 1),
+            (str((1 << 127) - 1), 127),
+        ]
+        for value, channels in cases:
+            with self.subTest(value=value, channels=channels):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    expected = parse_enabled_tip_mask(value, supported_channels=channels)
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    native = native_acceleration.worklist_parse_enabled_tip_mask(
+                        value, channels
+                    )
+                    self.assertIsNotNone(native)
+                    actual = parse_enabled_tip_mask(value, supported_channels=channels)
+                self.assertEqual(native, expected)
+                self.assertEqual(actual, expected)
+
+        fallback_cases = [
+            ("256", 8, False),
+            ("not-an-int", 8, False),
+            (str(1 << 127), 127, False),
+            ("١", 8, True),
+            ("1", 0, False),
+        ]
+        for value, channels, valid in fallback_cases:
+            with self.subTest(fallback=value, channels=channels):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    self.assertIsNone(
+                        native_acceleration.worklist_parse_enabled_tip_mask(
+                            value, channels
+                        )
+                    )
+                    if valid:
+                        self.assertEqual(
+                            parse_enabled_tip_mask(value, supported_channels=channels),
+                            1,
+                        )
+                    else:
+                        with self.assertRaises(ValueError):
+                            parse_enabled_tip_mask(value, supported_channels=channels)
 
     def test_native_tip_selection_matches_python_and_falls_back_on_edges(self):
         if not native_acceleration.available() or not hasattr(

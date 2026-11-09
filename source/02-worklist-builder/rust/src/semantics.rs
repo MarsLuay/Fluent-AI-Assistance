@@ -818,7 +818,7 @@ fn explicit_assignments(units: &[Unit]) -> BTreeMap<String, usize> {
     assignments
 }
 
-fn parse_enabled_tip_mask(
+pub fn parse_enabled_tip_mask(
     value: Option<&str>,
     supported_channels: usize,
 ) -> Result<Option<u128>, String> {

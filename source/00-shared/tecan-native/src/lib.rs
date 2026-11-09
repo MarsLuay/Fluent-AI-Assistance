@@ -659,6 +659,19 @@ fn worklist_parse_tip_selection(
 }
 
 #[pyfunction]
+fn worklist_parse_enabled_tip_mask(
+    value: &str,
+    supported_channels: usize,
+) -> PyResult<Option<String>> {
+    let Ok(Some(mask)) =
+        tecan_worklist_builder::semantics::parse_enabled_tip_mask(Some(value), supported_channels)
+    else {
+        return Ok(None);
+    };
+    Ok(Some(mask.to_string()))
+}
+
+#[pyfunction]
 fn worklist_well_to_position(value: &str, rows: i64) -> PyResult<Option<u64>> {
     Ok(tecan_worklist_builder::well_to_position(value, rows).ok())
 }
@@ -1064,6 +1077,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_load_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_well_to_position, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_tip_selection, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_parse_enabled_tip_mask, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_build_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_build_schedule, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_gwl, module)?)?;

@@ -264,6 +264,35 @@ def worklist_parse_tip_selection(
         return None
 
 
+def worklist_parse_enabled_tip_mask(value: str, supported_channels: int) -> int | None:
+    """Parse an in-range command mask natively; invalid cases retain Python errors."""
+    if (
+        not enabled()
+        or type(value) is not str
+        or not value.isascii()
+        or any(0x1C <= ord(character) <= 0x1F for character in value)
+        or type(supported_channels) is not int
+        or not 1 <= supported_channels <= 127
+    ):
+        return None
+    try:
+        result = _native.worklist_parse_enabled_tip_mask(value, supported_channels)
+        if not isinstance(result, str):
+            return None
+        mask = int(result, 10)
+        maximum = (1 << supported_channels) - 1
+        return mask if 0 < mask <= maximum else None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def worklist_load_transfers(
     path: str | Path, well_rows: int
 ) -> list[dict[str, Any]] | None:
