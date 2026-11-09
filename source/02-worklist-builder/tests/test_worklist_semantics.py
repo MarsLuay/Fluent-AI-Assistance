@@ -492,6 +492,91 @@ class WorklistSemanticsTests(unittest.TestCase):
             self.assertTrue(all(marker["metrics"] == {"record_count": 10} for marker in markers))
             self.assertNotIn(str(source), marker_output.getvalue())
 
+    def test_native_optimizer_matches_python_cli_and_verifies_before_write(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_optimize_lines"
+        ):
+            self.skipTest("optional Rust worklist-optimizer kernel is not built")
+        lines = []
+        for index, tip in enumerate(("1", "1", "2", "2"), start=1):
+            lines.extend(
+                [
+                    f"A;Source{index};s{index};Plate;{index};t{index};10;Water;;{tip};",
+                    f"D;Destination{index};d{index};Plate;{index};d{index};10;Water;;{tip};",
+                ]
+            )
+        with tempfile.TemporaryDirectory() as raw:
+            source = Path(raw) / "grouped.gwl"
+            output = Path(raw) / "optimized.gwl"
+            source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            arguments = [
+                "optimize",
+                str(source),
+                "--output",
+                str(output),
+                "--enabled-tip-mask",
+                "3",
+                "--supported-channels",
+                "2",
+                "--json",
+            ]
+            fallback_stdout = io.StringIO()
+            with patch.dict(
+                "os.environ",
+                {
+                    "TECAN_DISABLE_RUST_ACCELERATION": "1",
+                    "TECAN_PERFORMANCE_MARKERS": "0",
+                },
+            ):
+                with contextlib.redirect_stdout(fallback_stdout):
+                    self.assertEqual(main(arguments), 0)
+            fallback_text = output.read_bytes()
+            fallback_payload = json.loads(fallback_stdout.getvalue())
+            self.assertTrue(fallback_payload["changed"])
+
+            native_stdout = io.StringIO()
+            marker_output = io.StringIO()
+            with patch.dict(
+                "os.environ",
+                {
+                    "TECAN_DISABLE_RUST_ACCELERATION": "0",
+                    "TECAN_PERFORMANCE_MARKERS": "1",
+                },
+            ):
+                with contextlib.redirect_stdout(native_stdout):
+                    with contextlib.redirect_stderr(marker_output):
+                        with patch(
+                            "tecan_worklist.cli.optimize_worklist",
+                            side_effect=AssertionError("native optimizer fell back to Python"),
+                        ) as python_fallback:
+                            with patch.object(
+                                native_acceleration,
+                                "worklist_optimize_lines",
+                                wraps=native_acceleration.worklist_optimize_lines,
+                            ) as native_call:
+                                self.assertEqual(main(arguments), 0)
+            native_call.assert_called_once()
+            python_fallback.assert_not_called()
+            self.assertEqual(
+                json.loads(native_stdout.getvalue()), fallback_payload
+            )
+            self.assertEqual(output.read_bytes(), fallback_text)
+            markers = [
+                json.loads(line[5:]) for line in marker_output.getvalue().splitlines()
+            ]
+            self.assertEqual(
+                [marker["name"] for marker in markers],
+                [
+                    "worklist.gwl_parse",
+                    "worklist.gwl_optimization",
+                    "worklist.gwl_equivalence_verification",
+                    "worklist.gwl_write",
+                ],
+            )
+            self.assertTrue(all(marker["metrics"] == {"record_count": 8} for marker in markers))
+            self.assertNotIn(str(source), marker_output.getvalue())
+            self.assertNotIn(str(output), marker_output.getvalue())
+
     def test_native_transfer_validation_matches_python_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "worklist_validate_transfers"

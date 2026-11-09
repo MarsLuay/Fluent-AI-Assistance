@@ -196,27 +196,81 @@ def _cmd_analyze(args: argparse.Namespace) -> int:
 
 def _cmd_optimize(args: argparse.Namespace) -> int:
     try:
-        worklist = parse_gwl(args.gwl, permissive=True)
-        result = optimize_worklist(
-            worklist,
-            enabled_tip_mask=args.enabled_tip_mask,
-            supported_channels=args.supported_channels,
-        )
+        with performance_marker("worklist.gwl_parse") as metrics:
+            worklist = parse_gwl(args.gwl, permissive=True)
+            lines = [record.to_line() for record in worklist.records]
+            record_count = len(lines)
+            metrics["record_count"] = record_count
+
+        with performance_marker("worklist.gwl_optimization") as metrics:
+            native = native_acceleration.worklist_optimize_lines(
+                lines,
+                worklist.name,
+                args.enabled_tip_mask,
+                args.supported_channels,
+            )
+            if native is None:
+                result = optimize_worklist(
+                    worklist,
+                    enabled_tip_mask=args.enabled_tip_mask,
+                    supported_channels=args.supported_channels,
+                )
+                optimized_text = result.worklist.to_text()
+                analysis_payload = result.to_dict()
+                optimization_ok = not result.analysis.has_errors
+            else:
+                optimized_text = native.pop("text")
+                analysis_payload = native
+                optimization_ok = native["ok"]
+            metrics["record_count"] = record_count
     except (OSError, ValueError) as exc:
         return _emit_semantic_failure(str(exc), as_json=args.as_json)
-    payload = {"ok": not result.analysis.has_errors, "gwl": str(args.gwl), "output_gwl": str(args.output), **result.to_dict()}
+
+    payload = {
+        "ok": optimization_ok,
+        "gwl": str(args.gwl),
+        "output_gwl": str(args.output),
+    }
+    for key in (
+        "schema_version",
+        "record_count",
+        "unit_count",
+        "explicit_tip_assignments",
+        "automatic_tip_units",
+        "enabled_tip_mask",
+        "barriers",
+        "parallel_windows",
+        "diagnostics",
+        "runtime_parallelism",
+        "changed",
+        "reordered_units",
+        "reasons",
+    ):
+        if key in analysis_payload:
+            payload[key] = analysis_payload[key]
+
     if payload["ok"]:
-        reparsed = parse_gwl_text(result.worklist.to_text(), name=result.worklist.name, permissive=True)
-        if not semantic_equivalent(
-            worklist,
-            reparsed,
-            enabled_tip_mask=args.enabled_tip_mask,
-            supported_channels=args.supported_channels,
-        ):
+        with performance_marker("worklist.gwl_equivalence_verification") as metrics:
+            reparsed = parse_gwl_text(
+                optimized_text, name=worklist.name, permissive=True
+            )
+            equivalent = semantic_equivalent(
+                worklist,
+                reparsed,
+                enabled_tip_mask=args.enabled_tip_mask,
+                supported_channels=args.supported_channels,
+            )
+            metrics["record_count"] = len(reparsed.records)
+        if not equivalent:
             payload["ok"] = False
-            payload.setdefault("reasons", []).append("optimized output failed semantic-equivalence verification")
+            payload.setdefault("reasons", []).append(
+                "optimized output failed semantic-equivalence verification"
+            )
         else:
-            result.worklist.write(args.output)
+            with performance_marker("worklist.gwl_write") as metrics:
+                args.output.parent.mkdir(parents=True, exist_ok=True)
+                args.output.write_text(optimized_text, encoding="utf-8")
+                metrics["record_count"] = len(reparsed.records)
     _emit(payload, as_json=args.as_json)
     return 0 if payload["ok"] else 1
 

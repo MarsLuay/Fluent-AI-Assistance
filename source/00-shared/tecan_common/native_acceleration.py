@@ -363,3 +363,46 @@ def worklist_analyze_lines(
         RecursionError,
     ):
         return None
+
+
+def worklist_optimize_lines(
+    lines: Any,
+    name: str,
+    enabled_tip_mask: str | None,
+    supported_channels: int,
+) -> dict[str, Any] | None:
+    """Optimize normalized GWL lines with the native semantic engine."""
+    if not enabled():
+        return None
+    try:
+        encoded = _native.worklist_optimize_lines(
+            _encode_json(lines), name, enabled_tip_mask, supported_channels
+        )
+        if encoded is None:
+            return None
+        result = json.loads(encoded)
+        if (
+            not isinstance(result, dict)
+            or type(result.get("ok")) is not bool
+            or not isinstance(result.get("text"), str)
+            or type(result.get("changed")) is not bool
+            or not isinstance(result.get("reordered_units"), list)
+            or not all(
+                isinstance(unit, list)
+                and all(type(index) is int for index in unit)
+                for unit in result["reordered_units"]
+            )
+            or not isinstance(result.get("reasons"), list)
+            or not all(isinstance(reason, str) for reason in result["reasons"])
+        ):
+            return None
+        return result
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
