@@ -55,6 +55,17 @@ def canonical_json(value: Any) -> str | None:
         return None
 
 
+def command_short_name(type_name: Any) -> str | None:
+    """Shorten supported ASCII command type names natively, or request fallback."""
+    if not enabled() or type(type_name) is not str or not type_name.isascii():
+        return None
+    try:
+        result = _native.command_short_name(type_name)
+        return result if isinstance(result, str) else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def catalog_source_paths(install_path: str | Path, include_all_connectors: bool) -> list[str] | None:
     if not enabled():
         return None

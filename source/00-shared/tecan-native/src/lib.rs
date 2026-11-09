@@ -612,6 +612,23 @@ fn canonical_json(value: &Bound<'_, PyAny>) -> PyResult<String> {
 }
 
 #[pyfunction]
+fn command_short_name(type_name: &str) -> Option<String> {
+    if !type_name.is_ascii() {
+        return None;
+    }
+    let short = type_name.rsplit('.').next().unwrap_or(type_name);
+    let Some(suffix_start) = short.rfind("DataV") else {
+        return Some(short.to_owned());
+    };
+    let digits = &short[suffix_start + "DataV".len()..];
+    if !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        Some(short[..suffix_start].to_owned())
+    } else {
+        Some(short.to_owned())
+    }
+}
+
+#[pyfunction]
 fn worklist_execution_contract(commands_json: &str) -> PyResult<String> {
     let commands: Value = serde_json::from_str(commands_json)
         .map_err(|error| PyValueError::new_err(error.to_string()))?;
@@ -1109,6 +1126,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(source_content_fingerprint, module)?)?;
     module.add_function(wrap_pyfunction!(catalog_content_fingerprints, module)?)?;
     module.add_function(wrap_pyfunction!(canonical_json, module)?)?;
+    module.add_function(wrap_pyfunction!(command_short_name, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_execution_contract, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_load_contract, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_validate_transfers, module)?)?;

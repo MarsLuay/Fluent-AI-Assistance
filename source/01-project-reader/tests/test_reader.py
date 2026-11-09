@@ -9,8 +9,9 @@ from pathlib import Path
 
 from tecan_common import native_acceleration
 from tecan_common import xml_compat as ET
+import tecan_reader.common as reader_common
 from tecan_reader.archive import inspect_archive
-from tecan_reader.common import parse_xml_text
+from tecan_reader.common import command_short_name, parse_xml_text
 from tecan_reader.gwl import inspect_gwl_lines
 from tecan_reader.pattern_library import mine_script_patterns, search_script_patterns, summarize_script_patterns
 import sqlite3
@@ -180,6 +181,45 @@ PATTERN_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ReaderTests(unittest.TestCase):
+    def test_native_command_short_name_matches_regex_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "command_short_name"
+        ):
+            self.skipTest("optional Rust command-name helper is not built")
+        cases = [
+            ("Tecan.Core.LihaAspirateCommandDataV5", "LihaAspirateCommand"),
+            ("ScriptCommandDataV3", "ScriptCommand"),
+            ("Namespace.TypeDataV12", "Type"),
+            ("Namespace.DataV5", ""),
+            ("Namespace.DataV2DataV3", "DataV2"),
+            ("Namespace.TypeDataV", "TypeDataV"),
+            ("Namespace.TypeDataV2tail", "TypeDataV2tail"),
+            ("Namespace.TypeDataV2.Inner", "Inner"),
+            ("Namespace.CaféDataV2", "Café"),
+        ]
+        for type_name, expected in cases:
+            with self.subTest(type_name=type_name):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    python_result = command_short_name(type_name)
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    if type_name.isascii():
+                        with patch.object(
+                            reader_common,
+                            "_native_command_short_name",
+                            wraps=native_acceleration.command_short_name,
+                        ) as native_call:
+                            actual = command_short_name(type_name)
+                        native_call.assert_called_once()
+                    else:
+                        self.assertIsNone(native_acceleration.command_short_name(type_name))
+                        actual = command_short_name(type_name)
+                self.assertEqual(python_result, expected)
+                self.assertEqual(actual, expected)
+
     def test_inspect_xscr_text(self) -> None:
         report = inspect_xscr_text(SAMPLE_XSCR, source_name="sample.xscr")
         self.assertEqual(report["object_name"], "UnitTestScript")

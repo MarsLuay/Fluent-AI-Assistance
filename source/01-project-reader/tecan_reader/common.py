@@ -10,7 +10,10 @@ from typing import Any, Iterable
 import re
 
 from tecan_common import xml_compat as ET
-from tecan_common.native_acceleration import canonical_json as _native_canonical_json
+from tecan_common.native_acceleration import (
+    canonical_json as _native_canonical_json,
+    command_short_name as _native_command_short_name,
+)
 
 from .command_registry import registry_command_family
 
@@ -57,6 +60,9 @@ def extension_counts(names: Iterable[str]) -> dict[str, int]:
 
 
 def command_short_name(type_name: str) -> str:
+    native = _native_command_short_name(type_name)
+    if native is not None:
+        return native
     short = type_name.split(".")[-1]
     short = re.sub(r"DataV\d+$", "", short)
     short = re.sub(r"CommandDataV\d+$", "Command", short)
