@@ -831,6 +831,47 @@ fn worklist_parse_gwl_text_records(text: &str, permissive: bool) -> PyResult<Opt
     Ok(serde_json::to_string(&records).ok())
 }
 
+fn is_ascii_float_literal(value: &str) -> bool {
+    !value.is_empty()
+        && value.bytes().any(|byte| byte.is_ascii_digit())
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'+' | b'-' | b'.' | b'e' | b'E'))
+}
+
+#[pyfunction]
+fn worklist_format_volume(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+    if value.is_instance_of::<PyBool>() {
+        return Ok(None);
+    }
+    let number = if value.is_instance_of::<PyString>() {
+        let text = value.extract::<String>()?;
+        if !text.is_ascii()
+            || text
+                .chars()
+                .any(|character| (0x1c..=0x1f).contains(&(character as u32)))
+        {
+            return Ok(None);
+        }
+        let stripped = text.trim();
+        if !is_ascii_float_literal(stripped) {
+            return Ok(None);
+        }
+        let Ok(number) = stripped.parse::<f64>() else {
+            return Ok(None);
+        };
+        number
+    } else if value.is_instance_of::<PyInt>() || value.is_instance_of::<PyFloat>() {
+        let Ok(number) = value.extract::<f64>() else {
+            return Ok(None);
+        };
+        number
+    } else {
+        return Ok(None);
+    };
+    Ok(Some(tecan_worklist_builder::format_volume(number)))
+}
+
 #[pyfunction]
 fn worklist_clean_field(value: Option<&str>) -> String {
     value.unwrap_or_default().trim().to_owned()
@@ -1214,6 +1255,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_parse_gwl, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_gwl_records, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_gwl_text_records, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_format_volume, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_clean_field, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_serialize_gwl_lines, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_count_record_types, module)?)?;

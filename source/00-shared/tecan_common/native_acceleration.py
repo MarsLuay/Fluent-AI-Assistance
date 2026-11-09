@@ -599,6 +599,22 @@ def worklist_parse_gwl_text_records(
         return None
 
 
+def worklist_format_volume(value: Any) -> str | None:
+    """Format supported exact numeric GWL volumes natively, or request fallback."""
+    if not enabled() or type(value) not in (str, int, float):
+        return None
+    if type(value) is str and (
+        not value.isascii()
+        or any(0x1C <= ord(character) <= 0x1F for character in value)
+    ):
+        return None
+    try:
+        result = _native.worklist_format_volume(value)
+        return result if isinstance(result, str) else None
+    except (AttributeError, TypeError, ValueError, OverflowError, UnicodeError):
+        return None
+
+
 def worklist_clean_field(value: Any) -> str | None:
     """Trim supported ASCII GWL fields natively, preserving Python fallback cases."""
     if not enabled() or (

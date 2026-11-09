@@ -15,7 +15,10 @@ from tecan_common.worklist_contract import (
     normalize_load_worklist,
 )
 from tecan_worklist.cli import main
-from tecan_common.gwl import _clean as clean_gwl_field
+from tecan_common.gwl import (
+    _clean as clean_gwl_field,
+    _format_volume as format_gwl_volume,
+)
 from tecan_worklist.gwl import (
     Break,
     Comment,
@@ -281,6 +284,70 @@ class WorklistSemanticsTests(unittest.TestCase):
                     self.assertEqual(clean_gwl_field(value), expected)
                     if native is not None:
                         self.assertEqual(native, expected)
+
+    def test_native_gwl_volume_formatter_matches_python_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_format_volume"
+        ):
+            self.skipTest("optional Rust GWL volume formatter is not built")
+        class StringSubclass(str):
+            pass
+
+        values = [
+            0,
+            10,
+            9_007_199_254_740_993,
+            -0.0,
+            1.25,
+            1.2345675,
+            -0.0000001,
+            float("nan"),
+            float("inf"),
+            " 12.5 ",
+            "1e2",
+            ".5",
+            "1.",
+            "1e999",
+            "1_000",
+            "Infinity",
+            "nan",
+            "café",
+            "\x1c3",
+            StringSubclass(" 2.5 "),
+            True,
+        ]
+        for value in values:
+            with self.subTest(value_type=type(value).__name__, value=str(value)[:20]):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    expected = format_gwl_volume(value)
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    native = native_acceleration.worklist_format_volume(value)
+                    if type(value) in (int, float):
+                        self.assertIsNotNone(native)
+                    elif type(value) is str and value.strip() in {
+                        "12.5",
+                        "1e2",
+                        ".5",
+                        "1.",
+                        "1e999",
+                    }:
+                        self.assertIsNotNone(native)
+                    else:
+                        self.assertIsNone(native)
+                    actual = format_gwl_volume(value)
+                self.assertEqual(actual, expected)
+                if native is not None:
+                    self.assertEqual(native, expected)
+
+        oversized_integer = 10**400
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.worklist_format_volume(oversized_integer))
+            with self.assertRaises(OverflowError):
+                format_gwl_volume(oversized_integer)
 
     def test_native_gwl_serializer_matches_python_output(self):
         if not native_acceleration.available() or not hasattr(

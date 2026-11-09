@@ -684,8 +684,20 @@ impl PipetteRecord<'_> {
     }
 }
 
-fn format_volume(value: f64) -> String {
-    if value.is_finite() && value.fract() == 0.0 {
+pub fn format_volume(value: f64) -> String {
+    if value.is_nan() {
+        return "nan".to_owned();
+    }
+    if value == f64::INFINITY {
+        return "inf".to_owned();
+    }
+    if value == f64::NEG_INFINITY {
+        return "-inf".to_owned();
+    }
+    if value == 0.0 {
+        return "0".to_owned();
+    }
+    if value.fract() == 0.0 {
         return format!("{value:.0}");
     }
     let mut text = format!("{value:.6}");
@@ -897,6 +909,17 @@ mod tests {
         assert_eq!(transfers[0].comment, "quoted, comment");
         assert_eq!(transfers[0].wash_after, Some(false));
         assert_eq!(transfers[0].source_position, 1);
+    }
+
+    #[test]
+    fn worklist_volume_format_matches_python_fixed_precision_rules() {
+        assert_eq!(format_volume(-0.0), "0");
+        assert_eq!(format_volume(f64::NAN), "nan");
+        assert_eq!(format_volume(f64::INFINITY), "inf");
+        assert_eq!(format_volume(f64::NEG_INFINITY), "-inf");
+        assert_eq!(format_volume(1.2345675), "1.234568");
+        assert_eq!(format_volume(-0.0000001), "-0");
+        assert_eq!(format_volume(1_000_000_000_000_000.0), "1000000000000000");
     }
 
     #[test]
