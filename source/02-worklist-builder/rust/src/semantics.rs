@@ -1,6 +1,6 @@
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use tecan_worklist_builder::Worklist;
+use tecan_worklist_builder::{Worklist, parse_gwl_text_permissive};
 
 #[derive(Clone, Debug)]
 struct Pipette {
@@ -45,19 +45,20 @@ impl Record {
     fn to_line(&self) -> String {
         match self {
             Self::Comment(text) => format!("C;{}", text.replace('\n', "\\n")),
-            Self::Pipette(record) => format!(
-                "{};{};{};{};{};{};{};{};;{};{}",
-                record.operation,
-                record.rack_label,
-                record.rack_id,
-                record.rack_type,
-                record.position,
-                record.tube_id,
+            Self::Pipette(record) => [
+                clean(&record.operation),
+                clean(&record.rack_label),
+                clean(&record.rack_id),
+                clean(&record.rack_type),
+                clean(&record.position),
+                clean(&record.tube_id),
                 format_volume(&record.volume),
-                record.liquid_class,
-                record.tip_mask,
-                record.forced_rack_type,
-            ),
+                clean(&record.liquid_class),
+                String::new(),
+                record.tip_mask.clone(),
+                clean(&record.forced_rack_type),
+            ]
+            .join(";"),
             Self::Boundary { raw_line, .. } | Self::Unknown { raw_line, .. } => raw_line.clone(),
         }
     }
@@ -161,9 +162,39 @@ impl TipSelection {
 #[derive(Clone, Debug)]
 struct Unit {
     unit_index: usize,
+    record_indices: Vec<usize>,
+    aspirate: Pipette,
+    dispense: Pipette,
     tip_selection: TipSelection,
     source_key: Vec<String>,
     destination_key: Vec<String>,
+}
+
+impl Unit {
+    fn signature(&self) -> Vec<String> {
+        let aspirate = &self.aspirate;
+        let dispense = &self.dispense;
+        vec![
+            aspirate.rack_label.clone(),
+            aspirate.rack_id.clone(),
+            aspirate.rack_type.clone(),
+            aspirate.position.clone(),
+            aspirate.tube_id.clone(),
+            dispense.rack_label.clone(),
+            dispense.rack_id.clone(),
+            dispense.rack_type.clone(),
+            dispense.position.clone(),
+            dispense.tube_id.clone(),
+            aspirate.volume.clone(),
+            aspirate.liquid_class.clone(),
+            aspirate.tip_mask.clone(),
+            dispense.volume.clone(),
+            dispense.liquid_class.clone(),
+            dispense.tip_mask.clone(),
+            aspirate.forced_rack_type.clone(),
+            dispense.forced_rack_type.clone(),
+        ]
+    }
 }
 
 #[derive(Default)]
@@ -180,6 +211,15 @@ pub fn analyze_worklist(
     enabled_tip_mask: Option<&str>,
     supported_channels: usize,
 ) -> Result<Value, String> {
+    let (_, payload) = analyze_state(worklist, enabled_tip_mask, supported_channels)?;
+    Ok(payload)
+}
+
+fn analyze_state(
+    worklist: &Worklist,
+    enabled_tip_mask: Option<&str>,
+    supported_channels: usize,
+) -> Result<(AnalysisState, Value), String> {
     let enabled = parse_enabled_tip_mask(enabled_tip_mask, supported_channels)?;
     let records = worklist
         .lines
@@ -258,8 +298,13 @@ pub fn analyze_worklist(
                     ));
                 }
 
+                let mut record_indices = pending_comments.clone();
+                record_indices.extend([index, index + 1]);
                 let unit = Unit {
                     unit_index: state.units.len(),
+                    record_indices,
+                    aspirate: aspirate.clone(),
+                    dispense: dispense.clone(),
                     source_key: location_key(aspirate),
                     destination_key: location_key(dispense),
                     tip_selection: selection,
@@ -327,7 +372,7 @@ pub fn analyze_worklist(
         .diagnostics
         .iter()
         .any(|diagnostic| diagnostic["severity"] == "error");
-    Ok(json!({
+    let payload = json!({
         "ok": !has_errors,
         "schema_version": "tecan.worklist.semantics.v1",
         "record_count": records.len(),
@@ -335,11 +380,256 @@ pub fn analyze_worklist(
         "explicit_tip_assignments": explicit_assignments,
         "automatic_tip_units": automatic_tip_units,
         "enabled_tip_mask": enabled,
-        "barriers": state.barriers,
-        "parallel_windows": state.windows,
-        "diagnostics": state.diagnostics,
+        "barriers": state.barriers.clone(),
+        "parallel_windows": state.windows.clone(),
+        "diagnostics": state.diagnostics.clone(),
         "runtime_parallelism": "FluentControl-dependent; offline grouping is not a timing guarantee.",
-    }))
+    });
+    Ok((state, payload))
+}
+
+pub fn optimize_worklist(
+    worklist: &Worklist,
+    enabled_tip_mask: Option<&str>,
+    supported_channels: usize,
+) -> Result<(Worklist, Value), String> {
+    let (state, mut payload) = analyze_state(worklist, enabled_tip_mask, supported_channels)?;
+    let has_errors = payload["ok"].as_bool() != Some(true);
+    let mut reordered_units = Vec::<Vec<usize>>::new();
+    let mut reasons = Vec::<String>::new();
+    let mut changed = false;
+
+    let optimized = if has_errors {
+        reasons.push("optimization refused because the worklist has semantic errors".to_owned());
+        worklist.clone()
+    } else {
+        let original_records = worklist
+            .lines
+            .iter()
+            .map(|line| parse_record(line))
+            .collect::<Vec<_>>();
+        let mut records = original_records
+            .iter()
+            .cloned()
+            .map(Some)
+            .collect::<Vec<_>>();
+        let mut replacements = BTreeMap::<usize, Vec<Record>>::new();
+
+        for window in &state.windows {
+            let window_index = window["index"].as_u64().unwrap_or(0) as usize;
+            let unit_indices = window["unit_indices"]
+                .as_array()
+                .ok_or_else(|| "worklist_window_unit_indices_invalid".to_owned())?
+                .iter()
+                .map(|value| {
+                    value
+                        .as_u64()
+                        .map(|index| index as usize)
+                        .ok_or_else(|| "worklist_window_unit_index_invalid".to_owned())
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            if unit_indices.len() < 2 {
+                continue;
+            }
+            if window["independent"].as_bool() != Some(true) {
+                reasons.push(format!(
+                    "window {window_index}: shared source/destination state prevents reordering"
+                ));
+                continue;
+            }
+            if window["explicit_tips"].as_bool() != Some(true) {
+                reasons.push(format!(
+                    "window {window_index}: automatic tip selection is not rewritten"
+                ));
+                continue;
+            }
+
+            let mut grouped = BTreeMap::<usize, Vec<usize>>::new();
+            for unit_index in &unit_indices {
+                let unit = state
+                    .units
+                    .get(*unit_index)
+                    .ok_or_else(|| "worklist_window_unit_not_found".to_owned())?;
+                let channel = unit
+                    .tip_selection
+                    .channel
+                    .ok_or_else(|| "worklist_explicit_tip_channel_missing".to_owned())?;
+                grouped.entry(channel).or_default().push(*unit_index);
+            }
+            let channels = grouped.keys().copied().collect::<Vec<_>>();
+            if channels.len() < 2 {
+                reasons.push(format!(
+                    "window {window_index}: only one explicit tip channel is available"
+                ));
+                continue;
+            }
+            let mut candidate = Vec::<usize>::new();
+            let mut offset = 0;
+            loop {
+                let mut added = false;
+                for channel in &channels {
+                    if let Some(unit_index) =
+                        grouped.get(channel).and_then(|group| group.get(offset))
+                    {
+                        candidate.push(*unit_index);
+                        added = true;
+                    }
+                }
+                if !added {
+                    break;
+                }
+                offset += 1;
+            }
+            if candidate == unit_indices {
+                reasons.push(format!(
+                    "window {window_index}: order is already tip-interleaved"
+                ));
+                continue;
+            }
+
+            let first = unit_indices
+                .iter()
+                .flat_map(|unit_index| state.units[*unit_index].record_indices.iter().copied())
+                .min()
+                .ok_or_else(|| "worklist_window_records_missing".to_owned())?;
+            let mut blocks = BTreeMap::<usize, Vec<Record>>::new();
+            for unit_index in &unit_indices {
+                let unit = &state.units[*unit_index];
+                let block_start = unit
+                    .record_indices
+                    .iter()
+                    .copied()
+                    .min()
+                    .ok_or_else(|| "worklist_unit_records_missing".to_owned())?;
+                let block = unit
+                    .record_indices
+                    .iter()
+                    .map(|record_index| {
+                        original_records
+                            .get(*record_index)
+                            .cloned()
+                            .ok_or_else(|| "worklist_unit_record_not_found".to_owned())
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                blocks.insert(block_start, block);
+            }
+            let replacement = candidate
+                .iter()
+                .flat_map(|unit_index| {
+                    let block_start = state.units[*unit_index]
+                        .record_indices
+                        .iter()
+                        .copied()
+                        .min()
+                        .expect("validated unit has record indices");
+                    blocks[&block_start].clone()
+                })
+                .collect::<Vec<_>>();
+            replacements.insert(first, replacement);
+            for unit_index in &unit_indices {
+                for record_index in &state.units[*unit_index].record_indices {
+                    if *record_index != first {
+                        records[*record_index] = None;
+                    }
+                }
+            }
+            reordered_units.push(
+                candidate
+                    .iter()
+                    .map(|unit_index| state.units[*unit_index].unit_index)
+                    .collect(),
+            );
+        }
+
+        changed = !replacements.is_empty();
+        let mut output_records = Vec::<Record>::new();
+        for (index, record) in records.into_iter().enumerate() {
+            if let Some(replacement) = replacements.remove(&index) {
+                output_records.extend(replacement);
+            } else if let Some(record) = record {
+                output_records.push(record);
+            }
+        }
+        let lines = output_records
+            .iter()
+            .map(Record::to_line)
+            .collect::<Vec<_>>();
+        let text = format!("{}\n", lines.join("\n"));
+        let optimized = parse_gwl_text_permissive(&text, &worklist.name)?;
+        if !semantic_equivalent(worklist, &optimized, enabled_tip_mask, supported_channels)? {
+            payload["ok"] = json!(false);
+            reasons.push("optimized output failed semantic-equivalence verification".to_owned());
+        }
+        optimized
+    };
+
+    payload["changed"] = json!(changed);
+    payload["reordered_units"] = json!(reordered_units);
+    payload["reasons"] = json!(reasons);
+    Ok((optimized, payload))
+}
+
+pub fn semantic_equivalent(
+    left: &Worklist,
+    right: &Worklist,
+    enabled_tip_mask: Option<&str>,
+    supported_channels: usize,
+) -> Result<bool, String> {
+    let (left_state, left_payload) = analyze_state(left, enabled_tip_mask, supported_channels)?;
+    let (right_state, right_payload) = analyze_state(right, enabled_tip_mask, supported_channels)?;
+    if left_payload["ok"].as_bool() != Some(true) || right_payload["ok"].as_bool() != Some(true) {
+        return Ok(false);
+    }
+    if barrier_signatures(&left_state) != barrier_signatures(&right_state) {
+        return Ok(false);
+    }
+    if left_state.windows.len() != right_state.windows.len() {
+        return Ok(false);
+    }
+    for (left_window, right_window) in left_state.windows.iter().zip(&right_state.windows) {
+        if window_signatures(left_window, &left_state)?
+            != window_signatures(right_window, &right_state)?
+        {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+fn barrier_signatures(state: &AnalysisState) -> Vec<(Value, Value)> {
+    state
+        .barriers
+        .iter()
+        .map(|barrier| {
+            (
+                barrier.get("type").cloned().unwrap_or(Value::Null),
+                barrier.get("raw_line").cloned().unwrap_or(Value::Null),
+            )
+        })
+        .collect()
+}
+
+fn window_signatures(
+    window: &Value,
+    state: &AnalysisState,
+) -> Result<BTreeMap<Vec<String>, usize>, String> {
+    let unit_indices = window["unit_indices"]
+        .as_array()
+        .ok_or_else(|| "worklist_window_unit_indices_invalid".to_owned())?;
+    let mut signatures = BTreeMap::new();
+    for value in unit_indices {
+        let index = value
+            .as_u64()
+            .map(|index| index as usize)
+            .ok_or_else(|| "worklist_window_unit_index_invalid".to_owned())?;
+        let signature = state
+            .units
+            .get(index)
+            .ok_or_else(|| "worklist_window_unit_not_found".to_owned())?
+            .signature();
+        *signatures.entry(signature).or_insert(0) += 1;
+    }
+    Ok(signatures)
 }
 
 fn parse_record(line: &str) -> Record {
@@ -553,6 +843,10 @@ fn parse_decimal_i128(text: &str) -> Option<i128> {
         normalized.push(character);
     }
     normalized.parse().ok()
+}
+
+fn clean(value: &str) -> String {
+    value.trim().to_owned()
 }
 
 fn format_volume(value: &str) -> String {

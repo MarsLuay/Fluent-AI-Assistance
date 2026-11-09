@@ -9,14 +9,14 @@ Markers are off by default. Enable them for one process with:
 
 ```powershell
 $env:TECAN_PERFORMANCE_MARKERS = "1"
-# Invoke your usual Python command unchanged.
+# Invoke the command under test unchanged (Python or Rust worklist CLI).
 ```
 
 Or on POSIX shells:
 
 ```sh
 export TECAN_PERFORMANCE_MARKERS=1
-# Invoke your usual Python command unchanged.
+# Invoke the command under test unchanged (Python or Rust worklist CLI).
 ```
 
 Each completed stage writes one `PERF `-prefixed JSON record to stderr, for
@@ -56,7 +56,8 @@ costs.
 - **Worktable geometry:** manifest object selection, component/site/connector
   parsing, workspace resolution, and derived geometry/output shaping.
 - **Rust worklist CLI:** CSV loading, transfer validation, GWL record assembly
-  and writing, GWL parsing and summary, and worklist semantic analysis.
+  and writing, GWL parsing and summary, semantic analysis, and dependency-safe
+  optimization with semantic-equivalence verification.
 
 These are stage timings, not proof that a particular backend was selected and
 not guarantees of performance on production exports or installations. Use

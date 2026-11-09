@@ -10,13 +10,14 @@ use tecan_worklist_builder::{
     total_volume, validate_transfers,
 };
 
-const USAGE: &str = "Rust worklist conversion, validation, summary, and analysis
+const USAGE: &str = "Rust worklist conversion, validation, summary, analysis, and optimization
 
 USAGE:
   tecan-worklist convert <csv> --output <gwl> [--wash-policy <each|none>] [--batch-size N] [--well-rows N] [--strict] [--json]
   tecan-worklist validate <csv> [--well-rows N] [--strict] [--json]
   tecan-worklist summarize <gwl> [--json]
   tecan-worklist analyze <gwl> [--enabled-tip-mask MASK] [--supported-channels N] [--json]
+  tecan-worklist optimize <gwl> --output <gwl> [--enabled-tip-mask MASK] [--supported-channels N] [--json]
 ";
 
 fn main() {
@@ -45,6 +46,9 @@ fn run() -> Result<i32, String> {
     }
     if command == "analyze" {
         return run_analyze(&args[1..]);
+    }
+    if command == "optimize" {
+        return run_optimize(&args[1..]);
     }
     if command != "convert" && command != "validate" {
         return Err(format!(
@@ -192,6 +196,88 @@ fn run_analyze(args: &[String]) -> Result<i32, String> {
 fn semantic_failure(message: &str, as_json: bool) -> i32 {
     emit(&json!({ "ok": false, "errors": [message] }), as_json, true);
     1
+}
+
+fn run_optimize(args: &[String]) -> Result<i32, String> {
+    let mut input = None;
+    let mut output = None;
+    let mut enabled_tip_mask = None;
+    let mut supported_channels = 8usize;
+    let mut as_json = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--output" | "-o" => {
+                index += 1;
+                output = Some(PathBuf::from(
+                    args.get(index).ok_or("--output requires a path")?,
+                ));
+            }
+            "--enabled-tip-mask" => {
+                index += 1;
+                enabled_tip_mask = Some(
+                    args.get(index)
+                        .ok_or("--enabled-tip-mask requires a value")?
+                        .clone(),
+                );
+            }
+            "--supported-channels" => {
+                index += 1;
+                let parsed = args
+                    .get(index)
+                    .ok_or("--supported-channels requires a value")?
+                    .parse::<i64>()
+                    .map_err(|_| "--supported-channels must be an integer.")?;
+                supported_channels = usize::try_from(parsed).unwrap_or(0);
+            }
+            "--json" => as_json = true,
+            "--help" | "-h" => {
+                println!(
+                    "Usage: tecan-worklist optimize <gwl> --output <gwl> [--enabled-tip-mask MASK] [--supported-channels N] [--json]"
+                );
+                process::exit(0);
+            }
+            value if value.starts_with('-') => {
+                return Err(format!("unknown optimize argument: {value}"));
+            }
+            path => {
+                if input.replace(PathBuf::from(path)).is_some() {
+                    return Err(format!("unexpected extra positional argument: {path}"));
+                }
+            }
+        }
+        index += 1;
+    }
+    let input = input.ok_or("optimize requires a GWL path.")?;
+    let output = output.ok_or("optimize requires --output <gwl>.")?;
+    let worklist = match performance::measure("worklist.gwl_parse", json!({}), || {
+        parse_gwl_file_permissive(&input)
+    }) {
+        Ok(worklist) => worklist,
+        Err(error) => return Ok(semantic_failure(&error, as_json)),
+    };
+    let (optimized, mut payload) = match performance::measure(
+        "worklist.gwl_optimization",
+        json!({ "record_count": worklist.lines.len() }),
+        || semantics::optimize_worklist(&worklist, enabled_tip_mask.as_deref(), supported_channels),
+    ) {
+        Ok(result) => result,
+        Err(error) => return Ok(semantic_failure(&error, as_json)),
+    };
+    if let Some(object) = payload.as_object_mut() {
+        object.insert("gwl".to_owned(), json!(python_path_display(&input)));
+        object.insert("output_gwl".to_owned(), json!(python_path_display(&output)));
+    }
+    let ok = payload["ok"].as_bool().unwrap_or(false);
+    if ok {
+        performance::measure(
+            "worklist.gwl_write",
+            json!({ "record_count": optimized.lines.len() }),
+            || write_output(&output, &optimized.to_text()),
+        )?;
+    }
+    emit(&payload, as_json, false);
+    Ok(if ok { 0 } else { 1 })
 }
 
 fn run_summarize(args: &[String]) -> Result<i32, String> {
