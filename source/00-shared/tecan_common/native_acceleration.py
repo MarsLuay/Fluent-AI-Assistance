@@ -289,6 +289,40 @@ def worklist_build_transfers(
         return None
 
 
+def worklist_build_schedule(
+    transfers: Any, wash_policy: str, batch_size: int | None
+) -> list[dict[str, Any]] | None:
+    """Return native worklist operations while preserving Python record objects."""
+    if not enabled():
+        return None
+    try:
+        encoded = _native.worklist_build_schedule(
+            _encode_json(transfers), wash_policy, batch_size
+        )
+        if encoded is None:
+            return None
+        result = json.loads(encoded)
+        kinds = {"comment", "aspirate", "dispense", "wash", "break"}
+        if not isinstance(result, list) or not all(
+            isinstance(operation, dict)
+            and operation.get("kind") in kinds
+            and type(operation.get("transfer_index")) is int
+            and operation["transfer_index"] >= 0
+            for operation in result
+        ):
+            return None
+        return result
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def worklist_parse_gwl(path: str | Path) -> dict[str, Any] | None:
     """Parse a strict GWL file natively, or request the Python fallback."""
     if not enabled():

@@ -74,6 +74,12 @@ pub struct Worklist {
     pub count_order: Vec<String>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize)]
+pub struct WorklistOperation {
+    pub kind: &'static str,
+    pub transfer_index: usize,
+}
+
 impl Worklist {
     pub fn to_text(&self) -> String {
         if self.lines.is_empty() {
@@ -405,69 +411,107 @@ pub fn validate_transfers(transfers: &[Transfer], strict: bool) -> ValidationRes
     result
 }
 
+pub fn build_worklist_schedule(
+    transfers: &[Transfer],
+    wash_policy: WashPolicy,
+    batch_size: Option<usize>,
+) -> Result<Vec<WorklistOperation>, String> {
+    if batch_size == Some(0) {
+        return Err("batch_size must be positive.".to_owned());
+    }
+    let mut schedule = Vec::new();
+    for (index, transfer) in transfers.iter().enumerate() {
+        if !transfer.comment.is_empty() {
+            schedule.push(WorklistOperation {
+                kind: "comment",
+                transfer_index: index,
+            });
+        }
+        schedule.push(WorklistOperation {
+            kind: "aspirate",
+            transfer_index: index,
+        });
+        schedule.push(WorklistOperation {
+            kind: "dispense",
+            transfer_index: index,
+        });
+        if transfer
+            .wash_after
+            .unwrap_or(wash_policy == WashPolicy::Each)
+        {
+            schedule.push(WorklistOperation {
+                kind: "wash",
+                transfer_index: index,
+            });
+        }
+        if transfer.break_after || batch_size.is_some_and(|size| (index + 1) % size == 0) {
+            schedule.push(WorklistOperation {
+                kind: "break",
+                transfer_index: index,
+            });
+        }
+    }
+    Ok(schedule)
+}
+
 pub fn build_worklist(
     transfers: &[Transfer],
     name: &str,
     wash_policy: WashPolicy,
     batch_size: Option<usize>,
 ) -> Result<Worklist, String> {
-    if batch_size == Some(0) {
-        return Err("batch_size must be positive.".to_owned());
-    }
+    let schedule = build_worklist_schedule(transfers, wash_policy, batch_size)?;
     let mut worklist = Worklist {
         name: name.to_owned(),
         ..Worklist::default()
     };
-    for (index, transfer) in transfers.iter().enumerate() {
-        if !transfer.comment.is_empty() {
-            push_record(
+    for operation in schedule {
+        let transfer = transfers
+            .get(operation.transfer_index)
+            .ok_or_else(|| "worklist_schedule_transfer_index_invalid".to_owned())?;
+        match operation.kind {
+            "comment" => push_record(
                 &mut worklist,
                 format!("C;{}", transfer.comment.replace('\n', "\\n")),
                 "C",
-            );
-        }
-        push_record(
-            &mut worklist,
-            PipetteRecord {
-                operation: 'A',
-                rack_label: &transfer.source_label,
-                rack_id: &transfer.source_id,
-                rack_type: &transfer.source_type,
-                position: transfer.source_position,
-                tube_id: &transfer.source_tube_id,
-                volume: transfer.volume_ul,
-                liquid_class: &transfer.liquid_class,
-                tip_mask: &transfer.tip_mask,
-                forced_rack_type: &transfer.forced_source_type,
-            }
-            .to_line(),
-            "A",
-        );
-        push_record(
-            &mut worklist,
-            PipetteRecord {
-                operation: 'D',
-                rack_label: &transfer.dest_label,
-                rack_id: &transfer.dest_id,
-                rack_type: &transfer.dest_type,
-                position: transfer.dest_position,
-                tube_id: &transfer.dest_tube_id,
-                volume: transfer.volume_ul,
-                liquid_class: &transfer.liquid_class,
-                tip_mask: &transfer.tip_mask,
-                forced_rack_type: &transfer.forced_dest_type,
-            }
-            .to_line(),
-            "D",
-        );
-        let should_wash = transfer
-            .wash_after
-            .unwrap_or(wash_policy == WashPolicy::Each);
-        if should_wash {
-            push_record(&mut worklist, "W;".to_owned(), "W");
-        }
-        if transfer.break_after || batch_size.is_some_and(|size| (index + 1) % size == 0) {
-            push_record(&mut worklist, "B;".to_owned(), "B");
+            ),
+            "aspirate" => push_record(
+                &mut worklist,
+                PipetteRecord {
+                    operation: 'A',
+                    rack_label: &transfer.source_label,
+                    rack_id: &transfer.source_id,
+                    rack_type: &transfer.source_type,
+                    position: transfer.source_position,
+                    tube_id: &transfer.source_tube_id,
+                    volume: transfer.volume_ul,
+                    liquid_class: &transfer.liquid_class,
+                    tip_mask: &transfer.tip_mask,
+                    forced_rack_type: &transfer.forced_source_type,
+                }
+                .to_line(),
+                "A",
+            ),
+            "dispense" => push_record(
+                &mut worklist,
+                PipetteRecord {
+                    operation: 'D',
+                    rack_label: &transfer.dest_label,
+                    rack_id: &transfer.dest_id,
+                    rack_type: &transfer.dest_type,
+                    position: transfer.dest_position,
+                    tube_id: &transfer.dest_tube_id,
+                    volume: transfer.volume_ul,
+                    liquid_class: &transfer.liquid_class,
+                    tip_mask: &transfer.tip_mask,
+                    forced_rack_type: &transfer.forced_dest_type,
+                }
+                .to_line(),
+                "D",
+            ),
+            "wash" => push_record(&mut worklist, "W;".to_owned(), "W"),
+            "break" => push_record(&mut worklist, "B;".to_owned(), "B"),
+            _ => return Err("worklist_schedule_operation_invalid".to_owned()),
         }
     }
     Ok(worklist)

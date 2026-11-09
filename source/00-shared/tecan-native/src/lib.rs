@@ -735,6 +735,28 @@ fn worklist_build_transfers(
 }
 
 #[pyfunction]
+fn worklist_build_schedule(
+    transfers_json: &str,
+    wash_policy: &str,
+    batch_size: Option<usize>,
+) -> PyResult<Option<String>> {
+    let Ok(transfers) =
+        serde_json::from_str::<Vec<tecan_worklist_builder::Transfer>>(transfers_json)
+    else {
+        return Ok(None);
+    };
+    let Ok(wash_policy) = tecan_worklist_builder::WashPolicy::parse(wash_policy) else {
+        return Ok(None);
+    };
+    let Ok(schedule) =
+        tecan_worklist_builder::build_worklist_schedule(&transfers, wash_policy, batch_size)
+    else {
+        return Ok(None);
+    };
+    Ok(serde_json::to_string(&schedule).ok())
+}
+
+#[pyfunction]
 fn worklist_analyze_lines(
     lines_json: &str,
     enabled_tip_mask: Option<&str>,
@@ -1029,6 +1051,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_load_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_well_to_position, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_build_transfers, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_build_schedule, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_gwl, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_analyze_lines, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_optimize_lines, module)?)?;

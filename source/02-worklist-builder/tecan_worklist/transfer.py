@@ -118,6 +118,95 @@ def build_worklist(
     if batch_size is not None and batch_size < 1:
         raise ValueError("batch_size must be positive.")
 
+    if (
+        type(transfers) in (list, tuple)
+        and type(wash_policy) is str
+        and all(
+            type(transfer) is Transfer
+            and type(transfer.comment) is str
+            and (transfer.wash_after is None or type(transfer.wash_after) is bool)
+            and type(transfer.break_after) is bool
+            for transfer in transfers
+        )
+        and (batch_size is None or type(batch_size) is int)
+    ):
+        schedule = native_acceleration.worklist_build_schedule(
+            [vars(transfer) for transfer in transfers], wash_policy, batch_size
+        )
+        if schedule is not None:
+            worklist = _worklist_from_native_schedule(transfers, schedule, name)
+            if worklist is not None:
+                return worklist
+
+    return _build_worklist_python(
+        transfers, name=name, wash_policy=wash_policy, batch_size=batch_size
+    )
+
+
+def _worklist_from_native_schedule(
+    transfers: list[Transfer] | tuple[Transfer, ...],
+    schedule: list[dict[str, object]],
+    name: str,
+) -> Worklist | None:
+    worklist = Worklist(name=name)
+    for operation in schedule:
+        transfer_index = operation.get("transfer_index")
+        if (
+            type(transfer_index) is not int
+            or transfer_index < 0
+            or transfer_index >= len(transfers)
+        ):
+            return None
+        transfer = transfers[transfer_index]
+        kind = operation.get("kind")
+        if kind == "comment":
+            worklist.add(Comment(transfer.comment))
+        elif kind == "aspirate":
+            worklist.add(
+                Pipette(
+                    operation="A",
+                    rack_label=transfer.source_label,
+                    rack_id=transfer.source_id,
+                    rack_type=transfer.source_type,
+                    position=transfer.source_position,
+                    tube_id=transfer.source_tube_id,
+                    volume=transfer.volume_ul,
+                    liquid_class=transfer.liquid_class,
+                    tip_mask=transfer.tip_mask,
+                    forced_rack_type=transfer.forced_source_type,
+                )
+            )
+        elif kind == "dispense":
+            worklist.add(
+                Pipette(
+                    operation="D",
+                    rack_label=transfer.dest_label,
+                    rack_id=transfer.dest_id,
+                    rack_type=transfer.dest_type,
+                    position=transfer.dest_position,
+                    tube_id=transfer.dest_tube_id,
+                    volume=transfer.volume_ul,
+                    liquid_class=transfer.liquid_class,
+                    tip_mask=transfer.tip_mask,
+                    forced_rack_type=transfer.forced_dest_type,
+                )
+            )
+        elif kind == "wash":
+            worklist.add(Wash())
+        elif kind == "break":
+            worklist.add(Break())
+        else:
+            return None
+    return worklist
+
+
+def _build_worklist_python(
+    transfers: Iterable[Transfer],
+    *,
+    name: str,
+    wash_policy: WashPolicy,
+    batch_size: int | None,
+) -> Worklist:
     worklist = Worklist(name=name)
     transfer_count = 0
     for transfer in transfers:

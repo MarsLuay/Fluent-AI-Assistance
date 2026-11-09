@@ -29,6 +29,7 @@ from tecan_worklist.gwl import (
 from tecan_worklist.optimizer import analyze_worklist, optimize_worklist, semantic_equivalent
 from tecan_worklist.transfer import (
     Transfer,
+    build_worklist,
     load_transfers,
     validate_transfers,
     well_to_position,
@@ -219,6 +220,72 @@ class WorklistSemanticsTests(unittest.TestCase):
             self.assertIsNone(native_acceleration.worklist_well_to_position("A0", 8))
             with self.assertRaisesRegex(ValueError, "Invalid well/position value"):
                 well_to_position("A0")
+
+    def test_native_build_schedule_preserves_python_record_objects(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_build_schedule"
+        ):
+            self.skipTest("optional Rust worklist-scheduler kernel is not built")
+        transfers = [
+            Transfer(
+                "Source 1", "Plate", 1, "Destination 1", "Plate", 1, 10,
+                comment="first line\nsecond line",
+            ),
+            Transfer(
+                "Source 2", "Plate", 2, "Destination 2", "Plate", 2, 20.5,
+                wash_after=False,
+                break_after=True,
+            ),
+            Transfer(
+                "Source 3", "Plate", 3, "Destination 3", "Plate", 3, 30,
+                wash_after=True,
+            ),
+        ]
+        configurations = [("each", None), ("none", 2)]
+        for wash_policy, batch_size in configurations:
+            with self.subTest(wash_policy=wash_policy, batch_size=batch_size):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    expected = build_worklist(
+                        transfers,
+                        name="typed-records",
+                        wash_policy=wash_policy,
+                        batch_size=batch_size,
+                    )
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    with patch.object(
+                        native_acceleration,
+                        "worklist_build_schedule",
+                        wraps=native_acceleration.worklist_build_schedule,
+                    ) as native_call:
+                        actual = build_worklist(
+                            transfers,
+                            name="typed-records",
+                            wash_policy=wash_policy,
+                            batch_size=batch_size,
+                        )
+                native_call.assert_called_once()
+                self.assertEqual(actual, expected)
+                self.assertEqual(actual.to_text(), expected.to_text())
+                self.assertEqual(actual.counts(), expected.counts())
+                self.assertEqual(actual.records[0].text, "first line\nsecond line")
+                self.assertIsInstance(actual.records[1].volume, int)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            expected = build_worklist(transfers)
+            with patch.object(
+                native_acceleration,
+                "worklist_build_schedule",
+                side_effect=AssertionError("one-shot iterables must stay on Python"),
+            ) as native_call:
+                actual = build_worklist((transfer for transfer in transfers))
+            native_call.assert_not_called()
+            self.assertEqual(actual, expected)
+            with self.assertRaisesRegex(ValueError, "batch_size must be positive"):
+                build_worklist(transfers, batch_size=0)
 
     def test_native_csv_loader_matches_python_and_marks_logic_stage(self):
         if not native_acceleration.available() or not hasattr(
