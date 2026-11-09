@@ -80,7 +80,7 @@ are done. After `fluent_inspect_project`, re-call bootstrap with
 `inspected=true` (CLI: `--inspected`) so `next_step.action` becomes
 `choose_workflow` and generate is allowed. Doctor auto-fix requires both
 install flags (`install_missing` + `confirm_install`, or
-`--install-missing --confirm-install`). Local deps only; not full `install.ps1`.
+`--install-missing --confirm-install`). Local deps only; not the full Rust helper installer (`cargo run --manifest-path scripts/rust/Cargo.toml -- install`).
 Cursor enforces the gate via `.cursor/rules/hard-start-gate.mdc`.
 
 Prefer tools when you need `inspected=true` / install flags; use resources for

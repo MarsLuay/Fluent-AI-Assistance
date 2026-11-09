@@ -27,7 +27,7 @@ Implement minimal focused code OR scaffold stubs/interfaces (pythonnet/COM optio
 Add tests in tests/ when feasible without FluentControl installed.
 Write deliverable: ready-to-import/_shared/temp_files/build/api_v2/api_v2_issues/{id}.md with status (implemented|scaffolded|design-only), files_changed, summary, follow-up.
 Do NOT edit ready-to-import/ by hand.
-Run `scripts/test/test-fast.ps1` from the repo root if you changed code.
+Run `cargo run --manifest-path scripts/rust/Cargo.toml -- test --suite fast` from the repo root if you changed code.
 For low-priority delegate-only issues (BeginInvoke/EndInvoke): document skip + helper pattern unless trivial hook.
 """
 

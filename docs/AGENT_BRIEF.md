@@ -24,12 +24,12 @@ python -m fluent_pipeline.cli bootstrap-status --install-missing --confirm-insta
 python -m fluent_pipeline.cli bootstrap-status --inspected
 ```
 
-Checklist / intent map from repo root:
+Checklist / intent map from the repository root:
 
 ```bash
-python3 scripts/agent/agent-brief.py --intent "Script won't open; check diagnosis.md"
-python3 scripts/agent/agent-brief.py --intent "use this ZEIA" --resolve-only
-python3 scripts/agent/agent-brief.py --mode new-script
+cargo run --manifest-path scripts/rust/Cargo.toml -- agent-brief --intent "Script won't open; check diagnosis.md"
+cargo run --manifest-path scripts/rust/Cargo.toml -- agent-brief --intent "use this ZEIA" --resolve-only
+cargo run --manifest-path scripts/rust/Cargo.toml -- agent-brief --mode new-script
 ```
 
 Follow `next_step.tool` (MCP) or `next_step.cli` (shell). Open
@@ -40,13 +40,12 @@ under `NEED MORE` / `CONTRACT`. Cursor enforces the start gate via
 **Token rule:** `fluent_inspect_project` is summary-only. Mine names with
 `fluent_project_query` / `project-find --limit`. Never dump full `manifest.json`
 or `labware_catalog.json` into the chat.
+
 ## CLI fallback
 
-```text
-From the Fluent-AI-Assistance repo root, run `python3 scripts/agent/agent-brief.py --mode <MODE>` and follow that output. Only open AGENTS.md sections the brief points to.
-```
-
-Replace `<MODE>`:
+From the repository root, run
+`cargo run --manifest-path scripts/rust/Cargo.toml -- agent-brief --mode <MODE>`
+and follow that output. Only open AGENTS.md sections the brief points to.
 
 | Mode | When |
 |------|------|
@@ -59,11 +58,13 @@ Replace `<MODE>`:
 Examples:
 
 ```bash
-python3 scripts/agent/agent-brief.py --mode status
-python3 scripts/agent/agent-brief.py --mode new-script
-./scripts/agent/agent-brief.sh --mode repair
+cargo run --manifest-path scripts/rust/Cargo.toml -- agent-brief --mode status
+cargo run --manifest-path scripts/rust/Cargo.toml -- agent-brief --mode new-script
+cargo run --manifest-path scripts/rust/Cargo.toml -- agent-brief --mode repair
 ```
 
-Shared implementation: `fluent_pipeline/agent_brief.py` (CLI script is a thin wrapper).
+The standalone helper is implemented in Rust under `scripts/rust/`. MCP brief
+resources continue to use the shared `fluent_pipeline.agent_brief` API.
 
-The brief is a checklist. Deep rules stay in `AGENTS.md` / `source/03-protocol-builder/AGENTS.md` and are read on demand.
+The brief is a checklist. Deep rules stay in `AGENTS.md` /
+`source/03-protocol-builder/AGENTS.md` and are read on demand.

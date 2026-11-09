@@ -2,12 +2,12 @@
 
 ## Development
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install\install.ps1
-.\scripts\test\test-fast.ps1      # reader/worklist + protocol-builder + fluentcoder
-.\scripts\test\test-mcp.ps1       # MCP gateway, self-test, smoke
-.\scripts\test\test-simulator.ps1 # FluentControl-gated simulator suite
-.\scripts\test\test-all.ps1       # everything above
+```sh
+cargo run --manifest-path scripts/rust/Cargo.toml -- install
+cargo run --manifest-path scripts/rust/Cargo.toml -- test --suite fast      # reader/worklist + protocol-builder + fluentcoder
+cargo run --manifest-path scripts/rust/Cargo.toml -- test --suite mcp       # MCP gateway, self-test, smoke
+cargo run --manifest-path scripts/rust/Cargo.toml -- test --suite simulator # FluentControl-gated simulator suite
+cargo run --manifest-path scripts/rust/Cargo.toml -- test --suite all       # everything above
 ```
 
 Run `test-fast` before opening a pull request. Use the MCP, simulator, or all

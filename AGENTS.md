@@ -51,7 +51,7 @@ lab template (see nested **Test fixtures vs ZEIA**).
 | `source/03-protocol-builder/` | Generation pipeline (`fluent_pipeline`), packaging, validation |
 | `source/04-protocol-simulator/` | TypeScript/Vite protocol simulator |
 | `source/tools/` | Repo generators in subfolders (`simulator/`, `api_v2/`, `connectors/`, `registry/`, `prompt/`, `common/`) |
-| `scripts/` | Install / agent-brief / MCP smoke / test suites (`install/`, `agent/`, `mcp/`, `test/`); see `scripts/README.md` |
+| `scripts/rust/` | Rust CLI for install / agent-brief / MCP smoke / shadow check / test suites; see `scripts/README.md` |
 | `ready-to-import/` | Published bundles + `_shared/temp_files` scratch; do not hand-edit generated artifacts as “fixes” |
 | `docs/`, `.mcp/` | Docs and MCP config outputs |
 | `.venv/` | Local Python env (prefer for CLI/tests) |
@@ -79,9 +79,9 @@ Command registry (before new string heuristics):
 
 ## Quick pointers
 
-- Token-cheap start (hard gate) → MCP `fluent_bootstrap_status` or CLI `python -m fluent_pipeline.cli bootstrap-status`; then `fluent_agent_brief` / `scripts/agent/agent-brief.py` ([docs/AGENT_BRIEF.md](docs/AGENT_BRIEF.md), [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md), `.cursor/rules/hard-start-gate.mdc`)
+- Token-cheap start (hard gate) → MCP `fluent_bootstrap_status` or CLI `python -m fluent_pipeline.cli bootstrap-status`; then `fluent_agent_brief` / `cargo run --manifest-path scripts/rust/Cargo.toml -- agent-brief` ([docs/AGENT_BRIEF.md](docs/AGENT_BRIEF.md), [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md), `.cursor/rules/hard-start-gate.mdc`)
 - Protocol CLI / generate / ready gates → `source/03-protocol-builder/AGENTS.md`
-- Install / MCP → root `README.md`, `scripts/install/install.ps1`, `.mcp/`
+- Install / MCP → root `README.md`, `cargo run --manifest-path scripts/rust/Cargo.toml -- install`, `.mcp/`
 - Method-source incorporation map (instrument dump) → under a bundle's
   `temp_files/tecan_method_source/INCORPORATION_MAP.md` when that collect exists
 - Current-code structure and implementation detail belong in Serena; durable project knowledge belongs in `docs/project-memory/`.

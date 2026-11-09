@@ -45,7 +45,7 @@ class AgentBriefTests(unittest.TestCase):
         self.assertIn("simulator", payload["brief"].casefold())
 
     def test_gateway_resolve_brief_mode(self) -> None:
-        payload = ProtocolBuilderGateway().resolve_brief_mode("wire MCP after install.ps1")
+        payload = ProtocolBuilderGateway().resolve_brief_mode("wire MCP after installing")
         self.assertEqual(payload["mode"], "install")
         self.assertTrue(payload["ok"])
 

@@ -24,8 +24,10 @@ File formats, artifact names, and agent rules are in
 Install Fluent AI-Assistance from https://github.com/MarsLuay/Fluent-AI-Assistance. Clone or pull, then follow docs/AI_INSTALL_PROMPT.md in the repo.
 ```
 
-**Manual:** clone the repo, run `scripts/install/install.ps1`, then wire MCP from
-`.mcp/server-config.json`. Details: [Installation](docs/INSTALLATION.md).
+**Manual:** install Rust/Cargo and Python 3.11 or newer, then run
+`cargo run --manifest-path scripts/rust/Cargo.toml -- install` from the repo
+root and wire MCP from `.mcp/server-config.json`. Details:
+[Installation](docs/INSTALLATION.md).
 
 ## Use
 

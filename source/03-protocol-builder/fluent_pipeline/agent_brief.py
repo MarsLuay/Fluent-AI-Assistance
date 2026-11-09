@@ -18,7 +18,7 @@ _INTENT_MODE_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
     (
         "install",
         (
-            "install.ps1",
+            "cargo run --manifest-path scripts/rust/cargo.toml -- install",
             "wire mcp",
             "mcp config",
             "server-config.json",
@@ -178,8 +178,8 @@ def _brief_install() -> str:
             "STEPS:",
             "1. Ensure clone is Fluent-AI-Assistance at a user-owned path",
             "2. From repo root:",
-            "   powershell -ExecutionPolicy Bypass -File .\\scripts\\install\\install.ps1",
-            "   # Unix: create .venv then python -m fluent_pipeline.bootstrap from source/03-protocol-builder",
+            "   cargo run --manifest-path scripts/rust/Cargo.toml -- install",
+            "   # The Rust helper creates .venv, bootstraps Python packages, and wires MCP.",
             "3. Merge only fluent-ai-assistance from .mcp/server-config.json into client MCP config",
             "4. Reload MCP; call fluent_status then fluent_bootstrap_status",
             "DO NOT: install Tecan drivers, write C:\\ProgramData\\Tecan, network-expose MCP, upload ZEIA/logs",

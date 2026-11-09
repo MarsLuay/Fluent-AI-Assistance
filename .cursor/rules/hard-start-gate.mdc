@@ -29,11 +29,11 @@ Exceptions (no bootstrap required):
 - Pure doc/grammar edits with no protocol run
 - User explicitly says skip bootstrap / already ran it this session
 - `install` / `simulator` only (use `fluent_agent_brief` or
-  `scripts/agent/agent-brief.py --mode …` instead)
+  `cargo run --manifest-path scripts/rust/Cargo.toml -- agent-brief --mode …` instead)
 
 If doctor fails: re-run with install confirmation
 (`install_missing` + `confirm_install`, or CLI
 `--install-missing --confirm-install`). Doctor also auto-heals an empty
 global fluentcoder catalog by copying/refreshing from the active ZEIA
 DataStore or `FLUENTCODER_FC_INSTALL`. That fixes local deps / catalog only
-— not full `scripts/install/install.ps1`.
+— not the full Rust helper installer (`cargo run --manifest-path scripts/rust/Cargo.toml -- install`).

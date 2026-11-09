@@ -10,15 +10,23 @@ its steps.
 That installs the **full repository**. MCP is the adapter the installer wires
 into the client; the CLI and Python API come with the same checkout.
 
-## What the installer does
+## Prerequisites
 
-`scripts/install/install.ps1`:
+- Rust and Cargo
+- Python 3.11 or newer
 
-1. Creates a repository-local `.venv`.
-2. Installs the protocol-builder package with its `mcp` dependency group.
+## What the Rust installer does
+
+Run `cargo run --manifest-path scripts/rust/Cargo.toml -- install` from the
+repository root. The Rust helper:
+
+1. Creates a repository-local `.venv` with Python 3.11 or newer when missing.
+2. Invokes the Python bootstrap to install the protocol-builder package and its
+   `mcp` dependency group.
 3. Runs the server self-test (required tools + in-process bootstrap `next_step`).
-4. Starts a real stdio MCP session: `fluent_status` then `fluent_bootstrap_status`
-   (fails if required tools are missing or `next_step` is absent).
+4. Starts a real stdio MCP session: `fluent_status` then
+   `fluent_bootstrap_status` (fails if required tools are missing or
+   `next_step` is absent).
 5. Runs CLI `bootstrap-status --no-report` (exit `>=2` fails install).
 6. Writes `.mcp/server-config.json` with absolute local paths.
 
@@ -27,10 +35,10 @@ It does not install Tecan drivers, modify FluentControl, write into
 
 ## Manual installation
 
-```powershell
+```sh
 git clone https://github.com/MarsLuay/Fluent-AI-Assistance.git Fluent-AI-Assistance
 cd Fluent-AI-Assistance
-powershell -ExecutionPolicy Bypass -File .\scripts\install\install.ps1
+cargo run --manifest-path scripts/rust/Cargo.toml -- install
 ```
 
 Merge the generated `.mcp/server-config.json` entry into the MCP configuration

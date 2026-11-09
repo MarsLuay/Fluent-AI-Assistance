@@ -124,7 +124,7 @@ def next_bootstrap_step(
     return {
         "action": "choose_workflow",
         "tool": "fluent_agent_brief",
-        "cli": "python3 scripts/agent/agent-brief.py --mode new-script",
+        "cli": "cargo run --manifest-path scripts/rust/Cargo.toml -- agent-brief --mode new-script",
         "arguments": {"mode": "new-script"},
         "brief_mode": "new-script",
         "reason": (

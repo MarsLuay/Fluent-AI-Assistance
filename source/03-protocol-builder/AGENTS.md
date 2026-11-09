@@ -32,7 +32,7 @@ This file is large. Do **not** read it top-to-bottom.
    - MCP: `fluent_bootstrap_status` → follow `next_step`
    - or CLI: `python -m fluent_pipeline.cli bootstrap-status`
    - then `fluent_agent_brief(intent=...)` / `fluent_resolve_brief_mode(intent=...)`
-     (or `--mode` / `scripts/agent/agent-brief.py --intent ...`)
+     (or `--mode` / `cargo run --manifest-path scripts/rust/Cargo.toml -- agent-brief --intent ...`)
 2. Treat the brief as the checklist. Follow its STEPS.
 3. Open **only** the `##` sections in this file that the brief names under
    `NEED MORE` / `CONTRACT` (exact heading match). Do not skim unrelated
@@ -328,15 +328,14 @@ spec auto-upgrade and media seeding.
    - Authoritative table: [Readiness Gate Registry](docs/READINESS_GATES.md)
    <!-- END GENERATED: readiness-gate-summary -->
 
-- For code changes, run:
+- For code changes, run from the repository root:
 
-  ```powershell
-  ..\..\scripts\test\test-fast.ps1
+  ```sh
+  cargo run --manifest-path scripts/rust/Cargo.toml -- test --suite fast
   ```
 
-  Use `..\..\scripts\test\test-mcp.ps1` for MCP changes, `..\..\scripts\test\test-simulator.ps1`
-  for simulator-gated changes, and `..\..\scripts\test\test-all.ps1` when you want
-  the full sweep.
+  Use `--suite mcp` for MCP changes, `--suite simulator` for simulator-gated
+  changes, and `--suite all` for the full sweep.
 
 - For generation work, inspect these artifacts before claiming readiness:
 

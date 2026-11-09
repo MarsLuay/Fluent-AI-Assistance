@@ -593,7 +593,7 @@ def inspect_zeia_source(path: Path) -> SourceChoice:
     except ImportError as exc:
         raise ImportError(
             "fluent_pipeline is not importable. Run protocol-builder doctor "
-            "(or scripts/install/install.ps1) before inspecting ZEIA files."
+            "(or cargo run --manifest-path scripts/rust/Cargo.toml -- install) before inspecting ZEIA files."
         ) from exc
 
     manifest = inspect_zeia_archive(path)

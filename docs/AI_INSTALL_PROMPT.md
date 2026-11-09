@@ -8,9 +8,9 @@ Install Fluent AI-Assistance from https://github.com/MarsLuay/Fluent-AI-Assistan
 
 ## After clone : do this
 
-1. From the repository root run:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\scripts\install\install.ps1
+1. Install Rust/Cargo and Python 3.11 or newer, then from the repository root run:
+   ```sh
+   cargo run --manifest-path scripts/rust/Cargo.toml -- install
    ```
 2. Read `.mcp/server-config.json`.
 3. Merge **only** the `fluent-ai-assistance` entry into this client's MCP config.
