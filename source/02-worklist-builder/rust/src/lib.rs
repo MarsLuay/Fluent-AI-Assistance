@@ -82,12 +82,15 @@ pub struct WorklistOperation {
     pub transfer_index: usize,
 }
 
+pub fn serialize_gwl_lines(lines: &[String]) -> String {
+    let mut text = lines.join("\n");
+    text.push('\n');
+    text
+}
+
 impl Worklist {
     pub fn to_text(&self) -> String {
-        if self.lines.is_empty() {
-            return "\n".to_owned();
-        }
-        format!("{}\n", self.lines.join("\n"))
+        serialize_gwl_lines(&self.lines)
     }
 
     pub fn counts_repr(&self) -> String {

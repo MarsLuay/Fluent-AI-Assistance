@@ -256,6 +256,9 @@ class Worklist:
 
 def serialize_gwl(records: Iterable[Record]) -> str:
     lines = [record.to_line() for record in records]
+    native = native_acceleration.worklist_serialize_gwl_lines(lines)
+    if native is not None:
+        return native
     return "\n".join(lines) + "\n"
 
 

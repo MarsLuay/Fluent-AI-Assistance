@@ -22,10 +22,12 @@ from tecan_worklist.gwl import (
     Pipette,
     RawRecord,
     SetDiTiType,
+    Wash,
     parse_gwl,
     parse_gwl_line,
     parse_gwl_lines,
     parse_tip_selection,
+    serialize_gwl,
 )
 from tecan_worklist.optimizer import (
     analyze_worklist,
@@ -198,6 +200,35 @@ class WorklistSemanticsTests(unittest.TestCase):
         self.assertIsInstance(worklist.records[1], SetDiTiType)
         self.assertIsInstance(worklist.records[2], RawRecord)
         self.assertEqual(worklist.to_text(), "\n".join(lines) + "\n")
+
+    def test_native_gwl_serializer_matches_python_output(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_serialize_gwl_lines"
+        ):
+            self.skipTest("optional Rust GWL serializer is not built")
+        records = [
+            Pipette("A", " Source ", "Plate", 1, 10, rack_id="R1", tip_mask=" 01 "),
+            Comment("first line\nsecond line"),
+            Wash(scheme=2),
+            Break(),
+            Flush(("vendor", "field"), raw_line="F; raw ;line "),
+            SetDiTiType(("type", "42"), raw_line="S;type;42"),
+            RawRecord("X", "X;opaque;field"),
+        ]
+        with patch.dict(
+            "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+        ):
+            expected = serialize_gwl(records)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_serialize_gwl_lines",
+                wraps=native_acceleration.worklist_serialize_gwl_lines,
+            ) as native_call:
+                actual = serialize_gwl(records)
+            self.assertEqual(actual, expected)
+            native_call.assert_called_once()
+            self.assertEqual(serialize_gwl([]), "\n")
 
     def test_native_single_gwl_record_parser_matches_python(self):
         if not native_acceleration.available() or not hasattr(

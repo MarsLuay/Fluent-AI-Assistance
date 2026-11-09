@@ -511,6 +511,28 @@ def worklist_parse_gwl_records(
         return None
 
 
+def worklist_serialize_gwl_lines(lines: Any) -> str | None:
+    """Join exact text records natively, or request Python string-join fallback."""
+    if (
+        not enabled()
+        or type(lines) not in (list, tuple)
+        or not all(type(line) is str for line in lines)
+    ):
+        return None
+    try:
+        result = _native.worklist_serialize_gwl_lines(_encode_json(lines))
+        return result if isinstance(result, str) else None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def worklist_analyze_lines(
     lines: Any,
     enabled_tip_mask: str | None,
