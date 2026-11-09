@@ -28,6 +28,11 @@ from tecan_common.native_acceleration import (
     catalog_stat_fingerprint as _native_catalog_stat_fingerprint,
     source_content_fingerprint as _native_source_content_fingerprint,
 )
+from tecan_common.performance import (
+    finish_performance_marker,
+    performance_marker,
+    start_performance_marker,
+)
 
 from .catalog import open_index
 from .paths import index_db_path_default, install_path_key
@@ -90,12 +95,14 @@ def build_index(
             f"Set FLUENTCODER_FC_INSTALL or pass install_path explicitly."
         )
 
-    stat_fingerprint = _install_stat_fingerprint(
-        install,
-        include_all_connectors=index_all_connectors,
-    )
+    with performance_marker("catalog.install_stat_fingerprint"):
+        stat_fingerprint = _install_stat_fingerprint(
+            install,
+            include_all_connectors=index_all_connectors,
+        )
 
     with open_index(db) as conn:
+        cache_check_stage = start_performance_marker("catalog.incremental_cache_check")
         install_row = conn.execute(
             "SELECT install_path, fingerprint FROM install WHERE install_path = ?",
             (str(install),),
@@ -109,13 +116,17 @@ def build_index(
             ).fetchone()["n"]
             > 0
         ):
-            return _read_counts(conn, install_key)
+            counts = _read_counts(conn, install_key)
+            finish_performance_marker(cache_check_stage, cache_hit=True)
+            return counts
+        finish_performance_marker(cache_check_stage, cache_hit=False)
 
         existing_sources = _load_indexed_sources(conn, install_key)
         seen_paths: set[str] = set()
-        content_fingerprints = _native_catalog_content_fingerprints(
-            install, index_all_connectors
-        )
+        with performance_marker("catalog.source_content_fingerprints"):
+            content_fingerprints = _native_catalog_content_fingerprints(
+                install, index_all_connectors
+            )
 
         def content_fingerprint(path: Path) -> str:
             relative_path = _relative_install_path(path, install)
@@ -136,6 +147,7 @@ def build_index(
         components_to_insert = []
         components_sources_to_insert = []
 
+        component_stage = start_performance_marker("catalog.component_parse_inference_and_upsert")
         for path in sorted(components_dir.glob("*.xcmp"), key=lambda p: p.as_posix()):
             rel = _relative_install_path(path, install)
             seen_paths.add(rel)
@@ -207,7 +219,12 @@ def build_index(
                    VALUES (?, ?, ?, ?, ?)""",
                 components_sources_to_insert,
             )
+        finish_performance_marker(
+            component_stage,
+            upsert_count=len(components_to_insert),
+        )
 
+        workspace_stage = start_performance_marker("catalog.workspace_parse_and_upsert")
         if workspaces_dir.exists():
             indexed_ws_guids = {
                 row["guid"]
@@ -278,7 +295,12 @@ def build_index(
                     "Workspace index build collapsed parsed `.xwsp` files into fewer rows. "
                     "Check workspace GUID extraction for collisions."
                 )
+        finish_performance_marker(
+            workspace_stage,
+            upsert_count=len(workspaces_to_insert) if workspaces_dir.exists() else 0,
+        )
 
+        site_stage = start_performance_marker("catalog.site_path_indexing")
         if sites_dir.exists():
             existing_site_guids = {
                 row["guid"]
@@ -327,7 +349,12 @@ def build_index(
                        VALUES (?, ?, ?, ?, ?)""",
                     sites_sources_to_insert,
                 )
+        finish_performance_marker(
+            site_stage,
+            upsert_count=len(sites_to_insert) if sites_dir.exists() else 0,
+        )
 
+        connector_stage = start_performance_marker("catalog.connector_reference_resolution")
         connectors_dir = install / "SystemSpecific" / "Worktable" / "Connectors"
         if connectors_dir.exists():
             if index_all_connectors:
@@ -351,7 +378,9 @@ def build_index(
                     existing_sources=existing_sources,
                     content_fingerprints=content_fingerprints,
                 )
+        finish_performance_marker(connector_stage)
 
+        liquid_class_stage = start_performance_marker("catalog.liquid_class_parse_and_upsert")
         if liquid_classes_dir.exists():
             from .xlqc import load_xlqc
 
@@ -418,7 +447,12 @@ def build_index(
                        VALUES (?, ?, ?, ?, ?)""",
                     liquid_classes_sources_to_insert,
                 )
+        finish_performance_marker(
+            liquid_class_stage,
+            upsert_count=len(liquid_classes_to_insert) if liquid_classes_dir.exists() else 0,
+        )
 
+        cleanup_stage = start_performance_marker("catalog.stale_source_cleanup_and_commit")
         _purge_stale_sources(conn, seen_paths, install_key)
 
         conn.execute(
@@ -432,7 +466,10 @@ def build_index(
             ),
         )
         conn.commit()
-        return _read_counts(conn, install_key)
+        finish_performance_marker(cleanup_stage, indexed_source_count=len(seen_paths))
+        with performance_marker("catalog.final_count_queries"):
+            counts = _read_counts(conn, install_key)
+        return counts
 
 
 def index_connector_paths(

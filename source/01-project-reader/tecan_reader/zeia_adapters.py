@@ -9,6 +9,11 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 import zipfile
 
+from tecan_common.performance import (
+    finish_performance_marker,
+    performance_marker,
+    start_performance_marker,
+)
 from tecan_common.xml_compat import MAX_XML_BYTES
 from tecan_common.zeia_limits import (
     MAX_ZEIA_COMPRESSION_RATIO,
@@ -418,6 +423,7 @@ def ingest_zeia(
             else zipfile.ZipFile(archive_path)
         )
         with archive_context as zf:
+            inventory_stage = start_performance_marker("zeia.archive_inventory_and_format_detection")
             inventory = _inventory or build_zeia_archive_inventory(
                 zf,
                 max_entry_count=max_entry_count,
@@ -447,6 +453,15 @@ def ingest_zeia(
                 and Path(member.name).suffix.casefold() in {".xscr", *XML_OBJECT_EXTS}
                 and not _is_known_irrelevant_metadata(member.name)
             ]
+            finish_performance_marker(
+                inventory_stage,
+                archive_member_count=len(inventory.members),
+                adapter_count=len(detection.matches),
+            )
+            member_stage = start_performance_marker(
+                "zeia.member_inspection_and_normalization",
+                archive_member_count=len(inventory.members),
+            )
             for member in inventory.members:
                 info = member.info
                 if info.is_dir():
@@ -580,6 +595,14 @@ def ingest_zeia(
                             source_archive=archive_path,
                         )
                     )
+            finish_performance_marker(
+                member_stage,
+                script_count=len(scripts),
+                object_count=len(objects),
+                worklist_count=len(worklists),
+                task_input_count=len(task_inputs),
+                error_count=len(errors),
+            )
     except ZeiaArchiveValidationError as exc:
         raise IngestionArchiveError(
             str(exc), _archive_validation_diagnostic(archive_path, exc)
@@ -600,14 +623,15 @@ def ingest_zeia(
         "worklists": len(worklists),
         "task_inputs": len(task_inputs),
     }
-    completeness = build_completeness_metadata(
-        script_limit=script_limit,
-        object_limit=object_limit,
-        eligible_member_counts=eligible_member_counts,
-        summarized_counts=summarized_counts,
-        errors=errors,
-        oversized_members=oversized_members,
-    )
+    with performance_marker("zeia.completeness_and_limit_accounting"):
+        completeness = build_completeness_metadata(
+            script_limit=script_limit,
+            object_limit=object_limit,
+            eligible_member_counts=eligible_member_counts,
+            summarized_counts=summarized_counts,
+            errors=errors,
+            oversized_members=oversized_members,
+        )
     source_metadata = {
         "entry_count": len(detection.entries),
         "extension_counts": extension_counts(detection.entries),
@@ -625,21 +649,23 @@ def ingest_zeia(
         "truncated_scripts": completeness["truncated_scripts"],
         "truncated_objects": completeness["truncated_objects"],
     }
-    return CanonicalProjectModel(
-        source_archive=str(archive_path),
-        adapter_id=selected.adapter_id,
-        detection=detection.to_dict(),
-        scripts=scripts,
-        objects=objects,
-        worklists=worklists,
-        errors=errors,
-        source_metadata=source_metadata,
-        completeness=completeness,
-        scheduler_processes=scheduler_processes,
-        scheduler_tasks=scheduler_tasks,
-        task_inputs=task_inputs,
-        base_worktable_identity=derive_base_worktable_identity([*scripts, *objects]),
-    )
+    with performance_marker("zeia.canonical_model_assembly"):
+        model = CanonicalProjectModel(
+            source_archive=str(archive_path),
+            adapter_id=selected.adapter_id,
+            detection=detection.to_dict(),
+            scripts=scripts,
+            objects=objects,
+            worklists=worklists,
+            errors=errors,
+            source_metadata=source_metadata,
+            completeness=completeness,
+            scheduler_processes=scheduler_processes,
+            scheduler_tasks=scheduler_tasks,
+            task_inputs=task_inputs,
+            base_worktable_identity=derive_base_worktable_identity([*scripts, *objects]),
+        )
+    return model
 
 
 def ingest_zeia_from_open_archive(

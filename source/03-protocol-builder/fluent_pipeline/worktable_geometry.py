@@ -9,6 +9,12 @@ from . import xml_compat as ET
 from pathlib import Path
 from typing import Any, Mapping
 
+from tecan_common.performance import (
+    finish_performance_marker,
+    performance_marker,
+    start_performance_marker,
+)
+
 
 GEOMETRY_SCHEMA_VERSION = "tecan.worktable_geometry.v1"
 ZERO_GUID = "00000000-0000-0000-0000-000000000000"
@@ -21,13 +27,16 @@ def build_worktable_geometry(
     max_xml_bytes: int = 4 * 1024 * 1024,
 ) -> dict[str, Any]:
     """Return parsed worktable geometry from a project or collection manifest."""
-    objects = [item for item in manifest.get("objects") or [] if isinstance(item, dict)]
+    with performance_marker("worktable.manifest_object_selection") as metrics:
+        objects = [item for item in manifest.get("objects") or [] if isinstance(item, dict)]
+        metrics["object_count"] = len(objects)
     components: dict[str, dict[str, Any]] = {}
     sites: dict[str, dict[str, Any]] = {}
     connectors: dict[str, dict[str, Any]] = {}
     workspaces: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
 
+    component_stage = start_performance_marker("worktable.component_site_connector_parse")
     for item in objects:
         path = _object_path(manifest, item)
         if path is None or not path.exists():
@@ -48,7 +57,15 @@ def build_worktable_geometry(
                 connectors[connector["guid"]] = connector
         except Exception as exc:
             errors.append({"path": str(path), "error": str(exc)})
+    finish_performance_marker(
+        component_stage,
+        component_count=len(components),
+        site_count=len(sites),
+        connector_count=len(connectors),
+        error_count=len(errors),
+    )
 
+    workspace_stage = start_performance_marker("worktable.workspace_resolution")
     for item in objects:
         path = _object_path(manifest, item)
         if path is None or not path.exists():
@@ -68,7 +85,13 @@ def build_worktable_geometry(
             workspaces.append(workspace)
         except Exception as exc:
             errors.append({"path": str(path), "error": str(exc)})
+    finish_performance_marker(
+        workspace_stage,
+        workspace_count=len(workspaces),
+        error_count=len(errors),
+    )
 
+    derived_stage = start_performance_marker("worktable.derived_geometry_and_output")
     _decorate_connectors(connectors, components=components, sites=sites)
     _decorate_compatible_components(components, workspaces=workspaces)
 
@@ -83,7 +106,7 @@ def build_worktable_geometry(
     ]
     nest_cap_sites = [site for site in pin_sites if site.get("site_kind") == "cap_nest"]
 
-    return _clean(
+    result = _clean(
         {
             "schema_version": GEOMETRY_SCHEMA_VERSION,
             "component_count": len(components),
@@ -101,6 +124,14 @@ def build_worktable_geometry(
             "errors": errors,
         }
     )
+    finish_performance_marker(
+        derived_stage,
+        component_count=len(components),
+        site_count=len(sites),
+        connector_count=len(connectors),
+        workspace_count=len(workspaces),
+    )
+    return result
 
 
 def parse_connector(path: Path | str, *, max_xml_bytes: int = 4 * 1024 * 1024) -> dict[str, Any]:

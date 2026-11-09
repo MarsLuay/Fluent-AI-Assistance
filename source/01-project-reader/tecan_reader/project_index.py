@@ -14,6 +14,7 @@ import re
 import sqlite3
 
 from .common import _connect, _connection_arg, fast_json_dumps, to_jsonable
+from tecan_common.performance import performance_marker
 from .project_model import CanonicalProjectModel
 from .zeia_adapters import ingest_zeia
 
@@ -223,7 +224,9 @@ def build_project_index(
     max_compression_ratio: float | None | object = _UNSET,
 ) -> dict[str, Any]:
     """Build or refresh a searchable SQLite index for one or more ZEIA files."""
-    zeia_paths = discover_zeia_paths(paths)
+    with performance_marker("project_index.input_discovery") as metrics:
+        zeia_paths = discover_zeia_paths(paths)
+        metrics["archive_count"] = len(zeia_paths)
     database = Path(db_path)
     if force and database.exists():
         database.unlink()
@@ -231,7 +234,8 @@ def build_project_index(
 
     conn = _connect(database)
     try:
-        _initialize_database(conn)
+        with performance_marker("project_index.schema_setup"):
+            _initialize_database(conn)
         indexed_files = []
         for zeia_path in zeia_paths:
             ingest_kwargs: dict[str, Any] = {
@@ -242,11 +246,15 @@ def build_project_index(
                 ingest_kwargs["max_member_uncompressed_bytes"] = max_member_uncompressed_bytes
             if max_compression_ratio is not _UNSET:
                 ingest_kwargs["max_compression_ratio"] = max_compression_ratio
-            model = ingest_zeia(zeia_path, **ingest_kwargs)
-            _index_archive(conn, zeia_path, model)
+            with performance_marker("project_index.archive_ingestion"):
+                model = ingest_zeia(zeia_path, **ingest_kwargs)
+            with performance_marker("project_index.sqlite_archive_write"):
+                _index_archive(conn, zeia_path, model)
             indexed_files.append(str(zeia_path))
-        conn.commit()
-        summary = summarize_project_index(conn)
+        with performance_marker("project_index.sqlite_commit"):
+            conn.commit()
+        with performance_marker("project_index.summary_queries"):
+            summary = summarize_project_index(conn)
     finally:
         conn.close()
 

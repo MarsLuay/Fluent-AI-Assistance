@@ -11,6 +11,11 @@ from typing import Any
 from .command_registry import registry_manual_step, registry_pattern_type
 from .common import _connect, _connection_arg, fast_json_dumps, to_jsonable
 from tecan_common.native_acceleration import pattern_windows as _native_pattern_windows
+from tecan_common.performance import (
+    finish_performance_marker,
+    performance_marker,
+    start_performance_marker,
+)
 from .project_index import DEFAULT_INDEX_PATH
 
 PATTERN_SCHEMA_VERSION = "1"
@@ -87,12 +92,22 @@ def mine_script_patterns(
             conn.execute("DELETE FROM script_patterns")
 
         mined = 0
-        scripts = _load_indexed_scripts(conn)
-        classifications = [
-            [classify_command_pattern(command) for command in script["commands"]]
-            for script in scripts
-        ]
+        with performance_marker("patterns.load_indexed_scripts") as metrics:
+            scripts = _load_indexed_scripts(conn)
+            metrics["script_count"] = len(scripts)
+        with performance_marker(
+            "patterns.classify_commands", script_count=len(scripts)
+        ) as metrics:
+            classifications = [
+                [classify_command_pattern(command) for command in script["commands"]]
+                for script in scripts
+            ]
+            metrics["script_count"] = len(scripts)
         step_summary_cache: dict[int, str] = {}
+        mining_stage = start_performance_marker(
+            "patterns.window_discovery_and_persistence",
+            script_count=len(scripts),
+        )
         candidates = _native_pattern_windows(
             scripts, classifications, context_before, context_after
         )
@@ -147,8 +162,15 @@ def mine_script_patterns(
                             step_summary_cache=step_summary_cache,
                         )
                         mined += 1
-        conn.commit()
-        summary = summarize_script_patterns(conn)
+        finish_performance_marker(
+            mining_stage,
+            pattern_count=mined,
+            script_count=len(scripts),
+        )
+        with performance_marker("patterns.sqlite_commit"):
+            conn.commit()
+        with performance_marker("patterns.summary_query"):
+            summary = summarize_script_patterns(conn)
         return {
             **summary,
             "kind": "script_pattern_mining",

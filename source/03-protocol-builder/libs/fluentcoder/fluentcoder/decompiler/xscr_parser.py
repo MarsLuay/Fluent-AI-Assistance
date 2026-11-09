@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterator, Optional, Union
 
 from tecan_common.native_acceleration import xscr_object_fields as _native_xscr_object_fields
+from tecan_common.performance import performance_marker
 
 from ..catalog.xcmp import _find, _local, _text
 from ..expressions import is_expression_field, parse_or_preserve_source_expression
@@ -105,10 +106,14 @@ def parse_xscr(path: Union[Path, str]) -> Protocol:
     """Parse a .xscr file into a ``Protocol``."""
     # ElementTree's bounded safe parser avoids Python-node construction overhead;
     # the optional Rust batch index accelerates repeated step-field extraction.
-    root = ET.parse(str(path), use_native=False).getroot()
-    token = _ACTIVE_XSCR_FIELDS.set(_native_xscr_object_fields(root))
+    with performance_marker("xscr.xml_tree_parse"):
+        root = ET.parse(str(path), use_native=False).getroot()
+    with performance_marker("xscr.step_field_index"):
+        indexed_fields = _native_xscr_object_fields(root)
+    token = _ACTIVE_XSCR_FIELDS.set(indexed_fields)
     try:
-        return _parse_xscr_root(root)
+        with performance_marker("xscr.ir_model_construction"):
+            return _parse_xscr_root(root)
     finally:
         _ACTIVE_XSCR_FIELDS.reset(token)
 
