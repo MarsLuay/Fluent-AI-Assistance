@@ -7,6 +7,9 @@ import json
 import sys
 from pathlib import Path
 
+from tecan_common import native_acceleration
+from tecan_common.performance import performance_marker
+
 from .gwl import parse_gwl, parse_gwl_text
 from .optimizer import analyze_worklist, optimize_worklist, semantic_equivalent
 from .transfer import build_worklist, load_transfers, validate_transfers
@@ -63,20 +66,40 @@ def _cmd_convert(args: argparse.Namespace) -> int:
     if not result.ok:
         return _emit_validation_failure(result, as_json=args.as_json)
 
-    worklist = build_worklist(
-        transfers,
-        name=args.output.stem,
-        wash_policy=args.wash_policy,
-        batch_size=args.batch_size,
-    )
-    worklist.write(args.output)
+    with performance_marker("worklist.gwl_record_assembly") as metrics:
+        native = native_acceleration.worklist_build_transfers(
+            [vars(transfer) for transfer in transfers],
+            args.output.stem,
+            args.wash_policy,
+            args.batch_size,
+        )
+        if native is None:
+            worklist = build_worklist(
+                transfers,
+                name=args.output.stem,
+                wash_policy=args.wash_policy,
+                batch_size=args.batch_size,
+            )
+            gwl_text = worklist.to_text()
+            record_counts = worklist.counts()
+        else:
+            gwl_text = native["text"]
+            record_counts = native["counts"]
+        record_count = sum(record_counts.values())
+        metrics["record_count"] = record_count
+
+    with performance_marker("worklist.gwl_write") as metrics:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(gwl_text, encoding="utf-8")
+        metrics["record_count"] = record_count
+
     payload = {
         "ok": True,
         "input_csv": str(args.csv),
         "output_gwl": str(args.output),
         "transfer_count": len(transfers),
         "total_volume_ul": sum(t.volume_ul for t in transfers),
-        "record_counts": worklist.counts(),
+        "record_counts": record_counts,
         "warnings": list(result.warnings),
     }
     _emit(payload, as_json=args.as_json)

@@ -268,6 +268,81 @@ class WorklistSemanticsTests(unittest.TestCase):
             self.assertEqual(unicode_actual, unicode_expected)
             self.assertEqual(unicode_actual[0].source_position, 1)
 
+    def test_native_convert_cli_matches_python_fallback_and_markers(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_build_transfers"
+        ):
+            self.skipTest("optional Rust worklist-builder kernel is not built")
+        source = Path(__file__).resolve().parents[1] / "examples" / "simple_transfer.csv"
+        with tempfile.TemporaryDirectory() as raw:
+            output = Path(raw) / "generated.gwl"
+            for options in ([], ["--wash-policy", "none", "--batch-size", "2"]):
+                arguments = [
+                    "convert",
+                    str(source),
+                    "--output",
+                    str(output),
+                    "--json",
+                    *options,
+                ]
+                fallback_stdout = io.StringIO()
+                with patch.dict(
+                    "os.environ",
+                    {
+                        "TECAN_DISABLE_RUST_ACCELERATION": "1",
+                        "TECAN_PERFORMANCE_MARKERS": "0",
+                    },
+                ):
+                    with contextlib.redirect_stdout(fallback_stdout):
+                        self.assertEqual(main(arguments), 0)
+                fallback_text = output.read_bytes()
+
+                native_stdout = io.StringIO()
+                marker_output = io.StringIO()
+                with patch.dict(
+                    "os.environ",
+                    {
+                        "TECAN_DISABLE_RUST_ACCELERATION": "0",
+                        "TECAN_PERFORMANCE_MARKERS": "1",
+                    },
+                ):
+                    with contextlib.redirect_stdout(native_stdout):
+                        with contextlib.redirect_stderr(marker_output):
+                            with patch(
+                                "tecan_worklist.cli.build_worklist",
+                                side_effect=AssertionError("native builder fell back to Python"),
+                            ) as python_fallback:
+                                with patch.object(
+                                    native_acceleration,
+                                    "worklist_build_transfers",
+                                    wraps=native_acceleration.worklist_build_transfers,
+                                ) as native_call:
+                                    self.assertEqual(main(arguments), 0)
+                native_call.assert_called_once()
+                python_fallback.assert_not_called()
+                self.assertEqual(native_stdout.getvalue(), fallback_stdout.getvalue())
+                self.assertEqual(output.read_bytes(), fallback_text)
+
+                markers = [
+                    json.loads(line[5:]) for line in marker_output.getvalue().splitlines()
+                ]
+                self.assertEqual(
+                    [marker["name"] for marker in markers],
+                    [
+                        "worklist.csv_load",
+                        "worklist.transfer_validation",
+                        "worklist.gwl_record_assembly",
+                        "worklist.gwl_write",
+                    ],
+                )
+                self.assertNotIn(str(output), marker_output.getvalue())
+                self.assertTrue(
+                    all(
+                        set(marker["metrics"]) <= {"transfer_count", "record_count"}
+                        for marker in markers
+                    )
+                )
+
     def test_native_transfer_validation_matches_python_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "worklist_validate_transfers"

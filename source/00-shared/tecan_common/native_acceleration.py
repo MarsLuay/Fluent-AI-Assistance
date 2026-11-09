@@ -226,3 +226,47 @@ def worklist_load_transfers(
         RecursionError,
     ):
         return None
+
+
+def worklist_build_transfers(
+    transfers: Any,
+    name: str,
+    wash_policy: str,
+    batch_size: int | None,
+) -> dict[str, Any] | None:
+    """Assemble GWL text and ordered counts with the native worklist core."""
+    if not enabled():
+        return None
+    try:
+        encoded = _native.worklist_build_transfers(
+            _encode_json(transfers), name, wash_policy, batch_size
+        )
+        if encoded is None:
+            return None
+        result = json.loads(encoded)
+        if not isinstance(result, dict) or not isinstance(result.get("text"), str):
+            return None
+        counts = result.get("counts")
+        order = result.get("count_order")
+        if (
+            not isinstance(counts, dict)
+            or not all(isinstance(key, str) and type(value) is int for key, value in counts.items())
+            or not isinstance(order, list)
+            or not all(isinstance(key, str) for key in order)
+            or len(order) != len(set(order))
+            or set(order) != set(counts)
+        ):
+            return None
+        return {
+            "text": result["text"],
+            "counts": {key: counts[key] for key in order},
+        }
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None

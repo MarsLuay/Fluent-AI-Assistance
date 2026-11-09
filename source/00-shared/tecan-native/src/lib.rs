@@ -660,6 +660,40 @@ fn worklist_load_transfers(path: &str, well_rows: i64) -> PyResult<Option<String
 }
 
 #[pyfunction]
+fn worklist_build_transfers(
+    transfers_json: &str,
+    name: &str,
+    wash_policy: &str,
+    batch_size: Option<usize>,
+) -> PyResult<Option<String>> {
+    let Ok(transfers) =
+        serde_json::from_str::<Vec<tecan_worklist_builder::Transfer>>(transfers_json)
+    else {
+        return Ok(None);
+    };
+    if transfers
+        .iter()
+        .any(|transfer| !transfer.volume_ul.is_finite())
+    {
+        return Ok(None);
+    }
+    let Ok(wash_policy) = tecan_worklist_builder::WashPolicy::parse(wash_policy) else {
+        return Ok(None);
+    };
+    let Ok(worklist) =
+        tecan_worklist_builder::build_worklist(&transfers, name, wash_policy, batch_size)
+    else {
+        return Ok(None);
+    };
+    let payload = serde_json::json!({
+        "text": worklist.to_text(),
+        "counts": worklist.counts,
+        "count_order": worklist.count_order,
+    });
+    Ok(serde_json::to_string(&payload).ok())
+}
+
+#[pyfunction]
 fn worklist_validate_transfers(transfers_json: &str, strict: bool) -> PyResult<String> {
     let transfers: Vec<tecan_worklist_builder::Transfer> = serde_json::from_str(transfers_json)
         .map_err(|error| PyValueError::new_err(error.to_string()))?;
@@ -900,6 +934,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_load_contract, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_validate_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_load_transfers, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_build_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(deepcopy_json, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_object_fields, module)?)?;
     module.add_function(wrap_pyfunction!(pattern_windows, module)?)?;
