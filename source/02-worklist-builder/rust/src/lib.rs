@@ -30,7 +30,7 @@ impl WashPolicy {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Deserialize)]
 pub struct Transfer {
     pub source_label: String,
     pub source_type: String,

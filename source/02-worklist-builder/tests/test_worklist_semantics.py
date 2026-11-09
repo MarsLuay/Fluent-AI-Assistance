@@ -171,6 +171,69 @@ class WorklistSemanticsTests(unittest.TestCase):
         self.assertEqual(load, expected[0])
         self.assertIs(load.extra_fields["VendorZ"], commands[0]["parameters"]["VendorZ"])
 
+    def test_native_transfer_validation_matches_python_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_validate_transfers"
+        ):
+            self.skipTest("optional Rust transfer-validation kernel is not built")
+        transfers = [
+            Transfer(
+                source_label="",
+                source_type="S" * 33,
+                source_position=0,
+                dest_label="destination",
+                dest_type="",
+                dest_position=1,
+                volume_ul=1000.001,
+                liquid_class="L" * 33,
+                tip_mask="3",
+                row_number=17,
+            ),
+            Transfer(
+                source_label="source",
+                source_type="plate",
+                source_position=1,
+                dest_label="destination",
+                dest_type="plate",
+                dest_position=1,
+                volume_ul=10,
+                tip_mask="1",
+            ),
+        ]
+        for strict in (False, True):
+            with self.subTest(strict=strict):
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                    expected = validate_transfers(transfers, strict=strict)
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                    with patch.object(
+                        native_acceleration,
+                        "worklist_validate_transfers",
+                        wraps=native_acceleration.worklist_validate_transfers,
+                    ) as native_call:
+                        actual = validate_transfers(transfers, strict=strict)
+                native_call.assert_called_once()
+                self.assertEqual(actual, expected)
+        self.assertEqual(len(actual.errors), 7)
+        self.assertEqual(len(actual.warnings), 3)
+
+    def test_transfer_validation_marker_is_opt_in_and_count_only(self):
+        transfer = Transfer("source", "plate", 1, "destination", "plate", 1, 10.0)
+        disabled = io.StringIO()
+        with patch.dict("os.environ", {"TECAN_PERFORMANCE_MARKERS": "0"}):
+            with contextlib.redirect_stderr(disabled):
+                validate_transfers([transfer])
+        self.assertEqual(disabled.getvalue(), "")
+
+        output = io.StringIO()
+        with patch.dict("os.environ", {"TECAN_PERFORMANCE_MARKERS": "1"}):
+            with contextlib.redirect_stderr(output):
+                validate_transfers([transfer])
+        records = output.getvalue().splitlines()
+        self.assertEqual(len(records), 1)
+        marker = json.loads(records[0][5:])
+        self.assertEqual(marker["name"], "worklist.transfer_validation")
+        self.assertEqual(marker["metrics"], {"transfer_count": 1})
+
     def test_execution_contract_markers_are_opt_in_and_value_free(self):
         commands = [
             {"command_id": "LoadWorklist", "parameters": {"WorklistName": "synthetic.gwl", "private": "not-logged"}}

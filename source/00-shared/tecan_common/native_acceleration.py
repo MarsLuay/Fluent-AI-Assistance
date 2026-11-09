@@ -170,3 +170,33 @@ def worklist_load_contract(
         RecursionError,
     ):
         return None
+
+
+def worklist_validate_transfers(
+    transfers: Any, strict: bool
+) -> dict[str, Any] | None:
+    """Validate JSON-compatible transfer records with the native worklist core."""
+    if not enabled():
+        return None
+    try:
+        result = json.loads(
+            _native.worklist_validate_transfers(_encode_json(transfers), strict)
+        )
+        if not isinstance(result, dict):
+            return None
+        if not all(
+            isinstance(result.get(key), list)
+            and all(isinstance(item, str) for item in result[key])
+            for key in ("errors", "warnings")
+        ):
+            return None
+        return result
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None

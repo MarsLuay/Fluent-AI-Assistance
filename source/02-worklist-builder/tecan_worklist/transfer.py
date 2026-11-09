@@ -8,6 +8,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Literal
 
+from tecan_common import native_acceleration
+from tecan_common.performance import performance_marker
+
 from .gwl import Break, Comment, Pipette, Wash, Worklist, parse_tip_selection
 
 WashPolicy = Literal["each", "none"]
@@ -146,9 +149,33 @@ def build_worklist(
 
 
 def validate_transfers(transfers: Iterable[Transfer], *, strict: bool = False) -> ValidationResult:
+    with performance_marker("worklist.transfer_validation") as metrics:
+        seen = list(transfers)
+        metrics["transfer_count"] = len(seen)
+        if all(type(transfer) is Transfer for transfer in seen):
+            native = native_acceleration.worklist_validate_transfers(
+                [vars(transfer) for transfer in seen], strict
+            )
+            if native is not None:
+                errors = native.get("errors")
+                warnings = native.get("warnings")
+                if (
+                    isinstance(errors, list)
+                    and isinstance(warnings, list)
+                    and all(isinstance(message, str) for message in errors + warnings)
+                ):
+                    return ValidationResult(
+                        errors=tuple(errors), warnings=tuple(warnings)
+                    )
+        return _validate_transfers_python(seen, strict=strict)
+
+
+def _validate_transfers_python(
+    transfers: list[Transfer], *, strict: bool = False
+) -> ValidationResult:
     errors: list[str] = []
     warnings: list[str] = []
-    seen = list(transfers)
+    seen = transfers
     if not seen:
         errors.append("No transfers found.")
 

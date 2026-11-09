@@ -645,6 +645,19 @@ fn worklist_load_contract(
     serde_json::to_string(&contract).map_err(|error| PyValueError::new_err(error.to_string()))
 }
 
+#[pyfunction]
+fn worklist_validate_transfers(transfers_json: &str, strict: bool) -> PyResult<String> {
+    let transfers: Vec<tecan_worklist_builder::Transfer> = serde_json::from_str(transfers_json)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let result = tecan_worklist_builder::validate_transfers(&transfers, strict);
+    let payload = serde_json::json!({
+        "ok": result.ok(),
+        "errors": result.errors,
+        "warnings": result.warnings,
+    });
+    serde_json::to_string(&payload).map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
 fn window_has_pattern_type(
     classifications: &Bound<'_, PyList>,
     start: usize,
@@ -871,6 +884,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(canonical_json, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_execution_contract, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_load_contract, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_validate_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(deepcopy_json, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_object_fields, module)?)?;
     module.add_function(wrap_pyfunction!(pattern_windows, module)?)?;
