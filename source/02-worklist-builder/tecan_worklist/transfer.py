@@ -77,18 +77,33 @@ class ValidationResult:
 
 def load_transfers(path: str | Path, *, well_rows: int = 8) -> list[Transfer]:
     source = Path(path)
-    with source.open(newline="", encoding="utf-8-sig") as handle:
-        reader = csv.DictReader(handle)
-        if reader.fieldnames is None:
-            raise ValueError("CSV is empty or missing a header row.")
-        fieldnames = {name.strip() for name in reader.fieldnames}
-        missing = sorted(REQUIRED_COLUMNS - fieldnames)
-        if missing:
-            raise ValueError("CSV missing required columns: " + ", ".join(missing))
-        transfers = []
-        for row_number, row in enumerate(reader, start=2):
-            transfers.append(_row_to_transfer(row, row_number=row_number, well_rows=well_rows))
-    return transfers
+    with performance_marker("worklist.csv_load") as metrics:
+        if type(well_rows) is int:
+            native = native_acceleration.worklist_load_transfers(source, well_rows)
+            if native is not None:
+                try:
+                    transfers = [Transfer(**record) for record in native]
+                except (TypeError, ValueError):
+                    transfers = None
+                if transfers is not None:
+                    metrics["transfer_count"] = len(transfers)
+                    return transfers
+
+        with source.open(newline="", encoding="utf-8-sig") as handle:
+            reader = csv.DictReader(handle)
+            if reader.fieldnames is None:
+                raise ValueError("CSV is empty or missing a header row.")
+            fieldnames = {name.strip() for name in reader.fieldnames}
+            missing = sorted(REQUIRED_COLUMNS - fieldnames)
+            if missing:
+                raise ValueError("CSV missing required columns: " + ", ".join(missing))
+            transfers = []
+            for row_number, row in enumerate(reader, start=2):
+                transfers.append(
+                    _row_to_transfer(row, row_number=row_number, well_rows=well_rows)
+                )
+        metrics["transfer_count"] = len(transfers)
+        return transfers
 
 
 def build_worklist(

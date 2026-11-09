@@ -646,6 +646,20 @@ fn worklist_load_contract(
 }
 
 #[pyfunction]
+fn worklist_load_transfers(path: &str, well_rows: i64) -> PyResult<Option<String>> {
+    let Ok(transfers) = tecan_worklist_builder::load_transfers(path, well_rows) else {
+        return Ok(None);
+    };
+    if transfers
+        .iter()
+        .any(|transfer| !transfer.volume_ul.is_finite())
+    {
+        return Ok(None);
+    }
+    Ok(serde_json::to_string(&transfers).ok())
+}
+
+#[pyfunction]
 fn worklist_validate_transfers(transfers_json: &str, strict: bool) -> PyResult<String> {
     let transfers: Vec<tecan_worklist_builder::Transfer> = serde_json::from_str(transfers_json)
         .map_err(|error| PyValueError::new_err(error.to_string()))?;
@@ -885,6 +899,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_execution_contract, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_load_contract, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_validate_transfers, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_load_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(deepcopy_json, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_object_fields, module)?)?;
     module.add_function(wrap_pyfunction!(pattern_windows, module)?)?;

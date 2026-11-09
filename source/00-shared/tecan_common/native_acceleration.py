@@ -200,3 +200,29 @@ def worklist_validate_transfers(
         RecursionError,
     ):
         return None
+
+
+def worklist_load_transfers(
+    path: str | Path, well_rows: int
+) -> list[dict[str, Any]] | None:
+    """Load transfer CSV records natively, or request the Python parser fallback."""
+    if not enabled():
+        return None
+    try:
+        encoded = _native.worklist_load_transfers(str(path), well_rows)
+        if encoded is None:
+            return None
+        result = json.loads(encoded)
+        if isinstance(result, list) and all(isinstance(item, dict) for item in result):
+            return result
+        return None
+    except (
+        AttributeError,
+        OSError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None

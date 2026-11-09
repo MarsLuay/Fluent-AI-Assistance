@@ -1,4 +1,5 @@
 import contextlib
+import csv
 import io
 import json
 import tempfile
@@ -25,7 +26,7 @@ from tecan_worklist.gwl import (
     parse_tip_selection,
 )
 from tecan_worklist.optimizer import analyze_worklist, optimize_worklist, semantic_equivalent
-from tecan_worklist.transfer import Transfer, validate_transfers
+from tecan_worklist.transfer import Transfer, load_transfers, validate_transfers
 from tecan_worklist.gwl import Worklist
 
 
@@ -170,6 +171,102 @@ class WorklistSemanticsTests(unittest.TestCase):
         native_load_call.assert_called_once()
         self.assertEqual(load, expected[0])
         self.assertIs(load.extra_fields["VendorZ"], commands[0]["parameters"]["VendorZ"])
+
+    def test_native_csv_loader_matches_python_and_marks_logic_stage(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_load_transfers"
+        ):
+            self.skipTest("optional Rust CSV-loader kernel is not built")
+        headers = [
+            "source_label",
+            "source_type",
+            "source_position",
+            "dest_label",
+            "dest_type",
+            "dest_position",
+            "volume_ul",
+            "liquid_class",
+            "source_id",
+            "dest_id",
+            "source_tube_id",
+            "dest_tube_id",
+            "tip_mask",
+            "forced_source_type",
+            "forced_dest_type",
+            "comment",
+            "wash_after",
+            "break_after",
+        ]
+        rows = [
+            [
+                "Source, A", "Plate", "A1", "Destination", "Plate", "B1", "10.5",
+                "Water", "source-id", "dest-id", "source-tube", "dest-tube", "1",
+                "forced-source", "forced-dest", "quoted, comment", "no", "true",
+            ],
+            [
+                "Source2", "Plate", "H12", "Destination2", "Plate", "A2", "20.0",
+                "", "", "", "", "", "2", "", "", "", "", "",
+            ],
+        ]
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "synthetic.csv"
+            csv_text = io.StringIO(newline="")
+            writer = csv.writer(csv_text)
+            writer.writerow(headers)
+            writer.writerows(rows)
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                handle.write("\ufeff" + csv_text.getvalue())
+
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                expected = load_transfers(path)
+            marker_output = io.StringIO()
+            with patch.dict(
+                "os.environ",
+                {
+                    "TECAN_DISABLE_RUST_ACCELERATION": "0",
+                    "TECAN_PERFORMANCE_MARKERS": "1",
+                },
+            ):
+                with contextlib.redirect_stderr(marker_output):
+                    with patch.object(
+                        native_acceleration,
+                        "worklist_load_transfers",
+                        wraps=native_acceleration.worklist_load_transfers,
+                    ) as native_call:
+                        actual = load_transfers(path)
+            native_call.assert_called_once()
+            self.assertEqual(actual, expected)
+            self.assertEqual(actual[0].source_label, "Source, A")
+            self.assertEqual(actual[0].comment, "quoted, comment")
+            self.assertEqual(actual[0].wash_after, False)
+            self.assertTrue(actual[0].break_after)
+            self.assertEqual(actual[1].source_position, 96)
+            markers = marker_output.getvalue().splitlines()
+            self.assertEqual(len(markers), 1)
+            marker = json.loads(markers[0][5:])
+            self.assertEqual(marker["name"], "worklist.csv_load")
+            self.assertEqual(marker["metrics"], {"transfer_count": 2})
+            self.assertNotIn(str(path), markers[0])
+
+            unicode_path = Path(raw) / "unicode-position.csv"
+            unicode_text = io.StringIO(newline="")
+            unicode_writer = csv.writer(unicode_text)
+            unicode_writer.writerow(headers)
+            unicode_writer.writerow(
+                ["Source", "Plate", "١", "Destination", "Plate", "B1", "10"]
+                + [""] * (len(headers) - 7)
+            )
+            with unicode_path.open("w", encoding="utf-8", newline="") as handle:
+                handle.write(unicode_text.getvalue())
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                unicode_expected = load_transfers(unicode_path)
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                self.assertIsNone(
+                    native_acceleration.worklist_load_transfers(unicode_path, 8)
+                )
+                unicode_actual = load_transfers(unicode_path)
+            self.assertEqual(unicode_actual, unicode_expected)
+            self.assertEqual(unicode_actual[0].source_position, 1)
 
     def test_native_transfer_validation_matches_python_fallback(self):
         if not native_acceleration.available() or not hasattr(
