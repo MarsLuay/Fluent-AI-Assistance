@@ -349,6 +349,45 @@ class WorklistSemanticsTests(unittest.TestCase):
             with self.assertRaises(OverflowError):
                 format_gwl_volume(oversized_integer)
 
+    def test_native_gwl_comment_serializer_matches_python_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_comment_line"
+        ):
+            self.skipTest("optional Rust GWL comment serializer is not built")
+        texts = [
+            "",
+            "plain text",
+            "first\nsecond",
+            "first\r\nsecond",
+            "literal \\\\n sequence",
+            "naïve\n✓",
+            "\n",
+            "trailing\r",
+        ]
+        for text in texts:
+            with self.subTest(text=text):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    expected = Comment(text).to_line()
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    native = native_acceleration.worklist_comment_line(text)
+                    actual = Comment(text).to_line()
+                self.assertEqual(native, expected)
+                self.assertEqual(actual, expected)
+
+        class TextSubclass(str):
+            def replace(self, old, new):
+                return "custom replacement"
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.worklist_comment_line(TextSubclass("text"))
+            )
+            self.assertEqual(Comment(TextSubclass("text")).to_line(), "C;custom replacement")
+
     def test_native_gwl_serializer_matches_python_output(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "worklist_serialize_gwl_lines"

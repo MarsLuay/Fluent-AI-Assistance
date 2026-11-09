@@ -200,6 +200,9 @@ class Comment:
     type_character: str = "C"
 
     def to_line(self) -> str:
+        native = native_acceleration.worklist_comment_line(self.text)
+        if native is not None:
+            return native
         return "C;" + self.text.replace("\n", "\\n")
 
 

@@ -628,6 +628,17 @@ def worklist_format_volume(value: Any) -> str | None:
         return None
 
 
+def worklist_comment_line(text: Any) -> str | None:
+    """Serialize exact-string GWL comments natively, or request Python fallback."""
+    if not enabled() or type(text) is not str:
+        return None
+    try:
+        result = _native.worklist_comment_line(text)
+        return result if isinstance(result, str) else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def worklist_clean_field(value: Any) -> str | None:
     """Trim supported ASCII GWL fields natively, preserving Python fallback cases."""
     if not enabled() or (

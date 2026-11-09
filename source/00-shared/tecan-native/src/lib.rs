@@ -957,6 +957,11 @@ fn worklist_clean_field(value: Option<&str>) -> String {
 }
 
 #[pyfunction]
+fn worklist_comment_line(text: &str) -> String {
+    format!("C;{}", text.replace('\n', "\\n"))
+}
+
+#[pyfunction]
 fn worklist_serialize_gwl_lines(lines_json: &str) -> PyResult<Option<String>> {
     let Ok(lines) = serde_json::from_str::<Vec<String>>(lines_json) else {
         return Ok(None);
@@ -1336,6 +1341,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_parse_gwl_text_records, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_format_volume, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_clean_field, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_comment_line, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_serialize_gwl_lines, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_count_record_types, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_analyze_lines, module)?)?;
