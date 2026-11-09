@@ -436,16 +436,10 @@ def worklist_parse_gwl(path: str | Path) -> dict[str, Any] | None:
         return None
 
 
-def worklist_parse_gwl_records(
-    lines: Any, permissive: bool
-) -> list[dict[str, Any]] | None:
-    """Parse supported GWL lines natively, preserving Python record adapters."""
-    if not enabled() or type(permissive) is not bool:
+def _decode_worklist_record_payload(encoded: str | None) -> list[dict[str, Any]] | None:
+    if not isinstance(encoded, str):
         return None
     try:
-        encoded = _native.worklist_parse_gwl_records(_encode_json(lines), permissive)
-        if encoded is None:
-            return None
         records = json.loads(encoded)
         if not isinstance(records, list):
             return None
@@ -501,13 +495,38 @@ def worklist_parse_gwl_records(
                 return None
         return records
     except (
-        AttributeError,
         TypeError,
         ValueError,
         UnicodeError,
         OverflowError,
         RecursionError,
     ):
+        return None
+
+
+def worklist_parse_gwl_records(
+    lines: Any, permissive: bool
+) -> list[dict[str, Any]] | None:
+    """Parse supported GWL lines natively, preserving Python record adapters."""
+    if not enabled() or type(permissive) is not bool:
+        return None
+    try:
+        encoded = _native.worklist_parse_gwl_records(_encode_json(lines), permissive)
+        return _decode_worklist_record_payload(encoded)
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError, RecursionError):
+        return None
+
+
+def worklist_parse_gwl_text_records(
+    text: str, permissive: bool
+) -> list[dict[str, Any]] | None:
+    """Parse common GWL text natively while retaining line-splitting fallback."""
+    if not enabled() or type(text) is not str or type(permissive) is not bool:
+        return None
+    try:
+        encoded = _native.worklist_parse_gwl_text_records(text, permissive)
+        return _decode_worklist_record_payload(encoded)
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError, RecursionError):
         return None
 
 

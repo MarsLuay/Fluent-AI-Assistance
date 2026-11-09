@@ -289,6 +289,23 @@ pub fn parse_gwl_records_for_python(lines: &[String], permissive: bool) -> Optio
     Some(records)
 }
 
+pub fn parse_gwl_text_records_for_python(text: &str, permissive: bool) -> Option<Vec<Value>> {
+    if !text.is_ascii()
+        || text
+            .chars()
+            .any(|character| matches!(character, '\u{000b}' | '\u{000c}' | '\u{001c}'..='\u{001f}'))
+        || text
+            .as_bytes()
+            .iter()
+            .enumerate()
+            .any(|(index, byte)| *byte == b'\r' && text.as_bytes().get(index + 1) != Some(&b'\n'))
+    {
+        return None;
+    }
+    let lines = text.lines().map(str::to_owned).collect::<Vec<_>>();
+    parse_gwl_records_for_python(&lines, permissive)
+}
+
 pub fn load_transfers(path: impl AsRef<Path>, well_rows: i64) -> Result<Vec<Transfer>, String> {
     let path = path.as_ref();
     let file = std::fs::File::open(path)
@@ -809,6 +826,24 @@ mod tests {
             worklist.counts_repr(),
             "{'A': 1, 'D': 1, 'W': 1, 'C': 1, 'B': 1, 'F': 1, 'S': 1}"
         );
+    }
+
+    #[test]
+    fn native_gwl_text_record_parser_matches_supported_line_boundaries() {
+        let records =
+            parse_gwl_text_records_for_python("C;first\r\nC;second\nW;\n", false).unwrap();
+        assert_eq!(records.len(), 3);
+        assert_eq!(records[0]["text"], "first");
+        assert_eq!(records[1]["text"], "second");
+        assert_eq!(records[2]["kind"], "wash");
+        assert!(
+            parse_gwl_text_records_for_python("", false)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(parse_gwl_text_records_for_python("C;first\u{000b}C;second", false).is_none());
+        assert!(parse_gwl_text_records_for_python("C;first\rC;second", false).is_none());
+        assert!(parse_gwl_text_records_for_python("C;naïve", false).is_none());
     }
 
     #[test]

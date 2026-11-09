@@ -739,6 +739,15 @@ fn worklist_parse_gwl_records(lines_json: &str, permissive: bool) -> PyResult<Op
 }
 
 #[pyfunction]
+fn worklist_parse_gwl_text_records(text: &str, permissive: bool) -> PyResult<Option<String>> {
+    let Some(records) = tecan_worklist_builder::parse_gwl_text_records_for_python(text, permissive)
+    else {
+        return Ok(None);
+    };
+    Ok(serde_json::to_string(&records).ok())
+}
+
+#[pyfunction]
 fn worklist_serialize_gwl_lines(lines_json: &str) -> PyResult<Option<String>> {
     let Ok(lines) = serde_json::from_str::<Vec<String>>(lines_json) else {
         return Ok(None);
@@ -1111,6 +1120,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_build_schedule, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_gwl, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_gwl_records, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_parse_gwl_text_records, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_serialize_gwl_lines, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_count_record_types, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_analyze_lines, module)?)?;

@@ -26,6 +26,7 @@ from tecan_worklist.gwl import (
     parse_gwl,
     parse_gwl_line,
     parse_gwl_lines,
+    parse_gwl_text,
     parse_tip_selection,
     serialize_gwl,
 )
@@ -268,6 +269,55 @@ class WorklistSemanticsTests(unittest.TestCase):
             self.assertEqual(actual, expected)
             native_call.assert_called_once()
             self.assertEqual(serialize_gwl([]), "\n")
+
+    def test_native_gwl_text_parser_preserves_python_splitlines_behavior(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_parse_gwl_text_records"
+        ):
+            self.skipTest("optional Rust GWL text parser is not built")
+        cases = [
+            ("C;first\r\nC;second\nW1;\n", False, True),
+            ("A;src;;plate;1;;10;;;1;\nD;dst;;plate;2;;10;;;1;", False, True),
+            ("C;first\vC;second", False, False),
+            ("C;first\rC;second", False, False),
+            ("X;opaque;field\nW5;extra", True, True),
+            ("C;naïve", False, False),
+            ("", False, True),
+        ]
+        for text, permissive, native_supported in cases:
+            with self.subTest(permissive=permissive, length=len(text)):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    expected = parse_gwl_text(
+                        text, name="text-parse", permissive=permissive
+                    )
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    native_payload = native_acceleration.worklist_parse_gwl_text_records(
+                        text, permissive
+                    )
+                    if native_supported:
+                        self.assertIsNotNone(native_payload)
+                    else:
+                        self.assertIsNone(native_payload)
+                    actual = parse_gwl_text(
+                        text, name="text-parse", permissive=permissive
+                    )
+                self.assertEqual(actual, expected)
+                self.assertEqual(actual.to_text(), expected.to_text())
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.worklist_parse_gwl_text_records("A;short", False)
+            )
+            with self.assertRaises(ValueError) as native_error:
+                parse_gwl_text("A;short", name="error")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with self.assertRaises(ValueError) as python_error:
+                parse_gwl_text("A;short", name="error")
+        self.assertEqual(str(native_error.exception), str(python_error.exception))
 
     def test_native_single_gwl_record_parser_matches_python(self):
         if not native_acceleration.available() or not hasattr(
