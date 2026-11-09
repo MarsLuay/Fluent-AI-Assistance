@@ -730,6 +730,29 @@ fn worklist_build_transfers(
 }
 
 #[pyfunction]
+fn worklist_analyze_lines(
+    lines_json: &str,
+    enabled_tip_mask: Option<&str>,
+    supported_channels: usize,
+) -> PyResult<Option<String>> {
+    let Ok(lines) = serde_json::from_str::<Vec<String>>(lines_json) else {
+        return Ok(None);
+    };
+    let worklist = tecan_worklist_builder::Worklist {
+        lines,
+        ..tecan_worklist_builder::Worklist::default()
+    };
+    let Ok(analysis) = tecan_worklist_builder::semantics::analyze_worklist(
+        &worklist,
+        enabled_tip_mask,
+        supported_channels,
+    ) else {
+        return Ok(None);
+    };
+    Ok(serde_json::to_string(&analysis).ok())
+}
+
+#[pyfunction]
 fn worklist_validate_transfers(transfers_json: &str, strict: bool) -> PyResult<String> {
     let transfers: Vec<tecan_worklist_builder::Transfer> = serde_json::from_str(transfers_json)
         .map_err(|error| PyValueError::new_err(error.to_string()))?;
@@ -972,6 +995,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_load_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_build_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_gwl, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_analyze_lines, module)?)?;
     module.add_function(wrap_pyfunction!(deepcopy_json, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_object_fields, module)?)?;
     module.add_function(wrap_pyfunction!(pattern_windows, module)?)?;

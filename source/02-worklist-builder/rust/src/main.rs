@@ -1,5 +1,4 @@
 mod performance;
-mod semantics;
 
 use serde_json::{Value, json};
 use std::io::Write;
@@ -7,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process;
 use tecan_worklist_builder::{
     WashPolicy, build_worklist, load_transfers, parse_gwl_file, parse_gwl_file_permissive,
-    total_volume, validate_transfers,
+    semantics, total_volume, validate_transfers,
 };
 
 const USAGE: &str = "Rust worklist conversion, validation, summary, analysis, and optimization

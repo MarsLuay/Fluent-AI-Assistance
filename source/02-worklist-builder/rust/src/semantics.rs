@@ -1,6 +1,6 @@
+use crate::{Worklist, parse_gwl_text_permissive};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use tecan_worklist_builder::{Worklist, parse_gwl_text_permissive};
 
 #[derive(Clone, Debug)]
 struct Pipette {

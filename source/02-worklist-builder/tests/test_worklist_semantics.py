@@ -415,6 +415,83 @@ class WorklistSemanticsTests(unittest.TestCase):
                 expected_counts = parse_gwl(splitlines_source).counts()
             self.assertEqual(expected_counts, {"B": 1, "A": 1})
 
+    def test_native_analyzer_matches_python_cli_and_markers(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_analyze_lines"
+        ):
+            self.skipTest("optional Rust worklist-analysis kernel is not built")
+        with tempfile.TemporaryDirectory() as raw:
+            source = Path(raw) / "analysis.gwl"
+            source.write_text(
+                "C;first pair\n"
+                "A;Source1;s1;Plate;1;t1;10;Water;;1;\n"
+                "D;Destination1;d1;Plate;1;d1;10;Water;;1;\n"
+                "C;second pair\n"
+                "A;Source2;s2;Plate;1;t2;10;Water;;2;\n"
+                "D;Destination2;d2;Plate;1;d2;10;Water;;2;\n"
+                "W;\n"
+                "A;Source3;s3;Plate;2;t3;10;Water;;3;\n"
+                "D;Destination3;d3;Plate;2;d3;10;Water;;3;\n"
+                "Z;unsupported\n",
+                encoding="utf-8",
+            )
+            arguments = [
+                "analyze",
+                str(source),
+                "--enabled-tip-mask",
+                "7",
+                "--supported-channels",
+                "3",
+                "--json",
+            ]
+            fallback_stdout = io.StringIO()
+            with patch.dict(
+                "os.environ",
+                {
+                    "TECAN_DISABLE_RUST_ACCELERATION": "1",
+                    "TECAN_PERFORMANCE_MARKERS": "0",
+                },
+            ):
+                with contextlib.redirect_stdout(fallback_stdout):
+                    self.assertEqual(main(arguments), 1)
+
+            native_stdout = io.StringIO()
+            marker_output = io.StringIO()
+            with patch.dict(
+                "os.environ",
+                {
+                    "TECAN_DISABLE_RUST_ACCELERATION": "0",
+                    "TECAN_PERFORMANCE_MARKERS": "1",
+                },
+            ):
+                with contextlib.redirect_stdout(native_stdout):
+                    with contextlib.redirect_stderr(marker_output):
+                        with patch(
+                            "tecan_worklist.cli.analyze_worklist",
+                            side_effect=AssertionError("native analyzer fell back to Python"),
+                        ) as python_fallback:
+                            with patch.object(
+                                native_acceleration,
+                                "worklist_analyze_lines",
+                                wraps=native_acceleration.worklist_analyze_lines,
+                            ) as native_call:
+                                self.assertEqual(main(arguments), 1)
+            native_call.assert_called_once()
+            python_fallback.assert_not_called()
+            self.assertEqual(
+                json.loads(native_stdout.getvalue()),
+                json.loads(fallback_stdout.getvalue()),
+            )
+            markers = [
+                json.loads(line[5:]) for line in marker_output.getvalue().splitlines()
+            ]
+            self.assertEqual(
+                [marker["name"] for marker in markers],
+                ["worklist.gwl_parse", "worklist.gwl_analysis"],
+            )
+            self.assertTrue(all(marker["metrics"] == {"record_count": 10} for marker in markers))
+            self.assertNotIn(str(source), marker_output.getvalue())
+
     def test_native_transfer_validation_matches_python_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "worklist_validate_transfers"

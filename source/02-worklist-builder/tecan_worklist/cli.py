@@ -150,15 +150,46 @@ def _cmd_summarize(args: argparse.Namespace) -> int:
 
 def _cmd_analyze(args: argparse.Namespace) -> int:
     try:
-        worklist = parse_gwl(args.gwl, permissive=True)
-        analysis = analyze_worklist(
-            worklist,
-            enabled_tip_mask=args.enabled_tip_mask,
-            supported_channels=args.supported_channels,
-        )
+        with performance_marker("worklist.gwl_parse") as metrics:
+            worklist = parse_gwl(args.gwl, permissive=True)
+            lines = [record.to_line() for record in worklist.records]
+            record_count = len(lines)
+            metrics["record_count"] = record_count
+
+        with performance_marker("worklist.gwl_analysis") as metrics:
+            native = native_acceleration.worklist_analyze_lines(
+                lines, args.enabled_tip_mask, args.supported_channels
+            )
+            if native is None:
+                analysis = analyze_worklist(
+                    worklist,
+                    enabled_tip_mask=args.enabled_tip_mask,
+                    supported_channels=args.supported_channels,
+                )
+                analysis_payload = analysis.to_dict()
+                analysis_ok = not analysis.has_errors
+            else:
+                analysis_payload = native
+                analysis_ok = native["ok"]
+            metrics["record_count"] = record_count
     except (OSError, ValueError) as exc:
         return _emit_semantic_failure(str(exc), as_json=args.as_json)
-    payload = {"ok": not analysis.has_errors, "gwl": str(args.gwl), **analysis.to_dict()}
+
+    payload = {"ok": analysis_ok, "gwl": str(args.gwl)}
+    for key in (
+        "schema_version",
+        "record_count",
+        "unit_count",
+        "explicit_tip_assignments",
+        "automatic_tip_units",
+        "enabled_tip_mask",
+        "barriers",
+        "parallel_windows",
+        "diagnostics",
+        "runtime_parallelism",
+    ):
+        if key in analysis_payload:
+            payload[key] = analysis_payload[key]
     _emit(payload, as_json=args.as_json)
     return 0 if payload["ok"] else 1
 
