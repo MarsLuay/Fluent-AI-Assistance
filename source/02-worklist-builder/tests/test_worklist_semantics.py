@@ -27,7 +27,12 @@ from tecan_worklist.gwl import (
     parse_tip_selection,
 )
 from tecan_worklist.optimizer import analyze_worklist, optimize_worklist, semantic_equivalent
-from tecan_worklist.transfer import Transfer, load_transfers, validate_transfers
+from tecan_worklist.transfer import (
+    Transfer,
+    load_transfers,
+    validate_transfers,
+    well_to_position,
+)
 from tecan_worklist.gwl import Worklist
 
 
@@ -172,6 +177,48 @@ class WorklistSemanticsTests(unittest.TestCase):
         native_load_call.assert_called_once()
         self.assertEqual(load, expected[0])
         self.assertIs(load.extra_fields["VendorZ"], commands[0]["parameters"]["VendorZ"])
+
+    def test_native_well_to_position_matches_python_and_falls_back(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_well_to_position"
+        ):
+            self.skipTest("optional Rust well-coordinate kernel is not built")
+        cases = [
+            ("A1", 8),
+            ("h12", 8),
+            ("AA3", 8),
+            ("  B5\t", 1),
+            ("0", 8),
+            ("000", 8),
+            ("A1", 0),
+            ("H12", -1),
+        ]
+        for value, rows in cases:
+            with self.subTest(value=value, rows=rows):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    expected = well_to_position(value, rows=rows)
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    native = native_acceleration.worklist_well_to_position(value, rows)
+                    self.assertIsNotNone(native)
+                    actual = well_to_position(value, rows=rows)
+                self.assertEqual(actual, expected)
+                self.assertEqual(native, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.worklist_well_to_position("١", 8))
+            self.assertEqual(well_to_position("١"), 1)
+            huge_position = "18446744073709551616"
+            self.assertIsNone(
+                native_acceleration.worklist_well_to_position(huge_position, 8)
+            )
+            self.assertEqual(well_to_position(huge_position), int(huge_position))
+            self.assertIsNone(native_acceleration.worklist_well_to_position("A0", 8))
+            with self.assertRaisesRegex(ValueError, "Invalid well/position value"):
+                well_to_position("A0")
 
     def test_native_csv_loader_matches_python_and_marks_logic_stage(self):
         if not native_acceleration.available() or not hasattr(

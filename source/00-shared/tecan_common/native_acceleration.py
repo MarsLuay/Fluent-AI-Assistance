@@ -202,6 +202,23 @@ def worklist_validate_transfers(
         return None
 
 
+def worklist_well_to_position(value: str, rows: int) -> int | None:
+    """Convert a supported well coordinate natively, or request Python fallback."""
+    if not enabled():
+        return None
+    try:
+        result = _native.worklist_well_to_position(value, rows)
+        return result if type(result) is int and result >= 0 else None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def worklist_load_transfers(
     path: str | Path, well_rows: int
 ) -> list[dict[str, Any]] | None:

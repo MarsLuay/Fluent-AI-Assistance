@@ -222,6 +222,10 @@ def _validate_transfers_python(
 
 
 def well_to_position(value: str, *, rows: int = 8) -> int:
+    if type(value) is str and type(rows) is int:
+        native = native_acceleration.worklist_well_to_position(value, rows)
+        if native is not None:
+            return native
     stripped = value.strip()
     if stripped.isdigit():
         return int(stripped)

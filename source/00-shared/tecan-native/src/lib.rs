@@ -646,6 +646,11 @@ fn worklist_load_contract(
 }
 
 #[pyfunction]
+fn worklist_well_to_position(value: &str, rows: i64) -> PyResult<Option<u64>> {
+    Ok(tecan_worklist_builder::well_to_position(value, rows).ok())
+}
+
+#[pyfunction]
 fn worklist_load_transfers(path: &str, well_rows: i64) -> PyResult<Option<String>> {
     let Ok(transfers) = tecan_worklist_builder::load_transfers(path, well_rows) else {
         return Ok(None);
@@ -1022,6 +1027,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_load_contract, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_validate_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_load_transfers, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_well_to_position, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_build_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_gwl, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_analyze_lines, module)?)?;
