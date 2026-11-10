@@ -236,6 +236,9 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             "١٢",
             str(1 << 100),
             "not-an-int",
+            *(str(number) for number in range(-256, 257)),
+            str(-(1 << 63)),
+            str((1 << 63) - 1),
             None,
             7,
         ]
