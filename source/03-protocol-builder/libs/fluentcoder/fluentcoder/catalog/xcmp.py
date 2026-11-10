@@ -25,12 +25,17 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
+from tecan_common import native_acceleration
+
 
 # ── XML helpers (namespace-agnostic) ───────────────────────────────
 
 
 def _local(tag: str) -> str:
     """Strip the XML namespace from an element tag."""
+    native = native_acceleration.xml_local_name(tag)
+    if native is not None:
+        return native
     return tag.rsplit("}", 1)[-1] if "}" in tag else tag
 
 
@@ -38,6 +43,11 @@ def _find(elem: Optional[ET.Element], local_name: str) -> Optional[ET.Element]:
     """Find first descendant with the given local-name (BFS, namespace-agnostic)."""
     if elem is None:
         return None
+    native = native_acceleration.xml_first_element_by_name(
+        elem, local_name, ET.Element
+    )
+    if native is not None:
+        return native[1]
     for child in elem.iter():
         if isinstance(child.tag, str) and _local(child.tag) == local_name:
             return child
@@ -47,6 +57,11 @@ def _find(elem: Optional[ET.Element], local_name: str) -> Optional[ET.Element]:
 def _findall(elem: Optional[ET.Element], local_name: str) -> list[ET.Element]:
     if elem is None:
         return []
+    native = native_acceleration.xml_elements_by_name(
+        elem, {local_name}, ET.Element
+    )
+    if native is not None:
+        return native
     return [
         c for c in elem.iter()
         if isinstance(c.tag, str) and _local(c.tag) == local_name
@@ -56,10 +71,22 @@ def _findall(elem: Optional[ET.Element], local_name: str) -> list[ET.Element]:
 def _direct_children(elem: Optional[ET.Element], local_name: str) -> list[ET.Element]:
     if elem is None:
         return []
+    native = native_acceleration.xml_direct_elements_by_name(
+        elem, {local_name}, ET.Element
+    )
+    if native is not None:
+        return native
     return [c for c in list(elem) if isinstance(c.tag, str) and _local(c.tag) == local_name]
 
 
 def _direct_child(elem: Optional[ET.Element], local_name: str) -> Optional[ET.Element]:
+    if elem is None:
+        return None
+    native = native_acceleration.xml_first_direct_element_by_name(
+        elem, local_name, ET.Element
+    )
+    if native is not None:
+        return native[1]
     return next(iter(_direct_children(elem, local_name)), None)
 
 
@@ -72,6 +99,9 @@ def _text(elem: Optional[ET.Element]) -> Optional[str]:
     if elem is None:
         return None
     text = elem.text
+    native = native_acceleration.xml_clean_text(text)
+    if native is not None:
+        return native or None
     return text.strip() if isinstance(text, str) and text.strip() else None
 
 
@@ -98,6 +128,9 @@ def _int_text(elem: Optional[ET.Element]) -> Optional[int]:
     txt = _text(elem)
     if txt is None:
         return None
+    native = native_acceleration.parse_i64_text(txt)
+    if native is not None:
+        return native
     try:
         return int(txt)
     except ValueError:
@@ -108,6 +141,9 @@ def _float_text(elem: Optional[ET.Element]) -> Optional[float]:
     txt = _text(elem)
     if txt is None:
         return None
+    native = native_acceleration.parse_f64_decimal_text(txt)
+    if native is not None:
+        return native
     try:
         return float(txt)
     except ValueError:

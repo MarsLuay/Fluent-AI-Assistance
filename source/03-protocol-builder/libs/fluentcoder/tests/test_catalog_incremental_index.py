@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import math
 import os
 import tempfile
 import time
 import unittest
+from contextlib import ExitStack
 from pathlib import Path
 from unittest import mock
 
@@ -15,12 +17,27 @@ os.environ.setdefault("FLUENTCODER_FC_INSTALL", str(Path(__file__).resolve().par
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+from fluentcoder import xml_compat as ET  # noqa: E402
+from tecan_common import native_acceleration  # noqa: E402
+
 from fluentcoder.catalog.indexer import (  # noqa: E402
     _source_content_fingerprint,
     build_index,
     fingerprint_matches,
 )
-from fluentcoder.catalog.xcmp import XcmpArrangement, XcmpComponent, XwspWorkspace  # noqa: E402
+from fluentcoder.catalog.xcmp import (  # noqa: E402
+    XcmpArrangement,
+    XcmpComponent,
+    XwspWorkspace,
+    _direct_child,
+    _direct_children,
+    _find,
+    _findall,
+    _float_text,
+    _int_text,
+    _local,
+    _text,
+)
 
 
 def _make_install(root: Path, *, component_text: str = "<Component/>") -> Path:
@@ -51,6 +68,81 @@ def _fake_workspace(path: Path) -> XwspWorkspace:
 
 
 class CatalogIncrementalIndexTests(unittest.TestCase):
+    def test_catalog_xml_helpers_match_native_and_python_paths(self):
+        root = ET.Element("{urn:synthetic}Root")
+        root.append(ET.Comment("ignored"))
+        first = ET.SubElement(root, "{urn:synthetic}Item")
+        first.text = " 42 \t"
+        group = ET.SubElement(root, "Group")
+        nested = ET.SubElement(group, "Item")
+        second = ET.SubElement(root, "Item")
+        integer = ET.SubElement(root, "Integer")
+        integer.text = "١٢"
+        large_integer = ET.SubElement(root, "LargeInteger")
+        large_integer.text = "9223372036854775808"
+        decimal = ET.SubElement(root, "Decimal")
+        decimal.text = "1.25e2"
+        negative_zero = ET.SubElement(root, "NegativeZero")
+        negative_zero.text = "-0.0"
+        nan = ET.SubElement(root, "Nan")
+        nan.text = "nan"
+
+        def collect():
+            return {
+                "local": _local(first.tag),
+                "first": _find(root, "Item"),
+                "all": _findall(root, "Item"),
+                "direct": _direct_children(root, "Item"),
+                "direct_first": _direct_child(root, "Item"),
+                "text": _text(first),
+                "unicode_integer": _int_text(integer),
+                "large_integer": _int_text(large_integer),
+                "decimal": _float_text(decimal),
+                "negative_zero": _float_text(negative_zero),
+            }
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = collect()
+            expected_nan = _float_text(nan)
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with ExitStack() as stack:
+                calls = {
+                    name: stack.enter_context(
+                        mock.patch.object(
+                            native_acceleration,
+                            name,
+                            wraps=getattr(native_acceleration, name),
+                        )
+                    )
+                    for name in (
+                        "xml_local_name",
+                        "xml_first_element_by_name",
+                        "xml_elements_by_name",
+                        "xml_direct_elements_by_name",
+                        "xml_first_direct_element_by_name",
+                        "xml_clean_text",
+                        "parse_i64_text",
+                        "parse_f64_decimal_text",
+                    )
+                }
+                actual = collect()
+                actual_nan = _float_text(nan)
+                for name, call in calls.items():
+                    self.assertGreater(call.call_count, 0, name)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["all"], [first, nested, second])
+        self.assertEqual(actual["direct"], [first, second])
+        self.assertIs(actual["first"], first)
+        self.assertIs(actual["direct_first"], first)
+        self.assertEqual(actual["text"], "42")
+        self.assertEqual(actual["unicode_integer"], 12)
+        self.assertEqual(actual["large_integer"], 9223372036854775808)
+        self.assertEqual(actual["decimal"], 125.0)
+        self.assertEqual(math.copysign(1.0, actual["negative_zero"]), -1.0)
+        self.assertEqual(math.copysign(1.0, expected["negative_zero"]), -1.0)
+        self.assertTrue(math.isnan(expected_nan))
+        self.assertTrue(math.isnan(actual_nan))
+
     def test_stat_fingerprint_ignores_mtime_reset(self):
         with tempfile.TemporaryDirectory() as tmp:
             install = _make_install(Path(tmp))
