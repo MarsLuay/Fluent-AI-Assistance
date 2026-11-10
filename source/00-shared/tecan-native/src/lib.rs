@@ -868,9 +868,7 @@ fn decode_utf16_bytes(bytes: &[u8], little_endian: bool) -> Option<String> {
         .ok()
 }
 
-#[pyfunction]
-fn decode_text_bytes(data: &Bound<'_, PyBytes>) -> String {
-    let bytes = data.as_bytes();
+fn decode_text_bytes_data(bytes: &[u8]) -> String {
     let utf8_payload = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(bytes);
     if let Ok(text) = std::str::from_utf8(utf8_payload) {
         return text.to_owned();
@@ -890,6 +888,18 @@ fn decode_text_bytes(data: &Bound<'_, PyBytes>) -> String {
         return text;
     }
     bytes.iter().map(|byte| char::from(*byte)).collect()
+}
+
+#[pyfunction]
+fn decode_text_bytes(data: &Bound<'_, PyBytes>) -> String {
+    decode_text_bytes_data(data.as_bytes())
+}
+
+#[pyfunction]
+fn read_text_file(path: &str) -> Option<String> {
+    std::fs::read(path)
+        .ok()
+        .map(|bytes| decode_text_bytes_data(&bytes))
 }
 
 #[pyfunction]
@@ -1535,6 +1545,7 @@ fn pattern_windows<'py>(
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(parse_xml, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
+    module.add_function(wrap_pyfunction!(read_text_file, module)?)?;
     module.add_function(wrap_pyfunction!(catalog_source_paths, module)?)?;
     module.add_function(wrap_pyfunction!(catalog_stat_fingerprint, module)?)?;
     module.add_function(wrap_pyfunction!(source_content_fingerprint, module)?)?;

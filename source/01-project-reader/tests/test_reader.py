@@ -312,8 +312,10 @@ class ReaderTests(unittest.TestCase):
                 )
 
     def test_native_reader_text_decode_matches_python_encoding_order(self) -> None:
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "decode_text_bytes"
+        if (
+            not native_acceleration.available()
+            or not hasattr(native_acceleration._native, "decode_text_bytes")
+            or not hasattr(native_acceleration._native, "read_text_file")
         ):
             self.skipTest("optional Rust text decoder is not built")
 
@@ -354,6 +356,24 @@ class ReaderTests(unittest.TestCase):
                 for data in samples[:11]:
                     target.write_bytes(data)
                     self.assertEqual(read_text(target), python_decode(data))
+
+    def test_native_file_reader_avoids_python_byte_read_and_keeps_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "read_text_file"
+        ):
+            self.skipTest("optional Rust file reader is not built")
+        with tempfile.TemporaryDirectory() as raw_directory:
+            path = Path(raw_directory) / "utf16.txt"
+            path.write_bytes("native reader ✓".encode("utf-16"))
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    Path,
+                    "read_bytes",
+                    side_effect=AssertionError("native file reader should avoid Python byte reads"),
+                ):
+                    self.assertEqual(read_text(path), "native reader ✓")
+            with patch.object(native_acceleration, "_native", None):
+                self.assertEqual(read_text(path), "native reader ✓")
 
     def test_native_jsonable_containers_match_python_recursive_conversion(self) -> None:
         if not native_acceleration.available() or not hasattr(

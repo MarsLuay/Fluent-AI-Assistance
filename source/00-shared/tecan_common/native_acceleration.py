@@ -53,6 +53,17 @@ def decode_text_bytes(data: Any) -> str | None:
         return None
 
 
+def read_text_file(path: str | Path) -> str | None:
+    """Read and decode a text file natively, or request the Python fallback."""
+    if not enabled() or not isinstance(path, (str, Path)):
+        return None
+    try:
+        result = _native.read_text_file(str(path))
+        return result if type(result) is str else None
+    except (AttributeError, OSError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def to_jsonable_containers(value: Any) -> tuple[bool, Any] | None:
     """Convert supported exact JSON containers natively, or request Python fallback."""
     if not enabled():
