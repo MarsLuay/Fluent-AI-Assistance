@@ -9,6 +9,7 @@ use quick_xml::reader::NsReader;
 use rayon::prelude::*;
 use serde_json::{Map, Number, Value};
 use sha2::{Digest, Sha256};
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::Read;
@@ -536,6 +537,49 @@ fn is_safe_json_key(py: Python<'_>, value: &Bound<'_, PyAny>, depth: usize) -> P
     Ok(true)
 }
 
+fn sorted_builtin_set<'py>(
+    py: Python<'py>,
+    value: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    let items = value.cast::<PySet>()?;
+    let mut values: Vec<Bound<'py, PyAny>> = items.iter().collect();
+    let mut kind = None;
+    for item in &values {
+        let value_type = item.get_type();
+        let item_kind = if value_type.is(py.get_type::<PyBool>()) {
+            1
+        } else if value_type.is(py.get_type::<PyInt>()) {
+            2
+        } else if value_type.is(py.get_type::<PyString>()) {
+            3
+        } else {
+            return Ok(None);
+        };
+        if kind.is_some_and(|kind| kind != item_kind) {
+            return Ok(None);
+        }
+        kind = Some(item_kind);
+    }
+
+    for index in 1..values.len() {
+        let mut cursor = index;
+        while cursor > 0 {
+            match values[cursor].compare(&values[cursor - 1]) {
+                Ok(Ordering::Less) => values.swap(cursor, cursor - 1),
+                Ok(_) => break,
+                Err(_) => return Ok(None),
+            }
+            cursor -= 1;
+        }
+    }
+
+    let output = PyList::empty(py);
+    for item in values {
+        output.append(item)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
 #[allow(clippy::too_many_arguments)] // Exact Python types and recursion state stay explicit.
 fn try_to_jsonable_containers<'py>(
     py: Python<'py>,
@@ -573,23 +617,7 @@ fn try_to_jsonable_containers<'py>(
     }
 
     if value_type.is(py.get_type::<PySet>()) {
-        let items = value.cast::<PySet>()?;
-        let mut strings = Vec::with_capacity(items.len());
-        for item in items.iter() {
-            if !item.get_type().is(py.get_type::<PyString>()) {
-                return Ok(None);
-            }
-            let Ok(text) = item.extract::<String>() else {
-                return Ok(None);
-            };
-            strings.push((text, item));
-        }
-        strings.sort_by(|left, right| left.0.cmp(&right.0));
-        let output = PyList::empty(py);
-        for (_, item) in strings {
-            output.append(item)?;
-        }
-        return Ok(Some(output.into_any()));
+        return sorted_builtin_set(py, value);
     }
 
     if value_type.is(py.get_type::<PyTuple>()) {

@@ -384,6 +384,12 @@ class ReaderTests(unittest.TestCase):
             ),
             ([], []),
             ({}, {}),
+            (set(), []),
+            ({False, True}, [False, True]),
+            (
+                {-10, 0, 2**80, -(2**100)},
+                [-(2**100), -10, 0, 2**80],
+            ),
             (Path("sample.xscr"), "sample.xscr"),
             (
                 {"path": Path("nested.xml"), "values": (1, 2)},
@@ -474,7 +480,7 @@ class ReaderTests(unittest.TestCase):
             DerivedCounter({"warning": 2}),
             DerivedDefaultDict(list, {"value": (1,)}),
             DerivedOrderedDict([("value", (1,))]),
-            {2, 1},
+            {True, 2},
             custom_key_mapping,
         ]
         for value in fallback_values:
