@@ -328,6 +328,18 @@ def _dependencies(root: ET.Element) -> dict[str, list[str]]:
         grouped.get("WorklistName", []),
         grouped.get("SubRoutine", []),
     )
+    locations = grouped.get("Location", [])
+    pin_matches = native_acceleration.ascii_case_insensitive_substring_match_values(
+        locations, "pin"
+    )
+    if pin_matches is None:
+        worktable_pin_locations = _sorted_unique_strings(
+            [value for value in locations if "pin" in str(value).casefold()]
+        )
+    else:
+        worktable_pin_locations = _sorted_unique_strings(
+            [value for value, matched in zip(locations, pin_matches) if matched]
+        )
     return {
         "workspace_guids": grouped.get("BaseWorkspaceName", []),
         "labware_names": _sorted_unique_strings(
@@ -352,13 +364,7 @@ def _dependencies(root: ET.Element) -> dict[str, list[str]]:
         "pin_refs": _sorted_unique_strings(
             grouped.get("PinNumber", []), _pin_refs(_all_text_values(root))
         ),
-        "worktable_pin_locations": _sorted_unique_strings(
-            [
-                value
-                for value in grouped.get("Location", [])
-                if "pin" in str(value).casefold()
-            ]
-        ),
+        "worktable_pin_locations": worktable_pin_locations,
         "touchtools_titles": _sorted_unique_strings(grouped.get("RUPScreenTitle", [])),
     }
 

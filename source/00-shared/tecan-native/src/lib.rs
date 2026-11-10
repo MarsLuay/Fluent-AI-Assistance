@@ -1441,6 +1441,42 @@ fn ascii_case_insensitive_substring_match_groups(
     )
 }
 
+#[pyfunction]
+fn ascii_case_insensitive_substring_match_values<'py>(
+    py: Python<'py>,
+    values: &Bound<'py, PyAny>,
+    needle: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !values.get_type().is(py.get_type::<PyList>())
+        || !needle.get_type().is(py.get_type::<PyString>())
+    {
+        return Ok(None);
+    }
+    let needle = needle.extract::<String>()?;
+    if !needle.is_ascii() {
+        return Ok(None);
+    }
+    let needle_bytes = needle.as_bytes();
+    let output = PyList::empty(py);
+    for value in values.try_iter()? {
+        let value = value?;
+        if !value.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let value = value.extract::<String>()?;
+        if !value.is_ascii() {
+            return Ok(None);
+        }
+        let matched = needle_bytes.is_empty()
+            || value
+                .as_bytes()
+                .windows(needle_bytes.len())
+                .any(|window| window.eq_ignore_ascii_case(needle_bytes));
+        output.append(matched)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
 #[pyfunction(name = "ascii_case_insensitive_substring_match_groups")]
 fn ascii_case_insensitive_substring_match_groups_py<'py>(
     py: Python<'py>,
@@ -3861,6 +3897,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(most_common_string_counts, module)?)?;
     module.add_function(wrap_pyfunction!(sorted_unique_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        ascii_case_insensitive_substring_match_values,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(
         ascii_case_insensitive_substring_match_groups_py,
         module

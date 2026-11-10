@@ -47,6 +47,49 @@ SAMPLE_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ScriptTests(unittest.TestCase):
+    def test_worktable_pin_location_filter_uses_native_ascii_with_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native,
+            "ascii_case_insensitive_substring_match_values",
+        ):
+            self.skipTest("optional Rust substring matcher is not built")
+        source = (
+            "<Root><Location>Pin rack</Location><Location>spindle</Location>"
+            "<Location>pin shelf</Location><Location>pin shelf</Location></Root>"
+        )
+        root = script.parse_xml_text(source)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = script._dependencies(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_case_insensitive_substring_match_values",
+                wraps=native_acceleration.ascii_case_insensitive_substring_match_values,
+            ) as native_call:
+                actual = script._dependencies(root)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual["worktable_pin_locations"], ["Pin rack", "pin shelf", "spindle"]
+        )
+
+        unicode_root = script.parse_xml_text(
+            "<Root><Location>Pin café</Location><Location>spindle</Location></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unicode_expected = script._dependencies(unicode_root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.ascii_case_insensitive_substring_match_values(
+                    ["Pin café"], "pin"
+                )
+            )
+            unicode_actual = script._dependencies(unicode_root)
+        self.assertEqual(unicode_actual, unicode_expected)
+        self.assertEqual(
+            unicode_actual["worktable_pin_locations"], ["Pin café", "spindle"]
+        )
+
     def test_inspect_xscr_reads_from_path(self) -> None:
         with TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir) / "test.xscr"
