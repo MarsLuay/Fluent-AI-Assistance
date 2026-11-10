@@ -1447,6 +1447,34 @@ def pin_reference_candidates(values: Any) -> list[str] | None:
         return None
 
 
+def casefold_alias_values(mapping: Any, alias_groups: Any) -> list[Any] | None:
+    """Resolve ordered ASCII aliases in exact built-in string/dictionary fields."""
+    if (
+        not enabled()
+        or type(mapping) is not dict
+        or type(alias_groups) not in (list, tuple)
+        or not all(
+            type(group) in (list, tuple)
+            and all(type(alias) is str and alias.isascii() for alias in group)
+            for group in alias_groups
+        )
+        or not all(
+            type(key) is str
+            and key.isascii()
+            and type(value) in (str, dict)
+            for key, value in mapping.items()
+        )
+    ):
+        return None
+    try:
+        result = _native.casefold_alias_values(
+            mapping, [list(group) for group in alias_groups]
+        )
+        return result if type(result) is list else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def asset_reference_names(values: Any) -> list[str] | None:
     """Extract and deduplicate ASCII path basenames natively."""
     if (

@@ -14,6 +14,7 @@ from typing import Any
 
 from tecan_common import xml_compat as ET
 from tecan_common.native_acceleration import (
+    casefold_alias_values,
     collapse_ascii_whitespace,
     xml_elements_by_folded_name_with_children,
 )
@@ -131,6 +132,27 @@ def _element_record(element: Any, *, index: int) -> dict[str, Any]:
 
 
 def _normalized_task_fields(values: dict[str, Any]) -> dict[str, Any]:
+    field_aliases = {
+        "task_id": ("taskid", "task_id", "id"),
+        "task_name": ("taskname", "task_name", "task", "name"),
+        "process_id": ("processid", "process_id"),
+        "process_name": ("processname", "process_name", "process"),
+        "schedule": ("schedule", "scheduledtime", "starttime"),
+        "due_time": ("duetime", "due_time", "duedatetime", "due"),
+        "iteration_count": ("iterationcount", "iteration_count", "iterations", "count"),
+        "parameter": ("parameter", "parameters", "value"),
+        "labware_group": ("labwaregroup", "labware_group", "labwaregroupref"),
+        "comment": ("comment", "comments", "description"),
+    }
+    native_values = casefold_alias_values(values, tuple(field_aliases.values()))
+    if native_values is not None:
+        normalized = dict(zip(field_aliases, native_values))
+        return {
+            key: value
+            for key, value in normalized.items()
+            if value not in (None, "")
+        }
+
     folded = {str(key).casefold(): value for key, value in values.items()}
 
     def first(*names: str) -> Any:
@@ -140,16 +162,7 @@ def _normalized_task_fields(values: dict[str, Any]) -> dict[str, Any]:
         return None
 
     normalized = {
-        "task_id": first("taskid", "task_id", "id"),
-        "task_name": first("taskname", "task_name", "task", "name"),
-        "process_id": first("processid", "process_id"),
-        "process_name": first("processname", "process_name", "process"),
-        "schedule": first("schedule", "scheduledtime", "starttime"),
-        "due_time": first("duetime", "due_time", "duedatetime", "due"),
-        "iteration_count": first("iterationcount", "iteration_count", "iterations", "count"),
-        "parameter": first("parameter", "parameters", "value"),
-        "labware_group": first("labwaregroup", "labware_group", "labwaregroupref"),
-        "comment": first("comment", "comments", "description"),
+        key: first(*names) for key, names in field_aliases.items()
     }
     return {key: value for key, value in normalized.items() if value not in (None, "")}
 

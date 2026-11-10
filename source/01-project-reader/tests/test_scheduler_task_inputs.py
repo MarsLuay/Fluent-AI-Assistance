@@ -167,6 +167,56 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
             unicode_actual["records"][0]["fields"]["Name"], "café user"
         )
 
+    def test_task_field_alias_lookup_uses_native_for_ascii_and_falls_back(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "casefold_alias_values"
+        ):
+            self.skipTest("optional Rust field-alias lookup is not built")
+        nested_value = {"nested": "preserved"}
+        values = {
+            "TaskID": "older",
+            "taskid": "latest",
+            "TaskName": "",
+            "Task_Name": "Run assay",
+            "Process": "Scheduler A",
+            "DueDateTime": "",
+            "Due": "tomorrow",
+            "Parameter": nested_value,
+            "Comment": "review",
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = task_input._normalized_task_fields(values)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                task_input,
+                "casefold_alias_values",
+                wraps=native_acceleration.casefold_alias_values,
+            ) as native_call:
+                actual = task_input._normalized_task_fields(values)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["task_id"], "latest")
+        self.assertEqual(actual["task_name"], "Run assay")
+        self.assertEqual(actual["due_time"], "tomorrow")
+        self.assertIs(actual["parameter"], nested_value)
+
+        unicode_values = {
+            "Task_Name": "café",
+            "taskname": "",
+            "TâskName": "unmatched",
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unicode_expected = task_input._normalized_task_fields(unicode_values)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.casefold_alias_values(
+                    unicode_values, (("taskname", "task_name", "task", "name"),)
+                )
+            )
+            self.assertEqual(
+                task_input._normalized_task_fields(unicode_values), unicode_expected
+            )
+
     def test_twl_xml_preserves_additive_record_fields_and_order(self) -> None:
         result = inspect_twl_text(
             "<TaskInput><Task Name=\"one\" FutureField=\"x\"><Value>7</Value>"

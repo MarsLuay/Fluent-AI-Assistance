@@ -1270,6 +1270,63 @@ fn xscr_command_records<'py>(
 }
 
 #[pyfunction]
+fn casefold_alias_values<'py>(
+    py: Python<'py>,
+    mapping: &Bound<'py, PyAny>,
+    alias_groups: Vec<Vec<String>>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !mapping.get_type().is(py.get_type::<PyDict>()) {
+        return Ok(None);
+    }
+    let items = mapping.call_method0("items")?;
+    let folded = PyDict::new(py);
+    for item in items.try_iter()? {
+        let item = item?;
+        let key = item.get_item(0)?;
+        let value = item.get_item(1)?;
+        if !key.get_type().is(py.get_type::<PyString>())
+            || !(value.get_type().is(py.get_type::<PyString>())
+                || value.get_type().is(py.get_type::<PyDict>()))
+        {
+            return Ok(None);
+        }
+        let key = key.extract::<String>()?;
+        if !key.is_ascii() {
+            return Ok(None);
+        }
+        folded.set_item(key.to_ascii_lowercase(), value)?;
+    }
+    let output = PyList::empty(py);
+    for aliases in alias_groups {
+        let mut selected = None;
+        for alias in aliases {
+            if !alias.is_ascii() {
+                return Ok(None);
+            }
+            let Some(value) = folded.get_item(alias)? else {
+                continue;
+            };
+            if value.is_none() {
+                continue;
+            }
+            if value.get_type().is(py.get_type::<PyString>())
+                && value.extract::<String>()?.is_empty()
+            {
+                continue;
+            }
+            selected = Some(value);
+            break;
+        }
+        if let Some(value) = selected {
+            output.append(value)?;
+        } else {
+            output.append(py.None())?;
+        }
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn xml_variable_definition_elements<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -3218,6 +3275,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     module.add_function(wrap_pyfunction!(xml_variable_definition_elements, module)?)?;
+    module.add_function(wrap_pyfunction!(casefold_alias_values, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_command_records, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_dict, module)?)?;
