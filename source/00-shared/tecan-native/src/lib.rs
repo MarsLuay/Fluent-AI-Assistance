@@ -431,6 +431,30 @@ fn catalog_content_fingerprints(
     fingerprints.map_err(|error| PyOSError::new_err(error.to_string()))
 }
 
+fn is_exact_deepcopy_key(py: Python<'_>, value: &Bound<'_, PyAny>, depth: usize) -> PyResult<bool> {
+    if value.is_none() {
+        return Ok(true);
+    }
+    let value_type = value.get_type();
+    if value_type.is(py.get_type::<PyBool>())
+        || value_type.is(py.get_type::<PyInt>())
+        || value_type.is(py.get_type::<PyFloat>())
+        || value_type.is(py.get_type::<PyString>())
+        || value_type.is(py.get_type::<PyBytes>())
+    {
+        return Ok(true);
+    }
+    if depth >= 1024 || !value_type.is(py.get_type::<PyTuple>()) {
+        return Ok(false);
+    }
+    for item in value.cast::<PyTuple>()?.iter() {
+        if !is_exact_deepcopy_key(py, &item, depth + 1)? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 fn clone_json_value<'py>(
     py: Python<'py>,
     value: &Bound<'py, PyAny>,
@@ -443,12 +467,13 @@ fn clone_json_value<'py>(
             "data nesting exceeds native copy limit",
         ));
     }
+    let value_type = value.get_type();
     if value.is_none()
-        || value.is_instance_of::<PyBool>()
-        || value.is_instance_of::<PyInt>()
-        || value.is_instance_of::<PyFloat>()
-        || value.is_instance_of::<PyString>()
-        || value.is_instance_of::<PyBytes>()
+        || value_type.is(py.get_type::<PyBool>())
+        || value_type.is(py.get_type::<PyInt>())
+        || value_type.is(py.get_type::<PyFloat>())
+        || value_type.is(py.get_type::<PyString>())
+        || value_type.is(py.get_type::<PyBytes>())
     {
         return Ok(value.clone());
     }
@@ -463,7 +488,8 @@ fn clone_json_value<'py>(
         return Ok(copied.clone_ref(py).into_bound(py));
     }
 
-    if let Ok(items) = value.cast::<PyList>() {
+    if value_type.is(py.get_type::<PyList>()) {
+        let items = value.cast::<PyList>()?;
         let output = PyList::empty(py);
         memo.insert(pointer, output.clone().into_any().unbind());
         active.insert(pointer);
@@ -473,19 +499,13 @@ fn clone_json_value<'py>(
         active.remove(&pointer);
         return Ok(output.into_any());
     }
-    if let Ok(items) = value.cast::<PyDict>() {
+    if value_type.is(py.get_type::<PyDict>()) {
+        let items = value.cast::<PyDict>()?;
         let output = PyDict::new(py);
         memo.insert(pointer, output.clone().into_any().unbind());
         active.insert(pointer);
         for (key, item) in items.iter() {
-            if !(key.is_none()
-                || key.is_instance_of::<PyBool>()
-                || key.is_instance_of::<PyInt>()
-                || key.is_instance_of::<PyFloat>()
-                || key.is_instance_of::<PyString>()
-                || key.is_instance_of::<PyBytes>()
-                || key.is_instance_of::<PyTuple>())
-            {
+            if !is_exact_deepcopy_key(py, &key, 0)? {
                 return Err(PyTypeError::new_err(
                     "custom dictionary keys require Python deepcopy fallback",
                 ));
@@ -496,13 +516,20 @@ fn clone_json_value<'py>(
         active.remove(&pointer);
         return Ok(output.into_any());
     }
-    if let Ok(items) = value.cast::<PyTuple>() {
+    if value_type.is(py.get_type::<PyTuple>()) {
+        let items = value.cast::<PyTuple>()?;
         active.insert(pointer);
         let mut copied_items = Vec::with_capacity(items.len());
+        let mut unchanged = true;
         for item in items.iter() {
-            copied_items.push(clone_json_value(py, &item, memo, active, depth + 1)?);
+            let copied = clone_json_value(py, &item, memo, active, depth + 1)?;
+            unchanged &= copied.is(&item);
+            copied_items.push(copied);
         }
         active.remove(&pointer);
+        if unchanged {
+            return Ok(value.clone());
+        }
         let output = PyTuple::new(py, copied_items)?;
         memo.insert(pointer, output.clone().into_any().unbind());
         return Ok(output.into_any());

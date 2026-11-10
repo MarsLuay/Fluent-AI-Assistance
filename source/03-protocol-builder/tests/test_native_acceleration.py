@@ -110,6 +110,61 @@ class NativeAccelerationTests(unittest.TestCase):
         self.assertIs(copied["left"], copied["right"])
         self.assertIsNot(copied["left"], shared)
 
+        shared_tuple = ([1],)
+        copied_tuples = native_acceleration._native.deepcopy_json(
+            [shared_tuple, shared_tuple]
+        )
+        self.assertIs(copied_tuples[0], copied_tuples[1])
+        self.assertIsNot(copied_tuples[0], shared_tuple)
+        self.assertIsNot(copied_tuples[0][0], shared_tuple[0])
+
+        tuple_key = (1, "key")
+        copied_tuple_key = native_acceleration._native.deepcopy_json(
+            {tuple_key: tuple_key}
+        )
+        self.assertIs(copied_tuple_key[tuple_key], tuple_key)
+
+    def test_native_deepcopy_falls_back_for_overridden_python_types(self) -> None:
+        if not native_acceleration.available():
+            self.skipTest("optional Rust extension is not built")
+        from tecan_reader.project_model import deepcopy as project_deepcopy
+
+        class ShiftedInt(int):
+            def __deepcopy__(self, memo: dict[int, object]) -> ShiftedInt:
+                return ShiftedInt(int(self) + 1)
+
+        class CustomList(list):
+            def __deepcopy__(self, memo: dict[int, object]) -> dict[str, list[object]]:
+                return {"custom": list(self)}
+
+        class CustomDict(dict):
+            def __deepcopy__(self, memo: dict[int, object]) -> dict[str, object]:
+                return {"custom": dict(self)}
+
+        class CustomTuple(tuple):
+            def __deepcopy__(self, memo: dict[int, object]) -> tuple[object, ...]:
+                return ("copied", *self)
+
+        values = [
+            ShiftedInt(4),
+            CustomList([1]),
+            CustomDict({"value": 1}),
+            CustomTuple((1, 2)),
+            {ShiftedInt(4): "value"},
+        ]
+        for value in values:
+            with self.subTest(value_type=type(value).__name__):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    expected = project_deepcopy(value)
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    self.assertIsNone(native_acceleration.deepcopy_json(value))
+                    actual = project_deepcopy(value)
+                self.assertEqual(actual, expected)
+
     def test_native_canonical_json_matches_python_format(self) -> None:
         if not native_acceleration.available():
             self.skipTest("optional Rust extension is not built")
