@@ -117,7 +117,7 @@ class SourceProvenance:
         return {
             "source_archive": self.source_archive,
             "entry_path": self.entry_path,
-            "original_identifiers": dict(sorted(self.original_identifiers.items())),
+            "original_identifiers": _sorted_string_mapping(self.original_identifiers),
         }
 
 

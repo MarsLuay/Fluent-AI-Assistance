@@ -114,6 +114,45 @@ class ProjectModelTests(unittest.TestCase):
             ["value"],
         )
 
+    def test_source_identifier_sorting_uses_native_ascii_and_unicode_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "sort_ascii_string_keys"
+        ):
+            self.skipTest("optional Rust mapping sorter is not built")
+        provenance = SourceProvenance(
+            source_archive="input.zeia",
+            entry_path="Scripts/main.xscr",
+            original_identifiers={"guid": "abc", "object_name": "Main"},
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = provenance.to_dict()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                project_model,
+                "_native_sort_ascii_string_keys",
+                wraps=native_acceleration.sort_ascii_string_keys,
+            ) as native_call:
+                actual = provenance.to_dict()
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(list(actual["original_identifiers"]), ["guid", "object_name"])
+
+        unicode_provenance = SourceProvenance(
+            source_archive="input.zeia",
+            entry_path="Scripts/main.xscr",
+            original_identifiers={"é": "value", "a": "first"},
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.sort_ascii_string_keys(
+                    unicode_provenance.original_identifiers
+                )
+            )
+            self.assertEqual(
+                list(unicode_provenance.to_dict()["original_identifiers"]),
+                ["a", "é"],
+            )
+
     def test_source_provenance_shape(self) -> None:
         provenance = SourceProvenance(
             source_archive="input.zeia",
