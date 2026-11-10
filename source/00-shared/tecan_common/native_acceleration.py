@@ -92,12 +92,12 @@ def xml_container_child_texts(
 
 
 def collapse_ascii_whitespace(value: Any) -> str | None:
-    """Collapse Python ASCII whitespace runs, falling back for Unicode text."""
+    """Collapse Python Unicode whitespace runs, falling back for unsupported values."""
     if not enabled():
         return None
     if value is None:
         text = ""
-    elif type(value) is str and value.isascii():
+    elif type(value) is str:
         text = value
     else:
         return None

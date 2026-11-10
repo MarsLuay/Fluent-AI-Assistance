@@ -1875,10 +1875,12 @@ fn xml_elements_by_name<'py>(
     Ok(Some(output.into_any()))
 }
 
+fn is_python_whitespace(character: char) -> bool {
+    character.is_whitespace() || ('\u{001c}'..='\u{001f}').contains(&character)
+}
+
 fn trim_python_whitespace(value: &str) -> &str {
-    value.trim_matches(|character: char| {
-        character.is_whitespace() || ('\u{001c}'..='\u{001f}').contains(&character)
-    })
+    value.trim_matches(is_python_whitespace)
 }
 
 #[pyfunction]
@@ -2982,29 +2984,26 @@ fn asset_extension_end(bytes: &[u8], start: usize) -> Option<usize> {
     None
 }
 
-fn python_ascii_whitespace(byte: u8) -> bool {
-    matches!(byte, b'\t'..=b'\r' | 0x1c..=0x20)
-}
-
 #[pyfunction]
 fn collapse_ascii_whitespace(text: &str) -> Option<String> {
-    if !text.is_ascii() {
-        return None;
-    }
     let mut output = String::with_capacity(text.len());
     let mut pending_space = false;
-    for byte in text.bytes() {
-        if python_ascii_whitespace(byte) {
+    for character in text.chars() {
+        if is_python_whitespace(character) {
             pending_space = !output.is_empty();
         } else {
             if pending_space {
                 output.push(' ');
             }
-            output.push(char::from(byte));
+            output.push(character);
             pending_space = false;
         }
     }
     Some(output)
+}
+
+fn python_ascii_whitespace(byte: u8) -> bool {
+    matches!(byte, b'\t'..=b'\r' | 0x1c..=0x20)
 }
 
 #[pyfunction]
@@ -4389,7 +4388,14 @@ mod tests {
             Some("alpha beta gamma".to_string())
         );
         assert_eq!(collapse_ascii_whitespace(" \u{1f} \t"), Some(String::new()));
-        assert_eq!(collapse_ascii_whitespace("café"), None);
+        assert_eq!(
+            collapse_ascii_whitespace("café\u{00a0}user"),
+            Some("café user".to_string())
+        );
+        assert_eq!(
+            collapse_ascii_whitespace("a\u{2003}\u{2003}b"),
+            Some("a b".to_string())
+        );
     }
 
     #[test]

@@ -126,7 +126,7 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
             "unicode",
         )
 
-    def test_twl_xml_whitespace_normalization_uses_native_ascii_and_unicode_fallback(self) -> None:
+    def test_twl_xml_whitespace_normalization_uses_native_unicode(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "collapse_ascii_whitespace"
         ):
@@ -158,14 +158,40 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
                 unicode_source, source_name="Inputs/unicode.twl"
             )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            self.assertIsNone(native_acceleration.collapse_ascii_whitespace(unicode_text))
-            unicode_actual = inspect_twl_text(
-                unicode_source, source_name="Inputs/unicode.twl"
+            self.assertEqual(
+                native_acceleration.collapse_ascii_whitespace(unicode_text),
+                "café user",
             )
+            with patch.object(
+                task_input,
+                "collapse_ascii_whitespace",
+                wraps=native_acceleration.collapse_ascii_whitespace,
+            ) as native_call:
+                unicode_actual = inspect_twl_text(
+                    unicode_source, source_name="Inputs/unicode.twl"
+                )
+                self.assertGreater(native_call.call_count, 0)
         self.assertEqual(unicode_actual, unicode_expected)
         self.assertEqual(
             unicode_actual["records"][0]["fields"]["Name"], "café user"
         )
+
+        whitespace_chars = [
+            chr(codepoint)
+            for codepoint in range(0x110000)
+            if chr(codepoint).isspace()
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            for character in whitespace_chars:
+                text = f"α{character}{character}β"
+                self.assertEqual(
+                    native_acceleration.collapse_ascii_whitespace(text),
+                    " ".join(text.split()),
+                    f"whitespace U+{ord(character):04X}",
+                )
+            self.assertIsNone(
+                native_acceleration.collapse_ascii_whitespace(chr(0xD800))
+            )
 
     def test_delimited_row_field_normalization_preserves_python_rules(self) -> None:
         if not native_acceleration.available() or not hasattr(
