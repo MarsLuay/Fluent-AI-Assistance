@@ -1356,7 +1356,10 @@ fn delimited_text_rows<'py>(
         let Ok(record) = record else {
             return Ok(None);
         };
-        if record.len() == 1 && record.get(0) == Some("") {
+        if !record
+            .iter()
+            .any(|value| !trim_python_whitespace(value).is_empty())
+        {
             continue;
         }
         let row = PyList::empty(py);

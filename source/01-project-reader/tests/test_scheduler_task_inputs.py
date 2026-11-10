@@ -288,6 +288,7 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
             "taskname,parameter\r\n"
             "Run-1,\u00a0β\u00a0\r\n"
             "\r\n"
+            " \u00a0,\u001c\r\n"
             "Run-2,東京\r\n"
         )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
@@ -300,6 +301,14 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
             ) as native_call:
                 actual = inspect_twl_text(plain, source_name="Inputs/plain.twl")
                 native_call.assert_called_once_with(plain, ",")
+            self.assertEqual(
+                native_acceleration.delimited_text_rows(plain, ","),
+                [
+                    ["taskname", "parameter"],
+                    ["Run-1", "\u00a0β\u00a0"],
+                    ["Run-2", "東京"],
+                ],
+            )
         self.assertEqual(actual, expected)
         self.assertEqual(actual["record_count"], 2)
         self.assertEqual(actual["records"][0]["parameter"], "β")

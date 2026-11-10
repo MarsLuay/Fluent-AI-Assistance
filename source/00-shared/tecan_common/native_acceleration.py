@@ -1532,7 +1532,7 @@ def merge_unique_string_groups(groups: Any, limit: Any) -> dict[str, list[str]] 
 
 
 def delimited_text_rows(text: Any, delimiter: Any) -> list[list[str]] | None:
-    """Parse a conservative unquoted CSV subset natively; use Python otherwise."""
+    """Parse unquoted CSV rows, omitting Python-blank rows; fall back otherwise."""
     if (
         not enabled()
         or type(text) is not str

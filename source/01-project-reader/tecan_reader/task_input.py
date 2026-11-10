@@ -216,7 +216,7 @@ def _inspect_delimited(text: str, *, source_name: str) -> dict[str, Any]:
     rows = delimited_text_rows(text, delimiter)
     if rows is None:
         rows = list(csv.reader(io.StringIO(text), delimiter=delimiter))
-    rows = [row for row in rows if any(cell.strip() for cell in row)]
+        rows = [row for row in rows if any(cell.strip() for cell in row)]
     if not rows:
         return {
             "kind": "task_input", "schema_version": TASK_INPUT_SCHEMA_VERSION,
