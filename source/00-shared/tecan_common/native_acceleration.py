@@ -239,6 +239,28 @@ def render_object_report(
         return None
 
 
+def render_pattern_specs(specs: Any) -> list[str] | None:
+    """Render supported pattern specification mappings natively."""
+    if not enabled() or type(specs) is not dict:
+        return None
+    entries: list[tuple[str, list[str]]] = []
+    try:
+        for key, values in specs.items():
+            if (
+                type(key) is not str
+                or type(values) not in (list, tuple)
+                or not all(type(value) is str for value in values)
+            ):
+                return None
+            entries.append((key, list(values)))
+        result = _native.render_pattern_specs(entries)
+        if type(result) is list and all(type(line) is str for line in result):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def render_join_lines(lines: Any) -> str | None:
     """Join supported Markdown lines with one final newline natively."""
     if (

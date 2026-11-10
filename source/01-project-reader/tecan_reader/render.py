@@ -10,6 +10,7 @@ from tecan_common.native_acceleration import (
     render_append_list as _native_render_append_list,
     render_join_lines as _native_render_join_lines,
     render_object_report as _native_render_object_report,
+    render_pattern_specs as _native_render_pattern_specs,
 )
 
 from .common import compact_list, to_jsonable
@@ -267,6 +268,11 @@ def _render_script_pattern_types(report: dict[str, Any]) -> str:
 def _append_pattern_specs(lines: list[str], specs: dict[str, Any]) -> None:
     if not specs:
         return
+    if type(lines) is list:
+        native = _native_render_pattern_specs(specs)
+        if native is not None:
+            lines.extend(native)
+            return
     lines.append("   - Specifications:")
     for key, values in specs.items():
         if not values:

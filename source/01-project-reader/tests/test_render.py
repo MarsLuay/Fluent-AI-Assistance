@@ -214,6 +214,54 @@ class RenderListTests(unittest.TestCase):
             self.assertEqual(render._finish_markdown([StringSubclass("x")]), "x\n")
             self.assertEqual(render._finish_markdown(ListSubclass(["x"])), "x\n")
 
+    def test_native_pattern_specs_preserve_order_limits_and_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "render_pattern_specs"
+        ):
+            self.skipTest("optional Rust pattern-spec renderer is not built")
+        specs = {
+            "empty": [],
+            "dimensions": [f"value-{index}" for index in range(14)],
+            "unicode": ("β", "γ"),
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = ["existing"]
+            render._append_pattern_specs(expected, specs)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(native_acceleration.render_pattern_specs(specs), expected[1:])
+            actual = ["existing"]
+            with patch.object(
+                render,
+                "_native_render_pattern_specs",
+                wraps=render._native_render_pattern_specs,
+            ) as native_call:
+                render._append_pattern_specs(actual, specs)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+
+        class TextValue:
+            def __init__(self) -> None:
+                self.str_calls = 0
+
+            def __str__(self) -> str:
+                self.str_calls += 1
+                return "custom"
+
+        custom = TextValue()
+        unsupported = {"custom": [custom]}
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_fallback = []
+            render._append_pattern_specs(expected_fallback, unsupported)
+        self.assertEqual(custom.str_calls, 1)
+        custom.str_calls = 0
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.render_pattern_specs(unsupported))
+            self.assertEqual(custom.str_calls, 0)
+            actual_fallback = []
+            render._append_pattern_specs(actual_fallback, unsupported)
+        self.assertEqual(custom.str_calls, 1)
+        self.assertEqual(actual_fallback, expected_fallback)
+
     def test_native_xml_object_report_matches_python_and_limits_lists(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "render_object_report"

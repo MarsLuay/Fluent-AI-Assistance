@@ -1134,6 +1134,30 @@ fn render_append_dict(title: &str, entries: Vec<(String, String)>, limit: i64) -
 }
 
 #[pyfunction]
+fn render_pattern_specs(entries: Vec<(String, Vec<String>)>) -> Vec<String> {
+    if entries.is_empty() {
+        return Vec::new();
+    }
+    let mut output = vec!["   - Specifications:".to_string()];
+    for (key, values) in entries {
+        if values.is_empty() {
+            continue;
+        }
+        let mut rendered = values
+            .iter()
+            .take(12)
+            .map(|value| format!("`{value}`"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        if values.len() > 12 {
+            rendered.push_str(&format!(", ... {} more", values.len() - 12));
+        }
+        output.push(format!("     - {key}: {rendered}"));
+    }
+    output
+}
+
+#[pyfunction]
 fn render_join_lines(lines: Vec<String>) -> String {
     format!("{}\n", lines.join("\n"))
 }
@@ -2001,6 +2025,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_dict, module)?)?;
     module.add_function(wrap_pyfunction!(render_object_report, module)?)?;
+    module.add_function(wrap_pyfunction!(render_pattern_specs, module)?)?;
     module.add_function(wrap_pyfunction!(render_join_lines, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(read_text_file, module)?)?;
@@ -2060,6 +2085,27 @@ mod tests {
             "α\nline\nbreak\n"
         );
         assert_eq!(render_join_lines(Vec::new()), "\n");
+    }
+
+    #[test]
+    fn pattern_spec_render_preserves_order_empty_values_and_limit() {
+        let entries = vec![
+            ("empty".into(), Vec::new()),
+            (
+                "first".into(),
+                (0..14).map(|index| format!("value-{index}")).collect(),
+            ),
+            ("unicode".into(), vec!["β".into()]),
+        ];
+        assert_eq!(
+            render_pattern_specs(entries),
+            vec![
+                "   - Specifications:",
+                "     - first: `value-0`, `value-1`, `value-2`, `value-3`, `value-4`, `value-5`, `value-6`, `value-7`, `value-8`, `value-9`, `value-10`, `value-11`, ... 2 more",
+                "     - unicode: `β`",
+            ]
+        );
+        assert!(render_pattern_specs(Vec::new()).is_empty());
     }
 
     #[test]
