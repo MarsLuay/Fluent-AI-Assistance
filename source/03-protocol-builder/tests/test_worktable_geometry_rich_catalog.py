@@ -312,10 +312,17 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         self.assertEqual(generated_actual, generated_expected)
 
     def test_site_kind_ascii_compact_matching_uses_native_with_python_policy(self):
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "ascii_case_insensitive_substring_match_groups"
+        if (
+            not native_acceleration.available()
+            or not hasattr(
+                native_acceleration._native,
+                "ascii_case_insensitive_substring_match_groups",
+            )
+            or not hasattr(
+                native_acceleration._native, "ascii_word_boundary_contains"
+            )
         ):
-            self.skipTest("optional Rust substring matcher is not built")
+            self.skipTest("optional Rust site-name matchers are not built")
         cases = [
             (("pin carrier", "", ""), "pin"),
             (("Cap nest", "", ""), "cap_nest"),
@@ -326,6 +333,10 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             (("7mm nest", "", ""), "nest"),
             (("東京 nest", "", ""), "nest"),
             (("nested", "", ""), ""),
+            (("nest1", "", ""), ""),
+            (("1nest", "", ""), ""),
+            (("x_nest-y", "", ""), "nest"),
+            (("Straße NEST", "", ""), "nest"),
             (("pin plus cap nest", "", ""), "pin"),
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
@@ -338,13 +349,20 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
                 "ascii_case_insensitive_substring_match_groups",
                 wraps=native_acceleration.ascii_case_insensitive_substring_match_groups,
             ) as native_call:
-                actual = [
-                    worktable_geometry.classify_site_kind(*parts) for parts, _ in cases
-                ]
-                self.assertEqual(
-                    native_call.call_count,
-                    sum(expected_value != "pin" for _, expected_value in cases),
-                )
+                with patch.object(
+                    native_acceleration,
+                    "ascii_word_boundary_contains",
+                    wraps=native_acceleration.ascii_word_boundary_contains,
+                ) as native_word_call:
+                    actual = [
+                        worktable_geometry.classify_site_kind(*parts)
+                        for parts, _ in cases
+                    ]
+                    self.assertEqual(
+                        native_call.call_count,
+                        sum(expected_value != "pin" for _, expected_value in cases),
+                    )
+                    self.assertEqual(native_word_call.call_count, 7)
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [expected_value for _, expected_value in cases])
 

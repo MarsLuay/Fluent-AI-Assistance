@@ -1424,7 +1424,11 @@ def classify_site_kind(location_group: Any = "", type_name: Any = "", object_nam
     if nest_family_match:
         return "nest"
     # Nest site templates (7mm Nest, 61mm Nest, Landscape Nest, …) via TypeName/LocationGroup.
-    if re.search(r"(^|[^a-z0-9])nest([^a-z0-9]|$)", lower):
+    native_word_match = native_acceleration.ascii_word_boundary_contains(lower, "nest")
+    if native_word_match is None:
+        if re.search(r"(^|[^a-z0-9])nest([^a-z0-9]|$)", lower):
+            return "nest"
+    elif native_word_match:
         return "nest"
     return ""
 

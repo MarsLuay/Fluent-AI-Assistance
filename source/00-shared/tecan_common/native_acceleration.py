@@ -1866,6 +1866,23 @@ def ascii_casefold_equals(value: Any, expected: Any) -> bool | None:
         return None
 
 
+def ascii_word_boundary_contains(value: Any, word: Any) -> bool | None:
+    """Match an ASCII word using explicit lowercase-letter/digit boundaries."""
+    if (
+        not enabled()
+        or type(value) is not str
+        or type(word) is not str
+        or not value.isascii()
+        or not word.isascii()
+    ):
+        return None
+    try:
+        result = _native.ascii_word_boundary_contains(value, word)
+        return result if type(result) is bool else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def ascii_case_insensitive_substring_match_values(
     values: Any, needle: Any
 ) -> list[bool] | None:

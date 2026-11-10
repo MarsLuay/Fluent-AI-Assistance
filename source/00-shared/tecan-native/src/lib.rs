@@ -1515,6 +1515,32 @@ fn ascii_casefold_equals(value: &str, expected: &str) -> Option<bool> {
     }
 }
 
+#[pyfunction]
+fn ascii_word_boundary_contains(value: &str, word: &str) -> Option<bool> {
+    if !value.is_ascii() || !word.is_ascii() || word.is_empty() {
+        return None;
+    }
+    let bytes = value.as_bytes();
+    let needle = word.as_bytes();
+    if needle.len() > bytes.len() {
+        return Some(false);
+    }
+    for start in 0..=bytes.len() - needle.len() {
+        if &bytes[start..start + needle.len()] != needle {
+            continue;
+        }
+        let left_boundary = start == 0
+            || !(bytes[start - 1].is_ascii_lowercase() || bytes[start - 1].is_ascii_digit());
+        let end = start + needle.len();
+        let right_boundary =
+            end == bytes.len() || !(bytes[end].is_ascii_lowercase() || bytes[end].is_ascii_digit());
+        if left_boundary && right_boundary {
+            return Some(true);
+        }
+    }
+    Some(false)
+}
+
 fn label_base_ascii(value: &str) -> Option<String> {
     if !value.is_ascii() {
         return None;
@@ -4583,6 +4609,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(most_common_string_counts, module)?)?;
     module.add_function(wrap_pyfunction!(sorted_unique_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
+    module.add_function(wrap_pyfunction!(ascii_word_boundary_contains, module)?)?;
     module.add_function(wrap_pyfunction!(label_base_ascii_text, module)?)?;
     module.add_function(wrap_pyfunction!(is_guid_text, module)?)?;
     module.add_function(wrap_pyfunction!(format_site_path, module)?)?;
@@ -4680,6 +4707,28 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ascii_word_boundary_matches_python_character_class() {
+        for (value, expected) in [
+            ("nest", true),
+            ("x_nest-y", true),
+            ("  nest  ", true),
+            ("nonest", false),
+            ("nest1", false),
+            ("1nest", false),
+            ("nested", false),
+            ("NEST", false),
+        ] {
+            assert_eq!(
+                ascii_word_boundary_contains(value, "nest"),
+                Some(expected),
+                "unexpected word boundary result for {value:?}"
+            );
+        }
+        assert_eq!(ascii_word_boundary_contains("東京 nest", "nest"), None);
+        assert_eq!(ascii_word_boundary_contains("nest", ""), None);
+    }
 
     #[test]
     fn orientation_parser_matches_supported_ascii_regex_cases() {
