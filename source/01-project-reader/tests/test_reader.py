@@ -371,6 +371,7 @@ class ReaderTests(unittest.TestCase):
             ),
             ([], []),
             ({}, {}),
+            ({"é", "z", "A", "a", "Å"}, ["A", "a", "z", "Å", "é"]),
             (
                 {
                     1: "integer",

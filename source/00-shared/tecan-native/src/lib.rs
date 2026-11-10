@@ -1,6 +1,8 @@
 use pyo3::exceptions::{PyOSError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyBytes, PyDict, PyFloat, PyInt, PyList, PyModule, PyString, PyTuple};
+use pyo3::types::{
+    PyBool, PyBytes, PyDict, PyFloat, PyInt, PyList, PyModule, PySet, PyString, PyTuple,
+};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
@@ -552,6 +554,26 @@ fn try_to_jsonable_containers<'py>(
         || value_type.is(py.get_type::<PyBytes>())
     {
         return Ok(Some(value.clone()));
+    }
+
+    if value_type.is(py.get_type::<PySet>()) {
+        let items = value.cast::<PySet>()?;
+        let mut strings = Vec::with_capacity(items.len());
+        for item in items.iter() {
+            if !item.get_type().is(py.get_type::<PyString>()) {
+                return Ok(None);
+            }
+            let Ok(text) = item.extract::<String>() else {
+                return Ok(None);
+            };
+            strings.push((text, item));
+        }
+        strings.sort_by(|left, right| left.0.cmp(&right.0));
+        let output = PyList::empty(py);
+        for (_, item) in strings {
+            output.append(item)?;
+        }
+        return Ok(Some(output.into_any()));
     }
 
     if value_type.is(py.get_type::<PyTuple>()) {
