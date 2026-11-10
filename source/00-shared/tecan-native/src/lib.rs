@@ -2075,6 +2075,37 @@ fn command_short_name(type_name: &str) -> Option<String> {
 }
 
 #[pyfunction]
+fn entry_object_guid(source_name: &str) -> String {
+    let normalized = source_name.replace('\\', "/");
+    let Some(name) = normalized
+        .split('/')
+        .rfind(|part| !part.is_empty() && *part != ".")
+    else {
+        return String::new();
+    };
+    let stem = match name.rfind('.') {
+        Some(index) if index > 0 => &name[..index],
+        _ => name,
+    };
+    let bytes = stem.as_bytes();
+    if bytes.len() != 36
+        || [8, 13, 18, 23].iter().any(|index| bytes[*index] != b'-')
+        || bytes
+            .iter()
+            .enumerate()
+            .any(|(index, byte)| ![8, 13, 18, 23].contains(&index) && !byte.is_ascii_hexdigit())
+    {
+        return String::new();
+    }
+    let guid = stem.to_ascii_lowercase();
+    if guid == "00000000-0000-0000-0000-000000000000" {
+        String::new()
+    } else {
+        guid
+    }
+}
+
+#[pyfunction]
 fn compact_list(values: Vec<String>, limit: i64) -> Vec<String> {
     let mut output = Vec::new();
     for value in values {
@@ -2860,6 +2891,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(diagnostic_message, module)?)?;
     module.add_function(wrap_pyfunction!(xml_kind_from_suffix, module)?)?;
     module.add_function(wrap_pyfunction!(command_short_name, module)?)?;
+    module.add_function(wrap_pyfunction!(entry_object_guid, module)?)?;
     module.add_function(wrap_pyfunction!(compact_list, module)?)?;
     module.add_function(wrap_pyfunction!(extension_counts, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_execution_contract, module)?)?;

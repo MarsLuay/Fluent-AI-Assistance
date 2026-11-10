@@ -1344,6 +1344,17 @@ def xml_kind_from_suffix(suffix: Any) -> str | None:
         return None
 
 
+def entry_object_guid(source_name: Any) -> str | None:
+    """Extract a canonical nonzero filename GUID natively for exact strings."""
+    if not enabled() or type(source_name) is not str:
+        return None
+    try:
+        result = _native.entry_object_guid(source_name)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def command_short_name(type_name: Any) -> str | None:
     """Shorten supported ASCII command type names natively, or request fallback."""
     if not enabled() or type(type_name) is not str or not type_name.isascii():

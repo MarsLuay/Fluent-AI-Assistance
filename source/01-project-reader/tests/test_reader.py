@@ -785,6 +785,38 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(actual[0]["object_subfolder_path"], actual[0]["object_path"])
         self.assertEqual(actual[1]["type_id"], "type-y")
 
+    def test_native_entry_object_guid_matches_pure_posixpath_rules(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "entry_object_guid"
+        ):
+            self.skipTest("optional Rust filename GUID helper is not built")
+        guid = "0035411b-0f50-47d8-90e4-69a2e577ce36"
+        zero_guid = "00000000-0000-0000-0000-000000000000"
+        cases = [
+            f"C:\\Data\\{guid.upper()}.XSCR",
+            f"/archive/{guid}",
+            f"{guid}/",
+            f"{guid}/./",
+            f"{guid}.backup.xscr",
+            f".{guid}",
+            f"{zero_guid}.xscr",
+            f"{guid}/..",
+            "not-a-guid.xscr",
+            "",
+            None,
+            42,
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [reader_script._entry_object_guid(value) for value in cases]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual = [reader_script._entry_object_guid(value) for value in cases]
+            self.assertEqual(
+                native_acceleration.entry_object_guid(f"C:\\Data\\{guid.upper()}.XSCR"),
+                guid,
+            )
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [guid, guid, guid, guid, "", "", "", "", "", "", "", ""])
+
     def test_native_xscr_command_records_preserve_fields_and_python_classification(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xscr_command_records"

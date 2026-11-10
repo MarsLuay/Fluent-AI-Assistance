@@ -438,6 +438,9 @@ def _unknown_fields(root: ET.Element) -> dict[str, list[str]]:
 
 
 def _entry_object_guid(source_name: str) -> str:
+    native = native_acceleration.entry_object_guid(source_name)
+    if native is not None:
+        return native
     stem = PurePosixPath(str(source_name or "").replace("\\", "/")).stem
     if not re.fullmatch(
         r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
