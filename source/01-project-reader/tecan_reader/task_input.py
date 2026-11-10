@@ -21,6 +21,7 @@ from tecan_common.native_acceleration import (
     collapse_ascii_whitespace,
     merge_unique_string_groups,
     sort_string_keys,
+    sorted_unique_strings,
     xml_elements_by_folded_name_with_children,
 )
 from tecan_common.xml_helpers import local_name
@@ -78,9 +79,11 @@ def _inspect_xml(text: str, *, source_name: str) -> dict[str, Any]:
                 for value in values:
                     if value not in bucket and len(bucket) < 20:
                         bucket.append(value)
-    sorted_unknown_fields = {
-        name: unknown_fields[name] for name in sorted(unknown_fields)
-    }
+    sorted_unknown_fields = sort_string_keys(unknown_fields)
+    if sorted_unknown_fields is None:
+        sorted_unknown_fields = {
+            name: unknown_fields[name] for name in sorted(unknown_fields)
+        }
     return {
         "kind": "task_input",
         "schema_version": TASK_INPUT_SCHEMA_VERSION,
@@ -158,9 +161,17 @@ def _element_record(element: Any, *, index: int) -> dict[str, Any]:
         **_normalized_task_fields(values),
     }
     if unknown:
-        record["unknown_fields"] = {
-            name: sorted(dict.fromkeys(items)) for name, items in sorted(unknown.items())
-        }
+        ordered_unknown = sort_string_keys(unknown)
+        if ordered_unknown is None:
+            ordered_unknown = dict(sorted(unknown.items()))
+        record["unknown_fields"] = {}
+        for name, items in ordered_unknown.items():
+            native_values = sorted_unique_strings([items])
+            record["unknown_fields"][name] = (
+                native_values
+                if native_values is not None
+                else sorted(dict.fromkeys(items))
+            )
     return record
 
 

@@ -327,6 +327,43 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
         self.assertEqual(quoted_actual, quoted_expected)
         self.assertEqual(quoted_actual["records"][0]["parameter"], "alpha,beta")
 
+    def test_xml_unknown_task_fields_sort_natively_with_python_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "sorted_unique_strings"
+        ):
+            self.skipTest("optional Rust string ordering helpers are not built")
+        xml = (
+            "<Tasks><Task><TaskName>Import</TaskName>"
+            "<VendorField>zeta</VendorField><VendorField>alpha</VendorField>"
+            "<VendorField>zeta</VendorField>"
+            "<Alpha>β</Alpha><Alpha>α</Alpha></Task></Tasks>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = inspect_twl_text(xml, source_name="Inputs/unknown-fields.twl")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with (
+                patch.object(
+                    task_input,
+                    "sort_string_keys",
+                    wraps=native_acceleration.sort_string_keys,
+                ) as sort_call,
+                patch.object(
+                    task_input,
+                    "sorted_unique_strings",
+                    wraps=native_acceleration.sorted_unique_strings,
+                ) as unique_call,
+            ):
+                actual = inspect_twl_text(
+                    xml, source_name="Inputs/unknown-fields.twl"
+                )
+                self.assertGreaterEqual(sort_call.call_count, 2)
+                self.assertEqual(unique_call.call_count, 2)
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual["records"][0]["unknown_fields"],
+            {"Alpha": ["α", "β"], "VendorField": ["alpha", "zeta"]},
+        )
+
     def test_delimited_header_detection_uses_native_ascii_and_unicode_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "any_ascii_casefold_in"
