@@ -353,7 +353,7 @@ class ReaderTests(unittest.TestCase):
 
             with tempfile.TemporaryDirectory() as tmp:
                 target = Path(tmp) / "sample.txt"
-                for data in samples[:11]:
+                for data in samples:
                     target.write_bytes(data)
                     self.assertEqual(read_text(target), python_decode(data))
 
