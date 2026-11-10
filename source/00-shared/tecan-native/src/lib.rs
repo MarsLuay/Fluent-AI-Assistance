@@ -750,6 +750,109 @@ fn to_jsonable_containers(
     }
 }
 
+fn is_safe_clean_key(py: Python<'_>, key: &Bound<'_, PyAny>) -> bool {
+    let key_type = key.get_type();
+    key.is_none()
+        || key_type.is(py.get_type::<PyBool>())
+        || key_type.is(py.get_type::<PyInt>())
+        || key_type.is(py.get_type::<PyFloat>())
+        || key_type.is(py.get_type::<PyString>())
+        || key_type.is(py.get_type::<PyBytes>())
+}
+
+fn is_clean_value_omitted(value: &Bound<'_, PyAny>) -> PyResult<bool> {
+    if value.is_none() {
+        return Ok(true);
+    }
+    let py = value.py();
+    let value_type = value.get_type();
+    if value_type.is(py.get_type::<PyString>()) {
+        return Ok(value.extract::<String>()?.is_empty());
+    }
+    if value_type.is(py.get_type::<PyList>()) {
+        return Ok(value.cast::<PyList>()?.is_empty());
+    }
+    if value_type.is(py.get_type::<PyDict>()) {
+        return Ok(value.cast::<PyDict>()?.is_empty());
+    }
+    Ok(false)
+}
+
+fn try_clean_empty_containers<'py>(
+    py: Python<'py>,
+    value: &Bound<'py, PyAny>,
+    active: &mut HashSet<usize>,
+    depth: usize,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if depth > 256 {
+        return Ok(None);
+    }
+    let value_type = value.get_type();
+    if value.is_none()
+        || value_type.is(py.get_type::<PyBool>())
+        || value_type.is(py.get_type::<PyInt>())
+        || value_type.is(py.get_type::<PyFloat>())
+        || value_type.is(py.get_type::<PyString>())
+        || value_type.is(py.get_type::<PyBytes>())
+        || value_type.is(py.get_type::<PyTuple>())
+    {
+        return Ok(Some(value.clone()));
+    }
+
+    let pointer = value.as_ptr() as usize;
+    if value_type.is(py.get_type::<PyList>()) {
+        if !active.insert(pointer) {
+            return Ok(None);
+        }
+        let items = value.cast::<PyList>()?;
+        let output = PyList::empty(py);
+        for item in items.iter() {
+            let Some(cleaned) = try_clean_empty_containers(py, &item, active, depth + 1)? else {
+                active.remove(&pointer);
+                return Ok(None);
+            };
+            if !is_clean_value_omitted(&cleaned)? {
+                output.append(cleaned)?;
+            }
+        }
+        active.remove(&pointer);
+        return Ok(Some(output.into_any()));
+    }
+
+    if value_type.is(py.get_type::<PyDict>()) {
+        if !active.insert(pointer) {
+            return Ok(None);
+        }
+        let items = value.cast::<PyDict>()?;
+        let output = PyDict::new(py);
+        for (key, item) in items.iter() {
+            if !is_safe_clean_key(py, &key) {
+                active.remove(&pointer);
+                return Ok(None);
+            }
+            let Some(cleaned) = try_clean_empty_containers(py, &item, active, depth + 1)? else {
+                active.remove(&pointer);
+                return Ok(None);
+            };
+            if !is_clean_value_omitted(&cleaned)? {
+                output.set_item(key, cleaned)?;
+            }
+        }
+        active.remove(&pointer);
+        return Ok(Some(output.into_any()));
+    }
+
+    Ok(None)
+}
+
+#[pyfunction]
+fn clean_empty_containers(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<(bool, Py<PyAny>)> {
+    match try_clean_empty_containers(py, value, &mut HashSet::new(), 0)? {
+        Some(cleaned) => Ok((true, cleaned.unbind())),
+        None => Ok((false, py.None())),
+    }
+}
+
 #[pyfunction]
 fn deepcopy_json<'py>(py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     clone_json_value(py, value, &mut HashMap::new(), &mut HashSet::new(), 0)
@@ -4329,6 +4432,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_count_record_types, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_analyze_lines, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_optimize_lines, module)?)?;
+    module.add_function(wrap_pyfunction!(clean_empty_containers, module)?)?;
     module.add_function(wrap_pyfunction!(deepcopy_json, module)?)?;
     module.add_function(wrap_pyfunction!(to_jsonable_containers, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_object_fields, module)?)?;

@@ -1328,6 +1328,19 @@ def read_utf8_sig_file(path: str | Path) -> str | None:
         return None
 
 
+def clean_empty_containers(value: Any) -> tuple[bool, Any] | None:
+    """Remove empty JSON containers for exact built-ins, or request Python fallback."""
+    if not enabled():
+        return None
+    try:
+        supported, result = _native.clean_empty_containers(value)
+        if type(supported) is bool and supported:
+            return True, result
+        return None
+    except (AttributeError, TypeError, ValueError, OverflowError, UnicodeError):
+        return None
+
+
 def to_jsonable_containers(value: Any) -> tuple[bool, Any] | None:
     """Convert supported exact JSON containers natively, or request Python fallback."""
     if not enabled():

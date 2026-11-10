@@ -563,6 +563,60 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         )
         self.assertEqual(actual[10:], ["東京", "\ud800", "", "", "Custom"])
 
+    def test_clean_uses_native_for_safe_containers_and_falls_back_conservatively(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "clean_empty_containers"
+        ):
+            self.skipTest("optional Rust container cleaner is not built")
+
+        class DictSubclass(dict):
+            pass
+
+        class ListSubclass(list):
+            pass
+
+        nan_value = float("nan")
+        source = {
+            "empty-string": "",
+            "none": None,
+            "empty-list": [],
+            "empty-dict": {},
+            "zero": 0,
+            "false": False,
+            "empty-bytes": b"",
+            "nan": nan_value,
+            "nested": {"drop": [], "keep": {"value": 1}},
+            "items": [None, "", [], {}, 0, False, {"empty": ""}, {"keep": 2}],
+            "tuple-is-opaque": ("", []),
+            "dict-subclass": DictSubclass({"empty": "", "kept": 3}),
+            "list-subclass": ListSubclass(["", [], 4]),
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = worktable_geometry._clean(source)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual = worktable_geometry._clean(source)
+            self.assertEqual(worktable_geometry._clean(None), None)
+            self.assertEqual(worktable_geometry._clean({}), {})
+            self.assertEqual(worktable_geometry._clean([]), [])
+        self.assertEqual(list(actual), list(expected))
+        actual_without_nan = dict(actual)
+        expected_without_nan = dict(expected)
+        del actual_without_nan["nan"]
+        del expected_without_nan["nan"]
+        self.assertEqual(actual_without_nan, expected_without_nan)
+        self.assertIs(actual["nan"], nan_value)
+        self.assertEqual(actual["items"], [0, False, {"keep": 2}])
+        self.assertEqual(actual["nested"], {"keep": {"value": 1}})
+        self.assertEqual(actual["tuple-is-opaque"], ("", []))
+        self.assertEqual(actual["dict-subclass"], {"kept": 3})
+        self.assertEqual(actual["list-subclass"], [4])
+
+        cyclic = []
+        cyclic.append(cyclic)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with self.assertRaises(RecursionError):
+                worktable_geometry._clean(cyclic)
+
     def test_matrix_double_rows_use_native_direct_selection_with_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_direct_elements_by_name"
