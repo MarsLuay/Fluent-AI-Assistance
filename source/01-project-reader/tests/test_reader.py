@@ -1378,15 +1378,48 @@ class ReaderTests(unittest.TestCase):
         unicode_command = ET.SubElement(
             unicode_root, "Object", {"Type": "Namespace.SampleCommand"}
         )
+        for codepoint in range(0x110000):
+            character = chr(codepoint)
+            if character.isspace():
+                ET.SubElement(unicode_command, "Name").text = character
+        ET.SubElement(unicode_command, "Name").text = "\u00a0café\u2003"
         ET.SubElement(unicode_command, "Name").text = "café"
+        ET.SubElement(unicode_command, "Comment").text = " é | β "
+        ET.SubElement(unicode_command, "Comment").text = "β"
+        ET.SubElement(unicode_command, "Comment").text = " 雪 "
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unicode_expected = reader_script._commands(unicode_root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xscr_command_records(
+                    unicode_root, reader_script.INTERESTING_FIELDS, ET.Element
+                ),
+                [
+                    (
+                        "Namespace.SampleCommand",
+                        {"Name": "café", "Comment": "é | β | 雪"},
+                    )
+                ],
+            )
+            self.assertEqual(reader_script._commands(unicode_root), unicode_expected)
+            self.assertEqual(unicode_expected[0]["name"], "café")
+            self.assertEqual(
+                unicode_expected[0]["fields"]["Comment"], "é | β | 雪"
+            )
+
+        surrogate_root = ET.Element("Root")
+        surrogate_command = ET.SubElement(
+            surrogate_root, "Object", {"Type": "Namespace.SurrogateCommand"}
+        )
+        ET.SubElement(surrogate_command, "Name").text = chr(0xD800)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(
                 native_acceleration.xscr_command_records(
-                    unicode_root, reader_script.INTERESTING_FIELDS, ET.Element
+                    surrogate_root, reader_script.INTERESTING_FIELDS, ET.Element
                 )
             )
             self.assertEqual(
-                reader_script._commands(unicode_root)[0]["name"], "café"
+                reader_script._commands(surrogate_root)[0]["name"], chr(0xD800)
             )
 
     def test_native_operator_prompt_element_selection_preserves_document_order(self) -> None:

@@ -1259,10 +1259,7 @@ fn xscr_command_records<'py>(
                 return Ok(None);
             }
             let text = text.extract::<String>()?;
-            if !text.is_ascii() || text.chars().any(|ch| ('\u{1c}'..='\u{1f}').contains(&ch)) {
-                return Ok(None);
-            }
-            let value = text.trim();
+            let value = trim_python_whitespace(&text);
             if value.is_empty() {
                 continue;
             }
