@@ -258,6 +258,73 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         self.assertEqual(actual[2], (0, "000000000002"))
         self.assertEqual(actual[-2:], [(1, "None"), (0, "000000000007")])
 
+    def test_indexed_values_uses_native_xml_traversal_with_python_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_indexed_values"
+        ):
+            self.skipTest("optional Rust indexed XML reader is not built")
+        parser = worktable_geometry.ET.XMLParser(
+            target=worktable_geometry.ET.TreeBuilder(insert_comments=True)
+        )
+        root = worktable_geometry.ET.fromstring(
+            f"""<Root xmlns="urn:test">
+              <!-- ignored non-element child -->
+              <Pair><Key> 1 </Key><Value> first </Value></Pair>
+              <Pair><Key>+02</Key><Value>\u00a0second\u00a0</Value></Pair>
+              <Pair><Key>1</Key><Value>last</Value></Pair>
+              <Pair><Key>3</Key><Value>{worktable_geometry.ZERO_GUID}</Value></Pair>
+              <Pair><Key>4</Key><Value> \t </Value></Pair>
+              <Pair><Nested><Key>5</Key></Nested><Value>nested</Value></Pair>
+            </Root>""",
+            parser=parser,
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = worktable_geometry._indexed_values(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_indexed_values(
+                    root, worktable_geometry.ET.Element, worktable_geometry.ZERO_GUID
+                ),
+                expected,
+            )
+            with patch.object(
+                native_acceleration,
+                "xml_indexed_values",
+                wraps=native_acceleration.xml_indexed_values,
+            ) as native_call:
+                actual = worktable_geometry._indexed_values(root)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(list(actual.items()), [("1", "last"), ("2", "second"), ("5", "nested")])
+
+        fallback_root = worktable_geometry.ET.fromstring(
+            "<Root><Pair><Key>1_000</Key><Value>wide-python-int</Value></Pair>"
+            "<Pair><Key>١٢</Key><Value>unicode-int</Value></Pair>"
+            "<Pair><Key>9223372036854775808</Key><Value>large-int</Value></Pair></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = worktable_geometry._indexed_values(fallback_root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_indexed_values(
+                    fallback_root,
+                    worktable_geometry.ET.Element,
+                    worktable_geometry.ZERO_GUID,
+                )
+            )
+            with patch.object(
+                native_acceleration,
+                "xml_indexed_values",
+                wraps=native_acceleration.xml_indexed_values,
+            ) as native_fallback_call:
+                fallback_actual = worktable_geometry._indexed_values(fallback_root)
+                self.assertEqual(native_fallback_call.call_count, 1)
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(
+            fallback_actual,
+            {"1000": "wide-python-int", "12": "unicode-int", "9223372036854775808": "large-int"},
+        )
+
     def test_float_text_uses_native_decimal_subset_and_python_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "parse_f64_decimal_text"

@@ -1294,6 +1294,9 @@ def _indexed_values(elem: ET.Element | None) -> dict[str, str]:
     out: dict[str, str] = {}
     if elem is None:
         return out
+    native = native_acceleration.xml_indexed_values(elem, ET.Element, ZERO_GUID)
+    if native is not None:
+        return native
     for kv in list(elem):
         if not isinstance(kv.tag, str):
             continue
