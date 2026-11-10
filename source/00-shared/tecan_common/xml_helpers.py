@@ -11,6 +11,7 @@ from .native_acceleration import (
     xml_find_attribute as _native_xml_find_attribute,
     xml_find_text as _native_xml_find_text,
     xml_local_name as _native_xml_local_name,
+    xml_records_by_name as _native_xml_records_by_name,
     xml_texts_by_name as _native_xml_texts_by_name,
     xml_unique_texts as _native_xml_unique_texts,
 )
@@ -22,6 +23,7 @@ __all__ = [
     "first_attribute",
     "first_text",
     "local_name",
+    "records_by_name",
     "texts_by_name",
     "unique_texts",
 ]
@@ -121,6 +123,21 @@ def texts_by_name(root: ET.Element, names: Iterable[str]) -> dict[str, list[str]
         if value and value not in out[name]:
             out[name].append(value)
     return out
+
+
+def records_by_name(
+    root: ET.Element, record_name: str, field_names: Iterable[str]
+) -> list[list[str]]:
+    """Extract descendant text fields from each element with the local tag."""
+    names = tuple(field_names)
+    native = _native_xml_records_by_name(root, record_name, names, ET.Element)
+    if native is not None:
+        return native
+    records: list[list[str]] = []
+    for element in root.iter():
+        if local_name(element.tag) == record_name:
+            records.append([first_text(element, name) for name in names])
+    return records
 
 
 def unique_texts(root: ET.Element, names: Iterable[str], *, limit: int = 200) -> list[str]:

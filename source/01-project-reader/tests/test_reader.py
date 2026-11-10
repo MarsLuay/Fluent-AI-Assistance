@@ -655,6 +655,84 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, ("", "  v1  ", "missing", "comment-safe"))
 
+    def test_native_xml_records_by_name_matches_python_first_text_traversal(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_records_by_name"
+        ):
+            self.skipTest("optional Rust XML record extractor is not built")
+        root = ET.Element("Root")
+        prompt = ET.SubElement(root, "{urn:test}QueryVariableStatement")
+        ET.SubElement(prompt, "Name").text = "   "
+        nested = ET.SubElement(prompt, "Nested")
+        ET.SubElement(nested, "Name").text = " prompt-x "
+        ET.SubElement(prompt, "QueryPrompt").text = " question-x "
+        ET.SubElement(prompt, "MinimumText").text = "1"
+        ET.SubElement(prompt, "MaximumText").text = "2"
+        ET.SubElement(prompt, "LineNumber").text = "7"
+        second_prompt = ET.SubElement(root, "QueryVariableStatement")
+        ET.SubElement(second_prompt, "Name").text = "second-x"
+        ET.SubElement(second_prompt, "QueryPrompt").text = "question-y"
+        assignment = ET.SubElement(root, "SetVariableStatement")
+        ET.SubElement(assignment, "Name").text = "variable-x"
+        ET.SubElement(assignment, "Value").text = "value-x"
+        ET.SubElement(assignment, "LineNumber").text = "9"
+
+        def results() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+            return reader_script._query_prompts(root), reader_script._set_variables(root)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = results()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_records_by_name(
+                    root,
+                    "QueryVariableStatement",
+                    ("Name", "QueryPrompt", "MinimumText", "MaximumText", "LineNumber"),
+                    ET.Element,
+                ),
+                [
+                    ["prompt-x", "question-x", "1", "2", "7"],
+                    ["second-x", "question-y", "", "", ""],
+                ],
+            )
+            with patch.object(
+                xml_helpers,
+                "_native_xml_records_by_name",
+                wraps=xml_helpers._native_xml_records_by_name,
+            ) as native_call:
+                actual = results()
+                self.assertEqual(native_call.call_count, 2)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual[0][0]["name"], "prompt-x")
+        self.assertEqual(actual[0][1]["prompt"], "question-y")
+        self.assertEqual(actual[1], [{"name": "variable-x", "value": "value-x", "line": "9"}])
+
+        fallback_root = ET.Element("Root")
+        fallback_root.append(ET.Comment("comment"))
+        fallback_prompt = ET.SubElement(fallback_root, "QueryVariableStatement")
+        ET.SubElement(fallback_prompt, "Name").text = "fallback-x"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_records_by_name(
+                    fallback_root, "QueryVariableStatement", ("Name",), ET.Element
+                )
+            )
+            self.assertEqual(
+                reader_script._query_prompts(fallback_root)[0]["name"], "fallback-x"
+            )
+        unicode_root = ET.Element("Root")
+        unicode_prompt = ET.SubElement(unicode_root, "QueryVariableStatement")
+        ET.SubElement(unicode_prompt, "QueryPrompt").text = "café"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_records_by_name(
+                    unicode_root, "QueryVariableStatement", ("QueryPrompt",), ET.Element
+                )
+            )
+            self.assertEqual(
+                reader_script._query_prompts(unicode_root)[0]["prompt"], "café"
+            )
+
     def test_native_extension_counts_match_path_suffix_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "extension_counts"

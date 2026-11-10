@@ -13,6 +13,7 @@ from tecan_common.xml_helpers import (
     first_attribute,
     first_text,
     local_name,
+    records_by_name,
     texts_by_name,
     unique_texts,
 )
@@ -177,35 +178,19 @@ def _variable_declarations(root: ET.Element) -> list[dict[str, str]]:
 
 
 def _query_prompts(root: ET.Element) -> list[dict[str, str]]:
-    prompts: list[dict[str, str]] = []
-    for el in root.iter():
-        if local_name(el.tag) != "QueryVariableStatement":
-            continue
-        prompts.append(
-            {
-                "name": first_text(el, "Name"),
-                "prompt": first_text(el, "QueryPrompt"),
-                "minimum": first_text(el, "MinimumText"),
-                "maximum": first_text(el, "MaximumText"),
-                "line": first_text(el, "LineNumber"),
-            }
-        )
-    return prompts
+    names = ("Name", "QueryPrompt", "MinimumText", "MaximumText", "LineNumber")
+    return [
+        dict(zip(("name", "prompt", "minimum", "maximum", "line"), values))
+        for values in records_by_name(root, "QueryVariableStatement", names)
+    ]
 
 
 def _set_variables(root: ET.Element) -> list[dict[str, str]]:
-    values: list[dict[str, str]] = []
-    for el in root.iter():
-        if local_name(el.tag) != "SetVariableStatement":
-            continue
-        values.append(
-            {
-                "name": first_text(el, "Name"),
-                "value": first_text(el, "Value"),
-                "line": first_text(el, "LineNumber"),
-            }
-        )
-    return values
+    names = ("Name", "Value", "LineNumber")
+    return [
+        dict(zip(("name", "value", "line"), values))
+        for values in records_by_name(root, "SetVariableStatement", names)
+    ]
 
 
 def _commands(root: ET.Element) -> list[dict[str, Any]]:
