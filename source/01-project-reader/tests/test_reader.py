@@ -22,6 +22,7 @@ from tecan_reader.common import (
     read_text,
     to_jsonable,
 )
+import tecan_reader.gwl as reader_gwl
 from tecan_reader.gwl import inspect_gwl, inspect_gwl_lines
 from tecan_reader.pattern_library import mine_script_patterns, search_script_patterns, summarize_script_patterns
 import sqlite3
@@ -666,12 +667,22 @@ class ReaderTests(unittest.TestCase):
             self.assertEqual(actual, expected)
             self.assertEqual(actual["line_count"], 4)
 
-    def test_inspect_gwl_lines_batches_native_parse_with_ordered_examples(self) -> None:
+    def test_inspect_gwl_lines_uses_native_summary_with_ordered_examples(self) -> None:
         if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "worklist_parse_gwl_records"
+            native_acceleration._native, "worklist_inspect_gwl_lines"
         ):
-            self.skipTest("optional Rust GWL parser is not built")
-        lines = ["", "W5;", "X;unsupported;field"]
+            self.skipTest("optional Rust GWL summary is not built")
+        lines = [
+            "",
+            "W5;",
+            "X;unsupported;field",
+            "W;",
+            "W1;",
+            "B;",
+            "C;comment;with;semicolons",
+            "F;opaque;parameters",
+            "S;opaque;parameters",
+        ]
         lines.extend(
             f"A;Rack{index};;Plate;{index + 1};;20;Water;;;"
             for index in range(13)
@@ -681,17 +692,41 @@ class ReaderTests(unittest.TestCase):
             expected = inspect_gwl_lines(lines, source_name="sample.gwl")
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
-                native_acceleration,
-                "worklist_parse_gwl_records",
-                wraps=native_acceleration.worklist_parse_gwl_records,
+                reader_gwl,
+                "_native_worklist_inspect_gwl_lines",
+                wraps=reader_gwl._native_worklist_inspect_gwl_lines,
             ) as native_parser:
                 actual = inspect_gwl_lines(lines, source_name="sample.gwl")
                 native_parser.assert_called_once()
         self.assertEqual(actual, expected)
-        self.assertEqual(actual["record_counts"], {"W5": 1, "X": 1, "A": 13, "D": 1})
-        self.assertEqual(actual["pipette_examples"][0]["line"], "4")
+        self.assertEqual(
+            actual["record_counts"],
+            {"W5": 1, "X": 1, "W": 1, "W1": 1, "B": 1, "C": 1, "F": 1, "S": 1, "A": 13, "D": 1},
+        )
+        self.assertEqual(
+            list(actual["record_counts"]),
+            ["W5", "X", "W", "W1", "B", "C", "F", "S", "A", "D"],
+        )
+        self.assertEqual(actual["line_count"], 23)
+        self.assertEqual(actual["transfer_pairs_estimate"], 1)
+        self.assertEqual(actual["pipette_examples"][0]["line"], "10")
         self.assertEqual(len(actual["pipette_examples"]), 12)
         self.assertEqual(actual["pipette_examples"][-1]["rack_label"], "Rack11")
+
+    def test_inspect_gwl_lines_falls_back_for_unsupported_unicode(self) -> None:
+        lines = ["\x1c", "C;µ", "A;Räck;;Plate;1;;20;Water;;;"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = inspect_gwl_lines(lines, source_name="unicode.gwl")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.worklist_inspect_gwl_lines(lines))
+            with patch.object(
+                reader_gwl,
+                "_native_worklist_inspect_gwl_lines",
+                wraps=reader_gwl._native_worklist_inspect_gwl_lines,
+            ) as native_summary:
+                actual = inspect_gwl_lines(lines, source_name="unicode.gwl")
+                native_summary.assert_called_once()
+        self.assertEqual(actual, expected)
 
     def test_inspect_archive_collects_errors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -641,6 +641,89 @@ def worklist_parse_gwl_records(
         return None
 
 
+def worklist_inspect_gwl_lines(lines: Any) -> dict[str, Any] | None:
+    """Summarize supported ASCII GWL lines natively, or request Python fallback."""
+    if (
+        not enabled()
+        or type(lines) is not list
+        or not all(
+            type(line) is str
+            and line.isascii()
+            and not any(0x1C <= ord(character) <= 0x1F for character in line)
+            for line in lines
+        )
+    ):
+        return None
+    try:
+        encoded = _native.worklist_inspect_gwl_lines(_encode_json(lines))
+        if not isinstance(encoded, str):
+            return None
+        payload = json.loads(encoded)
+        if not isinstance(payload, dict):
+            return None
+        pairs = payload.get("record_counts")
+        line_count = payload.get("line_count")
+        transfer_pairs = payload.get("transfer_pairs_estimate")
+        raw_examples = payload.get("pipette_examples")
+        if (
+            not isinstance(pairs, list)
+            or type(line_count) is not int
+            or line_count != len(lines)
+            or type(transfer_pairs) is not int
+            or transfer_pairs < 0
+            or not isinstance(raw_examples, list)
+            or len(raw_examples) > 12
+        ):
+            return None
+        counts: dict[str, int] = {}
+        for pair in pairs:
+            if (
+                not isinstance(pair, list)
+                or len(pair) != 2
+                or not isinstance(pair[0], str)
+                or type(pair[1]) is not int
+                or pair[1] < 0
+                or pair[0] in counts
+            ):
+                return None
+            counts[pair[0]] = pair[1]
+        examples = []
+        for example in raw_examples:
+            if (
+                not isinstance(example, list)
+                or len(example) != 7
+                or not all(isinstance(value, str) for value in example)
+            ):
+                return None
+            line, operation, rack_label, rack_type, position, volume, liquid_class = example
+            examples.append(
+                {
+                    "line": line,
+                    "operation": operation,
+                    "rack_label": rack_label,
+                    "rack_type": rack_type,
+                    "position": position,
+                    "volume": volume,
+                    "liquid_class": liquid_class,
+                }
+            )
+        return {
+            "record_counts": counts,
+            "line_count": line_count,
+            "transfer_pairs_estimate": transfer_pairs,
+            "pipette_examples": examples,
+        }
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def worklist_parse_gwl_text_records(
     text: str, permissive: bool
 ) -> list[dict[str, Any]] | None:

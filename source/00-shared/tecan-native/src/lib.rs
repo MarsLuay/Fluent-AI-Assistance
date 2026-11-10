@@ -1104,6 +1104,122 @@ fn worklist_parse_gwl_records(lines_json: &str, permissive: bool) -> PyResult<Op
 }
 
 #[pyfunction]
+fn worklist_inspect_gwl_lines(lines_json: &str) -> PyResult<Option<String>> {
+    let Ok(lines) = serde_json::from_str::<Vec<String>>(lines_json) else {
+        return Ok(None);
+    };
+    if lines.iter().any(|line| {
+        !line.is_ascii()
+            || line
+                .chars()
+                .any(|character| (0x1c..=0x1f).contains(&(character as u32)))
+    }) {
+        return Ok(None);
+    }
+    let Some(records) = tecan_worklist_builder::parse_gwl_records_for_python(&lines, true) else {
+        return Ok(None);
+    };
+
+    let mut record_counts = Vec::<(String, usize)>::new();
+    let mut count_positions = HashMap::<String, usize>::new();
+    let mut pipette_examples = Vec::<Vec<String>>::new();
+    let mut aspirates = 0usize;
+    let mut dispenses = 0usize;
+    let mut record_index = 0usize;
+    for (line_index, line) in lines.iter().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let Some(record) = records.get(record_index) else {
+            return Ok(None);
+        };
+        record_index += 1;
+        let Some(kind) = record.get("kind").and_then(Value::as_str) else {
+            return Ok(None);
+        };
+        let record_type = match kind {
+            "pipette" => {
+                let Some(operation) = record.get("operation").and_then(Value::as_str) else {
+                    return Ok(None);
+                };
+                match operation {
+                    "A" => aspirates += 1,
+                    "D" => dispenses += 1,
+                    _ => return Ok(None),
+                }
+                if pipette_examples.len() < 12 {
+                    let Some(rack_label) = record.get("rack_label").and_then(Value::as_str) else {
+                        return Ok(None);
+                    };
+                    let Some(rack_type) = record.get("rack_type").and_then(Value::as_str) else {
+                        return Ok(None);
+                    };
+                    let Some(position) = record.get("position").and_then(Value::as_str) else {
+                        return Ok(None);
+                    };
+                    let Some(volume) = record.get("volume").and_then(Value::as_str) else {
+                        return Ok(None);
+                    };
+                    let Some(liquid_class) = record.get("liquid_class").and_then(Value::as_str)
+                    else {
+                        return Ok(None);
+                    };
+                    pipette_examples.push(vec![
+                        (line_index + 1).to_string(),
+                        operation.to_owned(),
+                        rack_label.to_owned(),
+                        rack_type.to_owned(),
+                        position.to_owned(),
+                        volume.to_owned(),
+                        liquid_class.to_owned(),
+                    ]);
+                }
+                operation.to_owned()
+            }
+            "wash" => match record.get("scheme") {
+                Some(Value::Number(number)) => match number.as_u64() {
+                    Some(scheme @ 1..=4) => format!("W{scheme}"),
+                    _ => return Ok(None),
+                },
+                Some(Value::Null) | None => "W".to_owned(),
+                _ => return Ok(None),
+            },
+            "break" => "B".to_owned(),
+            "comment" => "C".to_owned(),
+            "flush" => "F".to_owned(),
+            "set_diti_type" => "S".to_owned(),
+            "raw" => {
+                let Some(type_character) = record.get("type_character").and_then(Value::as_str)
+                else {
+                    return Ok(None);
+                };
+                type_character.to_owned()
+            }
+            _ => return Ok(None),
+        };
+        let count_index = if let Some(index) = count_positions.get(&record_type) {
+            *index
+        } else {
+            let index = record_counts.len();
+            count_positions.insert(record_type.clone(), index);
+            record_counts.push((record_type, 0));
+            index
+        };
+        record_counts[count_index].1 += 1;
+    }
+    if record_index != records.len() {
+        return Ok(None);
+    }
+    let payload = serde_json::json!({
+        "record_counts": record_counts,
+        "line_count": lines.len(),
+        "transfer_pairs_estimate": aspirates.min(dispenses),
+        "pipette_examples": pipette_examples,
+    });
+    Ok(serde_json::to_string(&payload).ok())
+}
+
+#[pyfunction]
 fn worklist_parse_gwl_text_records(text: &str, permissive: bool) -> PyResult<Option<String>> {
     let Some(records) = tecan_worklist_builder::parse_gwl_text_records_for_python(text, permissive)
     else {
@@ -1590,6 +1706,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_build_schedule, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_gwl, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_gwl_records, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_inspect_gwl_lines, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_gwl_text_records, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_read_gwl_records, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_format_volume, module)?)?;

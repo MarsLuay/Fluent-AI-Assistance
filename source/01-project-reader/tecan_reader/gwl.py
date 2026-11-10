@@ -7,7 +7,10 @@ from pathlib import Path
 from typing import Any
 
 from tecan_common.gwl import Pipette, parse_gwl_line, parse_gwl_lines
-from tecan_common.native_acceleration import read_utf8_sig_file as _native_read_utf8_sig_file
+from tecan_common.native_acceleration import (
+    read_utf8_sig_file as _native_read_utf8_sig_file,
+    worklist_inspect_gwl_lines as _native_worklist_inspect_gwl_lines,
+)
 
 
 def inspect_gwl(path: str | Path, *, source_name: str | None = None) -> dict[str, Any]:
@@ -20,6 +23,10 @@ def inspect_gwl(path: str | Path, *, source_name: str | None = None) -> dict[str
 
 
 def inspect_gwl_lines(lines: list[str], *, source_name: str) -> dict[str, Any]:
+    native = _native_worklist_inspect_gwl_lines(lines)
+    if native is not None:
+        return {"kind": "gwl", "source": source_name, **native}
+
     records_with_lines = None
     if type(lines) is list and all(
         type(line) is str
