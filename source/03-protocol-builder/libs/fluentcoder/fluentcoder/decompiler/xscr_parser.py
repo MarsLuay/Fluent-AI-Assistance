@@ -28,7 +28,7 @@ from tecan_common.native_acceleration import xscr_object_fields as _native_xscr_
 from tecan_common.performance import performance_marker
 from tecan_common.xml_helpers import elements_by_name
 
-from ..catalog.xcmp import _find, _local, _text
+from ..catalog.xcmp import _direct_children, _find, _local, _text
 from ..expressions import is_expression_field, parse_or_preserve_source_expression
 from ..ir.subroutine_semantics import normalize_subroutine_execution_mode
 from ..ir.driver_recovery import parse_driver_recovery_policy
@@ -128,18 +128,11 @@ def _parse_xscr_root(root: ET.Element) -> Protocol:
     variables, variable_defaults, variable_metadata = _parse_variable_declarations(root)
 
     groups: list[Group] = []
-    script_group = next(
-        (e for e in root.iter()
-         if isinstance(e.tag, str) and _local(e.tag) == "ScriptGroup"),
-        None,
-    )
+    script_group = _find(root, "ScriptGroup")
     if script_group is not None:
         objects = _find(script_group, "Objects")
         if objects is not None:
-            object_children = [
-                obj for obj in objects
-                if isinstance(obj.tag, str) and _local(obj.tag) == "Object"
-            ]
+            object_children = _direct_children(objects, "Object")
             if object_children and any(
                 "ScriptGroupData" in (obj.attrib.get("Type") or "")
                 for obj in object_children
