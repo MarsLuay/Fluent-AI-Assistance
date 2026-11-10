@@ -1300,7 +1300,7 @@ def _bool_text(text: str) -> bool | None:
 
 def _is_nil(elem: ET.Element) -> bool:
     return any(key.endswith("}nil") or key == "i:nil" for key in elem.attrib) and any(
-        str(value).casefold() == "true" for value in elem.attrib.values()
+        _bool_text(str(value)) is True for value in elem.attrib.values()
     )
 
 
