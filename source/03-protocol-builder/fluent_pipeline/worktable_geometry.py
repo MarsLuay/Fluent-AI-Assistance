@@ -918,6 +918,9 @@ def _allowed_grip_modes(elem: ET.Element | None) -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     if elem is None:
         return out
+    native = native_acceleration.xml_allowed_grip_modes(elem, ET.Element)
+    if native is not None:
+        return native
     for site_kv in list(elem):
         if not isinstance(site_kv.tag, str):
             continue

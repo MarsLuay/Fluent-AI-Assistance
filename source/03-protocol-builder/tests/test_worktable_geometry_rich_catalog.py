@@ -258,6 +258,59 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         self.assertEqual(actual[2], (0, "000000000002"))
         self.assertEqual(actual[-2:], [(1, "None"), (0, "000000000007")])
 
+    def test_allowed_grip_modes_uses_native_nested_xml_scan_with_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_allowed_grip_modes"
+        ):
+            self.skipTest("optional Rust grip-mode XML reader is not built")
+        parser = worktable_geometry.ET.XMLParser(
+            target=worktable_geometry.ET.TreeBuilder(insert_comments=True)
+        )
+        root = worktable_geometry.ET.fromstring(
+            "<Root xmlns='urn:test'><Pair><Key> 01 </Key><Value>"
+            "<Mode><Key>mode α</Key></Mode><Mode><Key>mode-beta</Key></Mode>"
+            "<Mode><Key>mode α</Key></Mode><Mode><Key> </Key></Mode></Value></Pair>"
+            "<!-- ignored non-element child -->"
+            "<Pair><Key>+1</Key><Value><Mode><Key>replacement</Key></Mode></Value></Pair>"
+            "<Pair><Key>2</Key><Value><Mode><Nested><Key>nested</Key></Nested></Mode></Value></Pair>"
+            "<Pair><Key>3</Key><Value /></Pair></Root>",
+            parser=parser,
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = worktable_geometry._allowed_grip_modes(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_allowed_grip_modes(
+                    root, worktable_geometry.ET.Element
+                ),
+                expected,
+            )
+            with patch.object(
+                native_acceleration,
+                "xml_allowed_grip_modes",
+                wraps=native_acceleration.xml_allowed_grip_modes,
+            ) as native_call:
+                actual = worktable_geometry._allowed_grip_modes(root)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, {"1": ["replacement"], "2": ["nested"]})
+
+        fallback_root = worktable_geometry.ET.fromstring(
+            "<Root><Pair><Key>9223372036854775808</Key><Value>"
+            "<Mode><Key>fallback</Key></Mode></Value></Pair></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = worktable_geometry._allowed_grip_modes(fallback_root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_allowed_grip_modes(
+                    fallback_root, worktable_geometry.ET.Element
+                )
+            )
+            fallback_actual = worktable_geometry._allowed_grip_modes(fallback_root)
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, {"9223372036854775808": ["fallback"]})
+
     def test_indexed_values_uses_native_xml_traversal_with_python_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_indexed_values"

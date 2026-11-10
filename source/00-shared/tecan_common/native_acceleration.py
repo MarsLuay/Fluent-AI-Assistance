@@ -477,6 +477,36 @@ def xml_indexed_float_values(
         return None
 
 
+def xml_allowed_grip_modes(
+    root: Any, element_type: Any
+) -> dict[str, list[str]] | None:
+    """Parse nested integer-keyed grip-mode lists with conservative fallback."""
+    if not enabled() or type(root) is not element_type:
+        return None
+    try:
+        result = _native.xml_allowed_grip_modes(root, element_type)
+        if (
+            type(result) is dict
+            and all(
+                type(key) is str
+                and type(values) is list
+                and all(type(value) is str for value in values)
+                for key, values in result.items()
+            )
+        ):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_indexed_values(
     root: Any, element_type: Any, zero_guid: Any
 ) -> dict[str, str] | None:

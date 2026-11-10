@@ -2642,6 +2642,84 @@ fn xml_indexed_float_values<'py>(
 }
 
 #[pyfunction]
+fn xml_allowed_grip_modes<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let output = PyDict::new(py);
+    for site in root.try_iter()? {
+        let site = site?;
+        if !site.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = site.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let (key_supported, key_text) = xml_first_exact_local_text(py, &site, "Key", element_type)?;
+        if !key_supported {
+            return Ok(None);
+        }
+        let Some(key_text) = key_text else {
+            continue;
+        };
+        let key_text = trim_python_whitespace(&key_text);
+        if key_text.is_empty() {
+            continue;
+        }
+        let Ok(site_index) = key_text.parse::<i64>() else {
+            return Ok(None);
+        };
+        let (value_supported, value_element) =
+            xml_first_exact_local_element(py, &site, "Value", element_type)?;
+        if !value_supported {
+            return Ok(None);
+        }
+        let Some(value_element) = value_element else {
+            continue;
+        };
+        let cgas = PyList::empty(py);
+        let mut seen = HashSet::new();
+        for cga in value_element.try_iter()? {
+            let cga = cga?;
+            if !cga.get_type().is(element_type) {
+                return Ok(None);
+            }
+            let tag = cga.getattr("tag")?;
+            if !tag.is_instance_of::<PyString>() {
+                continue;
+            }
+            if !tag.get_type().is(py.get_type::<PyString>()) {
+                return Ok(None);
+            }
+            let (mode_supported, mode_text) =
+                xml_first_exact_local_text(py, &cga, "Key", element_type)?;
+            if !mode_supported {
+                return Ok(None);
+            }
+            let Some(mode) = mode_text else {
+                continue;
+            };
+            let mode = trim_python_whitespace(&mode);
+            if !mode.is_empty() && seen.insert(mode.to_owned()) {
+                cgas.append(mode)?;
+            }
+        }
+        if !cgas.is_empty() {
+            output.set_item(site_index.to_string(), cgas)?;
+        }
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn xml_reference_guids<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -5120,6 +5198,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_matrix, module)?)?;
     module.add_function(wrap_pyfunction!(xml_indexed_values, module)?)?;
     module.add_function(wrap_pyfunction!(xml_indexed_float_values, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_allowed_grip_modes, module)?)?;
     module.add_function(wrap_pyfunction!(xml_vec_dict, module)?)?;
     module.add_function(wrap_pyfunction!(xml_indexed_vectors, module)?)?;
     module.add_function(wrap_pyfunction!(
