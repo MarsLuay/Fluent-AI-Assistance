@@ -379,6 +379,47 @@ class ReaderTests(unittest.TestCase):
             self.assertIsNone(native_acceleration.xml_clean_text(TextValue()))
             self.assertEqual(xml_helpers._clean_text(TextValue()), "custom text")
 
+    def test_native_all_xml_texts_matches_python_without_default_limit(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_unique_texts"
+        ):
+            self.skipTest("optional Rust XML unique-text helper is not built")
+        root = ET.Element("Root")
+        for index in range(205):
+            ET.SubElement(root, "Value").text = f"item-{index}"
+        ET.SubElement(root, "Value").text = "item-0"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = xml_helpers.all_text(root, {"Value"})
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_unique_texts(
+                    root, {"Value"}, (1 << 63) - 1, ET.Element
+                ),
+                expected,
+            )
+            with patch.object(
+                xml_helpers,
+                "_native_xml_unique_texts",
+                wraps=xml_helpers._native_xml_unique_texts,
+            ) as native_call:
+                actual = xml_helpers.all_text(root, {"Value"})
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(len(actual), 205)
+        self.assertEqual((actual[0], actual[-1]), ("item-0", "item-204"))
+
+        unicode_root = ET.Element("Root")
+        ET.SubElement(unicode_root, "Value").text = "café"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unicode_expected = xml_helpers.all_text(unicode_root, {"Value"})
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_unique_texts(
+                    unicode_root, {"Value"}, (1 << 63) - 1, ET.Element
+                )
+            )
+            self.assertEqual(xml_helpers.all_text(unicode_root, {"Value"}), unicode_expected)
+
     def test_native_unique_xml_texts_matches_python_limits_and_fallbacks(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_unique_texts"
@@ -474,6 +515,18 @@ class ReaderTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             expected = results()
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_find_text(root, "A", False, ET.Element),
+                (True, "alpha"),
+            )
+            self.assertEqual(
+                native_acceleration.xml_find_text(root, "A", True, ET.Element),
+                (True, "alpha"),
+            )
+            self.assertEqual(
+                native_acceleration.xml_find_text(root, "Missing", False, ET.Element),
+                (False, None),
+            )
             with patch.object(
                 xml_helpers,
                 "_native_xml_find_text",
@@ -500,6 +553,11 @@ class ReaderTests(unittest.TestCase):
         comment_root.append(ET.Comment("comment"))
         ET.SubElement(comment_root, "A").text = "after comment"
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_find_text(
+                    comment_root, "A", False, ET.Element
+                )
+            )
             self.assertEqual(xml_helpers.first_text(comment_root, "A"), "after comment")
 
     def test_native_extension_counts_match_path_suffix_fallback(self) -> None:

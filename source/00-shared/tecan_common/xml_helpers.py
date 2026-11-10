@@ -76,6 +76,9 @@ def direct_child_text(parent: ET.Element, name: str, *, default: str = "") -> st
 def all_text(root: ET.Element, names: Iterable[str]) -> list[str]:
     """Return unique non-empty descendant text values for local tag names."""
     wanted = set(names)
+    native = _native_xml_unique_texts(root, wanted, (1 << 63) - 1, ET.Element)
+    if native is not None:
+        return native
     values: list[str] = []
     for element in root.iter():
         if local_name(element.tag) not in wanted:
