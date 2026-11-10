@@ -1584,9 +1584,11 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             ) as native_call:
                 actual = [worktable_geometry._bool_text(text) for text in texts]
                 self.assertEqual(native_call.call_count, len(texts) - 1)
-            self.assertEqual(native_acceleration.parse_ascii_bool_text("yes"), "unknown")
-            self.assertEqual(native_acceleration.parse_ascii_bool_text(" true "), "unknown")
+            self.assertIsNone(native_acceleration.parse_ascii_bool_text("yes"))
+            self.assertIsNone(native_acceleration.parse_ascii_bool_text(" true "))
             self.assertIsNone(native_acceleration.parse_ascii_bool_text("trüe"))
+            self.assertIs(native_acceleration.parse_ascii_bool_text("TRUE"), True)
+            self.assertIs(native_acceleration.parse_ascii_bool_text("false"), False)
         self.assertEqual(actual, expected)
         self.assertEqual(
             actual,

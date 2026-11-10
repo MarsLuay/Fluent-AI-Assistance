@@ -1507,14 +1507,16 @@ fn unique_ascii_tuple_indices<'py>(
 }
 
 #[pyfunction]
-fn parse_ascii_bool_text(value: &str) -> Option<&'static str> {
+fn parse_ascii_bool_text(value: &str) -> Option<bool> {
     if !value.is_ascii() {
         return None;
     }
-    match value.to_ascii_lowercase().as_str() {
-        "true" => Some("true"),
-        "false" => Some("false"),
-        _ => Some("unknown"),
+    if value.eq_ignore_ascii_case("true") {
+        Some(true)
+    } else if value.eq_ignore_ascii_case("false") {
+        Some(false)
+    } else {
+        None
     }
 }
 
@@ -5514,11 +5516,11 @@ mod tests {
 
     #[test]
     fn ascii_boolean_parser_preserves_untrimmed_casefold_semantics() {
-        assert_eq!(parse_ascii_bool_text("true"), Some("true"));
-        assert_eq!(parse_ascii_bool_text("TRUE"), Some("true"));
-        assert_eq!(parse_ascii_bool_text("false"), Some("false"));
-        assert_eq!(parse_ascii_bool_text("yes"), Some("unknown"));
-        assert_eq!(parse_ascii_bool_text(" true "), Some("unknown"));
+        assert_eq!(parse_ascii_bool_text("true"), Some(true));
+        assert_eq!(parse_ascii_bool_text("TRUE"), Some(true));
+        assert_eq!(parse_ascii_bool_text("false"), Some(false));
+        assert_eq!(parse_ascii_bool_text("yes"), None);
+        assert_eq!(parse_ascii_bool_text(" true "), None);
         assert_eq!(parse_ascii_bool_text("trüe"), None);
     }
 

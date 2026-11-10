@@ -1367,7 +1367,7 @@ def _bool_text(text: str) -> bool | None:
         return None
     native = native_acceleration.parse_ascii_bool_text(text)
     if native is not None:
-        return {"true": True, "false": False, "unknown": None}[native]
+        return native
     if text.casefold() == "true":
         return True
     if text.casefold() == "false":
