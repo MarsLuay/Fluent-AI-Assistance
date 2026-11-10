@@ -1090,6 +1090,64 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             self.assertEqual(worktable_geometry._references(fallback, "Mesh"), fallback_expected)
         self.assertEqual(fallback_expected, ["\ud800-guid"])
 
+    def test_mesh_references_uses_native_ordered_lists_with_unicode_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_mesh_reference_lists"
+        ):
+            self.skipTest("optional Rust mesh-reference collector is not built")
+        parser = worktable_geometry.ET.XMLParser(
+            target=worktable_geometry.ET.TreeBuilder(insert_comments=True)
+        )
+        payload = worktable_geometry.ET.fromstring(
+            "<Payload xmlns='urn:test'><Reference><TypeId>WorktableMesh</TypeId>"
+            "<Guid>g-1</Guid><ObjectName>Plate</ObjectName></Reference>"
+            "<!-- ignored non-element child -->"
+            "<Reference><TypeId>WorktableMesh</TypeId><Guid>g-1</Guid><ObjectName>Plate</ObjectName></Reference>"
+            "<Reference><TypeId>WorktableMesh</TypeId><Guid>g-1</Guid><ObjectName>Other</ObjectName></Reference>"
+            "<Reference><TypeId>WorktableMesh</TypeId><Guid>g-2</Guid><ObjectName>G-2</ObjectName></Reference>"
+            "<Reference><TypeId>WorktableMesh</TypeId><Guid></Guid><ObjectName>NamelessGuid</ObjectName></Reference>"
+            "<Reference><TypeId>WorktableMesh</TypeId><Guid>ID</Guid><ObjectName>id</ObjectName></Reference>"
+            "<Reference><TypeId>Other</TypeId><Guid>ignored</Guid><ObjectName>Ignored</ObjectName></Reference></Payload>",
+            parser=parser,
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = worktable_geometry._mesh_references(payload)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_mesh_reference_lists(
+                    payload, "WorktableMesh", worktable_geometry.ET.Element
+                ),
+                expected,
+            )
+            with patch.object(
+                native_acceleration,
+                "xml_mesh_reference_lists",
+                wraps=native_acceleration.xml_mesh_reference_lists,
+            ) as native_call:
+                actual = worktable_geometry._mesh_references(payload)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, (["g-1", "g-2", "ID"], ["Plate", "Other", "NamelessGuid"]))
+
+        unicode_payload = worktable_geometry.ET.fromstring(
+            "<Payload><Reference><TypeId>WorktableMesh</TypeId>"
+            "<Guid>SS</Guid><ObjectName>ß</ObjectName></Reference></Payload>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unicode_expected = worktable_geometry._mesh_references(unicode_payload)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_mesh_reference_lists(
+                    unicode_payload,
+                    "WorktableMesh",
+                    worktable_geometry.ET.Element,
+                )
+            )
+            self.assertEqual(
+                worktable_geometry._mesh_references(unicode_payload), unicode_expected
+            )
+        self.assertEqual(unicode_expected, (["SS"], []))
+
     def test_matrix_rows_use_native_parser_with_python_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_matrix"

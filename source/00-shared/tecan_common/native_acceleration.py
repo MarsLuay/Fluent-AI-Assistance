@@ -360,6 +360,39 @@ def xml_reference_guids(
         return None
 
 
+def xml_mesh_reference_lists(
+    root: Any, type_id: Any, element_type: Any
+) -> tuple[list[str], list[str]] | None:
+    """Collect ASCII mesh GUIDs and names while preserving casefold exclusions."""
+    if (
+        not enabled()
+        or type(root) is not element_type
+        or type(type_id) is not str
+    ):
+        return None
+    try:
+        result = _native.xml_mesh_reference_lists(root, type_id, element_type)
+        if (
+            type(result) is tuple
+            and len(result) == 2
+            and all(
+                type(values) is list and all(type(value) is str for value in values)
+                for values in result
+            )
+        ):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_matrix(root: Any, element_type: Any) -> list[list[float]] | None:
     """Parse XML matrix rows with Python fallback for unsupported float forms."""
     if not enabled() or type(root) is not element_type:

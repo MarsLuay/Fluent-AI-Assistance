@@ -1239,6 +1239,11 @@ def _references(payload: ET.Element | None, type_id: str) -> list[str]:
 
 def _mesh_references(payload: ET.Element | None) -> tuple[list[str], list[str]]:
     """Return (mesh_guids, mesh_names) from WorktableMesh references on a component."""
+    native = native_acceleration.xml_mesh_reference_lists(
+        payload, "WorktableMesh", ET.Element
+    )
+    if native is not None:
+        return native
     guids: list[str] = []
     names: list[str] = []
     for ref in _direct_children(payload, "Reference"):

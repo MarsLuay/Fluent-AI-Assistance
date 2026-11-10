@@ -2634,6 +2634,65 @@ fn xml_reference_guids<'py>(
 }
 
 #[pyfunction]
+fn xml_mesh_reference_lists<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    type_id: &str,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<(Vec<String>, Vec<String>)>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let mut guids = Vec::new();
+    let mut guid_set = HashSet::new();
+    let mut names = Vec::new();
+    let mut name_set = HashSet::new();
+    for reference in root.try_iter()? {
+        let reference = reference?;
+        if !reference.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = reference.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        if local != "Reference" {
+            continue;
+        }
+        let (type_supported, observed_type) =
+            xml_direct_exact_local_text(py, &reference, "TypeId", element_type)?;
+        if !type_supported {
+            return Ok(None);
+        }
+        if observed_type != type_id {
+            continue;
+        }
+        let (guid_supported, guid) =
+            xml_direct_exact_local_text(py, &reference, "Guid", element_type)?;
+        if !guid_supported {
+            return Ok(None);
+        }
+        let (name_supported, name) =
+            xml_direct_exact_local_text(py, &reference, "ObjectName", element_type)?;
+        if !name_supported || !guid.is_ascii() || !name.is_ascii() {
+            return Ok(None);
+        }
+        if !guid.is_empty() && guid_set.insert(guid.clone()) {
+            guids.push(guid.clone());
+        }
+        if !name.is_empty() && !name.eq_ignore_ascii_case(&guid) && name_set.insert(name.clone()) {
+            names.push(name);
+        }
+    }
+    Ok(Some((guids, names)))
+}
+
+#[pyfunction]
 fn xml_matrix<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -5000,6 +5059,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_grouped_texts_excluding, module)?)?;
     module.add_function(wrap_pyfunction!(xml_elements_by_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_reference_guids, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_mesh_reference_lists, module)?)?;
     module.add_function(wrap_pyfunction!(xml_matrix, module)?)?;
     module.add_function(wrap_pyfunction!(xml_indexed_values, module)?)?;
     module.add_function(wrap_pyfunction!(xml_vec_dict, module)?)?;
