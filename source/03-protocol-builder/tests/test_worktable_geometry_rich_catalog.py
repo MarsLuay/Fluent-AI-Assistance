@@ -563,6 +563,50 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         )
         self.assertEqual(actual[10:], ["東京", "\ud800", "", "", "Custom"])
 
+    def test_named_descendants_use_native_ascii_casefold_with_unicode_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_ascii_casefolded_name"
+        ):
+            self.skipTest("optional Rust case-folded XML selector is not built")
+
+        root = worktable_geometry.ET.fromstring(
+            '<Root xmlns="urn:worktable"><Branch><GuId>one</GuId><GUID>two</GUID>'
+            "</Branch><guid>three</guid></Root>"
+        )
+        unicode_root = worktable_geometry.ET.fromstring(
+            "<Root><Straße>match</Straße></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = worktable_geometry._named_descendants(root, {"guid"})
+            mixed_case_name_expected = worktable_geometry._named_descendants(
+                root, {"gUiD"}
+            )
+            unicode_expected = worktable_geometry._named_descendants(
+                unicode_root, {"strasse"}
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_ascii_casefolded_name",
+                wraps=native_acceleration.xml_elements_by_ascii_casefolded_name,
+            ) as native_call:
+                actual = worktable_geometry._named_descendants(root, {"guid"})
+                self.assertEqual(native_call.call_count, 1)
+                mixed_case_name_actual = worktable_geometry._named_descendants(
+                    root, {"gUiD"}
+                )
+                self.assertEqual(native_call.call_count, 2)
+                unicode_actual = worktable_geometry._named_descendants(
+                    unicode_root, {"strasse"}
+                )
+                self.assertEqual(native_call.call_count, 3)
+        self.assertEqual(actual, expected)
+        self.assertEqual([element.text for element in actual], ["one", "two", "three"])
+        self.assertEqual(mixed_case_name_actual, mixed_case_name_expected)
+        self.assertEqual(mixed_case_name_actual, [])
+        self.assertEqual(unicode_actual, unicode_expected)
+        self.assertEqual([element.text for element in unicode_actual], ["match"])
+
     def test_stable_fingerprint_hashes_python_json_payload_natively(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "sha256_text"

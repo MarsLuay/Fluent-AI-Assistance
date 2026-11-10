@@ -666,6 +666,11 @@ def _vector_waypoints(node: ET.Element) -> list[dict[str, float]]:
 def _named_descendants(elem: ET.Element | None, names: set[str]) -> list[ET.Element]:
     if elem is None:
         return []
+    native = native_acceleration.xml_elements_by_ascii_casefolded_name(
+        elem, names, ET.Element
+    )
+    if native is not None:
+        return native
     return [
         child
         for child in elem.iter()
