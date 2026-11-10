@@ -298,6 +298,21 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         self.assertEqual(actual[1].attrib["id"], "first")
         self.assertIsNone(actual[2])
 
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_matches = worktable_geometry._findall_local(root, "Item")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual_matches = worktable_geometry._findall_local(root, "Item")
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual_matches, expected_matches)
+        self.assertEqual(
+            [element.attrib["id"] for element in actual_matches], ["first", "second"]
+        )
+
         root_with_comment = worktable_geometry.ET.Element("Root")
         root_with_comment.append(worktable_geometry.ET.Comment("ignored"))
         expected_comment_case = worktable_geometry.ET.SubElement(root_with_comment, "Item")
@@ -307,6 +322,12 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             actual = worktable_geometry._find(root_with_comment, "Item")
         self.assertIs(actual, expected_comment_case)
         self.assertIs(actual, expected)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_matches = worktable_geometry._findall_local(root_with_comment, "Item")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual_matches = worktable_geometry._findall_local(root_with_comment, "Item")
+        self.assertEqual(actual_matches, expected_matches)
+        self.assertEqual(actual_matches, [expected_comment_case])
 
     def test_is_nil_uses_native_true_match_without_changing_attribute_policy(self):
         if not native_acceleration.available() or not hasattr(

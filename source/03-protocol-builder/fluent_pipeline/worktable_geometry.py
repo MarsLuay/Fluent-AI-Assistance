@@ -1045,6 +1045,11 @@ def _indexed_float_values(elem: ET.Element | None) -> dict[str, float]:
 def _findall_local(elem: ET.Element | None, local_name: str) -> list[ET.Element]:
     if elem is None:
         return []
+    native = native_acceleration.xml_elements_by_name(
+        elem, {local_name}, ET.Element
+    )
+    if native is not None:
+        return native
     return [
         child
         for child in elem.iter()
