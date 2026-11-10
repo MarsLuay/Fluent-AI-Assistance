@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterator, Optional, Union
 
 from tecan_common.native_acceleration import (
+    parse_ascii_bool_text as _native_parse_ascii_bool_text,
     parse_f64_decimal_text as _native_parse_f64_decimal_text,
     xscr_object_fields as _native_xscr_object_fields,
 )
@@ -1391,13 +1392,21 @@ def _parse_int(text: Optional[str], *, default: int) -> int:
 def _parse_bool(text: Optional[str], *, default: bool = False) -> bool:
     if text is None or text == "":
         return default
-    return text.strip().lower() == "true"
+    return _parse_bool_value(text)
 
 
 def _parse_optional_bool(text: Optional[str]) -> Optional[bool]:
     if text is None or text == "":
         return None
-    return text.strip().lower() == "true"
+    return _parse_bool_value(text)
+
+
+def _parse_bool_value(text: str) -> bool:
+    stripped = text.strip()
+    native = _native_parse_ascii_bool_text(stripped)
+    if native is not None:
+        return native
+    return stripped.lower() == "true"
 
 
 def _strip_wrapping_quotes(text: str) -> str:

@@ -161,6 +161,70 @@ def test_xscr_int_cast_uses_native_float_parser_with_fallbacks() -> None:
     assert actual[-1] == 77
 
 
+def test_xscr_boolean_parsers_use_native_ascii_path_with_python_fallback() -> None:
+    from unittest.mock import patch
+
+    from tecan_common import native_acceleration
+    from fluentcoder.decompiler import xscr_parser
+
+    if not native_acceleration.available() or not hasattr(
+        native_acceleration._native, "parse_ascii_bool_text"
+    ):
+        pytest.skip("optional Rust boolean parser is not built")
+
+    values = [
+        None,
+        "",
+        "true",
+        " false ",
+        "TRUE",
+        "True \u2003",
+        "yes",
+        "no",
+        "truë",
+    ]
+    with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = (
+            [xscr_parser._parse_bool(value, default=True) for value in values],
+            [xscr_parser._parse_optional_bool(value) for value in values],
+        )
+    with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            xscr_parser,
+            "_native_parse_ascii_bool_text",
+            wraps=xscr_parser._native_parse_ascii_bool_text,
+        ) as native_call:
+            actual = (
+                [xscr_parser._parse_bool(value, default=True) for value in values],
+                [xscr_parser._parse_optional_bool(value) for value in values],
+            )
+            assert native_call.call_count == 14
+
+    assert actual == expected
+    assert actual[0] == [
+        True,
+        True,
+        True,
+        False,
+        True,
+        True,
+        False,
+        False,
+        False,
+    ]
+    assert actual[1] == [
+        None,
+        None,
+        True,
+        False,
+        True,
+        True,
+        False,
+        False,
+        False,
+    ]
+
+
 def test_declare_fc_variable_returns_token() -> None:
     wt = Worktable(name="fc var")
     token = wt.declare_fc_variable("PlateType")
