@@ -1200,6 +1200,82 @@ fn render_gwl_report(
     Some(format!("{}\n", lines.join("\n")))
 }
 
+#[pyfunction]
+fn render_zeia_report(
+    header: Vec<String>,
+    count_sections: Vec<Vec<(String, String)>>,
+    script_names: Vec<String>,
+    scripts: Vec<Vec<String>>,
+    errors: Vec<Vec<String>>,
+) -> Option<String> {
+    if header.len() != 6
+        || count_sections.len() != 4
+        || scripts
+            .iter()
+            .any(|script| script.len() < 2 || (script.len() - 2) % 2 != 0)
+        || errors.iter().any(|error| error.len() != 2)
+    {
+        return None;
+    }
+    let mut count_sections = count_sections.into_iter();
+    let mut lines = vec![
+        format!("# ZEIA Report: {}", header[0]),
+        String::new(),
+        format!("- Entries: `{}`", header[1]),
+        format!(
+            "- Scripts: `{}` total, `{}` summarized",
+            header[2], header[3]
+        ),
+        format!("- XML objects summarized: `{}`", header[4]),
+        format!("- GWL files summarized: `{}`", header[5]),
+    ];
+    lines.extend(render_append_dict(
+        "File Extensions",
+        count_sections.next().unwrap_or_default(),
+        40,
+    ));
+    lines.extend(render_append_dict(
+        "Command Families",
+        count_sections.next().unwrap_or_default(),
+        30,
+    ));
+    lines.extend(render_append_dict(
+        "Command Types",
+        count_sections.next().unwrap_or_default(),
+        30,
+    ));
+    lines.extend(render_append_dict(
+        "Warning Counts",
+        count_sections.next().unwrap_or_default(),
+        20,
+    ));
+    lines.extend(render_append_list("Script Names", script_names, 80));
+    if !scripts.is_empty() {
+        lines.push(String::new());
+        lines.push("## Script Summaries".to_string());
+        for script in scripts.iter().take(40) {
+            let families = script[2..]
+                .chunks_exact(2)
+                .take(5)
+                .map(|pair| format!("{}={}", pair[0], pair[1]))
+                .collect::<Vec<_>>()
+                .join(", ");
+            lines.push(format!(
+                "- `{}`: {} commands ({families})",
+                script[0], script[1]
+            ));
+        }
+    }
+    if !errors.is_empty() {
+        lines.push(String::new());
+        lines.push("## Parse Errors".to_string());
+        for error in errors.iter().take(20) {
+            lines.push(format!("- `{}`: {}", error[0], error[1]));
+        }
+    }
+    Some(format!("{}\n", lines.join("\n")))
+}
+
 #[allow(clippy::too_many_arguments)] // Keep report sections explicit for the Python adapter.
 #[pyfunction]
 fn render_directory_report(
@@ -2359,6 +2435,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_project_index_search, module)?)?;
     module.add_function(wrap_pyfunction!(render_project_index_summary, module)?)?;
     module.add_function(wrap_pyfunction!(render_directory_report, module)?)?;
+    module.add_function(wrap_pyfunction!(render_zeia_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_join_lines, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(read_text_file, module)?)?;
@@ -2464,6 +2541,40 @@ mod tests {
                 Vec::new(),
             ),
             "# ZEIA Compare Report\n\n- Left: `left-x`\n- Right: `right-x`\n- Entries: `2` -> `3`\n- Common script names: `1`\n\n## Scripts Added\n- added-x\n\n## Left Command Families\n- `family-x`: 2\n"
+        );
+    }
+
+    #[test]
+    fn zeia_report_preserves_sections_and_nested_summary_order() {
+        assert_eq!(
+            render_zeia_report(
+                vec![
+                    "source-x".into(),
+                    "entries-x".into(),
+                    "scripts-x".into(),
+                    "summarized-x".into(),
+                    "objects-x".into(),
+                    "worklists-x".into(),
+                ],
+                vec![
+                    vec![("extension-x".into(), "count-x".into())],
+                    vec![("family-x".into(), "count-y".into())],
+                    Vec::new(),
+                    vec![("warning-x".into(), "count-z".into())],
+                ],
+                vec!["script-name-x".into()],
+                vec![vec![
+                    "object-x".into(),
+                    "commands-x".into(),
+                    "key-x".into(),
+                    "value-x".into(),
+                ]],
+                vec![vec!["entry-x".into(), "error-x".into()]],
+            )
+            .as_deref(),
+            Some(
+                "# ZEIA Report: source-x\n\n- Entries: `entries-x`\n- Scripts: `scripts-x` total, `summarized-x` summarized\n- XML objects summarized: `objects-x`\n- GWL files summarized: `worklists-x`\n\n## File Extensions\n- `extension-x`: count-x\n\n## Command Families\n- `family-x`: count-y\n\n## Warning Counts\n- `warning-x`: count-z\n\n## Script Names\n- script-name-x\n\n## Script Summaries\n- `object-x`: commands-x commands (key-x=value-x)\n\n## Parse Errors\n- `entry-x`: error-x\n"
+            )
         );
     }
 

@@ -262,6 +262,79 @@ class RenderListTests(unittest.TestCase):
         self.assertEqual(custom.str_calls, 1)
         self.assertEqual(actual_fallback, expected_fallback)
 
+    def test_native_zeia_report_matches_python_limits_and_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "render_zeia_report"
+        ):
+            self.skipTest("optional Rust ZEIA report renderer is not built")
+        report = {
+            "kind": "zeia",
+            "source": "source-x",
+            "entry_count": 100,
+            "script_count_total": 42,
+            "script_count_summarized": 40,
+            "object_count_summarized": 8,
+            "gwl_count_summarized": 2,
+            "extension_counts": {f"extension-{index}": index for index in range(41)},
+            "family_counts": {f"family-{index}": index for index in range(31)},
+            "command_counts": {f"command-{index}": index for index in range(31)},
+            "warning_counts": {f"warning-{index}": index for index in range(21)},
+            "script_names": [f"script-{index}" for index in range(82)],
+            "scripts": [
+                {
+                    "object_name": f"object-{index}",
+                    "command_count": index,
+                    "family_counts": {f"key-{key}": key for key in range(6)},
+                }
+                for index in range(42)
+            ],
+            "errors": [
+                {"entry": f"entry-{index}", "error": f"error-{index}"}
+                for index in range(22)
+            ],
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = render.render_markdown(report)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            direct = native_acceleration.render_zeia_report(report)
+            self.assertEqual(direct, expected)
+            with patch.object(
+                render,
+                "_native_render_zeia_report",
+                wraps=render._native_render_zeia_report,
+            ) as native_call:
+                actual = render.render_markdown(report)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertIn("object-39", actual)
+        self.assertNotIn("object-40", actual)
+        self.assertIn("key-4=4", actual)
+        self.assertNotIn("key-5=5", actual)
+        self.assertIn("entry-19", actual)
+        self.assertNotIn("entry-20", actual)
+
+        class TextValue:
+            def __init__(self) -> None:
+                self.str_calls = 0
+
+            def __str__(self) -> str:
+                self.str_calls += 1
+                return "custom error"
+
+        custom = TextValue()
+        unsupported = {
+            "kind": "zeia",
+            "errors": [{"entry": "entry-x", "error": custom}],
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_fallback = render.render_markdown(unsupported)
+        self.assertEqual(custom.str_calls, 1)
+        custom.str_calls = 0
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual_fallback = render.render_markdown(unsupported)
+        self.assertEqual(custom.str_calls, 1)
+        self.assertEqual(actual_fallback, expected_fallback)
+
     def test_native_script_pattern_search_matches_nested_python_output(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "render_script_pattern_search"

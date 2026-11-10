@@ -348,6 +348,85 @@ def render_compare_report(
         return None
 
 
+def render_zeia_report(report: Any) -> str | None:
+    """Render supported ZEIA summary data natively, or request fallback."""
+    if not enabled() or type(report) is not dict:
+        return None
+    safe_values = (str, bool, int, float, type(None))
+    header = [
+        report.get("source"),
+        report.get("entry_count"),
+        report.get("script_count_total"),
+        report.get("script_count_summarized"),
+        report.get("object_count_summarized"),
+        report.get("gwl_count_summarized"),
+    ]
+    mappings = [
+        report.get("extension_counts", {}),
+        report.get("family_counts", {}),
+        report.get("command_counts", {}),
+        report.get("warning_counts", {}),
+    ]
+    script_names = report.get("script_names", [])
+    scripts = report.get("scripts", [])
+    errors = report.get("errors", [])
+    if (
+        not all(type(value) in safe_values for value in header)
+        or any(type(mapping) is not dict for mapping in mappings)
+        or type(script_names) not in (list, tuple)
+        or not all(type(value) in safe_values for value in script_names)
+        or type(scripts) not in (list, tuple)
+        or type(errors) not in (list, tuple)
+    ):
+        return None
+    try:
+        count_sections: list[list[tuple[str, str]]] = []
+        for mapping in mappings:
+            entries: list[tuple[str, str]] = []
+            for key, value in mapping.items():
+                if type(key) is not str or type(value) not in safe_values:
+                    return None
+                entries.append((key, str(value)))
+            count_sections.append(entries)
+        script_rows: list[list[str]] = []
+        for script in scripts[:40]:
+            if type(script) is not dict:
+                return None
+            object_name = script.get("object_name")
+            command_count = script.get("command_count")
+            family_counts = script.get("family_counts", {})
+            if (
+                type(object_name) not in safe_values
+                or type(command_count) not in safe_values
+                or type(family_counts) is not dict
+            ):
+                return None
+            row = [str(object_name), str(command_count)]
+            for key, value in list(family_counts.items())[:5]:
+                if type(key) not in safe_values or type(value) not in safe_values:
+                    return None
+                row.extend((str(key), str(value)))
+            script_rows.append(row)
+        error_rows: list[list[str]] = []
+        for error in errors[:20]:
+            if type(error) is not dict:
+                return None
+            values = [error.get("entry"), error.get("error")]
+            if not all(type(value) in safe_values for value in values):
+                return None
+            error_rows.append([str(value) for value in values])
+        result = _native.render_zeia_report(
+            [str(value) for value in header],
+            count_sections,
+            [str(value) for value in script_names],
+            script_rows,
+            error_rows,
+        )
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def render_directory_report(report: Any) -> str | None:
     """Render supported directory summary data natively, or request fallback."""
     if not enabled() or type(report) is not dict:
