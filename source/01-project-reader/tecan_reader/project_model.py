@@ -17,6 +17,7 @@ from typing import Any, Mapping
 from tecan_common.native_acceleration import (
     deepcopy_json as _native_deepcopy_json,
     sort_ascii_string_keys as _native_sort_ascii_string_keys,
+    sorted_unique_ascii_strings as _native_sorted_unique_ascii_strings,
 )
 
 
@@ -33,6 +34,13 @@ def _sorted_string_mapping(values: dict[str, Any]) -> dict[str, Any]:
     if native is not None:
         return native
     return dict(sorted(values.items()))
+
+
+def _sorted_unique_strings(values: list[str]) -> list[str]:
+    native = _native_sorted_unique_ascii_strings([values])
+    if native is not None:
+        return native
+    return sorted(set(values))
 
 
 CANONICAL_PROJECT_MODEL_SCHEMA_VERSION = "tecan.canonical_project.v1"
@@ -70,7 +78,8 @@ def build_completeness_metadata(
         if str(error.get("severity") or "error") != "warning"
     ]
     limited = script_limit is not None or object_limit is not None
-    oversized = sorted({str(entry) for entry in oversized_members if entry})
+    oversized_values = [str(entry) for entry in oversized_members if entry]
+    oversized = _sorted_unique_strings(oversized_values)
     complete = (
         not limited
         and not truncated_scripts

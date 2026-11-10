@@ -19,8 +19,9 @@ from tecan_reader.project_model import (
 
 class ProjectModelTests(unittest.TestCase):
     def test_completeness_count_keys_use_native_sort_with_unicode_fallback(self) -> None:
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "sort_ascii_string_keys"
+        if not native_acceleration.available() or not all(
+            hasattr(native_acceleration._native, name)
+            for name in ("sort_ascii_string_keys", "sorted_unique_ascii_strings")
         ):
             self.skipTest("optional Rust mapping sorter is not built")
         arguments = {
@@ -28,6 +29,7 @@ class ProjectModelTests(unittest.TestCase):
             "object_limit": None,
             "eligible_member_counts": {"scripts": 4, "objects": 3},
             "summarized_counts": {"scripts": 4, "objects": 3},
+            "oversized_members": ("zeta", "alpha", "zeta"),
         }
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             expected = build_completeness_metadata(**arguments)
@@ -39,7 +41,15 @@ class ProjectModelTests(unittest.TestCase):
             ) as native_call:
                 actual = build_completeness_metadata(**arguments)
                 self.assertEqual(native_call.call_count, 2)
+            with patch.object(
+                project_model,
+                "_native_sorted_unique_ascii_strings",
+                wraps=native_acceleration.sorted_unique_ascii_strings,
+            ) as unique_call:
+                actual = build_completeness_metadata(**arguments)
+                unique_call.assert_called_once()
         self.assertEqual(actual, expected)
+        self.assertEqual(actual["oversized_members"], ["alpha", "zeta"])
         self.assertEqual(
             list(actual["eligible_member_counts"]), ["objects", "scripts"]
         )
@@ -48,6 +58,7 @@ class ProjectModelTests(unittest.TestCase):
             **arguments,
             "eligible_member_counts": {"é": 1, "a": 2},
             "summarized_counts": {"é": 1, "a": 2},
+            "oversized_members": ("é", "a", "é"),
         }
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(
@@ -55,12 +66,14 @@ class ProjectModelTests(unittest.TestCase):
                     unicode_arguments["eligible_member_counts"]
                 )
             )
-            self.assertEqual(
-                build_completeness_metadata(**unicode_arguments)[
-                    "eligible_member_counts"
-                ],
-                {"a": 2, "é": 1},
+            self.assertIsNone(
+                native_acceleration.sorted_unique_ascii_strings([["é", "a", "é"]])
             )
+            unicode_result = build_completeness_metadata(**unicode_arguments)
+            self.assertEqual(
+                unicode_result["eligible_member_counts"], {"a": 2, "é": 1}
+            )
+            self.assertEqual(unicode_result["oversized_members"], ["a", "é"])
 
     def test_provenance_is_json_serializable_and_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
