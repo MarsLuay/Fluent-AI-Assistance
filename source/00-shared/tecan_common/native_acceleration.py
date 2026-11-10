@@ -42,6 +42,17 @@ def parse_xml(data: bytes, max_bytes: int, max_depth: int) -> Any | None:
         return None
 
 
+def xml_local_name(tag: Any) -> str | None:
+    """Return the namespace-free exact-string tag name natively when enabled."""
+    if not enabled() or type(tag) is not str:
+        return None
+    try:
+        result = _native.xml_tag_local_name(tag)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def decode_text_bytes(data: Any) -> str | None:
     """Decode the reader's supported text encodings natively when possible."""
     if not enabled() or type(data) is not bytes:

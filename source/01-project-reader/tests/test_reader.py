@@ -12,6 +12,7 @@ from pathlib import Path
 
 from tecan_common import native_acceleration
 from tecan_common import xml_compat as ET
+import tecan_common.xml_helpers as xml_helpers
 import tecan_reader.common as reader_common
 from tecan_reader.archive import inspect_archive
 from tecan_reader.common import (
@@ -314,6 +315,39 @@ class ReaderTests(unittest.TestCase):
             self.assertIsNone(native_acceleration.xml_kind_from_suffix(unicode_suffix))
             self.assertEqual(reader_xmlobj._kind_from_suffix(unicode_suffix), "i\u0307")
             self.assertEqual(reader_xmlobj._kind_from_suffix(StringSubclass(".xcmp")), "component")
+
+    def test_native_xml_local_name_matches_python_and_preserves_string_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_tag_local_name"
+        ):
+            self.skipTest("optional Rust XML local-name helper is not built")
+        tags = ["tag", "{namespace}tag", "{one}{two}last", "}", "{}", "", "µ标签"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [xml_helpers.local_name(tag) for tag in tags]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                xml_helpers,
+                "_native_xml_local_name",
+                wraps=xml_helpers._native_xml_local_name,
+            ) as native_call:
+                actual = [xml_helpers.local_name(tag) for tag in tags]
+                self.assertEqual(native_call.call_count, len(tags))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["tag", "tag", "last", "", "", "", "µ标签"])
+
+        class CustomTag:
+            str_calls = 0
+
+            def __str__(self) -> str:
+                self.str_calls += 1
+                return "{namespace}custom"
+
+        custom = CustomTag()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.xml_local_name(custom))
+            self.assertEqual(custom.str_calls, 0)
+            self.assertEqual(xml_helpers.local_name(custom), "custom")
+            self.assertEqual(custom.str_calls, 1)
 
     def test_native_extension_counts_match_path_suffix_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(

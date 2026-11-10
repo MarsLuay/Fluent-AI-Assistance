@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from . import xml_compat as ET
+from .native_acceleration import xml_local_name as _native_xml_local_name
 
 __all__ = [
     "all_text",
@@ -20,6 +21,9 @@ __all__ = [
 
 def local_name(tag: Any) -> str:
     """Return the namespace-free XML tag name."""
+    native = _native_xml_local_name(tag)
+    if native is not None:
+        return native
     text = str(tag)
     return text.rsplit("}", 1)[-1] if "}" in text else text
 

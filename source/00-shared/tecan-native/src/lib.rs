@@ -896,6 +896,11 @@ fn decode_text_bytes(data: &Bound<'_, PyBytes>) -> String {
 }
 
 #[pyfunction]
+fn xml_tag_local_name(tag: &str) -> String {
+    tag.rsplit('}').next().unwrap_or(tag).to_owned()
+}
+
+#[pyfunction]
 fn read_text_file(path: &str) -> Option<String> {
     std::fs::read(path)
         .ok()
@@ -1727,6 +1732,7 @@ fn pattern_windows<'py>(
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(parse_xml, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_tag_local_name, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(read_text_file, module)?)?;
     module.add_function(wrap_pyfunction!(read_utf8_sig_file, module)?)?;
