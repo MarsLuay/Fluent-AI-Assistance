@@ -18,6 +18,8 @@ import zipfile
 from . import xml_compat as ET
 from pathlib import Path
 from typing import Any, Iterable, Mapping
+
+from tecan_common import native_acceleration
 from tecan_common.zeia_limits import build_zeia_archive_inventory
 
 from tecan_common.gwl import (
@@ -3742,7 +3744,11 @@ def _number_or_text(value: str) -> Any:
 
 
 def _bool_text(value: str | None) -> bool:
-    return str(value or "").strip().lower() == "true"
+    text = str(value or "").strip()
+    native = native_acceleration.parse_ascii_bool_text(text)
+    if native is not None:
+        return native
+    return text.lower() == "true"
 
 
 def _optional_bool(value: Any) -> bool | None:
@@ -3750,10 +3756,14 @@ def _optional_bool(value: Any) -> bool | None:
         return value
     if value is None:
         return None
-    text = str(value).strip().lower()
-    if text == "true":
+    text = str(value).strip()
+    native = native_acceleration.parse_ascii_bool_text(text)
+    if native is not None:
+        return native
+    normalized = text.lower()
+    if normalized == "true":
         return True
-    if text == "false":
+    if normalized == "false":
         return False
     return None
 

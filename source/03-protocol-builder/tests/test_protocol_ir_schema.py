@@ -54,6 +54,56 @@ class ProtocolIRSchemaTests(unittest.TestCase):
         self.assertFalse(versions["tecan.protocol_ir.v1"].current)
         self.assertTrue(versions["tecan.protocol_ir.v2"].current)
 
+    def test_boolean_coercions_use_native_ascii_parser_with_python_fallback(self):
+        from unittest.mock import patch
+
+        from tecan_common import native_acceleration
+        from fluent_pipeline import protocol_ir
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "parse_ascii_bool_text"
+        ):
+            self.skipTest("optional Rust boolean parser is not built")
+        values = [
+            None,
+            "",
+            " true ",
+            "FALSE",
+            "yes",
+            0,
+            False,
+            True,
+            "truë",
+            " 1 ",
+        ]
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = (
+                [protocol_ir._bool_text(value) for value in values],
+                [protocol_ir._optional_bool(value) for value in values],
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "parse_ascii_bool_text",
+                wraps=native_acceleration.parse_ascii_bool_text,
+            ) as native_call:
+                actual = (
+                    [protocol_ir._bool_text(value) for value in values],
+                    [protocol_ir._optional_bool(value) for value in values],
+                )
+                self.assertEqual(native_call.call_count, 17)
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual[0],
+            [False, False, True, False, False, False, False, True, False, False],
+        )
+        self.assertEqual(
+            actual[1],
+            [None, None, True, False, None, None, False, True, None, None],
+        )
+
     def test_validate_document_rejects_missing_fields_and_invalid_operations(self):
         missing = {
             "ir_version": CANONICAL_IR_VERSION,
