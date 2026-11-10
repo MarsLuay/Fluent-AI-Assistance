@@ -912,7 +912,7 @@ fn xml_container_child_texts<'py>(
     container_name: &str,
     element_type: &Bound<'py, PyAny>,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
-    if !root.get_type().is(element_type) || !container_name.is_ascii() {
+    if !root.get_type().is(element_type) {
         return Ok(None);
     }
     let output = PyList::empty(py);
@@ -926,9 +926,6 @@ fn xml_container_child_texts<'py>(
             return Ok(None);
         }
         let tag = tag.extract::<String>()?;
-        if !tag.is_ascii() {
-            return Ok(None);
-        }
         if tag.rsplit('}').next().unwrap_or(tag.as_str()) != container_name {
             continue;
         }
@@ -945,12 +942,7 @@ fn xml_container_child_texts<'py>(
                 return Ok(None);
             }
             let text = text.extract::<String>()?;
-            if !text.is_ascii() {
-                return Ok(None);
-            }
-            let cleaned = text.trim_matches(|ch: char| {
-                ch.is_ascii_whitespace() || matches!(ch as u32, 0x1c..=0x1f)
-            });
+            let cleaned = trim_python_whitespace(&text);
             if !cleaned.is_empty() {
                 output.append(cleaned)?;
             }

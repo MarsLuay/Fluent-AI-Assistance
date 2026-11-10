@@ -73,12 +73,8 @@ def xml_clean_text(value: Any) -> str | None:
 def xml_container_child_texts(
     root: Any, container_name: Any, element_type: Any
 ) -> list[str] | None:
-    """Collect direct child texts beneath matching XML containers when ASCII."""
-    if (
-        not enabled()
-        or type(container_name) is not str
-        or not container_name.isascii()
-    ):
+    """Collect direct child texts beneath matching Unicode XML containers."""
+    if not enabled() or type(container_name) is not str:
         return None
     try:
         result = _native.xml_container_child_texts(

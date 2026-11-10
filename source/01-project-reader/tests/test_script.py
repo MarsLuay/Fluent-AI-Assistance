@@ -174,7 +174,7 @@ class ScriptTests(unittest.TestCase):
                 ],
             )
 
-    def test_startup_variable_values_use_native_ascii_with_unicode_fallback(self) -> None:
+    def test_startup_variable_values_use_native_with_unicode_text(self) -> None:
         if not native_acceleration.available() or not all(
             hasattr(native_acceleration._native, name)
             for name in ("xml_container_child_texts", "ascii_casefold_equals")
@@ -215,10 +215,11 @@ class ScriptTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             unicode_expected = script._startup_variables(unicode_root)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            self.assertIsNone(
+            self.assertEqual(
                 native_acceleration.xml_container_child_texts(
                     unicode_root[0], "Values", script.ET.Element
-                )
+                ),
+                ["café"],
             )
             self.assertIsNone(
                 native_acceleration.ascii_casefold_equals("trué", "true")
@@ -226,6 +227,39 @@ class ScriptTests(unittest.TestCase):
             unicode_actual = script._startup_variables(unicode_root)
         self.assertEqual(unicode_actual, unicode_expected)
         self.assertEqual(unicode_actual[0]["default_values"], ["café"])
+
+        values_root = script.ET.Element("Root")
+        values_container = script.ET.SubElement(values_root, "{urn:test}Välues")
+        for value in ("éclair", "東京"):
+            script.ET.SubElement(values_container, "Valüe").text = (
+                f"\u00a0{value}\u2003"
+            )
+        whitespace_chars = [
+            chr(codepoint)
+            for codepoint in range(0x110000)
+            if chr(codepoint).isspace()
+        ]
+        for index, character in enumerate(whitespace_chars):
+            script.ET.SubElement(values_container, "Value").text = (
+                f"{character}item-{index}{character}"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_values = [
+                (child.text or "").strip() for child in list(values_container)
+                if (child.text or "").strip()
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_container_child_texts(
+                    values_root, "Välues", script.ET.Element
+                ),
+                expected_values,
+            )
+            self.assertIsNone(
+                native_acceleration.xml_container_child_texts(
+                    values_root, chr(0xD800), script.ET.Element
+                )
+            )
 
     def test_warning_substring_scans_use_rust_with_unicode_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
