@@ -3549,11 +3549,16 @@ def _command_id(command_object: ET.Element) -> str:
 
 
 def _xscr_driver_recovery_policy(command_object: ET.Element):
-    for element in command_object.iter():
+    macro_names = {"ApplicationDriverMacro", "LegacyDriverMacro"}
+    native = native_acceleration.xml_elements_by_name(
+        command_object, macro_names, ET.Element
+    )
+    elements = native if native is not None else command_object.iter()
+    for element in elements:
         if not isinstance(element.tag, str):
             continue
         local = element.tag.rsplit("}", 1)[-1]
-        if local in {"ApplicationDriverMacro", "LegacyDriverMacro"}:
+        if local in macro_names:
             return parse_driver_recovery_policy(element)
     return None
 

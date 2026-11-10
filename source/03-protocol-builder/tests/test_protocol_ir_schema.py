@@ -553,6 +553,56 @@ class ProtocolIRSchemaTests(unittest.TestCase):
         self.assertEqual(actual_leaf, ["root", "", "namespaced", "first", "second", "third"])
         self.assertEqual(actual_path, ["first", "second", "third"])
 
+    def test_driver_recovery_macro_scan_uses_native_selector_with_fallback(self):
+        from unittest.mock import patch
+
+        from tecan_common import native_acceleration
+        from fluent_pipeline import protocol_ir
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        names = {"ApplicationDriverMacro", "LegacyDriverMacro"}
+        root = protocol_ir.ET.fromstring(
+            '<Root xmlns:ns="urn:test"><ns:LegacyDriverMacro/>'
+            "<ApplicationDriverMacro/></Root>"
+        )
+        commented = protocol_ir.ET.Element("Root")
+        commented.append(protocol_ir.ET.Comment("keep Python fallback"))
+        protocol_ir.ET.SubElement(commented, "LegacyDriverMacro")
+        roots = [root, commented]
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                protocol_ir,
+                "parse_driver_recovery_policy",
+                side_effect=lambda element: element.tag,
+            ):
+                expected = [
+                    protocol_ir._xscr_driver_recovery_policy(item) for item in roots
+                ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                protocol_ir,
+                "parse_driver_recovery_policy",
+                side_effect=lambda element: element.tag,
+            ):
+                with patch.object(
+                    native_acceleration,
+                    "xml_elements_by_name",
+                    wraps=native_acceleration.xml_elements_by_name,
+                ) as native_call:
+                    actual = [
+                        protocol_ir._xscr_driver_recovery_policy(item)
+                        for item in roots
+                    ]
+                    for item in roots:
+                        native_call.assert_any_call(item, names, protocol_ir.ET.Element)
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["{urn:test}LegacyDriverMacro", "LegacyDriverMacro"])
+
     def test_selected_tip_channels_use_native_integer_tag_selection(self):
         from unittest.mock import patch
 
