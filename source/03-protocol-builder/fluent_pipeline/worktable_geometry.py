@@ -1148,6 +1148,11 @@ def _find(elem: ET.Element | None, local_name: str) -> ET.Element | None:
 def _direct_child(elem: ET.Element | None, local_name: str) -> ET.Element | None:
     if elem is None:
         return None
+    native = native_acceleration.xml_direct_elements_by_name(
+        elem, {local_name}, ET.Element
+    )
+    if native is not None:
+        return native[0] if native else None
     for child in list(elem):
         if isinstance(child.tag, str) and _local_name(child.tag) == local_name:
             return child
@@ -1157,6 +1162,11 @@ def _direct_child(elem: ET.Element | None, local_name: str) -> ET.Element | None
 def _direct_children(elem: ET.Element | None, local_name: str) -> list[ET.Element]:
     if elem is None:
         return []
+    native = native_acceleration.xml_direct_elements_by_name(
+        elem, {local_name}, ET.Element
+    )
+    if native is not None:
+        return native
     return [child for child in list(elem) if isinstance(child.tag, str) and _local_name(child.tag) == local_name]
 
 

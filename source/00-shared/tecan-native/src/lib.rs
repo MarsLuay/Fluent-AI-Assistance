@@ -1975,6 +1975,36 @@ fn xml_elements_by_name<'py>(
     Ok(Some(output.into_any()))
 }
 
+#[pyfunction]
+fn xml_direct_elements_by_name<'py>(
+    py: Python<'py>,
+    parent: &Bound<'py, PyAny>,
+    names: Vec<String>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !parent.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let names = names.into_iter().collect::<HashSet<_>>();
+    let output = PyList::empty(py);
+    for child in parent.try_iter()? {
+        let child = child?;
+        if !child.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = child.getattr("tag")?;
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        if names.contains(local) {
+            output.append(child)?;
+        }
+    }
+    Ok(Some(output.into_any()))
+}
+
 fn is_python_whitespace(character: char) -> bool {
     character.is_whitespace() || ('\u{001c}'..='\u{001f}').contains(&character)
 }
@@ -3943,6 +3973,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_all_unique_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_grouped_texts_excluding, module)?)?;
     module.add_function(wrap_pyfunction!(xml_elements_by_name, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_direct_elements_by_name, module)?)?;
     module.add_function(wrap_pyfunction!(
         xml_elements_by_folded_name_with_children,
         module

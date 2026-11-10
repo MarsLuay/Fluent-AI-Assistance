@@ -205,6 +205,44 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             ]
         self.assertEqual(generated_actual, generated_expected)
 
+    def test_geometry_direct_children_use_native_selection_with_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_direct_elements_by_name"
+        ):
+            self.skipTest("optional Rust direct XML child selector is not built")
+        root = worktable_geometry.ET.fromstring(
+            '<Root xmlns="urn:test"><Item id="first"/><Group><Item id="nested"/></Group><Item id="last"/></Root>'
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_children = worktable_geometry._direct_children(root, "Item")
+            expected_first = worktable_geometry._direct_child(root, "Item")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_direct_elements_by_name",
+                wraps=native_acceleration.xml_direct_elements_by_name,
+            ) as native_call:
+                actual_children = worktable_geometry._direct_children(root, "Item")
+                actual_first = worktable_geometry._direct_child(root, "Item")
+                self.assertEqual(native_call.call_count, 2)
+        self.assertEqual(actual_children, expected_children)
+        self.assertIs(actual_first, expected_first)
+        self.assertEqual(
+            [element.attrib["id"] for element in actual_children], ["first", "last"]
+        )
+
+        root_with_comment = worktable_geometry.ET.Element("Root")
+        root_with_comment.append(worktable_geometry.ET.Comment("ignored"))
+        first = worktable_geometry.ET.SubElement(root_with_comment, "Item", id="first")
+        worktable_geometry.ET.SubElement(root_with_comment, "Item", id="last")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_children = worktable_geometry._direct_children(root_with_comment, "Item")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual_children = worktable_geometry._direct_children(root_with_comment, "Item")
+        self.assertEqual(actual_children, expected_children)
+        self.assertIs(actual_children[0], first)
+        self.assertEqual([element.attrib["id"] for element in actual_children], ["first", "last"])
+
     def test_geometry_find_uses_native_element_selection_with_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_elements_by_name"
