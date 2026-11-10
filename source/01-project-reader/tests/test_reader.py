@@ -22,7 +22,7 @@ from tecan_reader.common import (
     read_text,
     to_jsonable,
 )
-from tecan_reader.gwl import inspect_gwl_lines
+from tecan_reader.gwl import inspect_gwl, inspect_gwl_lines
 from tecan_reader.pattern_library import mine_script_patterns, search_script_patterns, summarize_script_patterns
 import sqlite3
 from unittest.mock import patch, MagicMock
@@ -641,6 +641,30 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(report["record_counts"]["X"], 1)
         self.assertEqual(report["pipette_examples"][0]["rack_label"], "Source")
         self.assertEqual(report["line_count"], 3)
+
+    def test_inspect_gwl_file_uses_native_utf8_sig_read_with_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "read_utf8_sig_file"
+        ):
+            self.skipTest("optional Rust UTF-8-sig file reader is not built")
+        with tempfile.TemporaryDirectory() as raw_directory:
+            path = Path(raw_directory) / "fixture.gwl"
+            payload = (
+                "\ufeffA;Source;;Plate;1;;20;Water;;;\r\n"
+                "W;\rC;row\u2028separator"
+            ).encode("utf-8")
+            path.write_bytes(payload)
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                expected = inspect_gwl(path, source_name="fixture.gwl")
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    Path,
+                    "read_text",
+                    side_effect=AssertionError("native file reader should be used"),
+                ):
+                    actual = inspect_gwl(path, source_name="fixture.gwl")
+            self.assertEqual(actual, expected)
+            self.assertEqual(actual["line_count"], 4)
 
     def test_inspect_gwl_lines_batches_native_parse_with_ordered_examples(self) -> None:
         if not native_acceleration.available() or not hasattr(

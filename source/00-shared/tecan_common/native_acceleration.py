@@ -64,6 +64,17 @@ def read_text_file(path: str | Path) -> str | None:
         return None
 
 
+def read_utf8_sig_file(path: str | Path) -> str | None:
+    """Read strict UTF-8 with BOM removal and universal newlines, or fall back."""
+    if not enabled() or not isinstance(path, (str, Path)):
+        return None
+    try:
+        result = _native.read_utf8_sig_file(str(path))
+        return result if type(result) is str else None
+    except (AttributeError, OSError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def to_jsonable_containers(value: Any) -> tuple[bool, Any] | None:
     """Convert supported exact JSON containers natively, or request Python fallback."""
     if not enabled():

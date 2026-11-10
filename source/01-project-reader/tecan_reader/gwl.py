@@ -7,11 +7,15 @@ from pathlib import Path
 from typing import Any
 
 from tecan_common.gwl import Pipette, parse_gwl_line, parse_gwl_lines
+from tecan_common.native_acceleration import read_utf8_sig_file as _native_read_utf8_sig_file
 
 
 def inspect_gwl(path: str | Path, *, source_name: str | None = None) -> dict[str, Any]:
     p = Path(path)
-    lines = p.read_text(encoding="utf-8-sig").splitlines()
+    text = _native_read_utf8_sig_file(p)
+    if text is None:
+        text = p.read_text(encoding="utf-8-sig")
+    lines = text.splitlines()
     return inspect_gwl_lines(lines, source_name=source_name or str(path))
 
 

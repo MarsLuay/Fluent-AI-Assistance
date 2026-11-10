@@ -903,6 +903,14 @@ fn read_text_file(path: &str) -> Option<String> {
 }
 
 #[pyfunction]
+fn read_utf8_sig_file(path: &str) -> Option<String> {
+    let bytes = std::fs::read(path).ok()?;
+    let text = std::str::from_utf8(&bytes).ok()?;
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+    Some(text.replace("\r\n", "\n").replace('\r', "\n"))
+}
+
+#[pyfunction]
 fn canonical_json(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<String> {
     let json = py_to_json(py, value)?;
     let compact =
@@ -1561,6 +1569,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(parse_xml, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(read_text_file, module)?)?;
+    module.add_function(wrap_pyfunction!(read_utf8_sig_file, module)?)?;
     module.add_function(wrap_pyfunction!(catalog_source_paths, module)?)?;
     module.add_function(wrap_pyfunction!(catalog_stat_fingerprint, module)?)?;
     module.add_function(wrap_pyfunction!(source_content_fingerprint, module)?)?;
