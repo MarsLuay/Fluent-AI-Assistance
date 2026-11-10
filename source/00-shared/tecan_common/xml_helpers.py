@@ -8,6 +8,7 @@ from typing import Any
 from . import xml_compat as ET
 from .native_acceleration import (
     xml_clean_text as _native_xml_clean_text,
+    xml_find_text as _native_xml_find_text,
     xml_local_name as _native_xml_local_name,
     xml_unique_texts as _native_xml_unique_texts,
 )
@@ -41,6 +42,10 @@ def _clean_text(value: Any) -> str:
 
 def first_text(root: ET.Element, name: str, *, default: str = "") -> str:
     """Return the first non-empty descendant text for a local tag name."""
+    native = _native_xml_find_text(root, name, False, ET.Element)
+    if native is not None:
+        found, value = native
+        return value if found else default
     for element in root.iter():
         if local_name(element.tag) == name:
             value = _clean_text(element.text)
@@ -51,6 +56,10 @@ def first_text(root: ET.Element, name: str, *, default: str = "") -> str:
 
 def child_text(parent: ET.Element, name: str, *, default: str = "") -> str:
     """Return the first non-empty direct-child text for a local tag name."""
+    native = _native_xml_find_text(parent, name, True, ET.Element)
+    if native is not None:
+        found, value = native
+        return value if found else default
     for child in list(parent):
         if local_name(child.tag) == name:
             value = _clean_text(child.text)

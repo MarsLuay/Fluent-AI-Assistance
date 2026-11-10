@@ -966,6 +966,70 @@ fn xml_unique_texts<'py>(
 }
 
 #[pyfunction]
+fn xml_find_text<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    name: &str,
+    direct: bool,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let iterator = if direct {
+        root.try_iter()?
+    } else {
+        root.call_method0("iter")?.try_iter()?
+    };
+    for element in iterator {
+        let element = element?;
+        if !element.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = element.getattr("tag")?;
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        if local != name {
+            continue;
+        }
+        let text = element.getattr("text")?;
+        if text.is_none() {
+            continue;
+        }
+        if !text.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let text_value = text.extract::<String>()?;
+        if !text_value.is_ascii()
+            || text_value
+                .chars()
+                .any(|ch| ('\u{1c}'..='\u{1f}').contains(&ch))
+        {
+            return Ok(None);
+        }
+        let cleaned = text_value.trim();
+        if cleaned.is_empty() {
+            continue;
+        }
+        let output = PyList::empty(py);
+        output.append(true)?;
+        if cleaned == text_value {
+            output.append(text)?;
+        } else {
+            output.append(cleaned)?;
+        }
+        return Ok(Some(output.into_any()));
+    }
+    let output = PyList::empty(py);
+    output.append(false)?;
+    output.append(py.None().bind(py))?;
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn read_text_file(path: &str) -> Option<String> {
     std::fs::read(path)
         .ok()
@@ -1800,6 +1864,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_tag_local_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_clean_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_unique_texts, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_find_text, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(read_text_file, module)?)?;
     module.add_function(wrap_pyfunction!(read_utf8_sig_file, module)?)?;

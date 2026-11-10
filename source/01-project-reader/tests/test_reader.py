@@ -449,6 +449,59 @@ class ReaderTests(unittest.TestCase):
             )
             self.assertEqual(xml_helpers.unique_texts(root, {"A"}, limit=True), ["first"])
 
+    def test_native_xml_find_text_matches_python_and_preserves_defaults(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_find_text"
+        ):
+            self.skipTest("optional Rust XML text-search helper is not built")
+        root = ET.Element("{urn:test}Root")
+        ET.SubElement(root, "A").text = "   "
+        ET.SubElement(root, "{urn:test}A").text = " alpha "
+        nested = ET.SubElement(root, "Wrap")
+        ET.SubElement(nested, "A").text = "later"
+        ET.SubElement(nested, "NestedValue").text = "nested result"
+        absent = object()
+
+        def results() -> tuple[object, ...]:
+            return (
+                xml_helpers.first_text(root, "A"),
+                xml_helpers.child_text(root, "A"),
+                xml_helpers.first_text(root, "NestedValue"),
+                xml_helpers.child_text(root, "Wrap", default=absent),
+                xml_helpers.first_text(root, "Missing", default=absent),
+            )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = results()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                xml_helpers,
+                "_native_xml_find_text",
+                wraps=xml_helpers._native_xml_find_text,
+            ) as native_call:
+                actual = results()
+                self.assertEqual(native_call.call_count, 5)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual[:3], ("alpha", "alpha", "nested result"))
+        self.assertIs(actual[3], absent)
+        self.assertIs(actual[4], absent)
+
+        unicode_root = ET.Element("Root")
+        ET.SubElement(unicode_root, "A").text = "\u2003café\u2003"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unicode_expected = xml_helpers.first_text(unicode_root, "A")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_find_text(unicode_root, "A", False, ET.Element)
+            )
+            self.assertEqual(xml_helpers.first_text(unicode_root, "A"), unicode_expected)
+
+        comment_root = ET.Element("Root")
+        comment_root.append(ET.Comment("comment"))
+        ET.SubElement(comment_root, "A").text = "after comment"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(xml_helpers.first_text(comment_root, "A"), "after comment")
+
     def test_native_extension_counts_match_path_suffix_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "extension_counts"

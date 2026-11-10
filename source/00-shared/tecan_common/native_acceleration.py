@@ -105,6 +105,38 @@ def xml_unique_texts(
         return None
 
 
+def xml_find_text(
+    root: Any, name: Any, direct: Any, element_type: Any
+) -> tuple[bool, str | None] | None:
+    """Find first supported XML text value natively, retaining Python fallback."""
+    if (
+        not enabled()
+        or type(root) is not element_type
+        or type(name) is not str
+        or type(direct) is not bool
+    ):
+        return None
+    try:
+        result = _native.xml_find_text(root, name, direct, element_type)
+        if (
+            type(result) is list
+            and len(result) == 2
+            and type(result[0]) is bool
+            and ((result[0] and type(result[1]) is str) or (not result[0] and result[1] is None))
+        ):
+            return result[0], result[1]
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def decode_text_bytes(data: Any) -> str | None:
     """Decode the reader's supported text encodings natively when possible."""
     if not enabled() or type(data) is not bytes:
