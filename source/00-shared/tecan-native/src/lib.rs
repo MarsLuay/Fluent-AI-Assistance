@@ -3194,6 +3194,36 @@ fn xml_first_vec_by_ascii_casefolded_name(
 }
 
 #[pyfunction]
+fn xml_first_direct_element_by_name<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    name: &str,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<(bool, Option<Bound<'py, PyAny>>)> {
+    if !root.get_type().is(element_type) {
+        return Ok((false, None));
+    }
+    for element in root.try_iter()? {
+        let element = element?;
+        if !element.get_type().is(element_type) {
+            return Ok((false, None));
+        }
+        let tag = element.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok((false, None));
+        }
+        let tag = tag.extract::<String>()?;
+        if xml_tag_local_name(&tag) == name {
+            return Ok((true, Some(element)));
+        }
+    }
+    Ok((true, None))
+}
+
+#[pyfunction]
 fn xml_direct_elements_by_name<'py>(
     py: Python<'py>,
     parent: &Bound<'py, PyAny>,
@@ -5358,6 +5388,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     module.add_function(wrap_pyfunction!(xml_direct_elements_by_name, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_first_direct_element_by_name, module)?)?;
     module.add_function(wrap_pyfunction!(
         xml_direct_elements_by_ascii_casefolded_name,
         module

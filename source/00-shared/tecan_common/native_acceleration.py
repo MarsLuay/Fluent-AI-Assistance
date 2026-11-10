@@ -650,6 +650,38 @@ def xml_direct_elements_by_ascii_casefolded_name(
         return None
 
 
+def xml_first_direct_element_by_name(
+    parent: Any, name: Any, element_type: Any
+) -> tuple[bool, Any] | None:
+    """Find the first matching direct XML child without collecting siblings."""
+    if (
+        not enabled()
+        or type(parent) is not element_type
+        or type(name) is not str
+    ):
+        return None
+    try:
+        supported, result = _native.xml_first_direct_element_by_name(
+            parent, name, element_type
+        )
+        if (
+            type(supported) is bool
+            and supported
+            and (result is None or type(result) is element_type)
+        ):
+            return True, result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_direct_elements_by_name(
     parent: Any, names: Any, element_type: Any
 ) -> list[Any] | None:

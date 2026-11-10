@@ -1423,10 +1423,14 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         self.assertEqual(actual[5:8], ["2", "41", "2.3"])
 
     def test_geometry_direct_children_use_native_selection_with_fallback(self):
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "xml_direct_elements_by_name"
+        if not native_acceleration.available() or not all(
+            hasattr(native_acceleration._native, name)
+            for name in (
+                "xml_direct_elements_by_name",
+                "xml_first_direct_element_by_name",
+            )
         ):
-            self.skipTest("optional Rust direct XML child selector is not built")
+            self.skipTest("optional Rust direct XML child selectors are not built")
         root = worktable_geometry.ET.fromstring(
             '<Root xmlns="urn:test"><Item id="first"/><Group><Item id="nested"/></Group><Item id="last"/></Root>'
         )
@@ -1438,10 +1442,16 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
                 native_acceleration,
                 "xml_direct_elements_by_name",
                 wraps=native_acceleration.xml_direct_elements_by_name,
-            ) as native_call:
-                actual_children = worktable_geometry._direct_children(root, "Item")
-                actual_first = worktable_geometry._direct_child(root, "Item")
-                self.assertEqual(native_call.call_count, 2)
+            ) as native_all_call:
+                with patch.object(
+                    native_acceleration,
+                    "xml_first_direct_element_by_name",
+                    wraps=native_acceleration.xml_first_direct_element_by_name,
+                ) as native_first_call:
+                    actual_children = worktable_geometry._direct_children(root, "Item")
+                    actual_first = worktable_geometry._direct_child(root, "Item")
+                    native_all_call.assert_called_once()
+                    native_first_call.assert_called_once()
         self.assertEqual(actual_children, expected_children)
         self.assertIs(actual_first, expected_first)
         self.assertEqual(
@@ -1454,9 +1464,19 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         worktable_geometry.ET.SubElement(root_with_comment, "Item", id="last")
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             expected_children = worktable_geometry._direct_children(root_with_comment, "Item")
+            expected_first = worktable_geometry._direct_child(root_with_comment, "Item")
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            actual_children = worktable_geometry._direct_children(root_with_comment, "Item")
+            with patch.object(
+                native_acceleration,
+                "xml_first_direct_element_by_name",
+                wraps=native_acceleration.xml_first_direct_element_by_name,
+            ) as native_first_call:
+                actual_children = worktable_geometry._direct_children(root_with_comment, "Item")
+                actual_first = worktable_geometry._direct_child(root_with_comment, "Item")
+                native_first_call.assert_called_once()
         self.assertEqual(actual_children, expected_children)
+        self.assertIs(actual_first, expected_first)
+        self.assertIs(actual_first, first)
         self.assertIs(actual_children[0], first)
         self.assertEqual([element.attrib["id"] for element in actual_children], ["first", "last"])
 
