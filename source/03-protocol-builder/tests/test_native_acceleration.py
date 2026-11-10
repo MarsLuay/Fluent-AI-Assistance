@@ -197,6 +197,41 @@ class NativeAccelerationTests(unittest.TestCase):
         self.assertEqual(actual.destination_site, 4)
         self.assertEqual(actual.module_name, "first-module")
 
+    def test_execution_settings_first_texts_use_native_map_with_python_parity(self) -> None:
+        from html import escape
+
+        from fluentcoder.decompiler import xscr_parser
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_first_nonempty_texts"
+        ):
+            self.skipTest("optional Rust XML text collector is not built")
+        inner = (
+            '<Root xmlns:ns="urn:test"><Empty> </Empty><ns:Labware> first </ns:Labware>'
+            "<Labware>later</Labware><Site>one</Site><Site>two</Site>"
+            "<Nested><Location> Deck A </Location></Nested></Root>"
+        )
+        execution_settings = escape(inner, quote=False)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = xscr_parser._parse_execution_settings_parameters(execution_settings)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                xscr_parser,
+                "_native_xml_first_nonempty_texts",
+                wraps=xscr_parser._native_xml_first_nonempty_texts,
+            ) as native_call:
+                actual = xscr_parser._parse_execution_settings_parameters(
+                    execution_settings
+                )
+                native_call.assert_called_once()
+                self.assertIs(native_call.call_args.args[1], ET.Element)
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            list(actual.items()),
+            [("Labware", "first"), ("Site", "one"), ("Location", "Deck A")],
+        )
+
     def test_native_pattern_window_order_and_confidence(self) -> None:
         if not native_acceleration.available():
             self.skipTest("optional Rust extension is not built")

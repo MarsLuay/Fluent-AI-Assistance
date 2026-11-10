@@ -117,6 +117,22 @@ def collapse_ascii_whitespace(value: Any) -> str | None:
         return None
 
 
+def xml_first_nonempty_texts(root: Any, element_type: Any) -> dict[str, str] | None:
+    """Collect the first non-empty trimmed text for each local tag name."""
+    if not enabled():
+        return None
+    try:
+        result = _native.xml_first_nonempty_texts(root, element_type)
+        if type(result) is dict and all(
+            type(name) is str and type(value) is str
+            for name, value in result.items()
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def xml_unique_texts(
     root: Any, names: Any, limit: Any, element_type: Any
 ) -> list[str] | None:

@@ -1041,6 +1041,45 @@ fn xml_direct_child_texts<'py>(
 }
 
 #[pyfunction]
+fn xml_first_nonempty_texts<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let result = PyDict::new(py);
+    let iterator = root.call_method0("iter")?;
+    for element in iterator.try_iter()? {
+        let element = element?;
+        if !element.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = element.getattr("tag")?;
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local_name = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        let text = element.getattr("text")?;
+        if text.is_none() {
+            continue;
+        }
+        if !text.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let text = text.extract::<String>()?;
+        let cleaned = trim_python_whitespace(&text);
+        if cleaned.is_empty() || result.get_item(local_name)?.is_some() {
+            continue;
+        }
+        result.set_item(local_name, cleaned)?;
+    }
+    Ok(Some(result.into_any()))
+}
+
+#[pyfunction]
 fn xml_container_child_texts<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -5489,6 +5528,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_tag_local_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_clean_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_child_texts, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_first_nonempty_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_container_child_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_unique_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_texts_by_name, module)?)?;

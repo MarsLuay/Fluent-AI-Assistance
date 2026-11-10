@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterator, Optional, Union
 
 from tecan_common.native_acceleration import (
+    xml_first_nonempty_texts as _native_xml_first_nonempty_texts,
     parse_ascii_bool_text as _native_parse_ascii_bool_text,
     parse_f64_decimal_text as _native_parse_f64_decimal_text,
     xscr_object_fields as _native_xscr_object_fields,
@@ -1204,6 +1205,9 @@ def _parse_execution_settings_parameters(execution_settings: str) -> dict[str, s
         inner = ET.fromstring(unescaped)
     except ET.ParseError:
         return {}
+    native = _native_xml_first_nonempty_texts(inner, ET.Element)
+    if native is not None:
+        return native
     params: dict[str, str] = {}
     for el in inner.iter():
         if not isinstance(el.tag, str):
