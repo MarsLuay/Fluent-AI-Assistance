@@ -224,6 +224,47 @@ class ProtocolIRSchemaTests(unittest.TestCase):
         self.assertEqual(len(actual[0]), 3)
         self.assertEqual(actual[1], [custom_child])
 
+    def test_first_descendant_uses_native_selector_with_unsupported_tree_fallback(self):
+        from unittest.mock import patch
+
+        from tecan_common import native_acceleration
+        from fluent_pipeline import protocol_ir
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        root = protocol_ir.ET.fromstring(
+            '<Target xmlns="urn:test"><Branch><Target/></Branch><Target/></Target>'
+        )
+        missing = protocol_ir.ET.fromstring("<Root><Other/></Root>")
+        roots = [root, missing]
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [protocol_ir._first_descendant(item, "Target") for item in roots]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = [protocol_ir._first_descendant(item, "Target") for item in roots]
+                self.assertEqual(native_call.call_count, 2)
+
+        self.assertEqual(actual, expected)
+        self.assertIs(actual[0], root)
+        self.assertIsNone(actual[1])
+
+        commented = protocol_ir.ET.Element("Root")
+        commented.append(protocol_ir.ET.Comment("before matching element"))
+        protocol_ir.ET.SubElement(commented, "Target")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with self.assertRaises(AttributeError):
+                protocol_ir._first_descendant(commented, "Target")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with self.assertRaises(AttributeError):
+                protocol_ir._first_descendant(commented, "Target")
+
     def test_direct_children_uses_native_selector_with_python_fallback(self):
         from unittest.mock import patch
 
