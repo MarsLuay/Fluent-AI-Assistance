@@ -1270,6 +1270,9 @@ def _vec_dict(elem: ET.Element | None) -> dict[str, float]:
 
 
 def _matrix(elem: ET.Element | None) -> list[list[float]]:
+    native = native_acceleration.xml_matrix(elem, ET.Element)
+    if native is not None:
+        return native
     mat = _find(elem, "Mat")
     rows: list[list[float]] = []
     for row in _direct_children(mat, "ArrayOfdouble"):

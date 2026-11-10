@@ -334,6 +334,32 @@ def xml_vec_dict(root: Any, element_type: Any) -> dict[str, float] | None:
         return None
 
 
+def xml_matrix(root: Any, element_type: Any) -> list[list[float]] | None:
+    """Parse XML matrix rows with Python fallback for unsupported float forms."""
+    if not enabled() or type(root) is not element_type:
+        return None
+    try:
+        result = _native.xml_matrix(root, element_type)
+        if (
+            type(result) is list
+            and all(
+                type(row) is list and all(type(value) is float for value in row)
+                for row in result
+            )
+        ):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_indexed_vectors(
     root: Any, element_type: Any
 ) -> dict[str, dict[str, float]] | None:

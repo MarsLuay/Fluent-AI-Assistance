@@ -2549,6 +2549,88 @@ fn xml_indexed_vectors<'py>(
 }
 
 #[pyfunction]
+fn xml_matrix<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let (supported, matrix) = xml_first_exact_local_element(py, root, "Mat", element_type)?;
+    if !supported {
+        return Ok(None);
+    }
+    let Some(matrix) = matrix else {
+        return Ok(Some(PyList::empty(py).into_any()));
+    };
+    let output = PyList::empty(py);
+    for row in matrix.try_iter()? {
+        let row = row?;
+        if !row.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = row.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        if local != "ArrayOfdouble" {
+            continue;
+        }
+        let values = PyList::empty(py);
+        let mut complete = true;
+        for cell in row.try_iter()? {
+            let cell = cell?;
+            if !cell.get_type().is(element_type) {
+                return Ok(None);
+            }
+            let tag = cell.getattr("tag")?;
+            if !tag.is_instance_of::<PyString>() {
+                continue;
+            }
+            if !tag.get_type().is(py.get_type::<PyString>()) {
+                return Ok(None);
+            }
+            let tag = tag.extract::<String>()?;
+            let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+            if local != "double" {
+                continue;
+            }
+            let text = cell.getattr("text")?;
+            if text.is_none() {
+                complete = false;
+                continue;
+            }
+            if !text.get_type().is(py.get_type::<PyString>()) {
+                return Ok(None);
+            }
+            let text = text.extract::<String>()?;
+            let text = trim_python_whitespace(&text);
+            if text.is_empty() {
+                complete = false;
+                continue;
+            }
+            if !has_ascii_decimal_float_syntax(text) {
+                return Ok(None);
+            }
+            let Ok(value) = text.parse::<f64>() else {
+                return Ok(None);
+            };
+            values.append(if value == 0.0 { 0.0 } else { value })?;
+        }
+        if complete && !values.is_empty() {
+            output.append(values)?;
+        }
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn xml_elements_by_ascii_casefolded_name<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -4832,6 +4914,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_all_unique_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_grouped_texts_excluding, module)?)?;
     module.add_function(wrap_pyfunction!(xml_elements_by_name, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_matrix, module)?)?;
     module.add_function(wrap_pyfunction!(xml_indexed_values, module)?)?;
     module.add_function(wrap_pyfunction!(xml_vec_dict, module)?)?;
     module.add_function(wrap_pyfunction!(xml_indexed_vectors, module)?)?;
