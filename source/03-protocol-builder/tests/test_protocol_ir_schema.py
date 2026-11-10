@@ -265,6 +265,49 @@ class ProtocolIRSchemaTests(unittest.TestCase):
             with self.assertRaises(AttributeError):
                 protocol_ir._first_descendant(commented, "Target")
 
+    def test_first_leaf_text_uses_native_selector_and_keeps_leaf_order(self):
+        from unittest.mock import patch
+
+        from tecan_common import native_acceleration
+        from fluent_pipeline import protocol_ir
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        root = protocol_ir.ET.fromstring(
+            "<Root><Value><Other/></Value><Value> \u2003 </Value>"
+            "<Value> result </Value></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = protocol_ir._first_leaf_text(root, "Value")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = protocol_ir._first_leaf_text(root, "Value")
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "result")
+
+        comment_after = protocol_ir.ET.Element("Root")
+        first = protocol_ir.ET.SubElement(comment_after, "Value")
+        first.text = "first"
+        comment_after.append(protocol_ir.ET.Comment("after first leaf"))
+        for disabled in ("1", "0"):
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": disabled}):
+                self.assertEqual(protocol_ir._first_leaf_text(comment_after, "Value"), "first")
+
+        comment_before = protocol_ir.ET.Element("Root")
+        comment_before.append(protocol_ir.ET.Comment("before first leaf"))
+        protocol_ir.ET.SubElement(comment_before, "Value").text = "later"
+        for disabled in ("1", "0"):
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": disabled}):
+                with self.assertRaises(AttributeError):
+                    protocol_ir._first_leaf_text(comment_before, "Value")
+
     def test_direct_children_uses_native_selector_with_python_fallback(self):
         from unittest.mock import patch
 

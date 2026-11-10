@@ -3663,7 +3663,9 @@ def _first_text(parent: ET.Element, name: str) -> str | None:
 
 def _first_leaf_text(parent: ET.Element, name: str) -> str | None:
     """Return the first non-empty text from a leaf with the given local name."""
-    for element in parent.iter():
+    native = native_acceleration.xml_elements_by_name(parent, {name}, ET.Element)
+    elements = native if native is not None else parent.iter()
+    for element in elements:
         if _local_name(element.tag) != name or list(element):
             continue
         value = _text(element)
