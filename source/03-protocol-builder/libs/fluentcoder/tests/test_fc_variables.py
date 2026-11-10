@@ -15,6 +15,56 @@ from fluentcoder.simulator.invariants import MissingSimValueError  # noqa: E402
 from tests.conftest import bind_offline_authoring  # noqa: E402
 
 
+def test_xscr_variable_declarations_use_native_candidate_scan_with_python_parity(
+) -> None:
+    from unittest.mock import patch
+
+    from tecan_common import native_acceleration, xml_compat, xml_helpers
+    from fluentcoder.decompiler import xscr_parser
+
+    if not native_acceleration.available() or not hasattr(
+        native_acceleration._native, "xml_elements_by_name"
+    ):
+        pytest.skip("optional Rust XML selector is not built")
+
+    root = xml_compat.fromstring(
+        """<Root><VariableDeclarations>
+          <anyType>
+            <Wrapper><Name> alpha </Name><TypeName>Integer</TypeName></Wrapper>
+            <Name>later-name</Name><Scope> Run </Scope>
+            <Values><string> 3.9 </string><string>9</string></Values>
+          </anyType>
+          <anyType>
+            <Name>beta</Name><TypeName>String</TypeName><Scope>Script</Scope>
+            <Values><string> </string><string>later-default</string></Values>
+          </anyType>
+          <anyType><Name> </Name><Name>must-not-be-selected</Name></anyType>
+        </VariableDeclarations></Root>"""
+    )
+
+    with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = xscr_parser._parse_variable_declarations(root)
+    with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            xml_helpers,
+            "_native_xml_elements_by_name",
+            wraps=xml_helpers._native_xml_elements_by_name,
+        ) as native_call:
+            actual = xscr_parser._parse_variable_declarations(root)
+            assert native_call.call_count == 3
+
+    assert actual == expected
+    assert actual == (
+        ["alpha", "beta", ""],
+        {"alpha": 3, "beta": "", "": ""},
+        {
+            "alpha": {"scope": "Run", "type_name": "Integer"},
+            "beta": {"scope": "Script", "type_name": "String"},
+            "": {"scope": "Script", "type_name": "Floating Point"},
+        },
+    )
+
+
 def test_declare_fc_variable_returns_token() -> None:
     wt = Worktable(name="fc var")
     token = wt.declare_fc_variable("PlateType")

@@ -26,6 +26,7 @@ from typing import Any, Callable, Iterator, Optional, Union
 
 from tecan_common.native_acceleration import xscr_object_fields as _native_xscr_object_fields
 from tecan_common.performance import performance_marker
+from tecan_common.xml_helpers import elements_by_name
 
 from ..catalog.xcmp import _find, _local, _text
 from ..expressions import is_expression_field, parse_or_preserve_source_expression
@@ -218,12 +219,13 @@ def _parse_variable_declarations(
             continue
         if _local(elem.tag) != "anyType":
             continue
-        name_el = next((c for c in elem.iter()
-                        if isinstance(c.tag, str) and _local(c.tag) == "Name"), None)
-        type_el = next((c for c in elem.iter()
-                        if isinstance(c.tag, str) and _local(c.tag) == "TypeName"), None)
-        values_el = next((c for c in elem.iter()
-                          if isinstance(c.tag, str) and _local(c.tag) == "Values"), None)
+        declaration_fields: dict[str, ET.Element] = {}
+        for field in elements_by_name(elem, {"Name", "TypeName", "Values", "Scope"}):
+            if isinstance(field.tag, str):
+                declaration_fields.setdefault(_local(field.tag), field)
+        name_el = declaration_fields.get("Name")
+        type_el = declaration_fields.get("TypeName")
+        values_el = declaration_fields.get("Values")
         if name_el is None or not name_el.text:
             continue
         var_name = name_el.text.strip()
@@ -237,8 +239,7 @@ def _parse_variable_declarations(
         default_value = _coerce_variable_default(default_text, type_name)
         variables.append(var_name)
         defaults[var_name] = default_value
-        scope_el = next((c for c in elem.iter()
-                         if isinstance(c.tag, str) and _local(c.tag) == "Scope"), None)
+        scope_el = declaration_fields.get("Scope")
         scope = (scope_el.text or "").strip() if scope_el is not None else ""
         metadata[var_name] = {
             "scope": scope or "Script",
