@@ -1155,6 +1155,9 @@ def _direct_children(elem: ET.Element | None, local_name: str) -> list[ET.Elemen
 def _text(elem: ET.Element | None) -> str:
     if elem is None or elem.text is None:
         return ""
+    native = native_acceleration.xml_clean_text(elem.text)
+    if native is not None:
+        return native
     return elem.text.strip()
 
 

@@ -205,6 +205,53 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             ]
         self.assertEqual(generated_actual, generated_expected)
 
+    def test_geometry_xml_text_trimming_uses_native_with_unsupported_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_clean_text"
+        ):
+            self.skipTest("optional Rust XML text trimmer is not built")
+        whitespace = [
+            chr(codepoint)
+            for codepoint in range(0x110000)
+            if chr(codepoint).isspace()
+        ]
+        texts = [f"{character}value{character}" for character in whitespace]
+        texts.extend([" \t\r\n", "\u00a0β\u001c", "\u2003"])
+
+        def element(text):
+            value = worktable_geometry.ET.Element("Value")
+            value.text = text
+            return value
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [worktable_geometry._text(element(text)) for text in texts]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_clean_text",
+                wraps=native_acceleration.xml_clean_text,
+            ) as native_call:
+                actual = [worktable_geometry._text(element(text)) for text in texts]
+                self.assertEqual(native_call.call_count, len(texts))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["value"] * len(whitespace) + ["", "β", ""])
+
+        class CustomText(str):
+            def strip(self):
+                return "custom-strip"
+
+        unsupported = ["\ud800value\ud800", CustomText("value")]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unsupported_expected = [
+                worktable_geometry._text(element(text)) for text in unsupported
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            unsupported_actual = [
+                worktable_geometry._text(element(text)) for text in unsupported
+            ]
+        self.assertEqual(unsupported_actual, unsupported_expected)
+        self.assertEqual(unsupported_actual, ["\ud800value\ud800", "custom-strip"])
+
     def test_parse_component_mines_pipettable_grip_compat_and_site_templates(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "rich.xcmp"
