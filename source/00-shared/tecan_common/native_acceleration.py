@@ -616,6 +616,100 @@ def render_script_pattern_summary(report: Any) -> str | None:
         return None
 
 
+def render_script_pattern_search(report: Any) -> str | None:
+    """Render supported script-pattern search reports natively."""
+    if not enabled() or type(report) is not dict:
+        return None
+    safe_values = (str, bool, int, float, type(None))
+    header = [
+        report.get("database"),
+        report.get("query"),
+        report.get("pattern_type_filter"),
+        report.get("source_script_filter"),
+        report.get("result_count"),
+    ]
+    results = report.get("results", [])
+    if (
+        not all(type(value) in safe_values for value in header)
+        or type(results) not in (list, tuple)
+    ):
+        return None
+    patterns: list[
+        tuple[list[str], list[tuple[str, list[str]]], list[str], list[list[str]]]
+    ] = []
+    try:
+        for pattern in results:
+            if type(pattern) is not dict:
+                return None
+            fields = [
+                pattern.get("name"),
+                pattern.get("pattern_type"),
+                pattern.get("label"),
+                pattern.get("source_script"),
+                pattern.get("start_command_index"),
+                pattern.get("end_command_index"),
+                pattern.get("zeia_file"),
+                pattern.get("source_path"),
+            ]
+            if not all(type(value) in safe_values for value in fields):
+                return None
+            specifications = pattern.get("specifications", {})
+            safety_notes = pattern.get("safety_notes", [])
+            steps = pattern.get("steps", [])
+            if (
+                type(specifications) is not dict
+                or type(safety_notes) not in (list, tuple)
+                or not all(type(value) in safe_values for value in safety_notes)
+                or type(steps) not in (list, tuple)
+            ):
+                return None
+            specification_entries: list[tuple[str, list[str]]] = []
+            for key, values in specifications.items():
+                if (
+                    type(key) not in safe_values
+                    or type(values) not in (list, tuple)
+                    or not all(type(value) is str for value in values)
+                ):
+                    return None
+                specification_entries.append(
+                    (str(key), list(values))
+                )
+            rendered_steps: list[list[str]] = []
+            for step in steps:
+                if type(step) is not dict:
+                    return None
+                step_fields = [
+                    step.get("step_number"),
+                    step.get("summary"),
+                    step.get("command_name"),
+                    step.get("command_index"),
+                ]
+                if not all(type(value) in safe_values for value in step_fields):
+                    return None
+                rendered_steps.append([str(value) for value in step_fields])
+            patterns.append(
+                (
+                    [str(value) for value in fields],
+                    specification_entries,
+                    [str(value) for value in safety_notes],
+                    rendered_steps,
+                )
+            )
+        result = _native.render_script_pattern_search(
+            [
+                str(header[0]),
+                str(header[1]),
+                str(header[2] or "any"),
+                str(header[3] or "any"),
+                str(header[4]),
+            ],
+            patterns,
+        )
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def render_pattern_types_report(pattern_types: Any) -> str | None:
     """Render supported script pattern type rows natively, or request fallback."""
     if not enabled() or type(pattern_types) not in (list, tuple):

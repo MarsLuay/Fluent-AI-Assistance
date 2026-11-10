@@ -16,6 +16,7 @@ from tecan_common.native_acceleration import (
     render_project_index_search as _native_render_project_index_search,
     render_project_index_summary as _native_render_project_index_summary,
     render_pattern_specs as _native_render_pattern_specs,
+    render_script_pattern_search as _native_render_script_pattern_search,
     render_script_pattern_summary as _native_render_script_pattern_summary,
     render_pattern_types_report as _native_render_pattern_types_report,
 )
@@ -252,6 +253,10 @@ def _render_script_pattern_summary(report: dict[str, Any]) -> str:
 
 
 def _render_script_pattern_search(report: dict[str, Any]) -> str:
+    if type(report) is dict:
+        native = _native_render_script_pattern_search(report)
+        if native is not None:
+            return native
     lines = [
         "# Tecan Script Pattern Search",
         "",

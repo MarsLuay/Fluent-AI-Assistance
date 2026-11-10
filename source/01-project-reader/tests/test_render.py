@@ -262,6 +262,90 @@ class RenderListTests(unittest.TestCase):
         self.assertEqual(custom.str_calls, 1)
         self.assertEqual(actual_fallback, expected_fallback)
 
+    def test_native_script_pattern_search_matches_nested_python_output(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "render_script_pattern_search"
+        ):
+            self.skipTest("optional Rust pattern-search renderer is not built")
+        report = {
+            "kind": "script_pattern_search",
+            "database": "database-x",
+            "query": "query-β",
+            "pattern_type_filter": "",
+            "source_script_filter": None,
+            "result_count": 2,
+            "results": [
+                {
+                    "name": "pattern-x",
+                    "pattern_type": "type-x",
+                    "label": "label-x",
+                    "source_script": "script-x",
+                    "start_command_index": 1,
+                    "end_command_index": 2,
+                    "zeia_file": "zeia-x",
+                    "source_path": "path-x",
+                    "specifications": {"key-x": ["value-α", "value-β"]},
+                    "safety_notes": ["note-x"],
+                    "steps": [
+                        {
+                            "step_number": 1,
+                            "summary": "summary-x",
+                            "command_name": "command-x",
+                            "command_index": 3,
+                        }
+                    ],
+                },
+                {
+                    "name": "pattern-y",
+                    "pattern_type": "type-y",
+                    "label": "label-y",
+                    "source_script": "script-y",
+                    "start_command_index": 4,
+                    "end_command_index": 5,
+                    "zeia_file": "zeia-y",
+                    "source_path": "path-y",
+                    "specifications": {"empty": []},
+                    "safety_notes": [],
+                    "steps": [],
+                },
+            ],
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = render.render_markdown(report)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            direct = native_acceleration.render_script_pattern_search(report)
+            self.assertEqual(direct, expected)
+            with patch.object(
+                render,
+                "_native_render_script_pattern_search",
+                wraps=render._native_render_script_pattern_search,
+            ) as native_call:
+                actual = render.render_markdown(report)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertIn("1. Pattern: `pattern-x`", actual)
+        self.assertIn("2. Pattern: `pattern-y`", actual)
+        self.assertIn("     - key-x: `value-α`, `value-β`", actual)
+
+        class TruthyFilter:
+            def __init__(self) -> None:
+                self.bool_calls = 0
+
+            def __bool__(self) -> bool:
+                self.bool_calls += 1
+                return True
+
+        custom = TruthyFilter()
+        unsupported = {**report, "pattern_type_filter": custom}
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_fallback = render.render_markdown(unsupported)
+        self.assertEqual(custom.bool_calls, 1)
+        custom.bool_calls = 0
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual_fallback = render.render_markdown(unsupported)
+        self.assertEqual(custom.bool_calls, 1)
+        self.assertEqual(actual_fallback, expected_fallback)
+
     def test_native_directory_report_matches_python_limits_and_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "render_directory_report"

@@ -1398,6 +1398,66 @@ fn render_pattern_types_report(rows: Vec<Vec<String>>) -> Option<String> {
     Some(format!("{}\n", lines.join("\n")))
 }
 
+type PatternSearchEntry = (
+    Vec<String>,
+    Vec<(String, Vec<String>)>,
+    Vec<String>,
+    Vec<Vec<String>>,
+);
+
+#[pyfunction]
+fn render_script_pattern_search(
+    header: Vec<String>,
+    patterns: Vec<PatternSearchEntry>,
+) -> Option<String> {
+    if header.len() != 5
+        || patterns.iter().any(|(fields, _, _, steps)| {
+            fields.len() != 8 || steps.iter().any(|step| step.len() != 4)
+        })
+    {
+        return None;
+    }
+    let mut lines = vec![
+        "# Tecan Script Pattern Search".to_string(),
+        String::new(),
+        format!("- Database: `{}`", header[0]),
+        format!("- Query: `{}`", header[1]),
+        format!("- Pattern type filter: `{}`", header[2]),
+        format!("- Source script filter: `{}`", header[3]),
+        format!("- Results: `{}`", header[4]),
+    ];
+    if !patterns.is_empty() {
+        lines.push(String::new());
+        lines.push("## Patterns".to_string());
+        for (index, (fields, specifications, safety_notes, steps)) in
+            patterns.into_iter().enumerate()
+        {
+            lines.push(format!("{}. Pattern: `{}`", index + 1, fields[0]));
+            lines.push(format!("   - Type: `{}` ({})", fields[1], fields[2]));
+            lines.push(format!("   - Source script: `{}`", fields[3]));
+            lines.push(format!("   - Commands: `{}` to `{}`", fields[4], fields[5]));
+            lines.push(format!("   - ZEIA: `{}`", fields[6]));
+            lines.push(format!("   - Path: `{}`", fields[7]));
+            lines.extend(render_pattern_specs(specifications));
+            if !safety_notes.is_empty() {
+                lines.push("   - Safety notes:".to_string());
+                lines.extend(safety_notes.iter().map(|note| format!("     - {note}")));
+            }
+            if !steps.is_empty() {
+                lines.push("   - Steps:".to_string());
+                for step in steps {
+                    lines.push(format!(
+                        "     {}. {} (`{}`, command `{}`)",
+                        step[0], step[1], step[2], step[3]
+                    ));
+                    lines.push(format!("        - Path: `{}`", fields[7]));
+                }
+            }
+        }
+    }
+    Some(format!("{}\n", lines.join("\n")))
+}
+
 #[pyfunction]
 fn render_pattern_specs(entries: Vec<(String, Vec<String>)>) -> Vec<String> {
     if entries.is_empty() {
@@ -2294,6 +2354,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_compare_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_pattern_specs, module)?)?;
     module.add_function(wrap_pyfunction!(render_pattern_types_report, module)?)?;
+    module.add_function(wrap_pyfunction!(render_script_pattern_search, module)?)?;
     module.add_function(wrap_pyfunction!(render_script_pattern_summary, module)?)?;
     module.add_function(wrap_pyfunction!(render_project_index_search, module)?)?;
     module.add_function(wrap_pyfunction!(render_project_index_summary, module)?)?;
@@ -2403,6 +2464,45 @@ mod tests {
                 Vec::new(),
             ),
             "# ZEIA Compare Report\n\n- Left: `left-x`\n- Right: `right-x`\n- Entries: `2` -> `3`\n- Common script names: `1`\n\n## Scripts Added\n- added-x\n\n## Left Command Families\n- `family-x`: 2\n"
+        );
+    }
+
+    #[test]
+    fn script_pattern_search_preserves_nested_sections_and_result_order() {
+        assert_eq!(
+            render_script_pattern_search(
+                vec![
+                    "database-x".into(),
+                    "query-x".into(),
+                    "any".into(),
+                    "source-x".into(),
+                    "1".into(),
+                ],
+                vec![(
+                    vec![
+                        "pattern-x".into(),
+                        "type-x".into(),
+                        "label-x".into(),
+                        "script-x".into(),
+                        "1".into(),
+                        "2".into(),
+                        "zeia-x".into(),
+                        "path-x".into(),
+                    ],
+                    vec![("key-x".into(), vec!["value-x".into()])],
+                    vec!["note-x".into()],
+                    vec![vec![
+                        "1".into(),
+                        "summary-x".into(),
+                        "command-x".into(),
+                        "3".into(),
+                    ]],
+                )],
+            )
+            .as_deref(),
+            Some(
+                "# Tecan Script Pattern Search\n\n- Database: `database-x`\n- Query: `query-x`\n- Pattern type filter: `any`\n- Source script filter: `source-x`\n- Results: `1`\n\n## Patterns\n1. Pattern: `pattern-x`\n   - Type: `type-x` (label-x)\n   - Source script: `script-x`\n   - Commands: `1` to `2`\n   - ZEIA: `zeia-x`\n   - Path: `path-x`\n   - Specifications:\n     - key-x: `value-x`\n   - Safety notes:\n     - note-x\n   - Steps:\n     1. summary-x (`command-x`, command `3`)\n        - Path: `path-x`\n"
+            )
         );
     }
 
