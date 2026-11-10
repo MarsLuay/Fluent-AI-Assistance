@@ -1424,6 +1424,53 @@ fn parse_i64_text<'py>(py: Python<'py>, text: &Bound<'py, PyAny>) -> PyResult<Op
     Ok(text.parse::<i64>().ok())
 }
 
+fn has_ascii_decimal_float_syntax(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    if bytes.is_empty() {
+        return false;
+    }
+    let mut index = usize::from(matches!(bytes[0], b'+' | b'-'));
+    let mut mantissa_digits = 0;
+    let mut decimal_point = false;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'0'..=b'9' => mantissa_digits += 1,
+            b'.' if !decimal_point => decimal_point = true,
+            b'e' | b'E' => break,
+            _ => return false,
+        }
+        index += 1;
+    }
+    if mantissa_digits == 0 {
+        return false;
+    }
+    if index == bytes.len() {
+        return true;
+    }
+
+    index += 1;
+    if index < bytes.len() && matches!(bytes[index], b'+' | b'-') {
+        index += 1;
+    }
+    let exponent_start = index;
+    while index < bytes.len() && bytes[index].is_ascii_digit() {
+        index += 1;
+    }
+    index == bytes.len() && index > exponent_start
+}
+
+#[pyfunction]
+fn parse_f64_decimal_text<'py>(py: Python<'py>, text: &Bound<'py, PyAny>) -> PyResult<Option<f64>> {
+    if !text.get_type().is(py.get_type::<PyString>()) {
+        return Ok(None);
+    }
+    let text = text.extract::<String>()?;
+    if !has_ascii_decimal_float_syntax(&text) {
+        return Ok(None);
+    }
+    Ok(text.parse::<f64>().ok())
+}
+
 fn ascii_case_insensitive_substring_match_groups(
     values: &[String],
     groups: &[Vec<String>],
@@ -3910,6 +3957,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(sorted_unique_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
     module.add_function(wrap_pyfunction!(parse_i64_text, module)?)?;
+    module.add_function(wrap_pyfunction!(parse_f64_decimal_text, module)?)?;
     module.add_function(wrap_pyfunction!(
         ascii_case_insensitive_substring_match_values,
         module

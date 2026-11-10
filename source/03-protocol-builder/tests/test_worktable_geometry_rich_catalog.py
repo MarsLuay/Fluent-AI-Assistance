@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import tempfile
 import unittest
 from pathlib import Path
@@ -145,6 +146,64 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
                 self.assertEqual(native_call.call_count, len(cases))
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [expected_value for _, expected_value in cases])
+
+    def test_float_text_uses_native_decimal_subset_and_python_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "parse_f64_decimal_text"
+        ):
+            self.skipTest("optional Rust decimal parser is not built")
+        cases = [
+            (" +1.25 ", 1.25),
+            (".5", 0.5),
+            ("1.", 1.0),
+            ("-2.5e+2", -250.0),
+            ("-0.0", 0.0),
+            ("1_000.5", 1000.5),
+            ("١.٢", 1.2),
+            ("inf", math.inf),
+            ("not-a-number", None),
+        ]
+
+        def element(text: str):
+            value = worktable_geometry.ET.Element("Value")
+            value.text = text
+            return value
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [worktable_geometry._float_text(element(text)) for text, _ in cases]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "parse_f64_decimal_text",
+                wraps=native_acceleration.parse_f64_decimal_text,
+            ) as native_call:
+                actual = [worktable_geometry._float_text(element(text)) for text, _ in cases]
+                self.assertEqual(native_call.call_count, len(cases))
+            self.assertEqual(
+                native_acceleration.parse_f64_decimal_text("+1.25"), 1.25
+            )
+            self.assertIsNone(native_acceleration.parse_f64_decimal_text("1_000.5"))
+            self.assertIsNone(native_acceleration.parse_f64_decimal_text("١.٢"))
+            self.assertIsNone(native_acceleration.parse_f64_decimal_text("inf"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [expected_value for _, expected_value in cases])
+        self.assertEqual(math.copysign(1.0, actual[4]), 1.0)
+
+        generated = [
+            f"{sign}{mantissa}{exponent}"
+            for sign in ("", "+", "-")
+            for mantissa in ("0", ".5", "1.", "1.234567890123456789", "9999999999999999.9")
+            for exponent in ("", "e+0", "E-12", "e300", "e-320")
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            generated_expected = [
+                worktable_geometry._float_text(element(text)) for text in generated
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            generated_actual = [
+                worktable_geometry._float_text(element(text)) for text in generated
+            ]
+        self.assertEqual(generated_actual, generated_expected)
 
     def test_parse_component_mines_pipettable_grip_compat_and_site_templates(self):
         with tempfile.TemporaryDirectory() as tmp:

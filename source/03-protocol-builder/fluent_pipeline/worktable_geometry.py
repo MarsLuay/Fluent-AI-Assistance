@@ -1264,6 +1264,9 @@ def _float_text(elem: ET.Element | None) -> float | None:
     text = _text(elem)
     if not text:
         return None
+    native = native_acceleration.parse_f64_decimal_text(text)
+    if native is not None:
+        return 0.0 if native == 0.0 else native
     try:
         value = float(text)
     except ValueError:
