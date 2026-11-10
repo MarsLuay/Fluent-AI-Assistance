@@ -3705,6 +3705,11 @@ def _direct_child(parent: ET.Element | None, name: str) -> ET.Element | None:
 def _direct_children(parent: ET.Element | None, name: str) -> list[ET.Element]:
     if parent is None:
         return []
+    native = native_acceleration.xml_direct_elements_by_name(
+        parent, {name}, ET.Element
+    )
+    if native is not None:
+        return native
     return [child for child in list(parent) if _local_name(child.tag) == name]
 
 
