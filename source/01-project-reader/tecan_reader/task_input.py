@@ -19,7 +19,7 @@ from tecan_common.native_acceleration import (
     casefold_alias_values,
     collapse_ascii_whitespace,
     merge_unique_string_groups,
-    sort_ascii_string_keys,
+    sort_string_keys,
     xml_elements_by_folded_name_with_children,
 )
 from tecan_common.xml_helpers import local_name
@@ -111,7 +111,7 @@ def _row_fields(
 
 
 def _sorted_fields(values: dict[str, Any]) -> dict[str, Any]:
-    native = sort_ascii_string_keys(values)
+    native = sort_string_keys(values)
     if native is not None:
         return native
     return dict(sorted(values.items()))

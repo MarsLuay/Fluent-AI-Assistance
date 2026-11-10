@@ -19,10 +19,10 @@ from tecan_reader.project_model import (
 
 
 class ProjectModelTests(unittest.TestCase):
-    def test_completeness_count_keys_use_native_sort_with_unicode_fallback(self) -> None:
+    def test_completeness_count_keys_use_native_sort_for_unicode(self) -> None:
         if not native_acceleration.available() or not all(
             hasattr(native_acceleration._native, name)
-            for name in ("sort_ascii_string_keys", "sorted_unique_ascii_strings")
+            for name in ("sort_string_keys", "sorted_unique_ascii_strings")
         ):
             self.skipTest("optional Rust mapping sorter is not built")
         arguments = {
@@ -37,8 +37,8 @@ class ProjectModelTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 project_model,
-                "_native_sort_ascii_string_keys",
-                wraps=native_acceleration.sort_ascii_string_keys,
+                "_native_sort_string_keys",
+                wraps=native_acceleration.sort_string_keys,
             ) as native_call:
                 actual = build_completeness_metadata(**arguments)
                 self.assertEqual(native_call.call_count, 2)
@@ -62,11 +62,11 @@ class ProjectModelTests(unittest.TestCase):
             "oversized_members": ("é", "a", "é"),
         }
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            self.assertIsNone(
-                native_acceleration.sort_ascii_string_keys(
-                    unicode_arguments["eligible_member_counts"]
-                )
+            native_sorted = native_acceleration.sort_string_keys(
+                unicode_arguments["eligible_member_counts"]
             )
+            self.assertIsNotNone(native_sorted)
+            self.assertEqual(list(native_sorted), ["a", "é"])
             self.assertIsNone(
                 native_acceleration.sorted_unique_ascii_strings([["é", "a", "é"]])
             )
@@ -75,6 +75,34 @@ class ProjectModelTests(unittest.TestCase):
                 unicode_result["eligible_member_counts"], {"a": 2, "é": 1}
             )
             self.assertEqual(unicode_result["oversized_members"], ["a", "é"])
+
+    def test_native_string_key_sort_matches_python_unicode_order(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "sort_string_keys"
+        ):
+            self.skipTest("optional Rust mapping sorter is not built")
+        marker = object()
+        mapping = {
+            "𝄞": marker,
+            "é": "accented",
+            "a": "ascii",
+            "Ω": "greek",
+            "e\u0301": "combining",
+            "😀": "emoji",
+            "Å": "ring",
+            "ß": "sharp-s",
+        }
+        expected = dict(sorted(mapping.items()))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual = native_acceleration.sort_string_keys(mapping)
+        self.assertIsNotNone(actual)
+        self.assertEqual(list(actual), list(expected))
+        self.assertEqual(actual, expected)
+        self.assertIs(actual["𝄞"], marker)
+
+        surrogate_mapping = {chr(0xD800): "surrogate", "a": "ascii"}
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.sort_string_keys(surrogate_mapping))
 
     def test_inspection_counter_aggregation_uses_native_stable_order(self) -> None:
         if not native_acceleration.available() or not hasattr(
@@ -234,9 +262,9 @@ class ProjectModelTests(unittest.TestCase):
             ["value"],
         )
 
-    def test_source_identifier_sorting_uses_native_ascii_and_unicode_fallback(self) -> None:
+    def test_source_identifier_sorting_uses_native_unicode_sort(self) -> None:
         if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "sort_ascii_string_keys"
+            native_acceleration._native, "sort_string_keys"
         ):
             self.skipTest("optional Rust mapping sorter is not built")
         provenance = SourceProvenance(
@@ -249,8 +277,8 @@ class ProjectModelTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 project_model,
-                "_native_sort_ascii_string_keys",
-                wraps=native_acceleration.sort_ascii_string_keys,
+                "_native_sort_string_keys",
+                wraps=native_acceleration.sort_string_keys,
             ) as native_call:
                 actual = provenance.to_dict()
                 native_call.assert_called_once()
@@ -263,11 +291,11 @@ class ProjectModelTests(unittest.TestCase):
             original_identifiers={"é": "value", "a": "first"},
         )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            self.assertIsNone(
-                native_acceleration.sort_ascii_string_keys(
-                    unicode_provenance.original_identifiers
-                )
+            native_sorted = native_acceleration.sort_string_keys(
+                unicode_provenance.original_identifiers
             )
+            self.assertIsNotNone(native_sorted)
+            self.assertEqual(list(native_sorted), ["a", "é"])
             self.assertEqual(
                 list(unicode_provenance.to_dict()["original_identifiers"]),
                 ["a", "é"],

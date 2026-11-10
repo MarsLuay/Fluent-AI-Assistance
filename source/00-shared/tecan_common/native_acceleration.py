@@ -1733,16 +1733,16 @@ def ordered_ascii_string_counts(values: Any) -> dict[str, int] | None:
         return None
 
 
-def sort_ascii_string_keys(mapping: Any) -> dict[str, Any] | None:
-    """Sort exact built-in dictionary keys natively for ASCII string mappings."""
+def sort_string_keys(mapping: Any) -> dict[str, Any] | None:
+    """Sort exact built-in dictionaries with string keys, preserving value objects."""
     if (
         not enabled()
         or type(mapping) is not dict
-        or not all(type(key) is str and key.isascii() for key in mapping)
+        or not all(type(key) is str for key in mapping)
     ):
         return None
     try:
-        result = _native.sort_ascii_string_keys(mapping)
+        result = _native.sort_string_keys(mapping)
         return result if type(result) is dict else None
     except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
         return None

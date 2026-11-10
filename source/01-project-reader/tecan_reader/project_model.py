@@ -18,7 +18,7 @@ from tecan_common.native_acceleration import (
     canonical_json_compact as _native_canonical_json_compact,
     deepcopy_json as _native_deepcopy_json,
     most_common_ascii_counts as _native_most_common_ascii_counts,
-    sort_ascii_string_keys as _native_sort_ascii_string_keys,
+    sort_string_keys as _native_sort_string_keys,
     sorted_unique_ascii_strings as _native_sorted_unique_ascii_strings,
 )
 
@@ -32,7 +32,7 @@ def deepcopy(value: Any) -> Any:
 
 
 def _sorted_string_mapping(values: dict[str, Any]) -> dict[str, Any]:
-    native = _native_sort_ascii_string_keys(values)
+    native = _native_sort_string_keys(values)
     if native is not None:
         return native
     return dict(sorted(values.items()))

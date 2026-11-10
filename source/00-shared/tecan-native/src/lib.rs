@@ -1623,7 +1623,7 @@ fn any_ascii_casefold_in(values: Vec<String>, candidates: Vec<String>) -> Option
 }
 
 #[pyfunction]
-fn sort_ascii_string_keys<'py>(
+fn sort_string_keys<'py>(
     py: Python<'py>,
     mapping: &Bound<'py, PyAny>,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -1639,9 +1639,6 @@ fn sort_ascii_string_keys<'py>(
             return Ok(None);
         }
         let key = key.extract::<String>()?;
-        if !key.is_ascii() {
-            return Ok(None);
-        }
         items.push((key, value));
     }
     items.sort_by(|left, right| left.0.cmp(&right.0));
@@ -3723,7 +3720,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_variable_definition_elements, module)?)?;
     module.add_function(wrap_pyfunction!(casefold_alias_values, module)?)?;
     module.add_function(wrap_pyfunction!(merge_unique_string_groups, module)?)?;
-    module.add_function(wrap_pyfunction!(sort_ascii_string_keys, module)?)?;
+    module.add_function(wrap_pyfunction!(sort_string_keys, module)?)?;
     module.add_function(wrap_pyfunction!(any_ascii_casefold_in, module)?)?;
     module.add_function(wrap_pyfunction!(ordered_ascii_string_counts, module)?)?;
     module.add_function(wrap_pyfunction!(most_common_ascii_counts, module)?)?;
