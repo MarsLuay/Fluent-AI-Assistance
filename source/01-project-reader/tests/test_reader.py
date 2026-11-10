@@ -642,6 +642,32 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(report["pipette_examples"][0]["rack_label"], "Source")
         self.assertEqual(report["line_count"], 3)
 
+    def test_inspect_gwl_lines_batches_native_parse_with_ordered_examples(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_parse_gwl_records"
+        ):
+            self.skipTest("optional Rust GWL parser is not built")
+        lines = ["", "W5;", "X;unsupported;field"]
+        lines.extend(
+            f"A;Rack{index};;Plate;{index + 1};;20;Water;;;"
+            for index in range(13)
+        )
+        lines.append("D;Destination;;Plate;1;;20;Water;;;")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = inspect_gwl_lines(lines, source_name="sample.gwl")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_parse_gwl_records",
+                wraps=native_acceleration.worklist_parse_gwl_records,
+            ) as native_parser:
+                actual = inspect_gwl_lines(lines, source_name="sample.gwl")
+                native_parser.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["record_counts"], {"W5": 1, "X": 1, "A": 13, "D": 1})
+        self.assertEqual(actual["pipette_examples"][0]["line"], "4")
+        self.assertEqual(len(actual["pipette_examples"]), 12)
+        self.assertEqual(actual["pipette_examples"][-1]["rack_label"], "Rack11")
 
     def test_inspect_archive_collects_errors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

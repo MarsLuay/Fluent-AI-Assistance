@@ -6,7 +6,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from tecan_common.gwl import Pipette, parse_gwl_line
+from tecan_common.gwl import Pipette, parse_gwl_line, parse_gwl_lines
 
 
 def inspect_gwl(path: str | Path, *, source_name: str | None = None) -> dict[str, Any]:
@@ -16,10 +16,34 @@ def inspect_gwl(path: str | Path, *, source_name: str | None = None) -> dict[str
 
 
 def inspect_gwl_lines(lines: list[str], *, source_name: str) -> dict[str, Any]:
+    records_with_lines = None
+    if type(lines) is list and all(
+        type(line) is str
+        and line.isascii()
+        and not any(0x1C <= ord(character) <= 0x1F for character in line)
+        for line in lines
+    ):
+        records = parse_gwl_lines(lines, permissive=True).records
+        nonblank_lines = [
+            (line_no, line)
+            for line_no, line in enumerate(lines, start=1)
+            if line.strip()
+        ]
+        if len(records) == len(nonblank_lines):
+            records_with_lines = (
+                (line_no, line, record)
+                for (line_no, line), record in zip(nonblank_lines, records)
+            )
+
+    if records_with_lines is None:
+        records_with_lines = (
+            (line_no, line, parse_gwl_line(line, line_no=line_no, permissive=True))
+            for line_no, line in enumerate(lines, start=1)
+        )
+
     counts: Counter[str] = Counter()
     pipette_examples: list[dict[str, str]] = []
-    for line_no, line in enumerate(lines, start=1):
-        record = parse_gwl_line(line, line_no=line_no, permissive=True)
+    for line_no, _line, record in records_with_lines:
         if record is None:
             continue
         counts[record.type_character] += 1
