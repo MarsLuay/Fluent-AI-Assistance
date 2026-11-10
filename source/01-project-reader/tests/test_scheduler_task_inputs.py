@@ -75,7 +75,7 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
         self.assertEqual(model.task_inputs[0]["records"][0]["fields"]["TaskName"], "Task A")
         self.assertNotEqual(model.task_inputs[0]["kind"], "worklist")
 
-    def test_twl_record_selection_uses_native_casefold_with_unicode_fallback(self) -> None:
+    def test_twl_record_selection_matches_python_casefold_for_unicode_tags(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_elements_by_folded_name_with_children"
         ):
@@ -108,10 +108,8 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
         ET.SubElement(unicode_task, "Name").text = "unicode"
         record_names = {"task", "taskrecord", "input", "item", "record"}
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            self.assertIsNone(
-                native_acceleration.xml_elements_by_folded_name_with_children(
-                    unicode_root, record_names, ET.Element
-                )
+            native_nodes = native_acceleration.xml_elements_by_folded_name_with_children(
+                unicode_root, record_names, ET.Element
             )
             fallback_nodes = [
                 element
@@ -120,11 +118,25 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
                 and task_input.local_name(element.tag).casefold() in record_names
                 and list(element)
             ]
+        self.assertEqual(native_nodes, fallback_nodes)
         self.assertEqual(fallback_nodes, [unicode_task])
         self.assertEqual(
             task_input._element_record(unicode_task, index=0)["fields"]["Name"],
             "unicode",
         )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(task_input, "parse_xml_text", return_value=unicode_root):
+                expected_unicode = task_input._inspect_xml(
+                    "<unused/>", source_name="Inputs/unicode-record.twl"
+                )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(task_input, "parse_xml_text", return_value=unicode_root):
+                actual_unicode = task_input._inspect_xml(
+                    "<unused/>", source_name="Inputs/unicode-record.twl"
+                )
+        self.assertEqual(actual_unicode, expected_unicode)
+        self.assertEqual(actual_unicode["record_count"], 1)
 
     def test_twl_xml_whitespace_normalization_uses_native_unicode(self) -> None:
         if not native_acceleration.available() or not hasattr(

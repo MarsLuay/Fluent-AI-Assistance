@@ -1825,11 +1825,15 @@ fn xml_elements_by_folded_name_with_children<'py>(
             return Ok(None);
         }
         let tag = tag.extract::<String>()?;
-        if !tag.is_ascii() {
-            return Ok(None);
-        }
         let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
-        if names.iter().any(|name| name.eq_ignore_ascii_case(local))
+        let folded = if local.is_ascii() {
+            local.to_ascii_lowercase()
+        } else {
+            PyString::new(py, local)
+                .call_method0("casefold")?
+                .extract::<String>()?
+        };
+        if names.iter().any(|name| name.eq_ignore_ascii_case(&folded))
             && element.call_method0("__len__")?.extract::<usize>()? > 0
         {
             output.append(element)?;

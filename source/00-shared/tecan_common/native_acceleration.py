@@ -246,7 +246,7 @@ def xml_elements_by_name(
 def xml_elements_by_folded_name_with_children(
     root: Any, names: Any, element_type: Any
 ) -> list[Any] | None:
-    """Select ASCII local names case-insensitively when they have children."""
+    """Select Python-casefolded local names when they have children."""
     if (
         not enabled()
         or type(root) is not element_type
