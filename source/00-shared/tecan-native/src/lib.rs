@@ -2350,6 +2350,67 @@ fn xml_first_exact_local_text<'py>(
 }
 
 #[pyfunction]
+fn xml_vec_dict<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let output = PyDict::new(py);
+    let mut axes = HashSet::new();
+    for child in root.try_iter()? {
+        let child = child?;
+        if !child.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = child.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        if !local.is_ascii() {
+            return Ok(None);
+        }
+        let axis = local.to_ascii_lowercase();
+        if !matches!(axis.as_str(), "x" | "y" | "z") {
+            continue;
+        }
+        let text = child.getattr("text")?;
+        if text.is_none() {
+            continue;
+        }
+        if !text.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let text = text.extract::<String>()?;
+        let text = trim_python_whitespace(&text);
+        if text.is_empty() {
+            continue;
+        }
+        if !has_ascii_decimal_float_syntax(text) {
+            return Ok(None);
+        }
+        let Ok(value) = text.parse::<f64>() else {
+            return Ok(None);
+        };
+        let value = if value == 0.0 { 0.0 } else { value };
+        axes.insert(axis.clone());
+        output.set_item(axis, value)?;
+    }
+    if axes.len() == 3 {
+        Ok(Some(output.into_any()))
+    } else {
+        Ok(Some(PyDict::new(py).into_any()))
+    }
+}
+
+#[pyfunction]
 fn xml_indexed_values<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -4689,6 +4750,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_grouped_texts_excluding, module)?)?;
     module.add_function(wrap_pyfunction!(xml_elements_by_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_indexed_values, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_vec_dict, module)?)?;
     module.add_function(wrap_pyfunction!(
         xml_elements_by_ascii_casefolded_name,
         module

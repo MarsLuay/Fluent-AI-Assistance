@@ -1253,6 +1253,9 @@ def _mesh_references(payload: ET.Element | None) -> tuple[list[str], list[str]]:
 def _vec_dict(elem: ET.Element | None) -> dict[str, float]:
     if elem is None:
         return {}
+    native = native_acceleration.xml_vec_dict(elem, ET.Element)
+    if native is not None:
+        return native
     values: dict[str, float] = {}
     for child in list(elem):
         if not isinstance(child.tag, str):

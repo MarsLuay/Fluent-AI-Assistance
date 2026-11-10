@@ -308,6 +308,32 @@ def xml_first_vec_by_ascii_casefolded_name(
         return None
 
 
+def xml_vec_dict(root: Any, element_type: Any) -> dict[str, float] | None:
+    """Read a complete ASCII-axis vector; unsupported numeric forms fall back."""
+    if not enabled() or type(root) is not element_type:
+        return None
+    try:
+        result = _native.xml_vec_dict(root, element_type)
+        if (
+            type(result) is dict
+            and all(
+                type(key) is str and type(value) is float
+                for key, value in result.items()
+            )
+        ):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_indexed_values(
     root: Any, element_type: Any, zero_guid: Any
 ) -> dict[str, str] | None:
