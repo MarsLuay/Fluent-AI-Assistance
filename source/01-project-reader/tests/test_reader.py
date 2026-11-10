@@ -1478,12 +1478,42 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(actual, expected)
 
         unicode_root = ET.Element("Root")
-        ET.SubElement(unicode_root, "Text").text = " café "
+        ET.SubElement(unicode_root, "Text").text = "\u00a0café\u2003"
+        whitespace_chars = [
+            chr(codepoint)
+            for codepoint in range(sys.maxunicode + 1)
+            if chr(codepoint).isspace()
+        ]
+        for index, character in enumerate(whitespace_chars):
+            ET.SubElement(unicode_root, f"Whitespace_{index:02d}").text = (
+                f"{character}value-{index}{character}"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unicode_expected = xml_helpers.all_text_values(unicode_root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_all_unique_texts(unicode_root, ET.Element),
+                unicode_expected,
+            )
+            with patch.object(
+                xml_helpers,
+                "_native_xml_all_unique_texts",
+                wraps=xml_helpers._native_xml_all_unique_texts,
+            ) as native_call:
+                self.assertEqual(
+                    xml_helpers.all_text_values(unicode_root), unicode_expected
+                )
+                native_call.assert_called_once()
+
+        surrogate_root = ET.Element("Root")
+        ET.SubElement(surrogate_root, "Text").text = chr(0xD800)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(
-                native_acceleration.xml_all_unique_texts(unicode_root, ET.Element)
+                native_acceleration.xml_all_unique_texts(surrogate_root, ET.Element)
             )
-            self.assertEqual(xml_helpers.all_text_values(unicode_root), ["café"])
+            self.assertEqual(
+                xml_helpers.all_text_values(surrogate_root), [chr(0xD800)]
+            )
 
     def test_native_extension_counts_match_path_suffix_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
