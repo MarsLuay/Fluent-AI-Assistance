@@ -552,6 +552,10 @@ fn sorted_builtin_set<'py>(
             2
         } else if value_type.is(py.get_type::<PyString>()) {
             3
+        } else if value_type.is(py.get_type::<PyFloat>()) {
+            4
+        } else if value_type.is(py.get_type::<PyBytes>()) {
+            5
         } else {
             return Ok(None);
         };

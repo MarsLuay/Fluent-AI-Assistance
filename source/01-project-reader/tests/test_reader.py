@@ -387,6 +387,11 @@ class ReaderTests(unittest.TestCase):
             (set(), []),
             ({False, True}, [False, True]),
             (
+                {float("-inf"), -1.5, 2.5, float("inf")},
+                [float("-inf"), -1.5, 2.5, float("inf")],
+            ),
+            ({b"z", b"\x00", b"a"}, [b"\x00", b"a", b"z"]),
+            (
                 {-10, 0, 2**80, -(2**100)},
                 [-(2**100), -10, 0, 2**80],
             ),
@@ -501,6 +506,17 @@ class ReaderTests(unittest.TestCase):
                     actual = to_jsonable(value)
                 self.assertEqual(actual, expected)
         self.assertEqual(custom_key.string_calls, 2)
+
+        nan_set = {float("nan"), 1.0}
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            nan_fallback = to_jsonable(nan_set)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.to_jsonable_containers(nan_set))
+            nan_actual = to_jsonable(nan_set)
+        self.assertEqual(len(nan_actual), len(nan_fallback))
+        self.assertTrue(
+            all(actual is fallback for actual, fallback in zip(nan_actual, nan_fallback))
+        )
 
         nested_list: list[object] = []
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
