@@ -452,6 +452,31 @@ def xml_indexed_vectors(
         return None
 
 
+def xml_indexed_float_values(
+    root: Any, element_type: Any
+) -> dict[str, float] | None:
+    """Read indexed float maps; unsupported Python float forms fall back."""
+    if not enabled() or type(root) is not element_type:
+        return None
+    try:
+        result = _native.xml_indexed_float_values(root, element_type)
+        if (
+            type(result) is dict
+            and all(type(key) is str and type(value) is float for key, value in result.items())
+        ):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_indexed_values(
     root: Any, element_type: Any, zero_guid: Any
 ) -> dict[str, str] | None:

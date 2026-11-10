@@ -325,6 +325,58 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             {"1000": "wide-python-int", "12": "unicode-int", "9223372036854775808": "large-int"},
         )
 
+    def test_indexed_float_values_uses_native_xml_traversal_with_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_indexed_float_values"
+        ):
+            self.skipTest("optional Rust indexed-float XML reader is not built")
+        parser = worktable_geometry.ET.XMLParser(
+            target=worktable_geometry.ET.TreeBuilder(insert_comments=True)
+        )
+        root = worktable_geometry.ET.fromstring(
+            "<Root xmlns='urn:test'><Pair><Key>first</Key><Value>1.25</Value></Pair>"
+            "<!-- ignored non-element child -->"
+            "<Pair><Key>second</Key><Value>-0.0</Value></Pair>"
+            "<Pair><Key>first</Key><Value>2.5</Value></Pair>"
+            "<Pair><Key>empty</Key><Value> \t </Value></Pair></Root>",
+            parser=parser,
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = worktable_geometry._indexed_float_values(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_indexed_float_values(
+                    root, worktable_geometry.ET.Element
+                ),
+                expected,
+            )
+            with patch.object(
+                native_acceleration,
+                "xml_indexed_float_values",
+                wraps=native_acceleration.xml_indexed_float_values,
+            ) as native_call:
+                actual = worktable_geometry._indexed_float_values(root)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(list(actual.items()), [("first", 2.5), ("second", 0.0)])
+
+        fallback_root = worktable_geometry.ET.fromstring(
+            "<Root><Pair><Key>underscore</Key><Value>1_000.5</Value></Pair>"
+            "<Pair><Key>special</Key><Value>inf</Value></Pair></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = worktable_geometry._indexed_float_values(fallback_root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_indexed_float_values(
+                    fallback_root, worktable_geometry.ET.Element
+                )
+            )
+            fallback_actual = worktable_geometry._indexed_float_values(fallback_root)
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual["underscore"], 1000.5)
+        self.assertTrue(math.isinf(fallback_actual["special"]))
+
     def test_indexed_vectors_uses_native_xml_traversal_with_python_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_indexed_vectors"

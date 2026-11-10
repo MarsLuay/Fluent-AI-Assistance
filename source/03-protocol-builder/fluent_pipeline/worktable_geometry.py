@@ -1060,6 +1060,9 @@ def _indexed_float_values(elem: ET.Element | None) -> dict[str, float]:
     out: dict[str, float] = {}
     if elem is None:
         return out
+    native = native_acceleration.xml_indexed_float_values(elem, ET.Element)
+    if native is not None:
+        return native
     for kv in list(elem):
         if not isinstance(kv.tag, str):
             continue
