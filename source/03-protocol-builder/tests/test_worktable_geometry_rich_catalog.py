@@ -5,7 +5,11 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from tecan_common import native_acceleration
+
+from fluent_pipeline import worktable_geometry
 from fluent_pipeline.labware_catalog_export import build_labware_catalog_from_geometry
 from fluent_pipeline.worktable_geometry import parse_component
 
@@ -109,6 +113,39 @@ RICH_XCMP = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class WorktableGeometryRichCatalogTests(unittest.TestCase):
+    def test_int_text_uses_native_i64_and_python_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "parse_i64_text"
+        ):
+            self.skipTest("optional Rust integer parser is not built")
+        cases = [
+            (" +42 ", 42),
+            ("-7", -7),
+            ("001", 1),
+            ("1_000", 1000),
+            ("١٢", 12),
+            (str(1 << 100), 1 << 100),
+            ("not-an-int", None),
+        ]
+
+        def element(text: str):
+            value = worktable_geometry.ET.Element("Value")
+            value.text = text
+            return value
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [worktable_geometry._int_text(element(text)) for text, _ in cases]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "parse_i64_text",
+                wraps=native_acceleration.parse_i64_text,
+            ) as native_call:
+                actual = [worktable_geometry._int_text(element(text)) for text, _ in cases]
+                self.assertEqual(native_call.call_count, len(cases))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [expected_value for _, expected_value in cases])
+
     def test_parse_component_mines_pipettable_grip_compat_and_site_templates(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "rich.xcmp"

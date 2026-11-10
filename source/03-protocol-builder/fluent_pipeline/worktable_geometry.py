@@ -9,6 +9,7 @@ from . import xml_compat as ET
 from pathlib import Path
 from typing import Any, Mapping
 
+from tecan_common import native_acceleration
 from tecan_common.performance import (
     finish_performance_marker,
     performance_marker,
@@ -1250,6 +1251,9 @@ def _int_text(elem: ET.Element | None) -> int | None:
     text = _text(elem)
     if not text:
         return None
+    native = native_acceleration.parse_i64_text(text)
+    if native is not None:
+        return native
     try:
         return int(text)
     except ValueError:

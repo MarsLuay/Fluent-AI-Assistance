@@ -1412,6 +1412,18 @@ fn ascii_casefold_equals(value: &str, expected: &str) -> Option<bool> {
     }
 }
 
+#[pyfunction]
+fn parse_i64_text<'py>(py: Python<'py>, text: &Bound<'py, PyAny>) -> PyResult<Option<i64>> {
+    if !text.get_type().is(py.get_type::<PyString>()) {
+        return Ok(None);
+    }
+    let text = text.extract::<String>()?;
+    if !text.is_ascii() {
+        return Ok(None);
+    }
+    Ok(text.parse::<i64>().ok())
+}
+
 fn ascii_case_insensitive_substring_match_groups(
     values: &[String],
     groups: &[Vec<String>],
@@ -3897,6 +3909,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(most_common_string_counts, module)?)?;
     module.add_function(wrap_pyfunction!(sorted_unique_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
+    module.add_function(wrap_pyfunction!(parse_i64_text, module)?)?;
     module.add_function(wrap_pyfunction!(
         ascii_case_insensitive_substring_match_values,
         module
