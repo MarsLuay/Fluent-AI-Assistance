@@ -2351,6 +2351,106 @@ fn xml_first_text_by_ascii_casefolded_name(
 }
 
 #[pyfunction]
+fn xml_first_vec_by_ascii_casefolded_name(
+    py: Python<'_>,
+    root: &Bound<'_, PyAny>,
+    names: Vec<String>,
+    element_type: &Bound<'_, PyAny>,
+) -> PyResult<(bool, Py<PyAny>)> {
+    if !root.get_type().is(element_type) || names.iter().any(|name| !name.is_ascii()) {
+        return Ok((false, py.None()));
+    }
+    let axis_names = ["x", "y", "z"];
+    let iterator = root.call_method0("iter")?;
+    for element in iterator.try_iter()? {
+        let element = element?;
+        if !element.get_type().is(element_type) {
+            return Ok((false, py.None()));
+        }
+        let tag = element.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok((false, py.None()));
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        if !local.is_ascii() {
+            return Ok((false, py.None()));
+        }
+        let folded_local = local.to_ascii_lowercase();
+        if !names.iter().any(|name| name == &folded_local) {
+            continue;
+        }
+
+        let mut values = [None; 3];
+        let mut order = Vec::new();
+        for child in element.try_iter()? {
+            let child = child?;
+            if !child.get_type().is(element_type) {
+                return Ok((false, py.None()));
+            }
+            let child_tag = child.getattr("tag")?;
+            if !child_tag.is_instance_of::<PyString>() {
+                continue;
+            }
+            if !child_tag.get_type().is(py.get_type::<PyString>()) {
+                return Ok((false, py.None()));
+            }
+            let child_tag = child_tag.extract::<String>()?;
+            let child_local = child_tag.rsplit('}').next().unwrap_or(child_tag.as_str());
+            if !child_local.is_ascii() {
+                return Ok((false, py.None()));
+            }
+            let folded_child_local = child_local.to_ascii_lowercase();
+            let Some(axis) = axis_names
+                .iter()
+                .position(|axis_name| *axis_name == folded_child_local)
+            else {
+                continue;
+            };
+            let text = child.getattr("text")?;
+            if text.is_none() {
+                continue;
+            }
+            if !text.get_type().is(py.get_type::<PyString>()) {
+                return Ok((false, py.None()));
+            }
+            let text = text.extract::<String>()?;
+            let text = trim_python_whitespace(&text);
+            if text.is_empty() {
+                continue;
+            }
+            if !has_ascii_decimal_float_syntax(text) {
+                return Ok((false, py.None()));
+            }
+            let Ok(mut number) = text.parse::<f64>() else {
+                return Ok((false, py.None()));
+            };
+            if number == 0.0 {
+                number = 0.0;
+            }
+            if values[axis].is_none() {
+                order.push(axis);
+            }
+            values[axis] = Some(number);
+        }
+
+        if values.iter().all(Option::is_some) {
+            let output = PyDict::new(py);
+            for axis in order {
+                if let Some(value) = values[axis] {
+                    output.set_item(axis_names[axis], value)?;
+                }
+            }
+            return Ok((true, output.into_any().unbind()));
+        }
+    }
+    Ok((true, PyDict::new(py).into_any().unbind()))
+}
+
+#[pyfunction]
 fn xml_direct_elements_by_name<'py>(
     py: Python<'py>,
     parent: &Bound<'py, PyAny>,
@@ -4458,6 +4558,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     module.add_function(wrap_pyfunction!(
         xml_first_text_by_ascii_casefolded_name,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        xml_first_vec_by_ascii_casefolded_name,
         module
     )?)?;
     module.add_function(wrap_pyfunction!(xml_direct_elements_by_name, module)?)?;

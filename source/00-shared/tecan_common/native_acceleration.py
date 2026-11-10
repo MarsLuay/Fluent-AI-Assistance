@@ -274,6 +274,40 @@ def xml_first_text_by_ascii_casefolded_name(
         return None
 
 
+def xml_first_vec_by_ascii_casefolded_name(
+    root: Any, names: Any, element_type: Any
+) -> dict[str, float] | None:
+    """Find the first complete ASCII-axis vector under a named XML element."""
+    if (
+        not enabled()
+        or type(root) is not element_type
+        or type(names) not in (set, frozenset, list, tuple)
+        or not all(type(name) is str and name.isascii() for name in names)
+    ):
+        return None
+    try:
+        supported, result = _native.xml_first_vec_by_ascii_casefolded_name(
+            root, list(names), element_type
+        )
+        if (
+            type(supported) is bool
+            and supported
+            and type(result) is dict
+            and all(type(key) is str and type(value) is float for key, value in result.items())
+        ):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_elements_by_name(
     root: Any, names: Any, element_type: Any
 ) -> list[Any] | None:

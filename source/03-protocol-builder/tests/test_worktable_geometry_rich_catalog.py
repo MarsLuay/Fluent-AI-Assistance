@@ -563,6 +563,55 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         )
         self.assertEqual(actual[10:], ["東京", "\ud800", "", "", "Custom"])
 
+    def test_first_named_vec_uses_native_ascii_parser_with_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_first_vec_by_ascii_casefolded_name"
+        ):
+            self.skipTest("optional Rust first-vector XML parser is not built")
+
+        root = worktable_geometry.ET.fromstring(
+            "<Root><Orientation><X>99</X></Orientation><Branch><orientation>"
+            "<Z>-0</Z><X>1</X><x>2.5</x><Y>\u00a00.03\u00a0</Y>"
+            "</orientation></Branch><Orientation><X>9</X><Y>8</Y><Z>7</Z>"
+            "</Orientation></Root>"
+        )
+        invalid_root = worktable_geometry.ET.fromstring(
+            "<Root><Orientation><X>bad</X></Orientation>"
+            "<Orientation><X>1</X><Y>2</Y><Z>3</Z></Orientation></Root>"
+        )
+        unicode_root = worktable_geometry.ET.fromstring(
+            "<Root><Straße><X>١</X><Y>2</Y><Z>3</Z></Straße></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = worktable_geometry._first_named_vec(root, {"orientation"})
+            invalid_expected = worktable_geometry._first_named_vec(
+                invalid_root, {"orientation"}
+            )
+            unicode_expected = worktable_geometry._first_named_vec(
+                unicode_root, {"strasse"}
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_first_vec_by_ascii_casefolded_name",
+                wraps=native_acceleration.xml_first_vec_by_ascii_casefolded_name,
+            ) as native_call:
+                actual = worktable_geometry._first_named_vec(root, {"orientation"})
+                invalid_actual = worktable_geometry._first_named_vec(
+                    invalid_root, {"orientation"}
+                )
+                unicode_actual = worktable_geometry._first_named_vec(
+                    unicode_root, {"strasse"}
+                )
+                self.assertEqual(native_call.call_count, 3)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, {"z": 0.0, "x": 2.5, "y": 0.03})
+        self.assertEqual(list(actual), ["z", "x", "y"])
+        self.assertEqual(invalid_actual, invalid_expected)
+        self.assertEqual(invalid_actual, {"x": 1.0, "y": 2.0, "z": 3.0})
+        self.assertEqual(unicode_actual, unicode_expected)
+        self.assertEqual(unicode_actual, {"x": 1.0, "y": 2.0, "z": 3.0})
+
     def test_first_named_text_uses_native_ascii_selector_with_unicode_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_first_text_by_ascii_casefolded_name"

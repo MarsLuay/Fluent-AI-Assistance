@@ -708,6 +708,13 @@ def _first_named_text(elem: ET.Element | None, names: set[str]) -> str:
 
 
 def _first_named_vec(elem: ET.Element | None, names: set[str]) -> dict[str, float]:
+    if elem is None:
+        return {}
+    native = native_acceleration.xml_first_vec_by_ascii_casefolded_name(
+        elem, names, ET.Element
+    )
+    if native is not None:
+        return native
     for child in _named_descendants(elem, names):
         value = _vec_dict(child)
         if value:
