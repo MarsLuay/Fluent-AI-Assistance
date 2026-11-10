@@ -677,6 +677,17 @@ def worklist_ascii_uppercase(value: Any) -> str | None:
         return None
 
 
+def worklist_wash_type(scheme: Any) -> str | None:
+    """Format exact integer or ``None`` wash schemes natively, or request fallback."""
+    if not enabled() or (scheme is not None and type(scheme) is not int):
+        return None
+    try:
+        result = _native.worklist_wash_type(scheme)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, OverflowError):
+        return None
+
+
 def worklist_record_type_line(type_character: Any) -> str | None:
     """Format exact-string GWL record types natively, or request fallback."""
     if not enabled() or type(type_character) is not str:

@@ -84,6 +84,33 @@ class WorklistSemanticsTests(unittest.TestCase):
                         outcomes.append((type(error), str(error)))
             self.assertEqual(outcomes[0], outcomes[1], operation)
 
+    def test_wash_scheme_normalization_matches_python(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_wash_type"
+        ):
+            self.skipTest("optional Rust wash formatter is not built")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(native_acceleration.worklist_wash_type(None), "W")
+            self.assertEqual(native_acceleration.worklist_wash_type(1), "W1")
+            self.assertEqual(native_acceleration.worklist_wash_type(4), "W4")
+            for unsupported in (True, 1.0, 0, 5, 2**100):
+                self.assertIsNone(native_acceleration.worklist_wash_type(unsupported))
+
+        class IntegerScheme(int):
+            pass
+
+        for scheme in (None, 1, 4, 0, 5, True, False, 1.0, 2.0, IntegerScheme(3)):
+            outcomes = []
+            for disabled in ("1", "0"):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": disabled}
+                ):
+                    try:
+                        outcomes.append(Wash(scheme).type_character)
+                    except ValueError as error:
+                        outcomes.append((type(error), str(error)))
+            self.assertEqual(outcomes[0], outcomes[1], repr(scheme))
+
     def test_tip_selection_is_automatic_or_one_hot_and_preserves_raw_spelling(self):
         automatic = parse_tip_selection("")
         self.assertEqual((automatic.mode, automatic.value, automatic.channel), ("automatic", None, None))

@@ -180,6 +180,10 @@ class Wash:
     type_character: str = field(init=False)
 
     def __post_init__(self) -> None:
+        native = native_acceleration.worklist_wash_type(self.scheme)
+        if native is not None:
+            object.__setattr__(self, "type_character", native)
+            return
         if self.scheme is None:
             object.__setattr__(self, "type_character", "W")
             return

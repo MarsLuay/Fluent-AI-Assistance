@@ -1131,6 +1131,20 @@ fn worklist_ascii_uppercase(value: &str) -> Option<String> {
 }
 
 #[pyfunction]
+fn worklist_wash_type(py: Python<'_>, scheme: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+    if scheme.is_none() {
+        return Ok(Some("W".to_owned()));
+    }
+    if !scheme.get_type().is(py.get_type::<PyInt>()) {
+        return Ok(None);
+    }
+    let Ok(scheme) = scheme.extract::<i64>() else {
+        return Ok(None);
+    };
+    Ok((1..=4).contains(&scheme).then(|| format!("W{scheme}")))
+}
+
+#[pyfunction]
 fn worklist_comment_line(text: &str) -> String {
     format!("C;{}", text.replace('\n', "\\n"))
 }
@@ -1529,6 +1543,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_format_volume, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_clean_field, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_ascii_uppercase, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_wash_type, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_comment_line, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_record_type_line, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_join_gwl_fields, module)?)?;
