@@ -87,6 +87,102 @@ class RenderListTests(unittest.TestCase):
                         native_call.assert_called_once()
                 self.assertEqual(actual, expected)
 
+    def test_markdown_report_output_matches_python_with_native_sections(self) -> None:
+        reports = [
+            {
+                "kind": "xscr",
+                "object_name": "Synthetic Object",
+                "source": "synthetic.xscr",
+                "script_version": "test",
+                "command_count": 1,
+                "references": [
+                    {"type_id": "reference", "object_name": "Example", "guid": "id"}
+                ],
+                "family_counts": {"category_a": 1},
+                "command_counts": {"example": 1},
+                "variables": [{"name": "value", "type": "text"}],
+                "query_prompts": [
+                    {"name": "prompt", "prompt": "value", "minimum": 0, "maximum": 1}
+                ],
+                "dependencies": {"files": ["alpha", "beta"]},
+                "comments": ["note"],
+                "warnings": ["warning"],
+                "commands": [
+                    {
+                        "name": "example",
+                        "line": 1,
+                        "index": 0,
+                        "type": "ExampleCommand",
+                        "family": "category_a",
+                    }
+                ],
+            },
+            {
+                "kind": "zeia",
+                "source": "synthetic.zeia",
+                "entry_count": 2,
+                "script_count_total": 1,
+                "script_count_summarized": 1,
+                "object_count_summarized": 1,
+                "gwl_count_summarized": 0,
+                "extension_counts": {".xml": 1},
+                "family_counts": {"category_a": 1},
+                "command_counts": {"example": 1},
+                "warning_counts": {"warning": 1},
+                "script_names": ["Synthetic Script"],
+                "scripts": [
+                    {
+                        "object_name": "Synthetic Script",
+                        "command_count": 1,
+                        "family_counts": {"category_a": 1},
+                    }
+                ],
+                "errors": [{"entry": "synthetic.xml", "error": "parse error"}],
+            },
+            {
+                "kind": "directory",
+                "source": "synthetic-directory",
+                "file_count": 1,
+                "extension_counts": {".xml": 1},
+                "family_counts": {"category_a": 1},
+                "command_counts": {"example": 1},
+                "warning_counts": {"warning": 1},
+                "script_names": ["Synthetic Script"],
+                "items": [{"kind": "xscr", "source": "synthetic.xscr"}],
+            },
+            {
+                "kind": "zeia_compare",
+                "left": "synthetic-left",
+                "right": "synthetic-right",
+                "left_entry_count": 1,
+                "right_entry_count": 2,
+                "script_names_common_count": 1,
+                "script_names_added": ["Added"],
+                "script_names_removed": ["Removed"],
+                "left_family_counts": {"category_a": 1},
+                "right_family_counts": {"category_b": 2},
+            },
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [render.render_markdown(report) for report in reports]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with (
+                patch.object(
+                    render,
+                    "_native_render_append_list",
+                    wraps=render._native_render_append_list,
+                ) as native_list,
+                patch.object(
+                    render,
+                    "_native_render_append_dict",
+                    wraps=render._native_render_append_dict,
+                ) as native_dict,
+            ):
+                actual = [render.render_markdown(report) for report in reports]
+            self.assertGreater(native_list.call_count, 0)
+            self.assertGreater(native_dict.call_count, 0)
+        self.assertEqual(actual, expected)
+
     def test_native_append_dict_falls_back_without_stringifying_unrendered_values(self) -> None:
         if not native_acceleration.available():
             self.skipTest("optional Rust renderer is not built")
