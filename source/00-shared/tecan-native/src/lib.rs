@@ -2470,6 +2470,46 @@ fn trim_python_ascii_whitespace(value: &str) -> &str {
 }
 
 #[pyfunction]
+fn append_unique_ascii_string<'py>(
+    py: Python<'py>,
+    values: &Bound<'py, PyAny>,
+    value: &Bound<'py, PyAny>,
+) -> PyResult<Option<bool>> {
+    if !values.get_type().is(py.get_type::<PyList>()) {
+        return Ok(None);
+    }
+    if value.is_none() {
+        return Ok(Some(false));
+    }
+    if !value.get_type().is(py.get_type::<PyString>()) {
+        return Ok(None);
+    }
+    let value = value.extract::<String>()?;
+    if !value.is_ascii() {
+        return Ok(None);
+    }
+    let normalized = trim_python_ascii_whitespace(&value);
+    if normalized.is_empty() {
+        return Ok(Some(false));
+    }
+    let values = values.cast::<PyList>()?;
+    for existing in values.iter() {
+        if !existing.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let existing = existing.extract::<String>()?;
+        if !existing.is_ascii() {
+            return Ok(None);
+        }
+        if existing == normalized {
+            return Ok(Some(false));
+        }
+    }
+    values.append(normalized)?;
+    Ok(Some(true))
+}
+
+#[pyfunction]
 fn pattern_join_summary<'py>(
     py: Python<'py>,
     parts: &Bound<'py, PyAny>,
@@ -3809,6 +3849,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_gwl_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_compare_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_pattern_specs, module)?)?;
+    module.add_function(wrap_pyfunction!(append_unique_ascii_string, module)?)?;
     module.add_function(wrap_pyfunction!(pattern_join_summary, module)?)?;
     module.add_function(wrap_pyfunction!(pattern_liquid_step, module)?)?;
     module.add_function(wrap_pyfunction!(render_pattern_types_report, module)?)?;

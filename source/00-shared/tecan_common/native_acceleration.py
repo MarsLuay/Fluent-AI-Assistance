@@ -1732,6 +1732,22 @@ def ordered_string_counts(values: Any) -> dict[str, int] | None:
         return None
 
 
+def append_unique_ascii_string(values: Any, value: Any) -> bool | None:
+    """Append one supported ASCII string with Python-compatible whitespace handling."""
+    if (
+        not enabled()
+        or type(values) is not list
+        or not all(type(item) is str and item.isascii() for item in values)
+        or (value is not None and (type(value) is not str or not value.isascii()))
+    ):
+        return None
+    try:
+        result = _native.append_unique_ascii_string(values, value)
+        return result if type(result) is bool else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def pattern_join_summary(parts: Any) -> str | None:
     """Join exact ASCII summary fields with Python-compatible stripping."""
     if (

@@ -11,6 +11,7 @@ from typing import Any
 from .command_registry import registry_manual_step, registry_pattern_type
 from .common import _connect, _connection_arg, fast_json_dumps, to_jsonable
 from tecan_common.native_acceleration import (
+    append_unique_ascii_string as _native_append_unique_ascii_string,
     pattern_join_summary as _native_pattern_join_summary,
     pattern_liquid_step as _native_pattern_liquid_step,
     pattern_windows as _native_pattern_windows,
@@ -782,6 +783,9 @@ def _first(specifications: dict[str, list[str]], key: str) -> str:
 
 
 def _append_unique(values: list[str], value: Any) -> None:
+    native = _native_append_unique_ascii_string(values, value)
+    if native is not None:
+        return
     text = str(value or "").strip()
     if text and text not in values:
         values.append(text)
