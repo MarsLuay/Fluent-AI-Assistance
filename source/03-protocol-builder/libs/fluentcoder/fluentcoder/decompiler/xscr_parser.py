@@ -28,7 +28,7 @@ from tecan_common.native_acceleration import xscr_object_fields as _native_xscr_
 from tecan_common.performance import performance_marker
 from tecan_common.xml_helpers import elements_by_name
 
-from ..catalog.xcmp import _direct_children, _find, _local, _text
+from ..catalog.xcmp import _direct_child, _direct_children, _find, _local, _text
 from ..expressions import is_expression_field, parse_or_preserve_source_expression
 from ..ir.subroutine_semantics import normalize_subroutine_execution_mode
 from ..ir.driver_recovery import parse_driver_recovery_policy
@@ -173,9 +173,7 @@ def _parse_xscr_root(root: ET.Element) -> Protocol:
 def _parse_worktable_reference(payload: Optional[ET.Element]) -> tuple[Optional[str], Optional[str]]:
     if payload is None:
         return None, None
-    for child in list(payload):
-        if not isinstance(child.tag, str) or _local(child.tag) != "Reference":
-            continue
+    for child in _direct_children(payload, "Reference"):
         if _text(_find(child, "TypeId")) != "WorktableWorkspace":
             continue
         return _text(_find(child, "Guid")), _text(_find(child, "ObjectName"))
@@ -196,11 +194,7 @@ def _parse_variable_declarations(
     ``Floating Point``/``Integer``/``String`` as type names; coerce
     to the matching Python type.
     """
-    var_root = next(
-        (e for e in root.iter()
-         if isinstance(e.tag, str) and _local(e.tag) == "VariableDeclarations"),
-        None,
-    )
+    var_root = _find(root, "VariableDeclarations")
     if var_root is None:
         return [], {}, {}
 
@@ -223,10 +217,9 @@ def _parse_variable_declarations(
         type_name = (type_el.text or "").strip() if type_el is not None else ""
         default_text = ""
         if values_el is not None:
-            for sub in values_el:
-                if isinstance(sub.tag, str) and _local(sub.tag) == "string":
-                    default_text = (sub.text or "").strip()
-                    break
+            default_element = _direct_child(values_el, "string")
+            if default_element is not None:
+                default_text = (default_element.text or "").strip()
         default_value = _coerce_variable_default(default_text, type_name)
         variables.append(var_name)
         defaults[var_name] = default_value
@@ -262,11 +255,7 @@ def _coerce_variable_default(text: str, type_name: str) -> Union[float, int, str
 def _parse_statements(stmts: ET.Element) -> list[Step]:
     out: list[Step] = []
     pending_conditional: Optional[ConditionalStep] = None
-    for child in stmts:
-        if not isinstance(child.tag, str):
-            continue
-        if _local(child.tag) != "Object":
-            continue
+    for child in _direct_children(stmts, "Object"):
         if _is_command_suffix(child, "AlternateGroup") and pending_conditional is not None:
             pending_conditional.else_steps = _parse_body(child)
             pending_conditional = None

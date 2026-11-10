@@ -50,8 +50,20 @@ def test_xscr_variable_declarations_use_native_candidate_scan_with_python_parity
             "_native_xml_elements_by_name",
             wraps=xml_helpers._native_xml_elements_by_name,
         ) as native_call:
-            actual = xscr_parser._parse_variable_declarations(root)
-            assert native_call.call_count == 4
+            with patch.object(
+                native_acceleration,
+                "xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
+            ) as native_first:
+                with patch.object(
+                    native_acceleration,
+                    "xml_first_direct_element_by_name",
+                    wraps=native_acceleration.xml_first_direct_element_by_name,
+                ) as native_direct_first:
+                    actual = xscr_parser._parse_variable_declarations(root)
+                    assert native_call.call_count == 4
+                    native_first.assert_called_once()
+                    assert native_direct_first.call_count == 2
 
     assert actual == expected
     assert actual == (
