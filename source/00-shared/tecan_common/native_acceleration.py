@@ -239,6 +239,57 @@ def render_object_report(
         return None
 
 
+def render_gwl_report(
+    source: Any,
+    line_count: Any,
+    transfer_pairs_estimate: Any,
+    record_counts: Any,
+    examples: Any,
+) -> str | None:
+    """Render supported GWL summary data natively, or request Python fallback."""
+    safe_values = (str, bool, int, float, type(None))
+    if (
+        not enabled()
+        or type(source) not in safe_values
+        or type(line_count) not in safe_values
+        or type(transfer_pairs_estimate) not in safe_values
+        or type(record_counts) is not dict
+        or type(examples) not in (list, tuple)
+    ):
+        return None
+    record_entries: list[tuple[str, str]] = []
+    rendered_examples: list[list[str]] = []
+    try:
+        for key, value in record_counts.items():
+            if type(key) is not str or type(value) not in safe_values:
+                return None
+            record_entries.append((key, str(value)))
+        for example in examples:
+            if type(example) is not dict:
+                return None
+            values = [
+                example.get("line"),
+                example.get("operation"),
+                example.get("rack_label"),
+                example.get("position"),
+                example.get("volume"),
+                example.get("liquid_class"),
+            ]
+            if not all(type(value) in safe_values for value in values):
+                return None
+            rendered_examples.append([str(value) for value in values])
+        result = _native.render_gwl_report(
+            str(source),
+            str(line_count),
+            str(transfer_pairs_estimate),
+            record_entries,
+            rendered_examples,
+        )
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def render_pattern_specs(specs: Any) -> list[str] | None:
     """Render supported pattern specification mappings natively."""
     if not enabled() or type(specs) is not dict:

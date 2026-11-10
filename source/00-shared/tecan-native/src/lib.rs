@@ -1134,6 +1134,37 @@ fn render_append_dict(title: &str, entries: Vec<(String, String)>, limit: i64) -
 }
 
 #[pyfunction]
+fn render_gwl_report(
+    source: &str,
+    line_count: &str,
+    transfer_pairs_estimate: &str,
+    record_counts: Vec<(String, String)>,
+    examples: Vec<Vec<String>>,
+) -> Option<String> {
+    if examples.iter().any(|example| example.len() != 6) {
+        return None;
+    }
+    let mut lines = vec![
+        format!("# GWL Report: {source}"),
+        String::new(),
+        format!("- Lines: `{line_count}`"),
+        format!("- Transfer pairs estimate: `{transfer_pairs_estimate}`"),
+    ];
+    lines.extend(render_append_dict("Record Counts", record_counts, 20));
+    if !examples.is_empty() {
+        lines.push(String::new());
+        lines.push("## Pipette Examples".to_string());
+        lines.extend(examples.iter().map(|example| {
+            format!(
+                "- line {}: `{}` {} pos {} vol {} lc `{}`",
+                example[0], example[1], example[2], example[3], example[4], example[5]
+            )
+        }));
+    }
+    Some(format!("{}\n", lines.join("\n")))
+}
+
+#[pyfunction]
 fn render_pattern_specs(entries: Vec<(String, Vec<String>)>) -> Vec<String> {
     if entries.is_empty() {
         return Vec::new();
@@ -2025,6 +2056,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_dict, module)?)?;
     module.add_function(wrap_pyfunction!(render_object_report, module)?)?;
+    module.add_function(wrap_pyfunction!(render_gwl_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_pattern_specs, module)?)?;
     module.add_function(wrap_pyfunction!(render_join_lines, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
@@ -2085,6 +2117,35 @@ mod tests {
             "α\nline\nbreak\n"
         );
         assert_eq!(render_join_lines(Vec::new()), "\n");
+    }
+
+    #[test]
+    fn gwl_report_render_preserves_sections_and_order() {
+        let report = render_gwl_report(
+            "source-x",
+            "line-count-x",
+            "estimate-x",
+            vec![("record-x".into(), "count-x".into())],
+            vec![vec![
+                "line-x".into(),
+                "operation-x".into(),
+                "rack-x".into(),
+                "position-x".into(),
+                "volume-x".into(),
+                "class-x".into(),
+            ]],
+        );
+        assert_eq!(
+            report.as_deref(),
+            Some(
+                "# GWL Report: source-x\n\n- Lines: `line-count-x`\n- Transfer pairs estimate: `estimate-x`\n\n## Record Counts\n- `record-x`: count-x\n\n## Pipette Examples\n- line line-x: `operation-x` rack-x pos position-x vol volume-x lc `class-x`\n"
+            )
+        );
+        assert_eq!(
+            render_gwl_report("source", "0", "0", Vec::new(), Vec::new()).as_deref(),
+            Some("# GWL Report: source\n\n- Lines: `0`\n- Transfer pairs estimate: `0`\n")
+        );
+        assert!(render_gwl_report("", "", "", Vec::new(), vec![vec!["short".into()]]).is_none());
     }
 
     #[test]

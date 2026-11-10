@@ -262,6 +262,74 @@ class RenderListTests(unittest.TestCase):
         self.assertEqual(custom.str_calls, 1)
         self.assertEqual(actual_fallback, expected_fallback)
 
+    def test_native_gwl_report_matches_python_and_falls_back_safely(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "render_gwl_report"
+        ):
+            self.skipTest("optional Rust GWL report renderer is not built")
+        report = {
+            "kind": "gwl",
+            "source": "synthetic-source",
+            "line_count": 3,
+            "transfer_pairs_estimate": 1,
+            "record_counts": {"record-a": 2, "record-b": 1},
+            "pipette_examples": [
+                {
+                    "line": 7,
+                    "operation": "operation-x",
+                    "rack_label": "rack-x",
+                    "position": "position-x",
+                    "volume": "volume-x",
+                    "liquid_class": "class-x",
+                }
+            ],
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = render.render_markdown(report)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            direct = native_acceleration.render_gwl_report(
+                report["source"],
+                report["line_count"],
+                report["transfer_pairs_estimate"],
+                report["record_counts"],
+                report["pipette_examples"],
+            )
+            self.assertEqual(direct, expected)
+            with patch.object(
+                render,
+                "_native_render_gwl_report",
+                wraps=render._native_render_gwl_report,
+            ) as native_call:
+                actual = render.render_markdown(report)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+
+        class TextValue:
+            def __init__(self) -> None:
+                self.str_calls = 0
+
+            def __str__(self) -> str:
+                self.str_calls += 1
+                return "custom source"
+
+        custom = TextValue()
+        unsupported = {
+            "kind": "gwl",
+            "source": custom,
+            "line_count": 0,
+            "transfer_pairs_estimate": 0,
+            "record_counts": {},
+            "pipette_examples": [],
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_fallback = render.render_markdown(unsupported)
+        self.assertEqual(custom.str_calls, 1)
+        custom.str_calls = 0
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual_fallback = render.render_markdown(unsupported)
+        self.assertEqual(custom.str_calls, 1)
+        self.assertEqual(actual_fallback, expected_fallback)
+
     def test_native_xml_object_report_matches_python_and_limits_lists(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "render_object_report"

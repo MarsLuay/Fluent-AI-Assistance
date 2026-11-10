@@ -8,6 +8,7 @@ from typing import Any
 from tecan_common.native_acceleration import (
     render_append_dict as _native_render_append_dict,
     render_append_list as _native_render_append_list,
+    render_gwl_report as _native_render_gwl_report,
     render_join_lines as _native_render_join_lines,
     render_object_report as _native_render_object_report,
     render_pattern_specs as _native_render_pattern_specs,
@@ -306,6 +307,16 @@ def _render_directory(report: dict[str, Any]) -> str:
 
 
 def _render_gwl(report: dict[str, Any]) -> str:
+    if type(report) is dict:
+        native = _native_render_gwl_report(
+            report.get("source"),
+            report.get("line_count"),
+            report.get("transfer_pairs_estimate"),
+            report.get("record_counts", {}),
+            report.get("pipette_examples", []),
+        )
+        if native is not None:
+            return native
     lines = [
         f"# GWL Report: {report.get('source')}",
         "",
