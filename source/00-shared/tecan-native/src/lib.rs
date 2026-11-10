@@ -2018,3 +2018,51 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pattern_windows, module)?)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn report_list_render_matches_slice_and_overflow_rules() {
+        assert_eq!(
+            render_append_list("Items", vec!["a".into(), "β".into(), "c".into()], 2),
+            vec!["", "## Items", "- a", "- β", "- ... 1 more"]
+        );
+        assert_eq!(
+            render_append_list("Items", vec!["a".into(), "b".into(), "c".into()], 0),
+            vec!["", "## Items", "- ... 3 more"]
+        );
+        assert_eq!(
+            render_append_list("Items", vec!["a".into(), "b".into(), "c".into()], -1),
+            vec!["", "## Items", "- a", "- b", "- ... 4 more"]
+        );
+        assert!(render_append_list("Empty", Vec::new(), 20).is_empty());
+    }
+
+    #[test]
+    fn report_dict_render_preserves_order_and_python_limit_behavior() {
+        let entries = vec![
+            ("first".into(), "one".into()),
+            ("second".into(), "2".into()),
+        ];
+        assert_eq!(
+            render_append_dict("Counts", entries.clone(), 1),
+            vec!["", "## Counts", "- `first`: one", "- ... 1 more"]
+        );
+        assert_eq!(
+            render_append_dict("Counts", entries, -1),
+            vec!["", "## Counts", "- ... 3 more"]
+        );
+        assert!(render_append_dict("Empty", Vec::new(), 20).is_empty());
+    }
+
+    #[test]
+    fn migrated_xml_string_helpers_cover_suffix_and_text_edges() {
+        assert_eq!(xml_tag_local_name("{urn:test}name"), "name");
+        assert_eq!(xml_tag_local_name("{first}{second}name"), "name");
+        assert_eq!(xml_clean_text(" \tvalue\r\n"), "value");
+        assert_eq!(xml_kind_from_suffix(".XWSP"), Some("workspace".into()));
+        assert_eq!(xml_kind_from_suffix("...Custom"), Some("custom".into()));
+    }
+}
