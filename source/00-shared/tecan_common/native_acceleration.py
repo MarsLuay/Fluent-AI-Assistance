@@ -245,6 +245,35 @@ def xml_elements_by_ascii_casefolded_name(
         return None
 
 
+def xml_first_text_by_ascii_casefolded_name(
+    root: Any, names: Any, element_type: Any
+) -> str | None:
+    """Find the first nonempty trimmed text under an ASCII-named XML element."""
+    if (
+        not enabled()
+        or type(root) is not element_type
+        or type(names) not in (set, frozenset, list, tuple)
+        or not all(type(name) is str and name.isascii() for name in names)
+    ):
+        return None
+    try:
+        supported, result = _native.xml_first_text_by_ascii_casefolded_name(
+            root, list(names), element_type
+        )
+        if type(supported) is bool and supported and type(result) is str:
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_elements_by_name(
     root: Any, names: Any, element_type: Any
 ) -> list[Any] | None:

@@ -2303,6 +2303,54 @@ fn xml_elements_by_ascii_casefolded_name<'py>(
 }
 
 #[pyfunction]
+fn xml_first_text_by_ascii_casefolded_name(
+    py: Python<'_>,
+    root: &Bound<'_, PyAny>,
+    names: Vec<String>,
+    element_type: &Bound<'_, PyAny>,
+) -> PyResult<(bool, String)> {
+    if !root.get_type().is(element_type) || names.iter().any(|name| !name.is_ascii()) {
+        return Ok((false, String::new()));
+    }
+    let iterator = root.call_method0("iter")?;
+    for element in iterator.try_iter()? {
+        let element = element?;
+        if !element.get_type().is(element_type) {
+            return Ok((false, String::new()));
+        }
+        let tag = element.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok((false, String::new()));
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        if !local.is_ascii() {
+            return Ok((false, String::new()));
+        }
+        let folded_local = local.to_ascii_lowercase();
+        if !names.iter().any(|name| name == &folded_local) {
+            continue;
+        }
+        let text = element.getattr("text")?;
+        if text.is_none() {
+            continue;
+        }
+        if !text.get_type().is(py.get_type::<PyString>()) {
+            return Ok((false, String::new()));
+        }
+        let text = text.extract::<String>()?;
+        let text = trim_python_whitespace(&text);
+        if !text.is_empty() {
+            return Ok((true, text.to_owned()));
+        }
+    }
+    Ok((true, String::new()))
+}
+
+#[pyfunction]
 fn xml_direct_elements_by_name<'py>(
     py: Python<'py>,
     parent: &Bound<'py, PyAny>,
@@ -4406,6 +4454,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_elements_by_name, module)?)?;
     module.add_function(wrap_pyfunction!(
         xml_elements_by_ascii_casefolded_name,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        xml_first_text_by_ascii_casefolded_name,
         module
     )?)?;
     module.add_function(wrap_pyfunction!(xml_direct_elements_by_name, module)?)?;

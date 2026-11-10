@@ -563,6 +563,43 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         )
         self.assertEqual(actual[10:], ["東京", "\ud800", "", "", "Custom"])
 
+    def test_first_named_text_uses_native_ascii_selector_with_unicode_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_first_text_by_ascii_casefolded_name"
+        ):
+            self.skipTest("optional Rust first-text XML selector is not built")
+
+        root = worktable_geometry.ET.fromstring(
+            '<Root xmlns="urn:worktable"><Name> \t </Name><Branch>'
+            "<VALUE>\u00a0  match \u00a0</VALUE></Branch><name>later</name></Root>"
+        )
+        unicode_root = worktable_geometry.ET.fromstring(
+            "<Root><Straße>wide</Straße></Root>"
+        )
+        names = {"name", "value"}
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = worktable_geometry._first_named_text(root, names)
+            unicode_expected = worktable_geometry._first_named_text(
+                unicode_root, {"strasse"}
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_first_text_by_ascii_casefolded_name",
+                wraps=native_acceleration.xml_first_text_by_ascii_casefolded_name,
+            ) as native_call:
+                actual = worktable_geometry._first_named_text(root, names)
+                self.assertEqual(native_call.call_count, 1)
+                unicode_actual = worktable_geometry._first_named_text(
+                    unicode_root, {"strasse"}
+                )
+                self.assertEqual(native_call.call_count, 2)
+                self.assertEqual(worktable_geometry._first_named_text(None, names), "")
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "match")
+        self.assertEqual(unicode_actual, unicode_expected)
+        self.assertEqual(unicode_actual, "wide")
+
     def test_first_named_direct_child_uses_native_ascii_selector(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_direct_elements_by_ascii_casefolded_name"

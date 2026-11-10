@@ -693,6 +693,13 @@ def _first_named_direct_child(elem: ET.Element | None, names: set[str]) -> ET.El
 
 
 def _first_named_text(elem: ET.Element | None, names: set[str]) -> str:
+    if elem is None:
+        return ""
+    native = native_acceleration.xml_first_text_by_ascii_casefolded_name(
+        elem, names, ET.Element
+    )
+    if native is not None:
+        return native
     for child in _named_descendants(elem, names):
         value = _text(child)
         if value:
