@@ -785,6 +785,53 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(actual[0]["object_subfolder_path"], actual[0]["object_path"])
         self.assertEqual(actual[1]["type_id"], "type-y")
 
+    def test_native_rup_variable_record_extraction_matches_python(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_records_by_name"
+        ):
+            self.skipTest("optional Rust XML record extractor is not built")
+        root = ET.Element("Statement")
+        first = ET.SubElement(root, "{urn:test}RupVariableItem")
+        ET.SubElement(first, "VariableName").text = "  "
+        ET.SubElement(first, "VariableName").text = " variable-x "
+        ET.SubElement(first, "DisplayText").text = " value-x "
+        second = ET.SubElement(root, "RupVariableItem")
+        nested = ET.SubElement(second, "Nested")
+        ET.SubElement(nested, "VariableName").text = "not-direct-x"
+        third = ET.SubElement(root, "RupVariableItem")
+        ET.SubElement(third, "IsEnabled").text = "false"
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = reader_script._rup_variable_items(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                xml_helpers,
+                "_native_xml_records_by_name",
+                wraps=xml_helpers._native_xml_records_by_name,
+            ) as native_call:
+                actual = reader_script._rup_variable_items(root)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [
+                {
+                    "name": "variable-x",
+                    "display_text": "value-x",
+                    "display_type": "",
+                    "allowed_values": "",
+                    "enabled": "",
+                },
+                {
+                    "name": "",
+                    "display_text": "",
+                    "display_type": "",
+                    "allowed_values": "",
+                    "enabled": "false",
+                },
+            ],
+        )
+
     def test_native_xml_all_text_values_preserves_order_comments_and_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_all_unique_texts"

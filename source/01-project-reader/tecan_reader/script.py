@@ -373,16 +373,17 @@ def _operator_prompts(root: ET.Element) -> list[dict[str, Any]]:
 
 
 def _rup_variable_items(statement: ET.Element) -> list[dict[str, str]]:
+    names = ("VariableName", "DisplayText", "DisplayType", "AllowedValues", "IsEnabled")
     items: list[dict[str, str]] = []
-    for element in statement.iter():
-        if local_name(element.tag) != "RupVariableItem":
-            continue
+    for name, display_text, display_type, allowed_values, enabled in records_by_name(
+        statement, "RupVariableItem", names, direct=True
+    ):
         item = {
-            "name": child_text(element, "VariableName"),
-            "display_text": child_text(element, "DisplayText"),
-            "display_type": child_text(element, "DisplayType"),
-            "allowed_values": child_text(element, "AllowedValues"),
-            "enabled": child_text(element, "IsEnabled"),
+            "name": name,
+            "display_text": display_text,
+            "display_type": display_type,
+            "allowed_values": allowed_values,
+            "enabled": enabled,
         }
         if any(item.values()):
             items.append(item)
