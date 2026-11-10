@@ -966,6 +966,72 @@ fn xml_unique_texts<'py>(
 }
 
 #[pyfunction]
+fn xml_texts_by_name<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    names: Vec<String>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let positions = names
+        .into_iter()
+        .enumerate()
+        .map(|(index, name)| (name, index))
+        .collect::<HashMap<_, _>>();
+    let groups = (0..positions.len())
+        .map(|_| PyList::empty(py))
+        .collect::<Vec<_>>();
+    let mut seen = HashSet::new();
+    let iterator = root.call_method0("iter")?;
+    for element in iterator.try_iter()? {
+        let element = element?;
+        if !element.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = element.getattr("tag")?;
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        let Some(index) = positions.get(local).copied() else {
+            continue;
+        };
+        let text = element.getattr("text")?;
+        if text.is_none() {
+            continue;
+        }
+        if !text.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let text_value = text.extract::<String>()?;
+        if !text_value.is_ascii()
+            || text_value
+                .chars()
+                .any(|ch| ('\u{1c}'..='\u{1f}').contains(&ch))
+        {
+            return Ok(None);
+        }
+        let cleaned = text_value.trim();
+        if cleaned.is_empty() || !seen.insert((index, cleaned.to_owned())) {
+            continue;
+        }
+        if cleaned == text_value {
+            groups[index].append(text)?;
+        } else {
+            groups[index].append(cleaned)?;
+        }
+    }
+    let output = PyList::empty(py);
+    for group in groups {
+        output.append(group)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn xml_find_text<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -1864,6 +1930,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_tag_local_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_clean_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_unique_texts, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_texts_by_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_find_text, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(read_text_file, module)?)?;

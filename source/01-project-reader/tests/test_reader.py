@@ -379,6 +379,52 @@ class ReaderTests(unittest.TestCase):
             self.assertIsNone(native_acceleration.xml_clean_text(TextValue()))
             self.assertEqual(xml_helpers._clean_text(TextValue()), "custom text")
 
+    def test_native_xml_texts_by_name_matches_python_grouping(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_texts_by_name"
+        ):
+            self.skipTest("optional Rust grouped XML text helper is not built")
+        root = ET.Element("Root")
+        ET.SubElement(root, "A").text = " first "
+        ET.SubElement(root, "{urn:test}A").text = "first"
+        ET.SubElement(root, "B").text = "second"
+        ET.SubElement(root, "A").text = "third"
+        name_list = ["A", "B", "A", "Missing"]
+        names_in_order = list(set(name_list))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = xml_helpers.texts_by_name(root, name_list)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            direct = native_acceleration.xml_texts_by_name(
+                root, names_in_order, ET.Element
+            )
+            self.assertIsNotNone(direct)
+            with patch.object(
+                xml_helpers,
+                "_native_xml_texts_by_name",
+                wraps=xml_helpers._native_xml_texts_by_name,
+            ) as native_call:
+                actual = xml_helpers.texts_by_name(root, name_list)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(list(actual), list(expected))
+        self.assertEqual(
+            [actual[name] for name in names_in_order],
+            direct,
+        )
+        self.assertEqual(actual["A"], ["first", "third"])
+        self.assertEqual(actual["B"], ["second"])
+        self.assertEqual(actual["Missing"], [])
+
+        unicode_root = ET.Element("Root")
+        ET.SubElement(unicode_root, "A").text = "café"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_texts_by_name(
+                    unicode_root, ["A"], ET.Element
+                )
+            )
+            self.assertEqual(xml_helpers.texts_by_name(unicode_root, ["A"]), {"A": ["café"]})
+
     def test_native_all_xml_texts_matches_python_without_default_limit(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_unique_texts"

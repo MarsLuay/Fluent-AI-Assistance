@@ -10,6 +10,7 @@ from .native_acceleration import (
     xml_clean_text as _native_xml_clean_text,
     xml_find_text as _native_xml_find_text,
     xml_local_name as _native_xml_local_name,
+    xml_texts_by_name as _native_xml_texts_by_name,
     xml_unique_texts as _native_xml_unique_texts,
 )
 
@@ -92,6 +93,10 @@ def all_text(root: ET.Element, names: Iterable[str]) -> list[str]:
 def texts_by_name(root: ET.Element, names: Iterable[str]) -> dict[str, list[str]]:
     """Return unique non-empty descendant text grouped by local tag name."""
     wanted = set(names)
+    names_in_order = list(wanted)
+    native = _native_xml_texts_by_name(root, names_in_order, ET.Element)
+    if native is not None:
+        return dict(zip(names_in_order, native))
     out: dict[str, list[str]] = {name: [] for name in wanted}
     for element in root.iter():
         name = local_name(element.tag)

@@ -105,6 +105,39 @@ def xml_unique_texts(
         return None
 
 
+def xml_texts_by_name(root: Any, names: Any, element_type: Any) -> list[list[str]] | None:
+    """Collect grouped supported XML text natively; otherwise use Python."""
+    if (
+        not enabled()
+        or type(root) is not element_type
+        or type(names) not in (list, tuple)
+        or not all(type(name) is str for name in names)
+        or len(set(names)) != len(names)
+    ):
+        return None
+    try:
+        result = _native.xml_texts_by_name(root, list(names), element_type)
+        if (
+            type(result) is list
+            and len(result) == len(names)
+            and all(
+                type(group) is list and all(type(value) is str for value in group)
+                for group in result
+            )
+        ):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_find_text(
     root: Any, name: Any, direct: Any, element_type: Any
 ) -> tuple[bool, str | None] | None:
