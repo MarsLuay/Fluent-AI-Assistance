@@ -14,7 +14,10 @@ import json
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
-from tecan_common.native_acceleration import deepcopy_json as _native_deepcopy_json
+from tecan_common.native_acceleration import (
+    deepcopy_json as _native_deepcopy_json,
+    sort_ascii_string_keys as _native_sort_ascii_string_keys,
+)
 
 
 def deepcopy(value: Any) -> Any:
@@ -23,6 +26,13 @@ def deepcopy(value: Any) -> Any:
     if copied is not None or value is None:
         return copied
     return _python_deepcopy(value)
+
+
+def _sorted_string_mapping(values: dict[str, Any]) -> dict[str, Any]:
+    native = _native_sort_ascii_string_keys(values)
+    if native is not None:
+        return native
+    return dict(sorted(values.items()))
 
 
 CANONICAL_PROJECT_MODEL_SCHEMA_VERSION = "tecan.canonical_project.v1"
@@ -75,8 +85,8 @@ def build_completeness_metadata(
             "scripts": script_limit,
             "objects": object_limit,
         },
-        "eligible_member_counts": dict(sorted(eligible.items())),
-        "summarized_counts": dict(sorted(summarized.items())),
+        "eligible_member_counts": _sorted_string_mapping(eligible),
+        "summarized_counts": _sorted_string_mapping(summarized),
         "truncated_scripts": truncated_scripts,
         "truncated_objects": truncated_objects,
         "error_count": len(errors),

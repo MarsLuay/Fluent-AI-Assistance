@@ -4,8 +4,12 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from tecan_common import native_acceleration
+from tecan_reader import project_model
 from tecan_reader.project_model import (
+    build_completeness_metadata,
     CANONICAL_PROJECT_MODEL_SCHEMA_VERSION,
     CanonicalProjectModel,
     SourceProvenance,
@@ -14,6 +18,50 @@ from tecan_reader.project_model import (
 
 
 class ProjectModelTests(unittest.TestCase):
+    def test_completeness_count_keys_use_native_sort_with_unicode_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "sort_ascii_string_keys"
+        ):
+            self.skipTest("optional Rust mapping sorter is not built")
+        arguments = {
+            "script_limit": None,
+            "object_limit": None,
+            "eligible_member_counts": {"scripts": 4, "objects": 3},
+            "summarized_counts": {"scripts": 4, "objects": 3},
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = build_completeness_metadata(**arguments)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                project_model,
+                "_native_sort_ascii_string_keys",
+                wraps=native_acceleration.sort_ascii_string_keys,
+            ) as native_call:
+                actual = build_completeness_metadata(**arguments)
+                self.assertEqual(native_call.call_count, 2)
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            list(actual["eligible_member_counts"]), ["objects", "scripts"]
+        )
+
+        unicode_arguments = {
+            **arguments,
+            "eligible_member_counts": {"é": 1, "a": 2},
+            "summarized_counts": {"é": 1, "a": 2},
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.sort_ascii_string_keys(
+                    unicode_arguments["eligible_member_counts"]
+                )
+            )
+            self.assertEqual(
+                build_completeness_metadata(**unicode_arguments)[
+                    "eligible_member_counts"
+                ],
+                {"a": 2, "é": 1},
+            )
+
     def test_provenance_is_json_serializable_and_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             record = normalize_record(
