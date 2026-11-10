@@ -1270,6 +1270,59 @@ fn xscr_command_records<'py>(
 }
 
 #[pyfunction]
+fn delimited_row_fields<'py>(
+    py: Python<'py>,
+    row: &Bound<'py, PyAny>,
+    header: &Bound<'py, PyAny>,
+    has_header: bool,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !row.get_type().is(py.get_type::<PyList>()) || !header.get_type().is(py.get_type::<PyList>())
+    {
+        return Ok(None);
+    }
+    let mut row_values = Vec::new();
+    for value in row.try_iter()? {
+        let value = value?;
+        if !value.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let value = value.extract::<String>()?;
+        if !value.is_ascii() {
+            return Ok(None);
+        }
+        row_values.push(value);
+    }
+    let mut header_values = Vec::new();
+    for value in header.try_iter()? {
+        let value = value?;
+        if !value.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let value = value.extract::<String>()?;
+        if !value.is_ascii() {
+            return Ok(None);
+        }
+        header_values.push(value);
+    }
+    let output = PyDict::new(py);
+    for (column, value) in row_values.iter().enumerate() {
+        let value = value.trim_matches(|character: char| {
+            character.is_ascii_whitespace() || matches!(character as u32, 0x1c..=0x1f)
+        });
+        if value.is_empty() {
+            continue;
+        }
+        let key = if has_header && column < header_values.len() {
+            header_values[column].clone()
+        } else {
+            format!("column_{}", column + 1)
+        };
+        output.set_item(key, value)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn any_ascii_casefold_in(values: Vec<String>, candidates: Vec<String>) -> Option<bool> {
     if values
         .iter()
@@ -3385,6 +3438,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(merge_unique_string_groups, module)?)?;
     module.add_function(wrap_pyfunction!(sort_ascii_string_keys, module)?)?;
     module.add_function(wrap_pyfunction!(any_ascii_casefold_in, module)?)?;
+    module.add_function(wrap_pyfunction!(delimited_row_fields, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_command_records, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_dict, module)?)?;

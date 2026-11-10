@@ -1509,6 +1509,31 @@ def merge_unique_string_groups(groups: Any, limit: Any) -> dict[str, list[str]] 
         return None
 
 
+def delimited_row_fields(
+    row: Any, header: Any, has_header: Any
+) -> dict[str, str] | None:
+    """Normalize supported ASCII CSV row fields with Python fallback otherwise."""
+    if (
+        not enabled()
+        or type(row) is not list
+        or type(header) is not list
+        or type(has_header) is not bool
+        or not all(type(value) is str and value.isascii() for value in row)
+        or not all(type(value) is str and value.isascii() for value in header)
+    ):
+        return None
+    try:
+        result = _native.delimited_row_fields(row, header, has_header)
+        if type(result) is dict and all(
+            type(key) is str and type(value) is str
+            for key, value in result.items()
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def any_ascii_casefold_in(values: Any, candidates: Any) -> bool | None:
     """Check ASCII strings against a Python-owned case-folded candidate set."""
     if (

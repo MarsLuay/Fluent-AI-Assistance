@@ -167,6 +167,36 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
             unicode_actual["records"][0]["fields"]["Name"], "café user"
         )
 
+    def test_delimited_row_field_normalization_preserves_python_rules(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "delimited_row_fields"
+        ):
+            self.skipTest("optional Rust delimited-row normalizer is not built")
+        row = ["  first  ", "\x1c", "\t42\r", "extra"]
+        header = ["duplicate", "duplicate", ""]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = task_input._row_fields(row, header, True)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                task_input,
+                "delimited_row_fields",
+                wraps=native_acceleration.delimited_row_fields,
+            ) as native_call:
+                actual = task_input._row_fields(row, header, True)
+                native_call.assert_called_once_with(row, header, True)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, {"duplicate": "first", "": "42", "column_4": "extra"})
+
+        unicode_row = ["\u00a0text\u00a0"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.delimited_row_fields(unicode_row, [], False)
+            )
+            self.assertEqual(
+                task_input._row_fields(unicode_row, [], False),
+                {"column_1": "text"},
+            )
+
     def test_delimited_header_detection_uses_native_ascii_and_unicode_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "any_ascii_casefold_in"

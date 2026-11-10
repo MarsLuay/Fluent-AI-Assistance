@@ -15,6 +15,7 @@ from typing import Any
 from tecan_common import xml_compat as ET
 from tecan_common.native_acceleration import (
     any_ascii_casefold_in,
+    delimited_row_fields,
     casefold_alias_values,
     collapse_ascii_whitespace,
     merge_unique_string_groups,
@@ -93,6 +94,19 @@ def _inspect_xml(text: str, *, source_name: str) -> dict[str, Any]:
             "format": "xml",
             "unknown_fields": sorted_unknown_fields.copy(),
         },
+    }
+
+
+def _row_fields(
+    row: list[str], header: list[str], has_header: bool
+) -> dict[str, str]:
+    native = delimited_row_fields(row, header, has_header)
+    if native is not None:
+        return native
+    return {
+        (header[column] if has_header and column < len(header) else f"column_{column + 1}"): value.strip()
+        for column, value in enumerate(row)
+        if value.strip()
     }
 
 
@@ -205,11 +219,7 @@ def _inspect_delimited(text: str, *, source_name: str) -> dict[str, Any]:
     data_rows = rows[1:] if has_header else rows
     records: list[dict[str, Any]] = []
     for index, row in enumerate(data_rows):
-        fields = {
-            (header[column] if has_header and column < len(header) else f"column_{column + 1}"): value.strip()
-            for column, value in enumerate(row)
-            if value.strip()
-        }
+        fields = _row_fields(row, header, has_header)
         if fields:
             records.append({
                 "index": index,
