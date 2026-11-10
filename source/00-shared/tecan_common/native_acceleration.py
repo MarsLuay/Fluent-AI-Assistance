@@ -1509,6 +1509,21 @@ def merge_unique_string_groups(groups: Any, limit: Any) -> dict[str, list[str]] 
         return None
 
 
+def sort_ascii_string_keys(mapping: Any) -> dict[str, Any] | None:
+    """Sort exact built-in dictionary keys natively for ASCII string mappings."""
+    if (
+        not enabled()
+        or type(mapping) is not dict
+        or not all(type(key) is str and key.isascii() for key in mapping)
+    ):
+        return None
+    try:
+        result = _native.sort_ascii_string_keys(mapping)
+        return result if type(result) is dict else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def asset_reference_names(values: Any) -> list[str] | None:
     """Extract and deduplicate ASCII path basenames natively."""
     if (

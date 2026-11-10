@@ -167,6 +167,35 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
             unicode_actual["records"][0]["fields"]["Name"], "café user"
         )
 
+    def test_task_field_key_sorting_uses_rust_and_preserves_values(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "sort_ascii_string_keys"
+        ):
+            self.skipTest("optional Rust field-key sorter is not built")
+        nested = {"preserve": "identity"}
+        fields = {"zeta": nested, "alpha": "first"}
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = task_input._sorted_fields(fields)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                task_input,
+                "sort_ascii_string_keys",
+                wraps=native_acceleration.sort_ascii_string_keys,
+            ) as native_call:
+                actual = task_input._sorted_fields(fields)
+                native_call.assert_called_once_with(fields)
+        self.assertEqual(list(actual), ["alpha", "zeta"])
+        self.assertEqual(actual, expected)
+        self.assertIs(actual["zeta"], nested)
+
+        unicode_fields = {"éclair": "unicode", "alpha": "first"}
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.sort_ascii_string_keys(unicode_fields))
+            self.assertEqual(
+                task_input._sorted_fields(unicode_fields),
+                dict(sorted(unicode_fields.items())),
+            )
+
     def test_task_unknown_field_groups_merge_natively_with_unicode_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "merge_unique_string_groups"

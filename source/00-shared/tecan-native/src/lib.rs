@@ -1270,6 +1270,36 @@ fn xscr_command_records<'py>(
 }
 
 #[pyfunction]
+fn sort_ascii_string_keys<'py>(
+    py: Python<'py>,
+    mapping: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !mapping.get_type().is(py.get_type::<PyDict>()) {
+        return Ok(None);
+    }
+    let mut items = Vec::new();
+    for item in mapping.call_method0("items")?.try_iter()? {
+        let item = item?;
+        let key = item.get_item(0)?;
+        let value = item.get_item(1)?;
+        if !key.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let key = key.extract::<String>()?;
+        if !key.is_ascii() {
+            return Ok(None);
+        }
+        items.push((key, value));
+    }
+    items.sort_by(|left, right| left.0.cmp(&right.0));
+    let output = PyDict::new(py);
+    for (key, value) in items {
+        output.set_item(key, value)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn merge_unique_string_groups<'py>(
     py: Python<'py>,
     group_mappings: &Bound<'py, PyAny>,
@@ -3333,6 +3363,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_variable_definition_elements, module)?)?;
     module.add_function(wrap_pyfunction!(casefold_alias_values, module)?)?;
     module.add_function(wrap_pyfunction!(merge_unique_string_groups, module)?)?;
+    module.add_function(wrap_pyfunction!(sort_ascii_string_keys, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_command_records, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_dict, module)?)?;

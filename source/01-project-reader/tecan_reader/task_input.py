@@ -17,6 +17,7 @@ from tecan_common.native_acceleration import (
     casefold_alias_values,
     collapse_ascii_whitespace,
     merge_unique_string_groups,
+    sort_ascii_string_keys,
     xml_elements_by_folded_name_with_children,
 )
 from tecan_common.xml_helpers import local_name
@@ -94,6 +95,13 @@ def _inspect_xml(text: str, *, source_name: str) -> dict[str, Any]:
     }
 
 
+def _sorted_fields(values: dict[str, Any]) -> dict[str, Any]:
+    native = sort_ascii_string_keys(values)
+    if native is not None:
+        return native
+    return dict(sorted(values.items()))
+
+
 def _element_record(element: Any, *, index: int) -> dict[str, Any]:
     values: dict[str, str] = {}
     unknown: dict[str, list[str]] = {}
@@ -130,7 +138,7 @@ def _element_record(element: Any, *, index: int) -> dict[str, Any]:
     record = {
         "index": index,
         "source_line": index + 1,
-        "fields": dict(sorted(values.items())),
+        "fields": _sorted_fields(values),
         **_normalized_task_fields(values),
     }
     if unknown:
@@ -200,7 +208,7 @@ def _inspect_delimited(text: str, *, source_name: str) -> dict[str, Any]:
             records.append({
                 "index": index,
                 "source_line": index + (2 if has_header else 1),
-                "fields": dict(sorted(fields.items())),
+                "fields": _sorted_fields(fields),
                 **_normalized_task_fields(fields),
             })
     return {
