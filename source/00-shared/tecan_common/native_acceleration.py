@@ -54,16 +54,12 @@ def xml_local_name(tag: Any) -> str | None:
 
 
 def xml_clean_text(value: Any) -> str | None:
-    """Trim supported ASCII XML text natively, preserving Python fallback cases."""
+    """Trim exact Unicode XML text natively, preserving Python fallback cases."""
     if not enabled():
         return None
     if value is None:
         text = ""
-    elif (
-        type(value) is str
-        and value.isascii()
-        and not any(0x1C <= ord(character) <= 0x1F for character in value)
-    ):
+    elif type(value) is str:
         text = value
     else:
         return None

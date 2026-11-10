@@ -356,6 +356,15 @@ class ReaderTests(unittest.TestCase):
         ):
             self.skipTest("optional Rust XML text helper is not built")
         values = [None, "", " ", "\t value \r\n", "plain", "\x1cvalue\x1c", "\u2003µ\u2003"]
+        whitespace_chars = [
+            chr(codepoint)
+            for codepoint in range(sys.maxunicode + 1)
+            if chr(codepoint).isspace()
+        ]
+        values.extend(
+            f"{character}value-{index}{character}"
+            for index, character in enumerate(whitespace_chars)
+        )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             expected = [xml_helpers._clean_text(value) for value in values]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
@@ -367,7 +376,10 @@ class ReaderTests(unittest.TestCase):
                 actual = [xml_helpers._clean_text(value) for value in values]
                 self.assertEqual(native_call.call_count, len(values))
         self.assertEqual(actual, expected)
-        self.assertEqual(actual, ["", "", "", "value", "plain", "value", "µ"])
+        self.assertEqual(actual[:7], ["", "", "", "value", "plain", "value", "µ"])
+        self.assertEqual(
+            actual[7:], [f"value-{index}" for index in range(len(whitespace_chars))]
+        )
 
         class TextValue:
             def __bool__(self) -> bool:
@@ -379,6 +391,8 @@ class ReaderTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(native_acceleration.xml_clean_text(TextValue()))
             self.assertEqual(xml_helpers._clean_text(TextValue()), "custom text")
+            self.assertIsNone(native_acceleration.xml_clean_text(chr(0xD800)))
+            self.assertEqual(xml_helpers._clean_text(chr(0xD800)), chr(0xD800))
 
     def test_native_xml_texts_by_name_matches_python_grouping(self) -> None:
         if not native_acceleration.available() or not hasattr(

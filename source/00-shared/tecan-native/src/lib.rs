@@ -902,7 +902,7 @@ fn xml_tag_local_name(tag: &str) -> String {
 
 #[pyfunction]
 fn xml_clean_text(text: &str) -> String {
-    text.trim().to_owned()
+    trim_python_whitespace(text).to_owned()
 }
 
 #[pyfunction]
