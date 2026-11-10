@@ -1379,6 +1379,9 @@ def _coerce_scalar(text: str) -> Union[int, float, str]:
 def _parse_int(text: Optional[str], *, default: int) -> int:
     if text is None or text == "":
         return default
+    native = _native_parse_f64_decimal_text(text)
+    if native is not None:
+        return int(native)
     try:
         return int(float(text))
     except ValueError:
