@@ -74,6 +74,27 @@ def xml_clean_text(value: Any) -> str | None:
         return None
 
 
+def xml_container_child_texts(
+    root: Any, container_name: Any, element_type: Any
+) -> list[str] | None:
+    """Collect direct child texts beneath matching XML containers when ASCII."""
+    if (
+        not enabled()
+        or type(container_name) is not str
+        or not container_name.isascii()
+    ):
+        return None
+    try:
+        result = _native.xml_container_child_texts(
+            root, container_name, element_type
+        )
+        if type(result) is list and all(type(value) is str for value in result):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def collapse_ascii_whitespace(value: Any) -> str | None:
     """Collapse Python ASCII whitespace runs, falling back for Unicode text."""
     if not enabled():

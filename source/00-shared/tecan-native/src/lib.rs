@@ -906,6 +906,60 @@ fn xml_clean_text(text: &str) -> String {
 }
 
 #[pyfunction]
+fn xml_container_child_texts<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    container_name: &str,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) || !container_name.is_ascii() {
+        return Ok(None);
+    }
+    let output = PyList::empty(py);
+    for container in root.try_iter()? {
+        let container = container?;
+        if !container.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = container.getattr("tag")?;
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        if !tag.is_ascii() {
+            return Ok(None);
+        }
+        if tag.rsplit('}').next().unwrap_or(tag.as_str()) != container_name {
+            continue;
+        }
+        for child in container.try_iter()? {
+            let child = child?;
+            if !child.get_type().is(element_type) {
+                return Ok(None);
+            }
+            let text = child.getattr("text")?;
+            if text.is_none() {
+                continue;
+            }
+            if !text.get_type().is(py.get_type::<PyString>()) {
+                return Ok(None);
+            }
+            let text = text.extract::<String>()?;
+            if !text.is_ascii() {
+                return Ok(None);
+            }
+            let cleaned = text.trim_matches(|ch: char| {
+                ch.is_ascii_whitespace() || matches!(ch as u32, 0x1c..=0x1f)
+            });
+            if !cleaned.is_empty() {
+                output.append(cleaned)?;
+            }
+        }
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn xml_unique_texts<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -3490,6 +3544,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(parse_xml, module)?)?;
     module.add_function(wrap_pyfunction!(xml_tag_local_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_clean_text, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_container_child_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_unique_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_texts_by_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_find_text, module)?)?;

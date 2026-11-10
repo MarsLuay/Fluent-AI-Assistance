@@ -362,13 +362,20 @@ def _startup_variables(root: ET.Element) -> list[dict[str, Any]]:
         name = child_text(element, "Name")
         if not name:
             continue
-        values = [
-            (child.text or "").strip()
-            for values_node in list(element)
-            if local_name(values_node.tag) == "Values"
-            for child in list(values_node)
-            if (child.text or "").strip()
-        ]
+        native_values = native_acceleration.xml_container_child_texts(
+            element, "Values", ET.Element
+        )
+        values = (
+            native_values
+            if native_values is not None
+            else [
+                (child.text or "").strip()
+                for values_node in list(element)
+                if local_name(values_node.tag) == "Values"
+                for child in list(values_node)
+                if (child.text or "").strip()
+            ]
+        )
         query = child_text(element, "QueryOnStartup").casefold() == "true"
         prompt = child_text(element, "QueryOnStartupString")
         variables.append(
