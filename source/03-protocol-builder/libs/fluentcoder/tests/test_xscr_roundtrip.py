@@ -121,6 +121,40 @@ def test_roundtrip_subroutine_call_simulates_with_registry(
     assert report.total_executed_steps == 4
 
 
+def test_native_xscr_object_index_matches_python_whitespace_trimming() -> None:
+    from unittest.mock import patch
+
+    from tecan_common import native_acceleration
+    from fluentcoder.decompiler import xscr_parser
+
+    if not native_acceleration.available() or not hasattr(
+        native_acceleration._native, "xscr_object_fields"
+    ):
+        pytest.skip("optional Rust XSCR field index is not built")
+
+    root = xscr_parser.ET.Element("Root")
+    obj = xscr_parser.ET.SubElement(root, "Object")
+    xscr_parser.ET.SubElement(obj, "Name").text = "\x1c \u2003Café \x1f"
+    xscr_parser.ET.SubElement(obj, "Name").text = "later name"
+    metadata = xscr_parser.ET.SubElement(obj, "Metadata")
+    metadata.set("LineNumber", "\x1c9\x1f")
+
+    expected_name = xscr_parser._extract_field(obj, "Name")
+    expected_line = xscr_parser._extract_step_metadata(obj, "LineNumber")
+    with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        index = native_acceleration.xscr_object_fields(root)
+    assert index is not None
+    token = xscr_parser._ACTIVE_XSCR_FIELDS.set(index)
+    try:
+        actual_name = xscr_parser._extract_field(obj, "Name")
+        actual_line = xscr_parser._extract_step_metadata(obj, "LineNumber")
+    finally:
+        xscr_parser._ACTIVE_XSCR_FIELDS.reset(token)
+
+    assert (actual_name, actual_line) == (expected_name, expected_line)
+    assert (actual_name, actual_line) == ("Café", "9")
+
+
 def test_decompile_cli_simulates_subroutine_with_registry(
     tmp_path: Path,
     capsys,

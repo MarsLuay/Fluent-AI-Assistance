@@ -3649,7 +3649,8 @@ fn scan_xscr_fields<'py>(
             if !text.is_none() {
                 if let Ok(value) = text.extract::<String>() {
                     if maps.texts.get_item(&local_name)?.is_none() {
-                        maps.texts.set_item(&local_name, value.trim())?;
+                        maps.texts
+                            .set_item(&local_name, trim_python_whitespace(&value))?;
                     }
                 }
             }
@@ -3660,7 +3661,8 @@ fn scan_xscr_fields<'py>(
                 let key = pair.get_item(0)?.extract::<String>()?;
                 if maps.attributes.get_item(&key)?.is_none() {
                     let value = pair.get_item(1)?.extract::<String>()?;
-                    maps.attributes.set_item(key, value.trim())?;
+                    maps.attributes
+                        .set_item(key, trim_python_whitespace(&value))?;
                 }
             }
         }
