@@ -17,7 +17,7 @@ from typing import Any, Mapping
 from tecan_common.native_acceleration import (
     canonical_json_compact as _native_canonical_json_compact,
     deepcopy_json as _native_deepcopy_json,
-    most_common_ascii_counts as _native_most_common_ascii_counts,
+    most_common_string_counts as _native_most_common_string_counts,
     sort_string_keys as _native_sort_string_keys,
     sorted_unique_strings as _native_sorted_unique_strings,
 )
@@ -46,7 +46,7 @@ def _sorted_unique_strings(values: list[str]) -> list[str]:
 
 
 def _most_common_counts(counter: Counter[str], limit: int | None = None) -> dict[str, int]:
-    native = _native_most_common_ascii_counts(dict(counter), limit)
+    native = _native_most_common_string_counts(dict(counter), limit)
     if native is not None:
         return native
     return dict(counter.most_common(limit))

@@ -68,7 +68,7 @@ INTERESTING_FIELDS = {
 
 
 def _ordered_counts(values: list[str]) -> dict[str, int]:
-    native = native_acceleration.ordered_ascii_string_counts(values)
+    native = native_acceleration.ordered_string_counts(values)
     if native is not None:
         return native
     return dict(Counter(values).most_common())

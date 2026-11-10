@@ -187,7 +187,7 @@ def _cmd_patterns_types(args: argparse.Namespace) -> int:
 
 
 def _most_common_counts(counter: Counter[str], limit: int | None = None) -> dict[str, int]:
-    native = native_acceleration.most_common_ascii_counts(dict(counter), limit)
+    native = native_acceleration.most_common_string_counts(dict(counter), limit)
     if native is not None:
         return native
     return dict(counter.most_common(limit))

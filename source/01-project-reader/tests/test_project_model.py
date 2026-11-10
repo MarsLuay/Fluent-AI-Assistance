@@ -107,7 +107,7 @@ class ProjectModelTests(unittest.TestCase):
 
     def test_inspection_counter_aggregation_uses_native_stable_order(self) -> None:
         if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "most_common_ascii_counts"
+            native_acceleration._native, "most_common_string_counts"
         ):
             self.skipTest("optional Rust counter ordering is not built")
         commands = {f"Command{index:02d}": 1 for index in range(42)}
@@ -140,8 +140,8 @@ class ProjectModelTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 project_model,
-                "_native_most_common_ascii_counts",
-                wraps=native_acceleration.most_common_ascii_counts,
+                "_native_most_common_string_counts",
+                wraps=native_acceleration.most_common_string_counts,
             ) as native_call:
                 actual = model.inspection_report()
                 self.assertEqual(native_call.call_count, 3)
@@ -158,12 +158,20 @@ class ProjectModelTests(unittest.TestCase):
 
         unicode_counts = Counter({"é": 2, "a": 1})
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            self.assertIsNone(
-                native_acceleration.most_common_ascii_counts(dict(unicode_counts))
+            native_unicode_counts = native_acceleration.most_common_string_counts(
+                dict(unicode_counts)
+            )
+            self.assertIsNotNone(native_unicode_counts)
+            self.assertEqual(
+                list(native_unicode_counts.items()),
+                list(unicode_counts.most_common()),
             )
             self.assertEqual(
                 project_model._most_common_counts(unicode_counts),
                 dict(unicode_counts.most_common()),
+            )
+            self.assertIsNone(
+                native_acceleration.most_common_string_counts({chr(0xD800): 1})
             )
 
     def test_model_json_uses_native_compact_serializer_with_python_fallback(self) -> None:

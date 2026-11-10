@@ -1683,17 +1683,16 @@ def sorted_unique_strings(groups: Any) -> list[str] | None:
         return None
 
 
-def most_common_ascii_counts(
+def most_common_string_counts(
     mapping: Any, limit: Any = None
 ) -> dict[str, int] | None:
-    """Order exact ASCII integer counts like ``Counter.most_common``."""
+    """Order exact string-keyed integer counts like ``Counter.most_common``."""
     if (
         not enabled()
         or type(mapping) is not dict
         or (limit is not None and (type(limit) is not int or not 0 <= limit < (1 << 63)))
         or not all(
             type(key) is str
-            and key.isascii()
             and type(count) is int
             and -(1 << 63) <= count < (1 << 63)
             for key, count in mapping.items()
@@ -1701,7 +1700,7 @@ def most_common_ascii_counts(
     ):
         return None
     try:
-        result = _native.most_common_ascii_counts(mapping, limit)
+        result = _native.most_common_string_counts(mapping, limit)
         if (
             type(result) is dict
             and all(type(key) is str and type(count) is int for key, count in result.items())
@@ -1713,16 +1712,16 @@ def most_common_ascii_counts(
         return None
 
 
-def ordered_ascii_string_counts(values: Any) -> dict[str, int] | None:
-    """Count ASCII string values in stable ``Counter.most_common`` order."""
+def ordered_string_counts(values: Any) -> dict[str, int] | None:
+    """Count exact string values in stable ``Counter.most_common`` order."""
     if (
         not enabled()
         or type(values) not in (list, tuple)
-        or not all(type(value) is str and value.isascii() for value in values)
+        or not all(type(value) is str for value in values)
     ):
         return None
     try:
-        result = _native.ordered_ascii_string_counts(list(values))
+        result = _native.ordered_string_counts(list(values))
         if type(result) is dict and all(
             type(key) is str and type(count) is int
             for key, count in result.items()

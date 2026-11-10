@@ -13,7 +13,7 @@ from tecan_reader import cli
 class ProjectReaderCliTests(unittest.TestCase):
     def test_directory_counter_aggregation_uses_native_with_python_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "most_common_ascii_counts"
+            native_acceleration._native, "most_common_string_counts"
         ):
             self.skipTest("optional Rust counter ordering is not built")
         script_report = {
@@ -44,8 +44,8 @@ class ProjectReaderCliTests(unittest.TestCase):
                     cli, "inspect_archive", return_value=archive_report
                 ), patch.object(
                     cli.native_acceleration,
-                    "most_common_ascii_counts",
-                    wraps=native_acceleration.most_common_ascii_counts,
+                    "most_common_string_counts",
+                    wraps=native_acceleration.most_common_string_counts,
                 ) as native_call:
                     actual = cli._inspect_directory(
                         root, script_limit=None, object_limit=None
@@ -58,12 +58,20 @@ class ProjectReaderCliTests(unittest.TestCase):
 
         unicode_counts = Counter({"é": 2, "a": 2})
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            self.assertIsNone(
-                native_acceleration.most_common_ascii_counts(dict(unicode_counts))
+            native_unicode_counts = native_acceleration.most_common_string_counts(
+                dict(unicode_counts)
+            )
+            self.assertIsNotNone(native_unicode_counts)
+            self.assertEqual(
+                list(native_unicode_counts.items()),
+                list(unicode_counts.most_common()),
             )
             self.assertEqual(
                 cli._most_common_counts(unicode_counts),
                 dict(unicode_counts.most_common()),
+            )
+            self.assertIsNone(
+                native_acceleration.most_common_string_counts({chr(0xD800): 1})
             )
 
 

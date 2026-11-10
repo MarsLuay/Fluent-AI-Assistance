@@ -291,7 +291,7 @@ def suggest_parser_priorities(
 
 
 def _most_common_counts(counter: Counter[str], limit: int) -> list[tuple[str, int]]:
-    native = native_acceleration.most_common_ascii_counts(dict(counter), limit)
+    native = native_acceleration.most_common_string_counts(dict(counter), limit)
     if native is not None:
         return list(native.items())
     return counter.most_common(limit)

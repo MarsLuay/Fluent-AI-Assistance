@@ -313,9 +313,9 @@ class ScriptTests(unittest.TestCase):
             unicode_field_expected,
         )
 
-    def test_ordered_command_counts_use_rust_with_unicode_fallback(self) -> None:
+    def test_ordered_command_counts_use_rust_for_unicode(self) -> None:
         if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "ordered_ascii_string_counts"
+            native_acceleration._native, "ordered_string_counts"
         ):
             self.skipTest("optional Rust ordered counter is not built")
         values = ["Zeta", "Alpha", "Zeta", "Beta", "Alpha", "Gamma"]
@@ -324,8 +324,8 @@ class ScriptTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
-                "ordered_ascii_string_counts",
-                wraps=native_acceleration.ordered_ascii_string_counts,
+                "ordered_string_counts",
+                wraps=native_acceleration.ordered_string_counts,
             ) as native_call:
                 actual_counts = script._ordered_counts(values)
                 native_call.assert_called_once_with(values)
@@ -335,12 +335,20 @@ class ScriptTests(unittest.TestCase):
             [("Zeta", 2), ("Alpha", 2), ("Beta", 1), ("Gamma", 1)],
         )
 
+        unicode_values = ["É", "A", "É", "A", "Ω"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_unicode_counts = script._ordered_counts(unicode_values)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            self.assertIsNone(
-                native_acceleration.ordered_ascii_string_counts(["É", "A", "É"])
+            native_unicode_counts = native_acceleration.ordered_string_counts(
+                unicode_values
+            )
+            self.assertIsNotNone(native_unicode_counts)
+            self.assertEqual(
+                list(native_unicode_counts.items()),
+                list(expected_unicode_counts.items()),
             )
             self.assertEqual(
-                script._ordered_counts(["É", "A", "É"]), {"É": 2, "A": 1}
+                script._ordered_counts(unicode_values), expected_unicode_counts
             )
 
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
@@ -348,8 +356,8 @@ class ScriptTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
-                "ordered_ascii_string_counts",
-                wraps=native_acceleration.ordered_ascii_string_counts,
+                "ordered_string_counts",
+                wraps=native_acceleration.ordered_string_counts,
             ) as native_call:
                 actual_report = inspect_xscr_text(
                     SAMPLE_XSCR, source_name="test.xscr"

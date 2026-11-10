@@ -34,9 +34,9 @@ _PRODUCTION_XSCR_ENV = os.environ.get("FLUENTCODER_PRODUCTION_XSCR")
 PRODUCTION_XSCR = Path(_PRODUCTION_XSCR_ENV) if _PRODUCTION_XSCR_ENV else None
 
 
-def test_corpus_report_counter_order_uses_rust_with_unicode_fallback() -> None:
+def test_corpus_report_counter_order_uses_rust_for_unicode() -> None:
     if not native_acceleration.available() or not hasattr(
-        native_acceleration._native, "most_common_ascii_counts"
+        native_acceleration._native, "most_common_string_counts"
     ):
         pytest.skip("optional Rust count sorter is not built")
     unsupported = Counter({f"Command{index:02d}": 1 for index in range(22)})
@@ -55,8 +55,8 @@ def test_corpus_report_counter_order_uses_rust_with_unicode_fallback() -> None:
     with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
         with patch.object(
             native_acceleration,
-            "most_common_ascii_counts",
-            wraps=native_acceleration.most_common_ascii_counts,
+            "most_common_string_counts",
+            wraps=native_acceleration.most_common_string_counts,
         ) as native_call:
             actual = render_corpus_report_markdown(data)
             assert native_call.call_count == 2
@@ -69,7 +69,12 @@ def test_corpus_report_counter_order_uses_rust_with_unicode_fallback() -> None:
 
     unicode_counts = Counter({"é": 2, "a": 2})
     with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-        assert native_acceleration.most_common_ascii_counts(dict(unicode_counts)) is None
+        native_unicode_counts = native_acceleration.most_common_string_counts(
+            dict(unicode_counts)
+        )
+        assert native_unicode_counts is not None
+        assert list(native_unicode_counts.items()) == unicode_counts.most_common()
+        assert native_acceleration.most_common_string_counts({chr(0xD800): 1}) is None
         from fluentcoder.decompiler.corpus import _most_common_counts
 
         assert _most_common_counts(unicode_counts, 20) == unicode_counts.most_common(20)

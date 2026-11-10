@@ -1525,7 +1525,7 @@ fn sorted_unique_strings<'py>(
 }
 
 #[pyfunction]
-fn most_common_ascii_counts<'py>(
+fn most_common_string_counts<'py>(
     py: Python<'py>,
     mapping: &Bound<'py, PyAny>,
     limit: Option<i64>,
@@ -1544,9 +1544,6 @@ fn most_common_ascii_counts<'py>(
             return Ok(None);
         }
         let key = key.extract::<String>()?;
-        if !key.is_ascii() {
-            return Ok(None);
-        }
         let Ok(value) = value.extract::<i64>() else {
             return Ok(None);
         };
@@ -1564,7 +1561,7 @@ fn most_common_ascii_counts<'py>(
 }
 
 #[pyfunction]
-fn ordered_ascii_string_counts<'py>(
+fn ordered_string_counts<'py>(
     py: Python<'py>,
     values: &Bound<'py, PyAny>,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -1578,9 +1575,6 @@ fn ordered_ascii_string_counts<'py>(
             return Ok(None);
         }
         let value = value.extract::<String>()?;
-        if !value.is_ascii() {
-            return Ok(None);
-        }
         let entry = counts.entry(value).or_insert((index, 0));
         entry.1 += 1;
     }
@@ -3719,8 +3713,8 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(merge_unique_string_groups, module)?)?;
     module.add_function(wrap_pyfunction!(sort_string_keys, module)?)?;
     module.add_function(wrap_pyfunction!(any_ascii_casefold_in, module)?)?;
-    module.add_function(wrap_pyfunction!(ordered_ascii_string_counts, module)?)?;
-    module.add_function(wrap_pyfunction!(most_common_ascii_counts, module)?)?;
+    module.add_function(wrap_pyfunction!(ordered_string_counts, module)?)?;
+    module.add_function(wrap_pyfunction!(most_common_string_counts, module)?)?;
     module.add_function(wrap_pyfunction!(sorted_unique_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
     module.add_function(wrap_pyfunction!(
