@@ -1422,7 +1422,9 @@ def _looks_like_guid(text: str) -> bool:
 
 
 def _non_guid(text: str) -> str:
-    text = str(text or "").strip()
+    text = str(text or "")
+    native = native_acceleration.xml_clean_text(text)
+    text = native if native is not None else text.strip()
     return "" if not text or text == ZERO_GUID or _looks_like_guid(text) else text
 
 

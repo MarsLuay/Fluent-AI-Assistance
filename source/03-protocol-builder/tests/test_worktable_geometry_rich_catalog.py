@@ -388,6 +388,56 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             self.assertIsNone(native_acceleration.is_guid_text(CustomGuid(guid)))
             self.assertTrue(worktable_geometry._looks_like_guid(CustomGuid(guid)))
 
+    def test_non_guid_uses_native_whitespace_normalizer_and_guid_match(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_clean_text"
+        ):
+            self.skipTest("optional Rust XML text trimmer is not built")
+
+        class CountedText:
+            def __init__(self):
+                self.calls = 0
+
+            def __bool__(self):
+                return True
+
+            def __str__(self):
+                self.calls += 1
+                return " Custom "
+
+        counted = CountedText()
+        values = [
+            " 11111111-1111-1111-1111-111111111111 ",
+            f" {worktable_geometry.ZERO_GUID} ",
+            "\u00a0 place \u00a0",
+            "\x1csite\x1c",
+            " site ",
+            "not-a-guid",
+            "",
+            None,
+            0,
+            "\ud800 raw \ud800",
+            counted,
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [worktable_geometry._non_guid(value) for value in values]
+        self.assertEqual(counted.calls, 1)
+        counted.calls = 0
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_clean_text",
+                wraps=native_acceleration.xml_clean_text,
+            ) as native_call:
+                actual = [worktable_geometry._non_guid(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(counted.calls, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            ["", "", "place", "site", "site", "not-a-guid", "", "", "", "\ud800 raw \ud800", "Custom"],
+        )
+
     def test_label_base_uses_native_ascii_regex_parity_and_unicode_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "label_base_ascii_text"
