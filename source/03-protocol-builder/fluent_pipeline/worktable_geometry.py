@@ -966,6 +966,11 @@ def _sub_component_names(template: ET.Element | None, *, object_name: str) -> li
     names: list[str] = []
     if template is None:
         return names
+    native = native_acceleration.xml_sub_component_names(
+        template, object_name, ET.Element
+    )
+    if native is not None:
+        return native
     for name_el in _findall_local(template, "ObjectName"):
         text = _text(name_el)
         if not text or text == object_name or _looks_like_guid(text):

@@ -393,6 +393,32 @@ def xml_mesh_reference_lists(
         return None
 
 
+def xml_sub_component_names(
+    root: Any, object_name: Any, element_type: Any
+) -> list[str] | None:
+    """Select unique non-GUID object names, preserving source order."""
+    if (
+        not enabled()
+        or type(root) is not element_type
+        or type(object_name) is not str
+    ):
+        return None
+    try:
+        result = _native.xml_sub_component_names(root, object_name, element_type)
+        if type(result) is list and all(type(value) is str for value in result):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_matrix(root: Any, element_type: Any) -> list[list[float]] | None:
     """Parse XML matrix rows with Python fallback for unsupported float forms."""
     if not enabled() or type(root) is not element_type:

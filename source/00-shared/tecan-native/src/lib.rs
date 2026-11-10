@@ -2828,6 +2828,55 @@ fn xml_mesh_reference_lists<'py>(
 }
 
 #[pyfunction]
+fn xml_sub_component_names<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    object_name: &str,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let output = PyList::empty(py);
+    let mut seen = HashSet::new();
+    let iterator = root.call_method0("iter")?;
+    for element in iterator.try_iter()? {
+        let element = element?;
+        if !element.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = element.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        if local != "ObjectName" {
+            continue;
+        }
+        let text = element.getattr("text")?;
+        if text.is_none() {
+            continue;
+        }
+        if !text.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let text = text.extract::<String>()?;
+        let text = trim_python_whitespace(&text);
+        if text.is_empty() || text == object_name || is_ascii_guid(text) {
+            continue;
+        }
+        if seen.insert(text.to_owned()) {
+            output.append(text)?;
+        }
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn xml_matrix<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -5195,6 +5244,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_elements_by_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_reference_guids, module)?)?;
     module.add_function(wrap_pyfunction!(xml_mesh_reference_lists, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_sub_component_names, module)?)?;
     module.add_function(wrap_pyfunction!(xml_matrix, module)?)?;
     module.add_function(wrap_pyfunction!(xml_indexed_values, module)?)?;
     module.add_function(wrap_pyfunction!(xml_indexed_float_values, module)?)?;

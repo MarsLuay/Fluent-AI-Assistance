@@ -1253,6 +1253,66 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             )
         self.assertEqual(unicode_expected, (["SS"], []))
 
+    def test_sub_component_names_uses_native_filter_with_surrogate_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_sub_component_names"
+        ):
+            self.skipTest("optional Rust subcomponent-name scanner is not built")
+        parser = worktable_geometry.ET.XMLParser(
+            target=worktable_geometry.ET.TreeBuilder(insert_comments=True)
+        )
+        template = worktable_geometry.ET.fromstring(
+            "<Template xmlns='urn:test'><Node><ObjectName> Sample One </ObjectName></Node>"
+            "<!-- ignored non-element child -->"
+            "<ObjectName>Sample One</ObjectName><ObjectName>Current</ObjectName>"
+            "<ObjectName>11111111-1111-1111-1111-111111111111</ObjectName>"
+            "<ObjectName>Straße</ObjectName><ObjectName>Sample Two</ObjectName>"
+            "<ObjectName> </ObjectName></Template>",
+            parser=parser,
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = worktable_geometry._sub_component_names(
+                template, object_name="Current"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_sub_component_names(
+                    template, "Current", worktable_geometry.ET.Element
+                ),
+                expected,
+            )
+            with patch.object(
+                native_acceleration,
+                "xml_sub_component_names",
+                wraps=native_acceleration.xml_sub_component_names,
+            ) as native_call:
+                actual = worktable_geometry._sub_component_names(
+                    template, object_name="Current"
+                )
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["Sample One", "Straße", "Sample Two"])
+
+        fallback = worktable_geometry.ET.Element("Template")
+        worktable_geometry.ET.SubElement(fallback, "ObjectName").text = "\ud800-name"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = worktable_geometry._sub_component_names(
+                fallback, object_name="Current"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_sub_component_names(
+                    fallback, "Current", worktable_geometry.ET.Element
+                )
+            )
+            self.assertEqual(
+                worktable_geometry._sub_component_names(
+                    fallback, object_name="Current"
+                ),
+                fallback_expected,
+            )
+        self.assertEqual(fallback_expected, ["\ud800-name"])
+
     def test_matrix_rows_use_native_parser_with_python_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_matrix"
