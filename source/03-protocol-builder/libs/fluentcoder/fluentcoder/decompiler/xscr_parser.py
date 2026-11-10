@@ -24,7 +24,10 @@ from .. import xml_compat as ET
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional, Union
 
-from tecan_common.native_acceleration import xscr_object_fields as _native_xscr_object_fields
+from tecan_common.native_acceleration import (
+    parse_f64_decimal_text as _native_parse_f64_decimal_text,
+    xscr_object_fields as _native_xscr_object_fields,
+)
 from tecan_common.performance import performance_marker
 from tecan_common.xml_helpers import elements_by_name
 
@@ -993,8 +996,12 @@ def _parse_int_list(obj: ET.Element, field_name: str) -> list[int]:
 def _parse_optional_float(text: Optional[str]) -> Optional[float]:
     if text is None or not str(text).strip():
         return None
+    stripped = text.strip()
+    native = _native_parse_f64_decimal_text(stripped)
+    if native is not None:
+        return native
     try:
-        return float(text.strip())
+        return float(stripped)
     except ValueError:
         return None
 

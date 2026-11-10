@@ -77,6 +77,41 @@ def test_xscr_variable_declarations_use_native_candidate_scan_with_python_parity
     )
 
 
+def test_xscr_optional_float_uses_native_decimal_and_python_fallbacks() -> None:
+    import math
+    from unittest.mock import patch
+
+    from tecan_common import native_acceleration
+    from fluentcoder.decompiler import xscr_parser
+
+    if not native_acceleration.available() or not hasattr(
+        native_acceleration._native, "parse_f64_decimal_text"
+    ):
+        pytest.skip("optional Rust decimal parser is not built")
+
+    values = [None, "", " \u2003 ", "1.25", " -0.0 ", "nan", "inf", "1_000", "bad"]
+    with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = [xscr_parser._parse_optional_float(value) for value in values]
+    with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            xscr_parser,
+            "_native_parse_f64_decimal_text",
+            wraps=xscr_parser._native_parse_f64_decimal_text,
+        ) as native_call:
+            actual = [xscr_parser._parse_optional_float(value) for value in values]
+            assert native_call.call_count == 6
+
+    for index, (actual_value, expected_value) in enumerate(zip(actual, expected)):
+        if index == 5:
+            assert math.isnan(actual_value)
+            assert math.isnan(expected_value)
+        else:
+            assert actual_value == expected_value
+    assert actual[3] == 1.25
+    assert math.copysign(1.0, actual[4]) == -1.0
+    assert math.isinf(actual[6])
+
+
 def test_declare_fc_variable_returns_token() -> None:
     wt = Worktable(name="fc var")
     token = wt.declare_fc_variable("PlateType")
