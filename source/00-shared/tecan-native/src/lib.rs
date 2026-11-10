@@ -2249,6 +2249,26 @@ fn compact_list(values: Vec<String>, limit: i64) -> Vec<String> {
 }
 
 #[pyfunction]
+fn path_suffixes(paths: Vec<String>) -> Option<Vec<String>> {
+    if paths.iter().any(|path| !path.is_ascii()) {
+        return None;
+    }
+    Some(
+        paths
+            .into_iter()
+            .map(|path| {
+                Path::new(&path)
+                    .extension()
+                    .and_then(|extension| extension.to_str())
+                    .filter(|extension| !extension.is_empty())
+                    .map(|extension| format!(".{}", extension.to_ascii_lowercase()))
+                    .unwrap_or_else(|| "<none>".to_string())
+            })
+            .collect(),
+    )
+}
+
+#[pyfunction]
 fn extension_counts(suffixes: Vec<String>) -> Vec<(String, usize)> {
     let mut counts = BTreeMap::new();
     for suffix in suffixes {
@@ -3023,6 +3043,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pin_reference_candidates, module)?)?;
     module.add_function(wrap_pyfunction!(compact_list, module)?)?;
     module.add_function(wrap_pyfunction!(extension_counts, module)?)?;
+    module.add_function(wrap_pyfunction!(path_suffixes, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_execution_contract, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_load_contract, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_validate_transfers, module)?)?;

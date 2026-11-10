@@ -1258,10 +1258,30 @@ class ReaderTests(unittest.TestCase):
             ".profile",
             "trailing.",
             "folder/name.XML",
+            "..",
+            "...",
+            "folder/..",
+            "foo..bar",
+            "....jpg",
+            "..foo.bar",
+            ".foo...",
+            "C:relative.png",
+            Path("C:\\"),
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             expected = extension_counts(names)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            expected_suffixes = [Path(name).suffix.lower() or "<none>" for name in names]
+            self.assertEqual(
+                native_acceleration.path_suffixes(names), expected_suffixes
+            )
+            with patch.object(
+                reader_common,
+                "_native_path_suffixes",
+                wraps=native_acceleration.path_suffixes,
+            ) as suffix_call:
+                extension_counts(names)
+                suffix_call.assert_called_once()
             with patch.object(
                 reader_common,
                 "_native_extension_counts",
@@ -1272,10 +1292,20 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(
             list(actual.items()),
-            [(".gz", 1), (".xml", 1), (".xscr", 1), ("<none>", 2)],
+            [
+                (".bar", 2),
+                (".gz", 1),
+                (".jpg", 1),
+                (".png", 1),
+                (".xml", 1),
+                (".xscr", 1),
+                ("<none>", 7),
+            ],
         )
 
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.path_suffixes(["café.txt"]))
+            self.assertEqual(extension_counts(["café.txt"]), {".txt": 1})
             with patch.object(
                 reader_common,
                 "_native_extension_counts",

@@ -1253,6 +1253,26 @@ def compact_list(values: Any, limit: Any = 20) -> list[str] | None:
         return None
 
 
+def path_suffixes(paths: Any) -> list[str] | None:
+    """Extract ASCII Path suffixes natively for exact strings and Paths."""
+    if (
+        not enabled()
+        or type(paths) not in (list, tuple)
+        or not all(type(path) in (str, _PathType) for path in paths)
+    ):
+        return None
+    path_strings = [str(path) for path in paths]
+    if any(not path.isascii() for path in path_strings):
+        return None
+    try:
+        result = _native.path_suffixes(path_strings)
+        if type(result) is list and all(type(suffix) is str for suffix in result):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def extension_counts(suffixes: Any) -> dict[str, int] | None:
     """Count exact string suffixes natively and return them in sorted order."""
     if (
