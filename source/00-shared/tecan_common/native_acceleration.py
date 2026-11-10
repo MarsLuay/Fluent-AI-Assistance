@@ -74,6 +74,23 @@ def xml_clean_text(value: Any) -> str | None:
         return None
 
 
+def collapse_ascii_whitespace(value: Any) -> str | None:
+    """Collapse Python ASCII whitespace runs, falling back for Unicode text."""
+    if not enabled():
+        return None
+    if value is None:
+        text = ""
+    elif type(value) is str and value.isascii():
+        text = value
+    else:
+        return None
+    try:
+        result = _native.collapse_ascii_whitespace(text)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def xml_unique_texts(
     root: Any, names: Any, limit: Any, element_type: Any
 ) -> list[str] | None:

@@ -2321,6 +2321,27 @@ fn python_ascii_whitespace(byte: u8) -> bool {
 }
 
 #[pyfunction]
+fn collapse_ascii_whitespace(text: &str) -> Option<String> {
+    if !text.is_ascii() {
+        return None;
+    }
+    let mut output = String::with_capacity(text.len());
+    let mut pending_space = false;
+    for byte in text.bytes() {
+        if python_ascii_whitespace(byte) {
+            pending_space = !output.is_empty();
+        } else {
+            if pending_space {
+                output.push(' ');
+            }
+            output.push(char::from(byte));
+            pending_space = false;
+        }
+    }
+    Some(output)
+}
+
+#[pyfunction]
 fn xml_asset_reference_names(text: &str) -> Option<Vec<String>> {
     if !text.is_ascii() {
         return None;
@@ -3190,6 +3211,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(asset_reference_candidates, module)?)?;
     module.add_function(wrap_pyfunction!(asset_reference_names, module)?)?;
     module.add_function(wrap_pyfunction!(xml_asset_reference_names, module)?)?;
+    module.add_function(wrap_pyfunction!(collapse_ascii_whitespace, module)?)?;
     module.add_function(wrap_pyfunction!(pin_reference_candidates, module)?)?;
     module.add_function(wrap_pyfunction!(compact_list, module)?)?;
     module.add_function(wrap_pyfunction!(extension_counts, module)?)?;
@@ -3649,6 +3671,16 @@ mod tests {
             )
         );
         assert!(render_object_report("Example", Vec::new(), Vec::new(), Vec::new()).is_none());
+    }
+
+    #[test]
+    fn collapse_ascii_whitespace_matches_python_split_join_rules() {
+        assert_eq!(
+            collapse_ascii_whitespace(" \talpha\n\t beta\u{1c}gamma \r\n"),
+            Some("alpha beta gamma".to_string())
+        );
+        assert_eq!(collapse_ascii_whitespace(" \u{1f} \t"), Some(String::new()));
+        assert_eq!(collapse_ascii_whitespace("café"), None);
     }
 
     #[test]

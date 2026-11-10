@@ -12,6 +12,7 @@ import io
 from pathlib import Path
 from typing import Any
 
+from tecan_common.native_acceleration import collapse_ascii_whitespace
 from tecan_common.xml_helpers import local_name
 
 from .common import parse_xml_text, read_text
@@ -82,7 +83,12 @@ def _element_record(element: Any, *, index: int) -> dict[str, Any]:
         if not isinstance(child.tag, str):
             continue
         name = local_name(child.tag)
-        text = " ".join((child.text or "").split())
+        native_text = collapse_ascii_whitespace(child.text)
+        text = (
+            native_text
+            if native_text is not None
+            else " ".join((child.text or "").split())
+        )
         if list(child):
             nested = _element_record(child, index=index)
             if nested:
