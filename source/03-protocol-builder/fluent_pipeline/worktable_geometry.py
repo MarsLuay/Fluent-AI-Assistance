@@ -1224,6 +1224,9 @@ def _first_text(root: ET.Element, local_name: str) -> str:
 
 
 def _references(payload: ET.Element | None, type_id: str) -> list[str]:
+    native = native_acceleration.xml_reference_guids(payload, type_id, ET.Element)
+    if native is not None:
+        return native
     out: list[str] = []
     for ref in _direct_children(payload, "Reference"):
         if _child_text(ref, "TypeId") != type_id:

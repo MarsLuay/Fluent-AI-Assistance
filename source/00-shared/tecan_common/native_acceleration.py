@@ -334,6 +334,32 @@ def xml_vec_dict(root: Any, element_type: Any) -> dict[str, float] | None:
         return None
 
 
+def xml_reference_guids(
+    root: Any, type_id: Any, element_type: Any
+) -> list[str] | None:
+    """Select unique direct-reference GUIDs for one exact type identifier."""
+    if (
+        not enabled()
+        or type(root) is not element_type
+        or type(type_id) is not str
+    ):
+        return None
+    try:
+        result = _native.xml_reference_guids(root, type_id, element_type)
+        if type(result) is list and all(type(value) is str for value in result):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_matrix(root: Any, element_type: Any) -> list[list[float]] | None:
     """Parse XML matrix rows with Python fallback for unsupported float forms."""
     if not enabled() or type(root) is not element_type:

@@ -2349,6 +2349,42 @@ fn xml_first_exact_local_text<'py>(
     Ok((true, None))
 }
 
+fn xml_direct_exact_local_text<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    target: &str,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<(bool, String)> {
+    for child in root.try_iter()? {
+        let child = child?;
+        if !child.get_type().is(element_type) {
+            return Ok((false, String::new()));
+        }
+        let tag = child.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok((false, String::new()));
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        if local != target {
+            continue;
+        }
+        let text = child.getattr("text")?;
+        if text.is_none() {
+            return Ok((true, String::new()));
+        }
+        if !text.get_type().is(py.get_type::<PyString>()) {
+            return Ok((false, String::new()));
+        }
+        let text = text.extract::<String>()?;
+        return Ok((true, trim_python_whitespace(&text).to_owned()));
+    }
+    Ok((true, String::new()))
+}
+
 fn xml_first_exact_local_element<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -2543,6 +2579,55 @@ fn xml_indexed_vectors<'py>(
         };
         if vector.call_method0("__len__")?.extract::<usize>()? == 3 {
             output.set_item(key.to_string(), vector)?;
+        }
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
+fn xml_reference_guids<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    type_id: &str,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let output = PyList::empty(py);
+    let mut seen = HashSet::new();
+    for reference in root.try_iter()? {
+        let reference = reference?;
+        if !reference.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = reference.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        if local != "Reference" {
+            continue;
+        }
+        let (type_supported, observed_type) =
+            xml_direct_exact_local_text(py, &reference, "TypeId", element_type)?;
+        if !type_supported {
+            return Ok(None);
+        }
+        if observed_type != type_id {
+            continue;
+        }
+        let (guid_supported, guid) =
+            xml_direct_exact_local_text(py, &reference, "Guid", element_type)?;
+        if !guid_supported {
+            return Ok(None);
+        }
+        if !guid.is_empty() && seen.insert(guid.clone()) {
+            output.append(guid)?;
         }
     }
     Ok(Some(output.into_any()))
@@ -4914,6 +4999,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_all_unique_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_grouped_texts_excluding, module)?)?;
     module.add_function(wrap_pyfunction!(xml_elements_by_name, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_reference_guids, module)?)?;
     module.add_function(wrap_pyfunction!(xml_matrix, module)?)?;
     module.add_function(wrap_pyfunction!(xml_indexed_values, module)?)?;
     module.add_function(wrap_pyfunction!(xml_vec_dict, module)?)?;
