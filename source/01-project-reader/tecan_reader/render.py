@@ -8,6 +8,7 @@ from typing import Any
 from tecan_common.native_acceleration import (
     render_append_dict as _native_render_append_dict,
     render_append_list as _native_render_append_list,
+    render_object_report as _native_render_object_report,
 )
 
 from .common import compact_list, to_jsonable
@@ -318,6 +319,34 @@ def _render_gwl(report: dict[str, Any]) -> str:
 
 
 def _render_object(report: dict[str, Any]) -> str:
+    if type(report) is dict:
+        object_name = report.get("object_name")
+        source_for_title = report.get("source")
+        fields = [
+            report.get("kind"),
+            report.get("source"),
+            report.get("type_id"),
+            report.get("functional_group"),
+            report.get("footprint"),
+        ]
+        names = report.get("names", [])
+        guids = report.get("guids", [])
+        safe_values = (str, bool, int, float, type(None))
+        if (
+            type(object_name) in safe_values
+            and type(source_for_title) in safe_values
+            and all(type(value) in safe_values for value in fields)
+            and type(names) in (list, tuple)
+            and all(type(value) is str for value in names)
+            and type(guids) in (list, tuple)
+            and all(type(value) is str for value in guids)
+        ):
+            title = str(object_name or source_for_title)
+            native = _native_render_object_report(
+                title, [str(value) for value in fields], names, guids
+            )
+            if native is not None:
+                return native
     lines = [
         f"# XML Object Report: {report.get('object_name') or report.get('source')}",
         "",

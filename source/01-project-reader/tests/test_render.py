@@ -183,6 +183,73 @@ class RenderListTests(unittest.TestCase):
             self.assertGreater(native_dict.call_count, 0)
         self.assertEqual(actual, expected)
 
+    def test_native_xml_object_report_matches_python_and_limits_lists(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "render_object_report"
+        ):
+            self.skipTest("optional Rust XML-object renderer is not built")
+        report = {
+            "object_name": "Synthetic Object",
+            "source": "synthetic.xml",
+            "kind": "component",
+            "type_id": "example-type",
+            "functional_group": None,
+            "footprint": 0,
+            "names": [f"name-{index}" for index in range(22)],
+            "guids": ["guid-a", "guid-b"],
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = render._render_object(report)
+        fields = [
+            str(report.get("kind")),
+            str(report.get("source")),
+            str(report.get("type_id")),
+            str(report.get("functional_group")),
+            str(report.get("footprint")),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            direct = native_acceleration.render_object_report(
+                str(report.get("object_name") or report.get("source")),
+                fields,
+                report["names"],
+                report["guids"],
+            )
+            self.assertEqual(direct, expected)
+            with patch.object(
+                render,
+                "_native_render_object_report",
+                wraps=render._native_render_object_report,
+            ) as native_call:
+                actual = render._render_object(report)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertIn("- ... 2 more", actual)
+
+        class TextValue:
+            def __init__(self) -> None:
+                self.str_calls = 0
+
+            def __str__(self) -> str:
+                self.str_calls += 1
+                return "custom value"
+
+        custom = TextValue()
+        unsupported = {"object_name": "Synthetic", "kind": custom}
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_fallback = render._render_object(unsupported)
+        self.assertEqual(custom.str_calls, 1)
+        custom.str_calls = 0
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.render_object_report(
+                    "Synthetic", [custom, "None", "None", "None", "None"], [], []
+                )
+            )
+            self.assertEqual(custom.str_calls, 0)
+            actual_fallback = render._render_object(unsupported)
+        self.assertEqual(custom.str_calls, 1)
+        self.assertEqual(actual_fallback, expected_fallback)
+
     def test_native_append_dict_falls_back_without_stringifying_unrendered_values(self) -> None:
         if not native_acceleration.available():
             self.skipTest("optional Rust renderer is not built")

@@ -1134,6 +1134,29 @@ fn render_append_dict(title: &str, entries: Vec<(String, String)>, limit: i64) -
 }
 
 #[pyfunction]
+fn render_object_report(
+    title: &str,
+    fields: Vec<String>,
+    names: Vec<String>,
+    guids: Vec<String>,
+) -> Option<String> {
+    let labels = ["Kind", "Source", "Type ID", "Functional group", "Footprint"];
+    if fields.len() != labels.len() {
+        return None;
+    }
+    let mut lines = vec![format!("# XML Object Report: {title}"), String::new()];
+    lines.extend(
+        labels
+            .iter()
+            .zip(fields.iter())
+            .map(|(label, value)| format!("- {label}: `{value}`")),
+    );
+    lines.extend(render_append_list("Names", names, 20));
+    lines.extend(render_append_list("GUIDs", guids, 20));
+    Some(format!("{}\n", lines.join("\n")))
+}
+
+#[pyfunction]
 fn read_text_file(path: &str) -> Option<String> {
     std::fs::read(path)
         .ok()
@@ -1972,6 +1995,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_find_text, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_dict, module)?)?;
+    module.add_function(wrap_pyfunction!(render_object_report, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(read_text_file, module)?)?;
     module.add_function(wrap_pyfunction!(read_utf8_sig_file, module)?)?;
@@ -2055,6 +2079,29 @@ mod tests {
             vec!["", "## Counts", "- ... 3 more"]
         );
         assert!(render_append_dict("Empty", Vec::new(), 20).is_empty());
+    }
+
+    #[test]
+    fn xml_object_report_uses_expected_labels_and_line_endings() {
+        let report = render_object_report(
+            "Example",
+            vec![
+                "component".into(),
+                "source".into(),
+                "type".into(),
+                "group".into(),
+                "footprint".into(),
+            ],
+            vec!["name".into()],
+            vec!["guid".into()],
+        );
+        assert_eq!(
+            report.as_deref(),
+            Some(
+                "# XML Object Report: Example\n\n- Kind: `component`\n- Source: `source`\n- Type ID: `type`\n- Functional group: `group`\n- Footprint: `footprint`\n\n## Names\n- name\n\n## GUIDs\n- guid\n"
+            )
+        );
+        assert!(render_object_report("Example", Vec::new(), Vec::new(), Vec::new()).is_none());
     }
 
     #[test]

@@ -214,6 +214,31 @@ def render_append_dict(title: Any, values: Any, limit: Any) -> list[str] | None:
         return None
 
 
+def render_object_report(
+    title: Any, fields: Any, names: Any, guids: Any
+) -> str | None:
+    """Render supported XML-object report sections natively; otherwise fall back."""
+    if (
+        not enabled()
+        or type(title) is not str
+        or type(fields) not in (list, tuple)
+        or len(fields) != 5
+        or not all(type(value) is str for value in fields)
+        or type(names) not in (list, tuple)
+        or not all(type(value) is str for value in names)
+        or type(guids) not in (list, tuple)
+        or not all(type(value) is str for value in guids)
+    ):
+        return None
+    try:
+        result = _native.render_object_report(
+            title, list(fields), list(names), list(guids)
+        )
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def decode_text_bytes(data: Any) -> str | None:
     """Decode the reader's supported text encodings natively when possible."""
     if not enabled() or type(data) is not bytes:
