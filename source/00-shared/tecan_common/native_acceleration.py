@@ -170,6 +170,26 @@ def xml_find_text(
         return None
 
 
+def render_append_list(title: Any, values: Any, limit: Any) -> list[str] | None:
+    """Format supported list-report sections natively, otherwise request fallback."""
+    if (
+        not enabled()
+        or type(title) is not str
+        or type(values) not in (list, tuple)
+        or not all(type(value) is str for value in values)
+        or type(limit) is not int
+        or not -(1 << 63) <= limit < (1 << 63)
+    ):
+        return None
+    try:
+        result = _native.render_append_list(title, list(values), limit)
+        if type(result) is list and all(type(line) is str for line in result):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def decode_text_bytes(data: Any) -> str | None:
     """Decode the reader's supported text encodings natively when possible."""
     if not enabled() or type(data) is not bytes:

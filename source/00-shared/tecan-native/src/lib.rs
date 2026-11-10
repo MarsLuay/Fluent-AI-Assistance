@@ -1096,6 +1096,26 @@ fn xml_find_text<'py>(
 }
 
 #[pyfunction]
+fn render_append_list(title: &str, values: Vec<String>, limit: i64) -> Vec<String> {
+    if values.is_empty() {
+        return Vec::new();
+    }
+    let length = values.len() as i128;
+    let limit = limit as i128;
+    let slice_end = if limit < 0 {
+        (length + limit).clamp(0, length) as usize
+    } else {
+        limit.min(length) as usize
+    };
+    let mut output = vec![String::new(), format!("## {title}")];
+    output.extend(values[..slice_end].iter().map(|value| format!("- {value}")));
+    if length > limit {
+        output.push(format!("- ... {} more", length - limit));
+    }
+    output
+}
+
+#[pyfunction]
 fn read_text_file(path: &str) -> Option<String> {
     std::fs::read(path)
         .ok()
@@ -1932,6 +1952,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_unique_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_texts_by_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_find_text, module)?)?;
+    module.add_function(wrap_pyfunction!(render_append_list, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(read_text_file, module)?)?;
     module.add_function(wrap_pyfunction!(read_utf8_sig_file, module)?)?;

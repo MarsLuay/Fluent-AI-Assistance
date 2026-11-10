@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from tecan_common.native_acceleration import render_append_list as _native_render_append_list
+
 from .common import compact_list, to_jsonable
 
 
@@ -342,6 +344,11 @@ def _append_dict(lines: list[str], title: str, values: dict[str, Any], *, limit:
 def _append_list(lines: list[str], title: str, values: list[str], *, limit: int = 20) -> None:
     if not values:
         return
+    if type(lines) is list:
+        native = _native_render_append_list(title, values, limit)
+        if native is not None:
+            lines.extend(native)
+            return
     lines.append("")
     lines.append(f"## {title}")
     for value in values[:limit]:
