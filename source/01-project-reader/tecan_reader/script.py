@@ -67,6 +67,13 @@ INTERESTING_FIELDS = {
 }
 
 
+def _ordered_counts(values: list[str]) -> dict[str, int]:
+    native = native_acceleration.ordered_ascii_string_counts(values)
+    if native is not None:
+        return native
+    return dict(Counter(values).most_common())
+
+
 def inspect_xscr(path: str | Path, *, source_name: str | None = None) -> dict[str, Any]:
     text = read_text(path)
     root = parse_xml_text(text)
@@ -88,8 +95,8 @@ def inspect_xscr_text(
     prompts = _query_prompts(root)
     set_variables = _set_variables(root)
     commands = _commands(root)
-    command_counts = Counter(command["type"] for command in commands)
-    family_counts = Counter(command["family"] for command in commands)
+    command_counts = _ordered_counts([command["type"] for command in commands])
+    family_counts = _ordered_counts([command["family"] for command in commands])
     dependencies = _dependencies(root)
     comments = _comments(root)
     script_guid = _entry_object_guid(source_name)
@@ -118,8 +125,8 @@ def inspect_xscr_text(
         "operator_prompts": operator_prompts,
         "set_variables": set_variables,
         "command_count": len(commands),
-        "command_counts": dict(command_counts.most_common()),
-        "family_counts": dict(family_counts.most_common()),
+        "command_counts": command_counts,
+        "family_counts": family_counts,
         "commands": commands,
         "dependencies": dependencies,
         "comments": comments,

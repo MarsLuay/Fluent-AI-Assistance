@@ -1323,6 +1323,42 @@ fn delimited_row_fields<'py>(
 }
 
 #[pyfunction]
+fn ordered_ascii_string_counts<'py>(
+    py: Python<'py>,
+    values: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !values.get_type().is(py.get_type::<PyList>()) {
+        return Ok(None);
+    }
+    let mut counts: HashMap<String, (usize, usize)> = HashMap::new();
+    for (index, value) in values.try_iter()?.enumerate() {
+        let value = value?;
+        if !value.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let value = value.extract::<String>()?;
+        if !value.is_ascii() {
+            return Ok(None);
+        }
+        let entry = counts.entry(value).or_insert((index, 0));
+        entry.1 += 1;
+    }
+    let mut ordered = counts.into_iter().collect::<Vec<_>>();
+    ordered.sort_by(|left, right| {
+        right
+            .1
+            .1
+            .cmp(&left.1.1)
+            .then_with(|| left.1.0.cmp(&right.1.0))
+    });
+    let output = PyDict::new(py);
+    for (value, (_, count)) in ordered {
+        output.set_item(value, count)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn any_ascii_casefold_in(values: Vec<String>, candidates: Vec<String>) -> Option<bool> {
     if values
         .iter()
@@ -3438,6 +3474,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(merge_unique_string_groups, module)?)?;
     module.add_function(wrap_pyfunction!(sort_ascii_string_keys, module)?)?;
     module.add_function(wrap_pyfunction!(any_ascii_casefold_in, module)?)?;
+    module.add_function(wrap_pyfunction!(ordered_ascii_string_counts, module)?)?;
     module.add_function(wrap_pyfunction!(delimited_row_fields, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_command_records, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;
