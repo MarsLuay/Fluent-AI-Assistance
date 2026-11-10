@@ -785,6 +785,50 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(actual[0]["object_subfolder_path"], actual[0]["object_path"])
         self.assertEqual(actual[1]["type_id"], "type-y")
 
+    def test_native_asset_path_names_match_pathlib_and_deduplicate(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "asset_reference_names"
+        ):
+            self.skipTest("optional Rust asset path basename helper is not built")
+        paths = [
+            "folder\\image.png",
+            "folder/image.png",
+            "image.png",
+            "folder\\",
+            "/",
+            ".",
+            "..",
+            "folder/.",
+            "folder/..",
+            "C:\\",
+            "C:",
+            "C:relative.png",
+            "\\\\server\\share\\file.bmp",
+            "a\\b//c",
+            ".hidden",
+            "..hidden",
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = reader_script._asset_refs(paths)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            native = native_acceleration.asset_reference_names(paths)
+            self.assertEqual(native, expected)
+            with patch.object(
+                reader_script.native_acceleration,
+                "asset_reference_names",
+                wraps=reader_script.native_acceleration.asset_reference_names,
+            ) as native_call:
+                actual = reader_script._asset_refs(paths)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+
+        unicode_paths = ["folder\\café.png"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.asset_reference_names(unicode_paths))
+            self.assertEqual(
+                reader_script._asset_refs(unicode_paths), ["café.png"]
+            )
+
     def test_native_pin_reference_filter_matches_python_regex(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "pin_reference_candidates"

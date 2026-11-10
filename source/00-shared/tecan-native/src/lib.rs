@@ -13,7 +13,7 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 struct ElementFrame {
     node: Py<PyAny>,
@@ -2193,6 +2193,32 @@ fn pin_reference_candidates(values: Vec<String>) -> Option<Vec<String>> {
 }
 
 #[pyfunction]
+fn asset_reference_names(values: Vec<String>) -> Option<Vec<String>> {
+    if values.iter().any(|value| !value.is_ascii()) {
+        return None;
+    }
+    let mut output = Vec::new();
+    for value in values {
+        let normalized = value.replace('\\', "/");
+        let Some(component) = Path::new(&normalized).components().next_back() else {
+            continue;
+        };
+        let name = match component {
+            Component::ParentDir => "..",
+            Component::Normal(name) => match name.to_str() {
+                Some(name) => name,
+                None => continue,
+            },
+            _ => continue,
+        };
+        if !name.is_empty() && !output.iter().any(|existing| existing == name) {
+            output.push(name.to_owned());
+        }
+    }
+    Some(output)
+}
+
+#[pyfunction]
 fn asset_reference_candidates(values: Vec<String>) -> Option<Vec<String>> {
     if values.iter().any(|value| !value.is_ascii()) {
         return None;
@@ -2993,6 +3019,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(command_short_name, module)?)?;
     module.add_function(wrap_pyfunction!(entry_object_guid, module)?)?;
     module.add_function(wrap_pyfunction!(asset_reference_candidates, module)?)?;
+    module.add_function(wrap_pyfunction!(asset_reference_names, module)?)?;
     module.add_function(wrap_pyfunction!(pin_reference_candidates, module)?)?;
     module.add_function(wrap_pyfunction!(compact_list, module)?)?;
     module.add_function(wrap_pyfunction!(extension_counts, module)?)?;

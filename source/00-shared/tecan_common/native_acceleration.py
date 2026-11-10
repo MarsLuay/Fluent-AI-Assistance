@@ -1361,6 +1361,23 @@ def pin_reference_candidates(values: Any) -> list[str] | None:
         return None
 
 
+def asset_reference_names(values: Any) -> list[str] | None:
+    """Extract and deduplicate ASCII path basenames natively."""
+    if (
+        not enabled()
+        or type(values) not in (list, tuple)
+        or not all(type(value) is str and value.isascii() for value in values)
+    ):
+        return None
+    try:
+        result = _native.asset_reference_names(list(values))
+        if type(result) is list and all(type(value) is str for value in result):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def asset_reference_candidates(values: Any) -> list[str] | None:
     """Filter exact ASCII image-reference text, retaining Python regex fallback."""
     if (

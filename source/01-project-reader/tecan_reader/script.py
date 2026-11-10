@@ -515,6 +515,9 @@ def _warnings(commands: list[dict[str, Any]]) -> list[str]:
 
 
 def _asset_refs(values: list[str]) -> list[str]:
+    native = native_acceleration.asset_reference_names(values)
+    if native is not None:
+        return native
     refs = []
     for value in values:
         name = Path(str(value).replace("\\", "/")).name
