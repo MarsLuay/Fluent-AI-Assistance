@@ -431,14 +431,52 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(actual["Missing"], [])
 
         unicode_root = ET.Element("Root")
-        ET.SubElement(unicode_root, "A").text = "café"
+        ET.SubElement(unicode_root, "A").text = "\u00a0café\u2003"
+        ET.SubElement(unicode_root, "Étiquette").text = "\x1céclair\x1f"
+        whitespace_chars = [
+            chr(codepoint)
+            for codepoint in range(0x110000)
+            if chr(codepoint).isspace()
+        ]
+        names = ["A", "Étiquette"]
+        for index, character in enumerate(whitespace_chars):
+            name = f"Whitespace_{index:02d}"
+            ET.SubElement(unicode_root, name).text = (
+                f"{character}value-{index}{character}"
+            )
+            names.append(name)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unicode_expected = xml_helpers.texts_by_name(unicode_root, names)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            unicode_direct = native_acceleration.xml_texts_by_name(
+                unicode_root, names, ET.Element
+            )
+            self.assertIsNotNone(unicode_direct)
+            self.assertEqual(
+                [unicode_expected[name] for name in names], unicode_direct
+            )
+            with patch.object(
+                xml_helpers,
+                "_native_xml_texts_by_name",
+                wraps=xml_helpers._native_xml_texts_by_name,
+            ) as native_call:
+                self.assertEqual(
+                    xml_helpers.texts_by_name(unicode_root, names), unicode_expected
+                )
+                native_call.assert_called_once()
+
+        surrogate_root = ET.Element("Root")
+        ET.SubElement(surrogate_root, "A").text = chr(0xD800)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(
                 native_acceleration.xml_texts_by_name(
-                    unicode_root, ["A"], ET.Element
+                    surrogate_root, ["A"], ET.Element
                 )
             )
-            self.assertEqual(xml_helpers.texts_by_name(unicode_root, ["A"]), {"A": ["café"]})
+            self.assertEqual(
+                xml_helpers.texts_by_name(surrogate_root, ["A"]),
+                {"A": [chr(0xD800)]},
+            )
 
     def test_native_all_xml_texts_matches_python_without_default_limit(self) -> None:
         if not native_acceleration.available() or not hasattr(

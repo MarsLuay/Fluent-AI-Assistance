@@ -1046,14 +1046,7 @@ fn xml_texts_by_name<'py>(
             return Ok(None);
         }
         let text_value = text.extract::<String>()?;
-        if !text_value.is_ascii()
-            || text_value
-                .chars()
-                .any(|ch| ('\u{1c}'..='\u{1f}').contains(&ch))
-        {
-            return Ok(None);
-        }
-        let cleaned = text_value.trim();
+        let cleaned = trim_python_whitespace(&text_value);
         if cleaned.is_empty() || !seen.insert((index, cleaned.to_owned())) {
             continue;
         }
