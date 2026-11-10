@@ -12,10 +12,19 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
+from tecan_common import native_acceleration
+
 from .diagnostics import DiagnosticCode, IngestionArchiveError, make_diagnostic, sort_diagnostics
 from .project_index import discover_zeia_paths
 from .project_model import CanonicalProjectModel
 from .zeia_adapters import ZeiaFormatError, ingest_zeia
+
+
+def _casefold_equals(value: str, expected: str) -> bool:
+    native = native_acceleration.ascii_casefold_equals(value, expected)
+    if native is not None:
+        return native
+    return value.casefold() == expected
 
 
 class ReadinessStatus(str, Enum):
@@ -334,15 +343,21 @@ def _resolve_records(
     warnings = [
         error
         for error in errors
-        if str(error.get("severity") or "error").casefold() == "warning"
+        if _casefold_equals(str(error.get("severity") or "error"), "warning")
     ]
     blocking_errors = [
         error
         for error in errors
-        if str(error.get("severity") or "error").casefold() != "warning"
+        if not _casefold_equals(str(error.get("severity") or "error"), "warning")
     ]
-    workspaces = [item for item in objects if str(item.get("kind") or "").casefold() == "workspace"]
-    liquid_classes = [item for item in objects if str(item.get("kind") or "").casefold() == "liquid_class"]
+    workspaces = [
+        item for item in objects
+        if _casefold_equals(str(item.get("kind") or ""), "workspace")
+    ]
+    liquid_classes = [
+        item for item in objects
+        if _casefold_equals(str(item.get("kind") or ""), "liquid_class")
+    ]
     structural: list[dict[str, Any]] = []
     if not scripts:
         structural.append({
@@ -673,7 +688,7 @@ def _compatibility_view(result: FullExportReadiness) -> dict[str, Any]:
     for item in result.conflicts:
         blocking.append({"id": "ambiguous_identifier", "summary": "Identifier resolves to multiple archive entities.", "items": [item.to_dict()]})
     for diagnostic in result.diagnostics:
-        if str(diagnostic.get("severity") or "error").casefold() == "warning":
+        if _casefold_equals(str(diagnostic.get("severity") or "error"), "warning"):
             continue
         if str(diagnostic.get("code") or "").startswith(("DEPENDENCY_", "REFERENCE_")):
             continue

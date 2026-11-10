@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from tecan_common import native_acceleration
 from tecan_reader.full_export_readiness import (
     ReadinessStatus,
     resolve_full_export_readiness,
@@ -183,6 +184,38 @@ class FullExportReadinessTests(unittest.TestCase):
             )
         )
         self.assertEqual(result.status, ReadinessStatus.COMPLETE_WITH_WARNINGS)
+
+    def test_readiness_label_casefolding_uses_rust_with_unicode_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "ascii_casefold_equals"
+        ):
+            self.skipTest("optional Rust ASCII comparison is not built")
+        model = _model(
+            "source.zeia",
+            scripts=[_script("Source")],
+            objects=[
+                _object("WORKSPACE", "Worktable", "workspace"),
+                _object("LIQUID_CLASS", "Water", "water"),
+            ],
+            errors=[
+                {"severity": "WARNING", "entry": "metadata.xml", "error": "notice"}
+            ],
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = resolve_full_export_readiness(model).to_dict()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_casefold_equals",
+                wraps=native_acceleration.ascii_casefold_equals,
+            ) as native_call:
+                actual = resolve_full_export_readiness(model).to_dict()
+                self.assertGreaterEqual(native_call.call_count, 4)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["status"], ReadinessStatus.COMPLETE_WITH_WARNINGS.value)
+        self.assertIsNone(
+            native_acceleration.ascii_casefold_equals("warníng", "warning")
+        )
 
     def test_partial_approval_does_not_change_factual_status(self) -> None:
         result = resolve_full_export_readiness(
