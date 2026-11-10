@@ -14,6 +14,7 @@ from typing import Any
 
 from tecan_common import xml_compat as ET
 from tecan_common.native_acceleration import (
+    any_ascii_casefold_in,
     casefold_alias_values,
     collapse_ascii_whitespace,
     merge_unique_string_groups,
@@ -195,7 +196,12 @@ def _inspect_delimited(text: str, *, source_name: str) -> dict[str, Any]:
             "unknown_fields": {}, "source_metadata": {"format": "delimited", "unknown_fields": {}},
         }
     header = [cell.strip() for cell in rows[0]]
-    has_header = any(cell.casefold() in _KNOWN_FIELDS for cell in header)
+    native_header_match = any_ascii_casefold_in(header, _KNOWN_FIELDS)
+    has_header = (
+        native_header_match
+        if native_header_match is not None
+        else any(cell.casefold() in _KNOWN_FIELDS for cell in header)
+    )
     data_rows = rows[1:] if has_header else rows
     records: list[dict[str, Any]] = []
     for index, row in enumerate(data_rows):

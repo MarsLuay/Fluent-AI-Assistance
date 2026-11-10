@@ -167,6 +167,42 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
             unicode_actual["records"][0]["fields"]["Name"], "café user"
         )
 
+    def test_delimited_header_detection_uses_native_ascii_and_unicode_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "any_ascii_casefold_in"
+        ):
+            self.skipTest("optional Rust header matcher is not built")
+        source = "TASKNAME,VALUE\nRun,42\n"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = inspect_twl_text(source, source_name="Inputs/header.twl")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                task_input,
+                "any_ascii_casefold_in",
+                wraps=native_acceleration.any_ascii_casefold_in,
+            ) as native_call:
+                actual = inspect_twl_text(source, source_name="Inputs/header.twl")
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["header"], ["TASKNAME", "VALUE"])
+
+        unicode_source = "TâskName,Payload\nRun,42\n"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unicode_expected = inspect_twl_text(
+                unicode_source, source_name="Inputs/unicode-header.twl"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.any_ascii_casefold_in(
+                    ["TâskName", "Payload"], task_input._KNOWN_FIELDS
+                )
+            )
+            unicode_actual = inspect_twl_text(
+                unicode_source, source_name="Inputs/unicode-header.twl"
+            )
+        self.assertEqual(unicode_actual, unicode_expected)
+        self.assertEqual(unicode_actual["header"], [])
+
     def test_task_field_key_sorting_uses_rust_and_preserves_values(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "sort_ascii_string_keys"

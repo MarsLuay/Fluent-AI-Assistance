@@ -1509,6 +1509,26 @@ def merge_unique_string_groups(groups: Any, limit: Any) -> dict[str, list[str]] 
         return None
 
 
+def any_ascii_casefold_in(values: Any, candidates: Any) -> bool | None:
+    """Check ASCII strings against a Python-owned case-folded candidate set."""
+    if (
+        not enabled()
+        or type(values) not in (list, tuple)
+        or type(candidates) not in (list, tuple, set, frozenset)
+        or not all(type(value) is str and value.isascii() for value in values)
+        or not all(
+            type(candidate) is str and candidate.isascii()
+            for candidate in candidates
+        )
+    ):
+        return None
+    try:
+        result = _native.any_ascii_casefold_in(list(values), list(candidates))
+        return result if type(result) is bool else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def sort_ascii_string_keys(mapping: Any) -> dict[str, Any] | None:
     """Sort exact built-in dictionary keys natively for ASCII string mappings."""
     if (

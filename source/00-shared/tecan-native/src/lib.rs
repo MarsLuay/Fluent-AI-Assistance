@@ -1270,6 +1270,26 @@ fn xscr_command_records<'py>(
 }
 
 #[pyfunction]
+fn any_ascii_casefold_in(values: Vec<String>, candidates: Vec<String>) -> Option<bool> {
+    if values
+        .iter()
+        .chain(&candidates)
+        .any(|value| !value.is_ascii())
+    {
+        return None;
+    }
+    let candidates = candidates
+        .into_iter()
+        .map(|value| value.to_ascii_lowercase())
+        .collect::<HashSet<_>>();
+    Some(
+        values
+            .iter()
+            .any(|value| candidates.contains(&value.to_ascii_lowercase())),
+    )
+}
+
+#[pyfunction]
 fn sort_ascii_string_keys<'py>(
     py: Python<'py>,
     mapping: &Bound<'py, PyAny>,
@@ -3364,6 +3384,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(casefold_alias_values, module)?)?;
     module.add_function(wrap_pyfunction!(merge_unique_string_groups, module)?)?;
     module.add_function(wrap_pyfunction!(sort_ascii_string_keys, module)?)?;
+    module.add_function(wrap_pyfunction!(any_ascii_casefold_in, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_command_records, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_dict, module)?)?;
