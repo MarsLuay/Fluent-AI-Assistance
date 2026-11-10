@@ -262,6 +262,93 @@ class RenderListTests(unittest.TestCase):
         self.assertEqual(custom.str_calls, 1)
         self.assertEqual(actual_fallback, expected_fallback)
 
+    def test_native_project_index_summary_matches_build_modes_and_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "render_project_index_summary"
+        ):
+            self.skipTest("optional Rust project-index summary renderer is not built")
+        build_report = {
+            "kind": "project_index_build",
+            "database": "database-x",
+            "schema_version": "schema-x",
+            "zeia_file_count": 2,
+            "script_count": 3,
+            "command_count": 4,
+            "command_sequence_count": 5,
+            "catalog_object_count": 6,
+            "worklist_count": 7,
+            "indexed_files": [f"indexed-{index}" for index in range(102)],
+            "entity_counts": {f"entity-{index}": index for index in range(42)},
+            "command_family_counts": {f"key-{index}": index for index in range(32)},
+            "files": [
+                {
+                    "file_name": f"file-{index}",
+                    "script_count_summarized": index,
+                    "object_count_summarized": index + 1,
+                    "gwl_count_summarized": index + 2,
+                    "path": f"path-{index}",
+                }
+                for index in range(102)
+            ],
+        }
+        summary_report = {
+            "kind": "project_index_summary",
+            "database": "database-y",
+            "schema_version": "schema-y",
+            "zeia_file_count": 0,
+            "script_count": 0,
+            "command_count": 0,
+            "command_sequence_count": 0,
+            "catalog_object_count": 0,
+            "worklist_count": 0,
+        }
+        reports = [build_report, summary_report]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [render.render_markdown(report) for report in reports]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                render,
+                "_native_render_project_index_summary",
+                wraps=render._native_render_project_index_summary,
+            ) as native_call:
+                actual = [render.render_markdown(report) for report in reports]
+                self.assertEqual(native_call.call_count, len(reports))
+        self.assertEqual(actual, expected)
+        self.assertIn("# Tecan Project Index Build", actual[0])
+        self.assertIn("- ... 2 more", actual[0])
+        self.assertNotIn("# Tecan Project Index Build", actual[1])
+        self.assertEqual(actual[1].count("## "), 0)
+
+        class TextValue:
+            def __init__(self) -> None:
+                self.str_calls = 0
+
+            def __str__(self) -> str:
+                self.str_calls += 1
+                return "custom file"
+
+        custom = TextValue()
+        unsupported = {
+            **summary_report,
+            "files": [
+                {
+                    "file_name": custom,
+                    "script_count_summarized": 1,
+                    "object_count_summarized": 1,
+                    "gwl_count_summarized": 1,
+                    "path": "path-x",
+                }
+            ],
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_fallback = render.render_markdown(unsupported)
+        self.assertEqual(custom.str_calls, 1)
+        custom.str_calls = 0
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual_fallback = render.render_markdown(unsupported)
+        self.assertEqual(custom.str_calls, 1)
+        self.assertEqual(actual_fallback, expected_fallback)
+
     def test_native_project_index_search_matches_python_and_preserves_truthiness(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "render_project_index_search"

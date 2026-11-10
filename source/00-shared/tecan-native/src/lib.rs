@@ -1201,6 +1201,57 @@ fn render_gwl_report(
 }
 
 #[pyfunction]
+fn render_project_index_summary(
+    header: Vec<String>,
+    indexed_files: Vec<String>,
+    entity_counts: Vec<(String, String)>,
+    family_counts: Vec<(String, String)>,
+    file_rows: Vec<Vec<String>>,
+    total_files: usize,
+) -> Option<String> {
+    if header.len() != 9
+        || file_rows.len() != total_files.min(100)
+        || file_rows.iter().any(|file| file.len() != 5)
+    {
+        return None;
+    }
+    let mut lines = vec![
+        format!("# {}", header[0]),
+        String::new(),
+        format!("- Database: `{}`", header[1]),
+        format!("- Schema version: `{}`", header[2]),
+        format!("- ZEIA files: `{}`", header[3]),
+        format!("- Scripts: `{}`", header[4]),
+        format!("- Commands: `{}`", header[5]),
+        format!("- Command sequences: `{}`", header[6]),
+        format!("- Catalog objects: `{}`", header[7]),
+        format!("- Worklists: `{}`", header[8]),
+    ];
+    lines.extend(render_append_list("Indexed Files", indexed_files, 100));
+    lines.extend(render_append_dict("Entity Counts", entity_counts, 40));
+    lines.extend(render_append_dict(
+        "Command Family Counts",
+        family_counts,
+        30,
+    ));
+    if total_files > 0 {
+        lines.push(String::new());
+        lines.push("## ZEIA Files".to_string());
+        for file in &file_rows {
+            lines.push(format!(
+                "- `{}`: {} scripts, {} objects, {} worklists",
+                file[0], file[1], file[2], file[3]
+            ));
+            lines.push(format!("  - Path: `{}`", file[4]));
+        }
+        if total_files > 100 {
+            lines.push(format!("- ... {} more", total_files - 100));
+        }
+    }
+    Some(format!("{}\n", lines.join("\n")))
+}
+
+#[pyfunction]
 fn render_project_index_search(
     database: &str,
     query: &str,
@@ -2196,6 +2247,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_pattern_types_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_script_pattern_summary, module)?)?;
     module.add_function(wrap_pyfunction!(render_project_index_search, module)?)?;
+    module.add_function(wrap_pyfunction!(render_project_index_summary, module)?)?;
     module.add_function(wrap_pyfunction!(render_join_lines, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(read_text_file, module)?)?;
@@ -2301,6 +2353,51 @@ mod tests {
                 Vec::new(),
             ),
             "# ZEIA Compare Report\n\n- Left: `left-x`\n- Right: `right-x`\n- Entries: `2` -> `3`\n- Common script names: `1`\n\n## Scripts Added\n- added-x\n\n## Left Command Families\n- `family-x`: 2\n"
+        );
+    }
+
+    #[test]
+    fn project_index_summary_preserves_sections_and_file_rows() {
+        assert_eq!(
+            render_project_index_summary(
+                vec![
+                    "Tecan Project Index Build".into(),
+                    "database-x".into(),
+                    "schema-x".into(),
+                    "1".into(),
+                    "2".into(),
+                    "3".into(),
+                    "4".into(),
+                    "5".into(),
+                    "6".into(),
+                ],
+                vec!["indexed-x".into()],
+                vec![("entity-x".into(), "count-x".into())],
+                vec![("key-x".into(), "count-y".into())],
+                vec![vec![
+                    "file-x".into(),
+                    "script-x".into(),
+                    "object-x".into(),
+                    "worklist-x".into(),
+                    "path-x".into(),
+                ]],
+                1,
+            )
+            .as_deref(),
+            Some(
+                "# Tecan Project Index Build\n\n- Database: `database-x`\n- Schema version: `schema-x`\n- ZEIA files: `1`\n- Scripts: `2`\n- Commands: `3`\n- Command sequences: `4`\n- Catalog objects: `5`\n- Worklists: `6`\n\n## Indexed Files\n- indexed-x\n\n## Entity Counts\n- `entity-x`: count-x\n\n## Command Family Counts\n- `key-x`: count-y\n\n## ZEIA Files\n- `file-x`: script-x scripts, object-x objects, worklist-x worklists\n  - Path: `path-x`\n"
+            )
+        );
+        assert!(
+            render_project_index_summary(
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                0
+            )
+            .is_none()
         );
     }
 

@@ -348,6 +348,79 @@ def render_compare_report(
         return None
 
 
+def render_project_index_summary(report: Any) -> str | None:
+    """Render supported project-index summary data natively, or request fallback."""
+    if not enabled() or type(report) is not dict:
+        return None
+    kind = report.get("kind")
+    if type(kind) is not str:
+        return None
+    safe_values = (str, bool, int, float, type(None))
+    fields = [
+        report.get("database"),
+        report.get("schema_version"),
+        report.get("zeia_file_count"),
+        report.get("script_count"),
+        report.get("command_count"),
+        report.get("command_sequence_count"),
+        report.get("catalog_object_count"),
+        report.get("worklist_count"),
+    ]
+    indexed_files = report.get("indexed_files", [])
+    entity_counts = report.get("entity_counts", {})
+    family_counts = report.get("command_family_counts", {})
+    files = report.get("files", [])
+    if (
+        not all(type(value) in safe_values for value in fields)
+        or type(indexed_files) not in (list, tuple)
+        or not all(type(value) in safe_values for value in indexed_files)
+        or type(entity_counts) is not dict
+        or type(family_counts) is not dict
+        or type(files) not in (list, tuple)
+    ):
+        return None
+    file_rows: list[list[str]] = []
+    try:
+        count_entries: list[list[tuple[str, str]]] = []
+        for mapping in (entity_counts, family_counts):
+            entries: list[tuple[str, str]] = []
+            for key, value in mapping.items():
+                if type(key) is not str or type(value) not in safe_values:
+                    return None
+                entries.append((key, str(value)))
+            count_entries.append(entries)
+        for file_item in files[:100]:
+            if type(file_item) is not dict:
+                return None
+            values = [
+                file_item.get("file_name"),
+                file_item.get("script_count_summarized"),
+                file_item.get("object_count_summarized"),
+                file_item.get("gwl_count_summarized"),
+                file_item.get("path"),
+            ]
+            if not all(type(value) in safe_values for value in values):
+                return None
+            file_rows.append([str(value) for value in values])
+        header = [
+            "Tecan Project Index Build"
+            if kind == "project_index_build"
+            else "Tecan Project Index",
+            *(str(value) for value in fields),
+        ]
+        result = _native.render_project_index_summary(
+            header,
+            [str(value) for value in indexed_files],
+            count_entries[0],
+            count_entries[1],
+            file_rows,
+            len(files),
+        )
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def render_project_index_search(report: Any) -> str | None:
     """Render supported project-index search data natively, or request fallback."""
     if not enabled() or type(report) is not dict:
