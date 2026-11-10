@@ -3678,9 +3678,16 @@ def _direct_text(parent: ET.Element | None, name: str) -> str | None:
 
 
 def _text(node: ET.Element | None) -> str | None:
-    if node is None or node.text is None:
+    if node is None:
         return None
-    value = node.text.strip()
+    text = node.text
+    if text is None:
+        return None
+    if type(node) is ET.Element:
+        native = native_acceleration.xml_clean_text(text)
+        if native is not None:
+            return native or None
+    value = text.strip()
     return value or None
 
 

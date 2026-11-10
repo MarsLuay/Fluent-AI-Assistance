@@ -262,6 +262,48 @@ class ProtocolIRSchemaTests(unittest.TestCase):
         self.assertEqual(actual[1], [custom_child])
         self.assertEqual(protocol_ir._direct_children(None, "Target"), [])
 
+    def test_text_uses_native_cleaner_with_unicode_and_custom_fallbacks(self):
+        from unittest.mock import patch
+
+        from tecan_common import native_acceleration
+        from fluent_pipeline import protocol_ir
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_clean_text"
+        ):
+            self.skipTest("optional Rust XML text cleaner is not built")
+
+        class CustomText(str):
+            def strip(self):
+                return "custom-strip"
+
+        def element(text):
+            node = protocol_ir.ET.Element("Value")
+            node.text = text
+            return node
+
+        nodes = [
+            None,
+            element(None),
+            element(" \u2003value\u00a0 "),
+            element("\x1c value \x1c"),
+            element(""),
+            element(CustomText("ignored")),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [protocol_ir._text(node) for node in nodes]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_clean_text",
+                wraps=native_acceleration.xml_clean_text,
+            ) as native_call:
+                actual = [protocol_ir._text(node) for node in nodes]
+                self.assertEqual(native_call.call_count, 4)
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [None, None, "value", "value", None, "custom-strip"])
+
     def test_validate_document_rejects_missing_fields_and_invalid_operations(self):
         missing = {
             "ir_version": CANONICAL_IR_VERSION,
