@@ -388,6 +388,9 @@ def _parse_bool(value: str) -> bool:
 
 
 def _row_name_to_index(row_name: str) -> int:
+    native = native_acceleration.worklist_row_name_to_index(row_name)
+    if native is not None:
+        return native
     index = 0
     for char in row_name.upper():
         if not ("A" <= char <= "Z"):

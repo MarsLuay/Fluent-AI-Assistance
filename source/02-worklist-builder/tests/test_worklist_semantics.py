@@ -47,6 +47,7 @@ from tecan_worklist.transfer import (
     validate_transfers,
     well_to_position,
     _parse_bool as parse_transfer_bool,
+    _row_name_to_index as transfer_row_name_to_index,
 )
 from tecan_worklist.gwl import Worklist
 
@@ -911,6 +912,37 @@ class WorklistSemanticsTests(unittest.TestCase):
         native_load_call.assert_called_once()
         self.assertEqual(load, expected[0])
         self.assertIs(load.extra_fields["VendorZ"], commands[0]["parameters"]["VendorZ"])
+
+    def test_native_row_name_index_matches_python_and_falls_back(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_row_name_to_index"
+        ):
+            self.skipTest("optional Rust alphabetic-row kernel is not built")
+
+        class CustomRowName(str):
+            pass
+
+        values = ["", "A", "a", "Z", "AA", "AZ", "BA", "ZZ", "AAA", "ß", "é", "A!", "Z" * 100, CustomRowName("BC")]
+
+        def result(function, value):
+            try:
+                return ("value", function(value))
+            except ValueError:
+                return ("ValueError", None)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [result(transfer_row_name_to_index, value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(native_acceleration.worklist_row_name_to_index("AA"), 26)
+            self.assertIsNone(native_acceleration.worklist_row_name_to_index("ß"))
+            with patch.object(
+                native_acceleration,
+                "worklist_row_name_to_index",
+                wraps=native_acceleration.worklist_row_name_to_index,
+            ) as native_call:
+                actual = [result(transfer_row_name_to_index, value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
 
     def test_native_well_to_position_matches_python_and_falls_back(self):
         if not native_acceleration.available() or not hasattr(

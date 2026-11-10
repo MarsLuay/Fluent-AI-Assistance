@@ -2724,6 +2724,17 @@ def worklist_parse_bool(value: Any) -> bool | None:
         return None
 
 
+def worklist_row_name_to_index(value: Any) -> int | None:
+    """Convert ASCII alphabetic well rows, leaving Unicode/large integers to Python."""
+    if not enabled() or type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.worklist_row_name_to_index(value)
+        return result if type(result) is int else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def worklist_well_to_position(value: str, rows: int) -> int | None:
     """Convert a supported well coordinate natively, or request Python fallback."""
     if not enabled():

@@ -4593,6 +4593,21 @@ fn worklist_parse_bool(value: &str) -> Option<bool> {
 }
 
 #[pyfunction]
+fn worklist_row_name_to_index(value: &str) -> Option<i64> {
+    let mut index = 0_i64;
+    for byte in value.bytes() {
+        let upper = byte.to_ascii_uppercase();
+        if !upper.is_ascii_uppercase() {
+            return None;
+        }
+        index = index
+            .checked_mul(26)?
+            .checked_add(i64::from(upper - b'A' + 1))?;
+    }
+    index.checked_sub(1)
+}
+
+#[pyfunction]
 fn worklist_well_to_position(value: &str, rows: i64) -> PyResult<Option<u64>> {
     Ok(tecan_worklist_builder::well_to_position(value, rows).ok())
 }
@@ -5361,6 +5376,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_validate_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_load_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_bool, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_row_name_to_index, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_well_to_position, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_tip_selection, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_enabled_tip_mask, module)?)?;
