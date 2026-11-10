@@ -3736,10 +3736,12 @@ def _local_name(tag: str) -> str:
 def _number_or_text(value: str) -> Any:
     if value == "":
         return None
-    try:
-        number = float(value)
-    except ValueError:
-        return value
+    number = native_acceleration.parse_f64_decimal_text(value)
+    if number is None:
+        try:
+            number = float(value)
+        except ValueError:
+            return value
     return int(number) if number.is_integer() else number
 
 

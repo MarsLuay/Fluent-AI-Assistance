@@ -104,6 +104,51 @@ class ProtocolIRSchemaTests(unittest.TestCase):
             [None, None, True, False, None, None, False, True, None, None],
         )
 
+    def test_number_or_text_uses_native_decimal_parser_with_python_fallback(self):
+        import math
+        from unittest.mock import patch
+
+        from tecan_common import native_acceleration
+        from fluent_pipeline import protocol_ir
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "parse_f64_decimal_text"
+        ):
+            self.skipTest("optional Rust decimal parser is not built")
+        values = [
+            "",
+            "0",
+            "2.0",
+            "2.25",
+            "1e2",
+            "1_000",
+            " 17 ",
+            "١٢",
+            "nan",
+            "inf",
+            "1e999",
+            "bad",
+        ]
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [protocol_ir._number_or_text(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "parse_f64_decimal_text",
+                wraps=native_acceleration.parse_f64_decimal_text,
+            ) as native_call:
+                actual = [protocol_ir._number_or_text(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values) - 1)
+
+        for actual_value, expected_value in zip(actual, expected):
+            if isinstance(expected_value, float) and math.isnan(expected_value):
+                self.assertTrue(math.isnan(actual_value))
+            else:
+                self.assertEqual(actual_value, expected_value)
+        self.assertEqual(actual[:5], [None, 0, 2, 2.25, 100])
+        self.assertEqual(actual[-1], "bad")
+
     def test_validate_document_rejects_missing_fields_and_invalid_operations(self):
         missing = {
             "ir_version": CANONICAL_IR_VERSION,
