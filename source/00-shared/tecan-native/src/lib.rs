@@ -1507,6 +1507,18 @@ fn unique_ascii_tuple_indices<'py>(
 }
 
 #[pyfunction]
+fn parse_ascii_bool_text(value: &str) -> Option<&'static str> {
+    if !value.is_ascii() {
+        return None;
+    }
+    match value.to_ascii_lowercase().as_str() {
+        "true" => Some("true"),
+        "false" => Some("false"),
+        _ => Some("unknown"),
+    }
+}
+
+#[pyfunction]
 fn ascii_casefold_equals(value: &str, expected: &str) -> Option<bool> {
     if value.is_ascii() && expected.is_ascii() {
         Some(value.eq_ignore_ascii_case(expected))
@@ -5332,6 +5344,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(most_common_string_counts, module)?)?;
     module.add_function(wrap_pyfunction!(sorted_unique_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
+    module.add_function(wrap_pyfunction!(parse_ascii_bool_text, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_lower_alnum_compact, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_word_boundary_contains, module)?)?;
     module.add_function(wrap_pyfunction!(label_base_ascii_text, module)?)?;
@@ -5435,6 +5448,16 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ascii_boolean_parser_preserves_untrimmed_casefold_semantics() {
+        assert_eq!(parse_ascii_bool_text("true"), Some("true"));
+        assert_eq!(parse_ascii_bool_text("TRUE"), Some("true"));
+        assert_eq!(parse_ascii_bool_text("false"), Some("false"));
+        assert_eq!(parse_ascii_bool_text("yes"), Some("unknown"));
+        assert_eq!(parse_ascii_bool_text(" true "), Some("unknown"));
+        assert_eq!(parse_ascii_bool_text("trüe"), None);
+    }
 
     #[test]
     fn site_index_sort_format_matches_python_zero_padding() {

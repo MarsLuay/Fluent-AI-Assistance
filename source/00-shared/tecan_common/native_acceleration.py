@@ -2137,6 +2137,17 @@ def parse_f64_decimal_text(value: Any) -> float | None:
         return None
 
 
+def parse_ascii_bool_text(value: Any) -> str | None:
+    """Parse ASCII true/false text, distinguishing unknown input from fallback."""
+    if not enabled() or type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.parse_ascii_bool_text(value)
+        return result if result in {"true", "false", "unknown"} else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def ascii_casefold_equals(value: Any, expected: Any) -> bool | None:
     """Compare supported ASCII strings with Python-compatible case-folding."""
     if (

@@ -1515,11 +1515,11 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         self.assertEqual(actual_matches, expected_matches)
         self.assertEqual(actual_matches, [expected_comment_case])
 
-    def test_is_nil_uses_native_true_match_without_changing_attribute_policy(self):
+    def test_is_nil_uses_native_bool_parser_without_changing_attribute_policy(self):
         if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "ascii_casefold_equals"
+            native_acceleration._native, "parse_ascii_bool_text"
         ):
-            self.skipTest("optional Rust ASCII comparator is not built")
+            self.skipTest("optional Rust ASCII boolean parser is not built")
         attributes = [
             {"i:nil": "TRUE"},
             {"{xsi}nil": "false", "other": "true"},
@@ -1533,33 +1533,44 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
-                "ascii_casefold_equals",
-                wraps=native_acceleration.ascii_casefold_equals,
+                "parse_ascii_bool_text",
+                wraps=native_acceleration.parse_ascii_bool_text,
             ) as native_call:
                 actual = [worktable_geometry._is_nil(element) for element in elements]
                 self.assertGreater(native_call.call_count, 0)
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [True, True, False, False, False])
 
-    def test_geometry_bool_text_uses_native_ascii_comparisons(self):
+    def test_geometry_bool_text_uses_one_native_ascii_parse_with_fallback(self):
         if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "ascii_casefold_equals"
+            native_acceleration._native, "parse_ascii_bool_text"
         ):
-            self.skipTest("optional Rust ASCII comparator is not built")
-        texts = ["true", "TRUE", "false", "FALSE", "TrUe", "FaLsE", "yes", " true ", "trüe", ""]
+            self.skipTest("optional Rust ASCII boolean parser is not built")
+
+        class BooleanText(str):
+            pass
+
+        texts = [
+            "true", "TRUE", "false", "FALSE", "TrUe", "FaLsE", "yes",
+            " true ", "trüe", "", BooleanText("TRUE"),
+        ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             expected = [worktable_geometry._bool_text(text) for text in texts]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
-                "ascii_casefold_equals",
-                wraps=native_acceleration.ascii_casefold_equals,
+                "parse_ascii_bool_text",
+                wraps=native_acceleration.parse_ascii_bool_text,
             ) as native_call:
                 actual = [worktable_geometry._bool_text(text) for text in texts]
-                self.assertGreaterEqual(native_call.call_count, len(texts) - 1)
+                self.assertEqual(native_call.call_count, len(texts) - 1)
+            self.assertEqual(native_acceleration.parse_ascii_bool_text("yes"), "unknown")
+            self.assertEqual(native_acceleration.parse_ascii_bool_text(" true "), "unknown")
+            self.assertIsNone(native_acceleration.parse_ascii_bool_text("trüe"))
         self.assertEqual(actual, expected)
         self.assertEqual(
-            actual, [True, True, False, False, True, False, None, None, None, None]
+            actual,
+            [True, True, False, False, True, False, None, None, None, None, True],
         )
 
     def test_geometry_local_names_use_native_with_python_type_fallback(self):

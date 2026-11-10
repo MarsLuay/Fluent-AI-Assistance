@@ -1365,14 +1365,9 @@ def _float_text(elem: ET.Element | None) -> float | None:
 def _bool_text(text: str) -> bool | None:
     if not text:
         return None
-    native_true = native_acceleration.ascii_casefold_equals(text, "true")
-    if native_true is True:
-        return True
-    native_false = native_acceleration.ascii_casefold_equals(text, "false")
-    if native_false is True:
-        return False
-    if native_true is not None and native_false is not None:
-        return None
+    native = native_acceleration.parse_ascii_bool_text(text)
+    if native is not None:
+        return {"true": True, "false": False, "unknown": None}[native]
     if text.casefold() == "true":
         return True
     if text.casefold() == "false":
