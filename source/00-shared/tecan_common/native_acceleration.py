@@ -74,6 +74,37 @@ def xml_clean_text(value: Any) -> str | None:
         return None
 
 
+def xml_unique_texts(
+    root: Any, names: Any, limit: Any, element_type: Any
+) -> list[str] | None:
+    """Collect supported standard-Element text natively; otherwise use Python."""
+    if (
+        not enabled()
+        or type(root) is not element_type
+        or type(names) not in (set, frozenset, list, tuple)
+        or not all(type(name) is str for name in names)
+        or type(limit) is not int
+        or not -(1 << 63) <= limit < (1 << 63)
+    ):
+        return None
+    try:
+        result = _native.xml_unique_texts(root, list(names), limit, element_type)
+        if result is None:
+            return None
+        if type(result) is list and all(type(value) is str for value in result):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def decode_text_bytes(data: Any) -> str | None:
     """Decode the reader's supported text encodings natively when possible."""
     if not enabled() or type(data) is not bytes:

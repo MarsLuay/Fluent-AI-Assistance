@@ -9,6 +9,7 @@ from . import xml_compat as ET
 from .native_acceleration import (
     xml_clean_text as _native_xml_clean_text,
     xml_local_name as _native_xml_local_name,
+    xml_unique_texts as _native_xml_unique_texts,
 )
 
 __all__ = [
@@ -93,6 +94,9 @@ def texts_by_name(root: ET.Element, names: Iterable[str]) -> dict[str, list[str]
 def unique_texts(root: ET.Element, names: Iterable[str], *, limit: int = 200) -> list[str]:
     """Return unique non-empty descendant text values up to a limit."""
     wanted = set(names)
+    native = _native_xml_unique_texts(root, wanted, limit, ET.Element)
+    if native is not None:
+        return native
     values: list[str] = []
     for element in root.iter():
         if local_name(element.tag) not in wanted:

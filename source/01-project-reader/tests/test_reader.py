@@ -379,6 +379,76 @@ class ReaderTests(unittest.TestCase):
             self.assertIsNone(native_acceleration.xml_clean_text(TextValue()))
             self.assertEqual(xml_helpers._clean_text(TextValue()), "custom text")
 
+    def test_native_unique_xml_texts_matches_python_limits_and_fallbacks(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_unique_texts"
+        ):
+            self.skipTest("optional Rust XML unique-text helper is not built")
+        root = ET.Element("Root")
+        ET.SubElement(root, "A").text = " first "
+        ET.SubElement(root, "{urn:test}A").text = "first"
+        ET.SubElement(root, "B").text = "second"
+        ET.SubElement(root, "A").text = "third"
+        cases = [
+            (root, {"A", "B"}, 20),
+            (root, {"A", "B"}, 2),
+            (root, {"A", "B"}, 0),
+            (root, {"A", "B"}, -1),
+            (root, {"Missing"}, 20),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                xml_helpers.unique_texts(tree, names, limit=limit)
+                for tree, names, limit in cases
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_unique_texts(root, {"A", "B"}, 20, ET.Element),
+                expected[0],
+            )
+            with patch.object(
+                xml_helpers,
+                "_native_xml_unique_texts",
+                wraps=xml_helpers._native_xml_unique_texts,
+            ) as native_call:
+                actual = [
+                    xml_helpers.unique_texts(tree, names, limit=limit)
+                    for tree, names, limit in cases
+                ]
+                self.assertEqual(native_call.call_count, len(cases))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [["first", "second", "third"], ["first", "second"], ["first"], ["first"], []],
+        )
+
+        unicode_root = ET.Element("Root")
+        ET.SubElement(unicode_root, "A").text = "café"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unicode_expected = xml_helpers.unique_texts(unicode_root, {"A"})
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_unique_texts(
+                    unicode_root, {"A"}, 200, ET.Element
+                )
+            )
+            self.assertEqual(xml_helpers.unique_texts(unicode_root, {"A"}), unicode_expected)
+
+        comment_root = ET.Element("Root")
+        comment_root.append(ET.Comment("comment"))
+        ET.SubElement(comment_root, "A").text = "after comment"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_unique_texts(
+                    comment_root, {"A"}, 200, ET.Element
+                )
+            )
+            self.assertEqual(xml_helpers.unique_texts(comment_root, {"A"}), ["after comment"])
+            self.assertIsNone(
+                native_acceleration.xml_unique_texts(root, {"A"}, True, ET.Element)
+            )
+            self.assertEqual(xml_helpers.unique_texts(root, {"A"}, limit=True), ["first"])
+
     def test_native_extension_counts_match_path_suffix_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "extension_counts"
