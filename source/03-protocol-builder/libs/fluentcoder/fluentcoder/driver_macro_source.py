@@ -8,6 +8,7 @@ vendor error codes.
 from __future__ import annotations
 
 from . import xml_compat as ET
+from tecan_common import native_acceleration
 from tecan_common.xml_helpers import elements_by_name
 
 _KNOWN_MACRO_TAGS = {"ApplicationDriverMacro", "LegacyDriverMacro"}
@@ -41,6 +42,11 @@ def application_driver_macro_has_unmodeled_source(raw_xml: str | None) -> bool:
     macro = macros[0]
     if any(name not in _KNOWN_ATTRIBUTES for name in macro.attrib):
         return True
+    native_children = native_acceleration.xml_direct_elements_by_name(
+        macro, _KNOWN_CHILDREN, ET.Element
+    )
+    if native_children is not None:
+        return len(native_children) != len(macro)
     for child in list(macro):
         if isinstance(child.tag, str) and _local(child.tag) not in _KNOWN_CHILDREN:
             return True

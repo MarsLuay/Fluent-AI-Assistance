@@ -261,11 +261,25 @@ class NativeAccelerationTests(unittest.TestCase):
                 "_native_xml_elements_by_name",
                 wraps=xml_helpers._native_xml_elements_by_name,
             ) as native_call:
-                actual = [
-                    application_driver_macro_has_unmodeled_source(source)
-                    for source in sources
-                ]
-                self.assertEqual(native_call.call_count, len(sources))
+                with patch.object(
+                    native_acceleration,
+                    "xml_direct_elements_by_name",
+                    wraps=native_acceleration.xml_direct_elements_by_name,
+                ) as native_children:
+                    actual = [
+                        application_driver_macro_has_unmodeled_source(source)
+                        for source in sources
+                    ]
+                    self.assertEqual(native_call.call_count, len(sources))
+                    self.assertEqual(native_children.call_count, 2)
+                    self.assertTrue(
+                        any(
+                            call.args[1]
+                            == {"ExecutionSettings", "AvailableID", "ErrorHandling"}
+                            and call.args[2] is ET.Element
+                            for call in native_children.call_args_list
+                        )
+                    )
 
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [False, True, True, True])
