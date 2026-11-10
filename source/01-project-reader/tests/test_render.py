@@ -183,6 +183,37 @@ class RenderListTests(unittest.TestCase):
             self.assertGreater(native_dict.call_count, 0)
         self.assertEqual(actual, expected)
 
+    def test_native_markdown_join_matches_python_with_fallbacks(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "render_join_lines"
+        ):
+            self.skipTest("optional Rust Markdown join helper is not built")
+        cases = [[], [""], ["first", "second"], ["λ", "line\nbreak", "tail"]]
+        for lines in cases:
+            with self.subTest(line_count=len(lines)):
+                expected = "\n".join(lines) + "\n"
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                    self.assertEqual(native_acceleration.render_join_lines(lines), expected)
+                    with patch.object(
+                        render,
+                        "_native_render_join_lines",
+                        wraps=render._native_render_join_lines,
+                    ) as native_call:
+                        self.assertEqual(render._finish_markdown(lines), expected)
+                        native_call.assert_called_once()
+
+        class StringSubclass(str):
+            pass
+
+        class ListSubclass(list):
+            pass
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.render_join_lines([StringSubclass("x")]))
+            self.assertIsNone(native_acceleration.render_join_lines(ListSubclass(["x"])))
+            self.assertEqual(render._finish_markdown([StringSubclass("x")]), "x\n")
+            self.assertEqual(render._finish_markdown(ListSubclass(["x"])), "x\n")
+
     def test_native_xml_object_report_matches_python_and_limits_lists(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "render_object_report"

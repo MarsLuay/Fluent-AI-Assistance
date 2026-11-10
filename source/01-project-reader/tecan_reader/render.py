@@ -8,6 +8,7 @@ from typing import Any
 from tecan_common.native_acceleration import (
     render_append_dict as _native_render_append_dict,
     render_append_list as _native_render_append_list,
+    render_join_lines as _native_render_join_lines,
     render_object_report as _native_render_object_report,
 )
 
@@ -78,7 +79,7 @@ def _render_xscr(report: dict[str, Any]) -> str:
             label = command.get("name") or command.get("fields", {}).get("Comment") or ""
             line = command.get("line") or "?"
             lines.append(f"- #{command.get('index')} line {line}: `{command.get('type')}` ({command.get('family')}) {label}")
-    return "\n".join(lines) + "\n"
+    return _finish_markdown(lines)
 
 
 def _render_zeia(report: dict[str, Any]) -> str:
@@ -108,7 +109,7 @@ def _render_zeia(report: dict[str, Any]) -> str:
         lines.append("## Parse Errors")
         for error in errors[:20]:
             lines.append(f"- `{error.get('entry')}`: {error.get('error')}")
-    return "\n".join(lines) + "\n"
+    return _finish_markdown(lines)
 
 
 def _render_compare(report: dict[str, Any]) -> str:
@@ -124,7 +125,7 @@ def _render_compare(report: dict[str, Any]) -> str:
     _append_list(lines, "Scripts Removed", report.get("script_names_removed", []), limit=100)
     _append_dict(lines, "Left Command Families", report.get("left_family_counts", {}))
     _append_dict(lines, "Right Command Families", report.get("right_family_counts", {}))
-    return "\n".join(lines) + "\n"
+    return _finish_markdown(lines)
 
 
 def _render_project_index_summary(report: dict[str, Any]) -> str:
@@ -158,7 +159,7 @@ def _render_project_index_summary(report: dict[str, Any]) -> str:
             lines.append(f"  - Path: `{file_item.get('path')}`")
         if len(files) > 100:
             lines.append(f"- ... {len(files) - 100} more")
-    return "\n".join(lines) + "\n"
+    return _finish_markdown(lines)
 
 
 def _render_project_index_search(report: dict[str, Any]) -> str:
@@ -185,7 +186,7 @@ def _render_project_index_search(report: dict[str, Any]) -> str:
                 lines.append(f"   - Command: `{result.get('command_index')}`")
             lines.append(f"   - ZEIA: `{result.get('zeia_file')}`")
             lines.append(f"   - Path: `{result.get('source_path')}`")
-    return "\n".join(lines) + "\n"
+    return _finish_markdown(lines)
 
 
 def _render_script_pattern_summary(report: dict[str, Any]) -> str:
@@ -213,7 +214,7 @@ def _render_script_pattern_summary(report: dict[str, Any]) -> str:
         for source in sources:
             lines.append(f"- `{source.get('source_script')}`: {source.get('pattern_count')} patterns")
             lines.append(f"  - ZEIA: `{source.get('zeia_file')}`")
-    return "\n".join(lines) + "\n"
+    return _finish_markdown(lines)
 
 
 def _render_script_pattern_search(report: dict[str, Any]) -> str:
@@ -252,7 +253,7 @@ def _render_script_pattern_search(report: dict[str, Any]) -> str:
                         f"(`{step.get('command_name')}`, command `{step.get('command_index')}`)"
                     )
                     lines.append(f"        - Path: `{pattern.get('source_path')}`")
-    return "\n".join(lines) + "\n"
+    return _finish_markdown(lines)
 
 
 def _render_script_pattern_types(report: dict[str, Any]) -> str:
@@ -260,7 +261,7 @@ def _render_script_pattern_types(report: dict[str, Any]) -> str:
     for pattern_type in report.get("pattern_types", []):
         lines.append(f"- `{pattern_type.get('pattern_type')}`: {pattern_type.get('label')}")
         lines.append(f"  - {pattern_type.get('description')}")
-    return "\n".join(lines) + "\n"
+    return _finish_markdown(lines)
 
 
 def _append_pattern_specs(lines: list[str], specs: dict[str, Any]) -> None:
@@ -295,7 +296,7 @@ def _render_directory(report: dict[str, Any]) -> str:
             families = ", ".join(f"{k}={v}" for k, v in list(script.get("family_counts", {}).items())[:5])
             lines.append(f"- `{script.get('object_name')}`: {script.get('command_count')} commands ({families})")
     _append_list(lines, "Files", [item.get("source", "") for item in report.get("items", [])], limit=100)
-    return "\n".join(lines) + "\n"
+    return _finish_markdown(lines)
 
 
 def _render_gwl(report: dict[str, Any]) -> str:
@@ -315,7 +316,7 @@ def _render_gwl(report: dict[str, Any]) -> str:
                 f"- line {item.get('line')}: `{item.get('operation')}` {item.get('rack_label')} "
                 f"pos {item.get('position')} vol {item.get('volume')} lc `{item.get('liquid_class')}`"
             )
-    return "\n".join(lines) + "\n"
+    return _finish_markdown(lines)
 
 
 def _render_object(report: dict[str, Any]) -> str:
@@ -358,7 +359,7 @@ def _render_object(report: dict[str, Any]) -> str:
     ]
     _append_list(lines, "Names", report.get("names", []))
     _append_list(lines, "GUIDs", report.get("guids", []))
-    return "\n".join(lines) + "\n"
+    return _finish_markdown(lines)
 
 
 def _append_dict(lines: list[str], title: str, values: dict[str, Any], *, limit: int = 20) -> None:
@@ -392,3 +393,10 @@ def _append_list(lines: list[str], title: str, values: list[str], *, limit: int 
         lines.append(f"- {value}")
     if len(values) > limit:
         lines.append(f"- ... {len(values) - limit} more")
+
+
+def _finish_markdown(lines: list[str]) -> str:
+    native = _native_render_join_lines(lines) if type(lines) is list else None
+    if native is not None:
+        return native
+    return "\n".join(lines) + "\n"

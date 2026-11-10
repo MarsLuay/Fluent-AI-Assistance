@@ -1134,6 +1134,11 @@ fn render_append_dict(title: &str, entries: Vec<(String, String)>, limit: i64) -
 }
 
 #[pyfunction]
+fn render_join_lines(lines: Vec<String>) -> String {
+    format!("{}\n", lines.join("\n"))
+}
+
+#[pyfunction]
 fn render_object_report(
     title: &str,
     fields: Vec<String>,
@@ -1996,6 +2001,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_dict, module)?)?;
     module.add_function(wrap_pyfunction!(render_object_report, module)?)?;
+    module.add_function(wrap_pyfunction!(render_join_lines, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(read_text_file, module)?)?;
     module.add_function(wrap_pyfunction!(read_utf8_sig_file, module)?)?;
@@ -2046,6 +2052,15 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn markdown_join_preserves_embedded_and_final_newlines() {
+        assert_eq!(
+            render_join_lines(vec!["α".into(), "line\nbreak".into()]),
+            "α\nline\nbreak\n"
+        );
+        assert_eq!(render_join_lines(Vec::new()), "\n");
+    }
 
     #[test]
     fn report_list_render_matches_slice_and_overflow_rules() {

@@ -239,6 +239,21 @@ def render_object_report(
         return None
 
 
+def render_join_lines(lines: Any) -> str | None:
+    """Join supported Markdown lines with one final newline natively."""
+    if (
+        not enabled()
+        or type(lines) not in (list, tuple)
+        or not all(type(line) is str for line in lines)
+    ):
+        return None
+    try:
+        result = _native.render_join_lines(list(lines))
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def decode_text_bytes(data: Any) -> str | None:
     """Decode the reader's supported text encodings natively when possible."""
     if not enabled() or type(data) is not bytes:
