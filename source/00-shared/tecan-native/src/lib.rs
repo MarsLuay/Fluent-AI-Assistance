@@ -1507,6 +1507,46 @@ fn unique_ascii_tuple_indices<'py>(
 }
 
 #[pyfunction]
+fn xml_element_is_nil<'py>(
+    py: Python<'py>,
+    element: &Bound<'py, PyAny>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<bool>> {
+    if !element.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let attributes = element.getattr("attrib")?;
+    if !attributes.get_type().is(py.get_type::<PyDict>()) {
+        return Ok(None);
+    }
+    let attributes = attributes.cast::<PyDict>()?;
+    let mut has_nil_key = false;
+    for (key, _) in attributes.iter() {
+        if !key.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let key = key.extract::<String>()?;
+        has_nil_key |= key.ends_with("}nil") || key == "i:nil";
+    }
+    if !has_nil_key {
+        return Ok(Some(false));
+    }
+    for (_, value) in attributes.iter() {
+        if !value.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let value = value.extract::<String>()?;
+        if !value.is_ascii() {
+            return Ok(None);
+        }
+        if value.eq_ignore_ascii_case("true") {
+            return Ok(Some(true));
+        }
+    }
+    Ok(Some(false))
+}
+
+#[pyfunction]
 fn parse_ascii_bool_text(value: &str) -> Option<bool> {
     if !value.is_ascii() {
         return None;
@@ -5410,6 +5450,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(sorted_unique_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
     module.add_function(wrap_pyfunction!(parse_ascii_bool_text, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_element_is_nil, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_lower_alnum_compact, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_word_boundary_contains, module)?)?;
     module.add_function(wrap_pyfunction!(label_base_ascii_text, module)?)?;

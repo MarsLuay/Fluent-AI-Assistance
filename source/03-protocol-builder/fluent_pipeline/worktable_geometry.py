@@ -1376,6 +1376,9 @@ def _bool_text(text: str) -> bool | None:
 
 
 def _is_nil(elem: ET.Element) -> bool:
+    native = native_acceleration.xml_element_is_nil(elem, ET.Element)
+    if native is not None:
+        return native
     return any(key.endswith("}nil") or key == "i:nil" for key in elem.attrib) and any(
         _bool_text(str(value)) is True for value in elem.attrib.values()
     )

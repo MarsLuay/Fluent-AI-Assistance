@@ -2201,6 +2201,17 @@ def parse_f64_decimal_text(value: Any) -> float | None:
         return None
 
 
+def xml_element_is_nil(element: Any, element_type: Any) -> bool | None:
+    """Check standard string-valued XML attributes with Python fallback."""
+    if not enabled() or type(element) is not element_type:
+        return None
+    try:
+        result = _native.xml_element_is_nil(element, element_type)
+        return result if type(result) is bool else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def parse_ascii_bool_text(value: Any) -> bool | None:
     """Parse exact ASCII true/false text, otherwise request Python fallback."""
     if not enabled() or type(value) is not str or not value.isascii():

@@ -1535,11 +1535,11 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         self.assertEqual(actual_matches, expected_matches)
         self.assertEqual(actual_matches, [expected_comment_case])
 
-    def test_is_nil_uses_native_bool_parser_without_changing_attribute_policy(self):
+    def test_is_nil_uses_native_attribute_scan_with_unsupported_value_fallback(self):
         if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "parse_ascii_bool_text"
+            native_acceleration._native, "xml_element_is_nil"
         ):
-            self.skipTest("optional Rust ASCII boolean parser is not built")
+            self.skipTest("optional Rust XML nil checker is not built")
         attributes = [
             {"i:nil": "TRUE"},
             {"{xsi}nil": "false", "other": "true"},
@@ -1553,13 +1553,45 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
-                "parse_ascii_bool_text",
-                wraps=native_acceleration.parse_ascii_bool_text,
+                "xml_element_is_nil",
+                wraps=native_acceleration.xml_element_is_nil,
             ) as native_call:
                 actual = [worktable_geometry._is_nil(element) for element in elements]
-                self.assertGreater(native_call.call_count, 0)
+                self.assertEqual(native_call.call_count, len(elements))
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [True, True, False, False, False])
+
+        class Stringifiable:
+            calls = 0
+
+            def __str__(self):
+                self.calls += 1
+                return "TRUE"
+
+        def make_custom_element():
+            element = worktable_geometry.ET.Element("Value")
+            value = Stringifiable()
+            element.attrib["i:nil"] = value
+            return element, value
+
+        fallback_element, fallback_value = make_custom_element()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_custom = worktable_geometry._is_nil(fallback_element)
+        native_element, native_value = make_custom_element()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_element_is_nil",
+                wraps=native_acceleration.xml_element_is_nil,
+            ) as native_call:
+                actual_custom = worktable_geometry._is_nil(native_element)
+                native_call.assert_called_once()
+                self.assertIsNone(
+                    native_acceleration.xml_element_is_nil(native_element, worktable_geometry.ET.Element)
+                )
+        self.assertEqual(actual_custom, expected_custom)
+        self.assertTrue(actual_custom)
+        self.assertEqual((fallback_value.calls, native_value.calls), (1, 1))
 
     def test_geometry_bool_text_uses_one_native_ascii_parse_with_fallback(self):
         if not native_acceleration.available() or not hasattr(
