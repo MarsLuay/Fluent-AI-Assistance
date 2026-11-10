@@ -898,6 +898,53 @@ class ReaderTests(unittest.TestCase):
             )
             self.assertEqual(reader_script._pin_refs(unicode_values), unicode_expected)
 
+    def test_xml_object_asset_reference_filter_matches_legacy_regex(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_asset_reference_names"
+        ):
+            self.skipTest("optional Rust XML asset-reference filter is not built")
+        text = (
+            "<Root><A>first.png and second.jpg</A>"
+            "<B>folder\\image.TIFF</B><C>only.pngx</C>"
+            "<D>quotes \" hidden.gif</D><E>.starts.png</E>"
+            "<F>.bmp</F><G>split.bmp</G><H>dup.bmp</H><I>dup.bmp</I></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = reader_xmlobj._asset_refs(text)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_asset_reference_names(text), expected
+            )
+            with patch.object(
+                reader_xmlobj,
+                "_native_xml_asset_reference_names",
+                wraps=native_acceleration.xml_asset_reference_names,
+            ) as native_call:
+                actual = reader_xmlobj._asset_refs(text)
+                native_call.assert_called_once_with(text)
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [
+                ".starts.png",
+                "dup.bmp",
+                "first.png and second.jpg",
+                "hidden.gif",
+                "image.TIFF",
+                "only.png",
+                "split.bmp",
+            ],
+        )
+
+        unicode_text = "<Root><Asset>café.png</Asset></Root>"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unicode_expected = reader_xmlobj._asset_refs(unicode_text)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_asset_reference_names(unicode_text)
+            )
+            self.assertEqual(reader_xmlobj._asset_refs(unicode_text), unicode_expected)
+
     def test_xml_object_pin_reference_filter_uses_rust_with_unicode_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "pin_reference_candidates"

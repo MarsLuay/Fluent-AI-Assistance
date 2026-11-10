@@ -2192,6 +2192,16 @@ fn pin_reference_candidates(values: Vec<String>) -> Option<Vec<String>> {
     Some(output.into_iter().collect())
 }
 
+fn path_basename(value: &str) -> Option<String> {
+    let normalized = value.replace('\\', "/");
+    let component = Path::new(&normalized).components().next_back()?;
+    match component {
+        Component::ParentDir => Some("..".to_string()),
+        Component::Normal(name) => name.to_str().map(str::to_owned),
+        _ => None,
+    }
+}
+
 #[pyfunction]
 fn asset_reference_names(values: Vec<String>) -> Option<Vec<String>> {
     if values.iter().any(|value| !value.is_ascii()) {
@@ -2199,23 +2209,85 @@ fn asset_reference_names(values: Vec<String>) -> Option<Vec<String>> {
     }
     let mut output = Vec::new();
     for value in values {
-        let normalized = value.replace('\\', "/");
-        let Some(component) = Path::new(&normalized).components().next_back() else {
+        let Some(name) = path_basename(&value) else {
             continue;
         };
-        let name = match component {
-            Component::ParentDir => "..",
-            Component::Normal(name) => match name.to_str() {
-                Some(name) => name,
-                None => continue,
-            },
-            _ => continue,
-        };
-        if !name.is_empty() && !output.iter().any(|existing| existing == name) {
-            output.push(name.to_owned());
+        if !name.is_empty() && !output.contains(&name) {
+            output.push(name);
         }
     }
     Some(output)
+}
+
+fn asset_extension_end(bytes: &[u8], start: usize) -> Option<usize> {
+    if bytes.get(start) != Some(&b'.') {
+        return None;
+    }
+    for extension in [
+        b"bmp".as_slice(),
+        b"gif".as_slice(),
+        b"jpg".as_slice(),
+        b"jpeg".as_slice(),
+        b"png".as_slice(),
+        b"tiff".as_slice(),
+        b"tif".as_slice(),
+    ] {
+        let end = start + 1 + extension.len();
+        if end <= bytes.len() && bytes[start + 1..end].eq_ignore_ascii_case(extension) {
+            return Some(end);
+        }
+    }
+    None
+}
+
+fn python_ascii_whitespace(byte: u8) -> bool {
+    matches!(byte, b'\t'..=b'\r' | 0x1c..=0x20)
+}
+
+#[pyfunction]
+fn xml_asset_reference_names(text: &str) -> Option<Vec<String>> {
+    if !text.is_ascii() {
+        return None;
+    }
+    let bytes = text.as_bytes();
+    let mut references = BTreeSet::new();
+    let mut start = 0;
+    while start < bytes.len() {
+        if matches!(bytes[start], b'<' | b'>' | b'"') {
+            start += 1;
+            continue;
+        }
+        let mut run_end = start;
+        while run_end < bytes.len() && !matches!(bytes[run_end], b'<' | b'>' | b'"') {
+            run_end += 1;
+        }
+        let mut last_extension_end = None;
+        for position in (start + 1)..run_end {
+            if let Some(end) = asset_extension_end(bytes, position)
+                && end <= run_end
+            {
+                last_extension_end = Some(end);
+            }
+        }
+        if let Some(end) = last_extension_end {
+            let mut left = start;
+            let mut right = end;
+            while left < right && python_ascii_whitespace(bytes[left]) {
+                left += 1;
+            }
+            while right > left && python_ascii_whitespace(bytes[right - 1]) {
+                right -= 1;
+            }
+            if left < right
+                && let Some(name) = path_basename(&text[left..right])
+                && !name.is_empty()
+            {
+                references.insert(name);
+            }
+        }
+        start = run_end;
+    }
+    Some(references.into_iter().collect())
 }
 
 #[pyfunction]
@@ -3040,6 +3112,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(entry_object_guid, module)?)?;
     module.add_function(wrap_pyfunction!(asset_reference_candidates, module)?)?;
     module.add_function(wrap_pyfunction!(asset_reference_names, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_asset_reference_names, module)?)?;
     module.add_function(wrap_pyfunction!(pin_reference_candidates, module)?)?;
     module.add_function(wrap_pyfunction!(compact_list, module)?)?;
     module.add_function(wrap_pyfunction!(extension_counts, module)?)?;
@@ -3499,6 +3572,19 @@ mod tests {
             )
         );
         assert!(render_object_report("Example", Vec::new(), Vec::new(), Vec::new()).is_none());
+    }
+
+    #[test]
+    fn xml_asset_reference_scan_preserves_legacy_greedy_runs() {
+        assert_eq!(
+            xml_asset_reference_names("<A>a.png and b.jpg</A><B>x.tiff</B><C>.bmp</C><D>z.bmp</D>"),
+            Some(vec![
+                "a.png and b.jpg".to_string(),
+                "x.tiff".to_string(),
+                "z.bmp".to_string(),
+            ])
+        );
+        assert_eq!(xml_asset_reference_names("café.png"), None);
     }
 
     #[test]

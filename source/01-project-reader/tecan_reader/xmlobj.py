@@ -8,6 +8,7 @@ import re
 
 from tecan_common.native_acceleration import (
     pin_reference_candidates as _native_pin_reference_candidates,
+    xml_asset_reference_names as _native_xml_asset_reference_names,
     xml_kind_from_suffix as _native_xml_kind_from_suffix,
 )
 from tecan_common.xml_helpers import first_text, local_name, texts_by_name
@@ -128,6 +129,9 @@ def _pin_refs(text: str) -> list[str]:
 
 
 def _asset_refs(text: str) -> list[str]:
+    native = _native_xml_asset_reference_names(text)
+    if native is not None:
+        return native
     refs = set()
     for match in re.findall(
         r"[^<>\"]+\.(?:bmp|gif|jpe?g|png|tiff?)", text, flags=re.IGNORECASE

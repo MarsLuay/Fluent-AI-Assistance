@@ -1398,6 +1398,19 @@ def asset_reference_names(values: Any) -> list[str] | None:
         return None
 
 
+def xml_asset_reference_names(text: Any) -> list[str] | None:
+    """Extract ASCII image basenames from XML text using the legacy regex shape."""
+    if not enabled() or type(text) is not str or not text.isascii():
+        return None
+    try:
+        result = _native.xml_asset_reference_names(text)
+        if type(result) is list and all(type(value) is str for value in result):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def asset_reference_candidates(values: Any) -> list[str] | None:
     """Filter exact ASCII image-reference text, retaining Python regex fallback."""
     if (
