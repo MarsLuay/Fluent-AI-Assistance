@@ -1323,6 +1323,39 @@ fn delimited_row_fields<'py>(
 }
 
 #[pyfunction]
+fn sorted_unique_ascii_strings<'py>(
+    py: Python<'py>,
+    groups: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !groups.get_type().is(py.get_type::<PyList>()) {
+        return Ok(None);
+    }
+    let mut values = BTreeSet::new();
+    for group in groups.try_iter()? {
+        let group = group?;
+        if !group.get_type().is(py.get_type::<PyList>()) {
+            return Ok(None);
+        }
+        for value in group.try_iter()? {
+            let value = value?;
+            if !value.get_type().is(py.get_type::<PyString>()) {
+                return Ok(None);
+            }
+            let value = value.extract::<String>()?;
+            if !value.is_ascii() {
+                return Ok(None);
+            }
+            values.insert(value);
+        }
+    }
+    let output = PyList::empty(py);
+    for value in values {
+        output.append(value)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn ordered_ascii_string_counts<'py>(
     py: Python<'py>,
     values: &Bound<'py, PyAny>,
@@ -3475,6 +3508,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(sort_ascii_string_keys, module)?)?;
     module.add_function(wrap_pyfunction!(any_ascii_casefold_in, module)?)?;
     module.add_function(wrap_pyfunction!(ordered_ascii_string_counts, module)?)?;
+    module.add_function(wrap_pyfunction!(sorted_unique_ascii_strings, module)?)?;
     module.add_function(wrap_pyfunction!(delimited_row_fields, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_command_records, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;

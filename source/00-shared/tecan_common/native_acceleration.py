@@ -1554,6 +1554,29 @@ def any_ascii_casefold_in(values: Any, candidates: Any) -> bool | None:
         return None
 
 
+def sorted_unique_ascii_strings(groups: Any) -> list[str] | None:
+    """Sort and deduplicate ASCII strings across exact built-in groups."""
+    if (
+        not enabled()
+        or type(groups) not in (list, tuple)
+        or not all(
+            type(group) in (list, tuple)
+            and all(type(value) is str and value.isascii() for value in group)
+            for group in groups
+        )
+    ):
+        return None
+    try:
+        result = _native.sorted_unique_ascii_strings(
+            [list(group) for group in groups]
+        )
+        if type(result) is list and all(type(value) is str for value in result):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def ordered_ascii_string_counts(values: Any) -> dict[str, int] | None:
     """Count ASCII string values in stable ``Counter.most_common`` order."""
     if (

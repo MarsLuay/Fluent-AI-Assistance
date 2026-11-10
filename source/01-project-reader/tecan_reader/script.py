@@ -268,6 +268,13 @@ def _interesting_fields(el: ET.Element) -> dict[str, str]:
     return fields
 
 
+def _sorted_unique_strings(*groups: list[str]) -> list[str]:
+    native = native_acceleration.sorted_unique_ascii_strings(groups)
+    if native is not None:
+        return native
+    return sorted({value for group in groups for value in group})
+
+
 def _dependencies(root: ET.Element) -> dict[str, list[str]]:
     grouped = texts_by_name(
         root,
@@ -297,49 +304,51 @@ def _dependencies(root: ET.Element) -> dict[str, list[str]]:
             "RUPScreenTitle",
         },
     )
-    liquid_classes = sorted(
-        set(grouped.get("LiquidClassName", []))
-        | set(grouped.get("LiquidClassNameBySelection", []))
+    liquid_classes = _sorted_unique_strings(
+        grouped.get("LiquidClassName", []),
+        grouped.get("LiquidClassNameBySelection", []),
     )
-    external = sorted(
-        set(grouped.get("ScriptName", []))
-        | set(grouped.get("MethodName", []))
-        | set(grouped.get("ApplicationName", []))
-        | set(grouped.get("FileName", []))
-        | set(grouped.get("Path", []))
-        | set(grouped.get("WorklistName", []))
-        | set(grouped.get("SubRoutine", []))
+    external = _sorted_unique_strings(
+        grouped.get("ScriptName", []),
+        grouped.get("MethodName", []),
+        grouped.get("ApplicationName", []),
+        grouped.get("FileName", []),
+        grouped.get("Path", []),
+        grouped.get("WorklistName", []),
+        grouped.get("SubRoutine", []),
     )
     return {
         "workspace_guids": grouped.get("BaseWorkspaceName", []),
-        "labware_names": sorted(
-            set(grouped.get("LabwareName", []))
-            | set(grouped.get("LabwareLabel", []))
-            | set(grouped.get("LabwareLable", []))
+        "labware_names": _sorted_unique_strings(
+            grouped.get("LabwareName", []),
+            grouped.get("LabwareLabel", []),
+            grouped.get("LabwareLable", []),
         ),
-        "rack_labels": sorted(set(grouped.get("RackLabel", []))),
-        "rack_types": sorted(
-            set(grouped.get("RackType", [])) | set(grouped.get("LabwareType", []))
+        "rack_labels": _sorted_unique_strings(grouped.get("RackLabel", [])),
+        "rack_types": _sorted_unique_strings(
+            grouped.get("RackType", []), grouped.get("LabwareType", [])
         ),
         "liquid_classes": liquid_classes,
-        "device_aliases": sorted(set(grouped.get("DeviceAlias", []))),
-        "available_ids": sorted(set(grouped.get("AvailableID", []))),
+        "device_aliases": _sorted_unique_strings(grouped.get("DeviceAlias", [])),
+        "available_ids": _sorted_unique_strings(grouped.get("AvailableID", [])),
         "external_or_worklist_refs": external,
-        "subroutine_refs": sorted(set(grouped.get("SubRoutine", []))),
-        "barcode_refs": sorted(set(grouped.get("Barcode", []))),
-        "custom_asset_refs": sorted(
-            set(_asset_refs(grouped.get("CustomDetailImageFilePath", [])))
-            | set(_asset_refs_from_text(_all_text_values(root)))
+        "subroutine_refs": _sorted_unique_strings(grouped.get("SubRoutine", [])),
+        "barcode_refs": _sorted_unique_strings(grouped.get("Barcode", [])),
+        "custom_asset_refs": _sorted_unique_strings(
+            _asset_refs(grouped.get("CustomDetailImageFilePath", [])),
+            _asset_refs_from_text(_all_text_values(root)),
         ),
-        "pin_refs": sorted(
-            set(grouped.get("PinNumber", [])) | set(_pin_refs(_all_text_values(root)))
+        "pin_refs": _sorted_unique_strings(
+            grouped.get("PinNumber", []), _pin_refs(_all_text_values(root))
         ),
-        "worktable_pin_locations": sorted(
-            value
-            for value in set(grouped.get("Location", []))
-            if "pin" in str(value).casefold()
+        "worktable_pin_locations": _sorted_unique_strings(
+            [
+                value
+                for value in grouped.get("Location", [])
+                if "pin" in str(value).casefold()
+            ]
         ),
-        "touchtools_titles": sorted(set(grouped.get("RUPScreenTitle", []))),
+        "touchtools_titles": _sorted_unique_strings(grouped.get("RUPScreenTitle", [])),
     }
 
 

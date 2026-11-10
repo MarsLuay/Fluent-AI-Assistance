@@ -59,6 +59,47 @@ class ScriptTests(unittest.TestCase):
             self.assertEqual(report["source"], str(tmp_path))
             self.assertEqual(report["command_count"], 1)
 
+    def test_dependency_string_sorting_uses_rust_with_unicode_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "sorted_unique_ascii_strings"
+        ):
+            self.skipTest("optional Rust string sorter is not built")
+        groups = (["zeta", "alpha", "zeta"], ["Alpha", "beta", "alpha"])
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_values = script._sorted_unique_strings(*groups)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "sorted_unique_ascii_strings",
+                wraps=native_acceleration.sorted_unique_ascii_strings,
+            ) as native_call:
+                actual_values = script._sorted_unique_strings(*groups)
+                native_call.assert_called_once_with(groups)
+        self.assertEqual(actual_values, expected_values)
+        self.assertEqual(actual_values, ["Alpha", "alpha", "beta", "zeta"])
+
+        unicode_groups = (["éclair", "alpha"], ["café"])
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.sorted_unique_ascii_strings(unicode_groups)
+            )
+            self.assertEqual(
+                script._sorted_unique_strings(*unicode_groups),
+                sorted({value for group in unicode_groups for value in group}),
+            )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_report = inspect_xscr_text(SAMPLE_XSCR, source_name="deps.xscr")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "sorted_unique_ascii_strings",
+                wraps=native_acceleration.sorted_unique_ascii_strings,
+            ) as native_call:
+                actual_report = inspect_xscr_text(SAMPLE_XSCR, source_name="deps.xscr")
+                self.assertGreater(native_call.call_count, 0)
+        self.assertEqual(actual_report, expected_report)
+
     def test_ordered_command_counts_use_rust_with_unicode_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "ordered_ascii_string_counts"
