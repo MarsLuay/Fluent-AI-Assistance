@@ -1010,6 +1010,37 @@ fn xml_clean_text(text: &str) -> String {
 }
 
 #[pyfunction]
+fn xml_direct_child_texts<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let output = PyList::empty(py);
+    for child in root.try_iter()? {
+        let child = child?;
+        if !child.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let text = child.getattr("text")?;
+        if text.is_none() {
+            continue;
+        }
+        if !text.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let text = text.extract::<String>()?;
+        let cleaned = trim_python_whitespace(&text);
+        if !cleaned.is_empty() {
+            output.append(cleaned)?;
+        }
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn xml_container_child_texts<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -5457,6 +5488,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(parse_xml, module)?)?;
     module.add_function(wrap_pyfunction!(xml_tag_local_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_clean_text, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_direct_child_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_container_child_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_unique_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_texts_by_name, module)?)?;

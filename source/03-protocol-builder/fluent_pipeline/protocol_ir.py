@@ -1567,9 +1567,14 @@ def _xscr_variable_values(element: ET.Element) -> list[Any]:
     values = _first_descendant(element, "Values")
     if values is None:
         return []
+    native_values = native_acceleration.xml_direct_child_texts(values, ET.Element)
+    child_values = (
+        native_values
+        if native_values is not None
+        else [_text(child) for child in list(values)]
+    )
     out: list[Any] = []
-    for child in list(values):
-        value = _text(child)
+    for value in child_values:
         if value not in (None, "", []):
             out.append(_number_or_text(str(value)))
     return out

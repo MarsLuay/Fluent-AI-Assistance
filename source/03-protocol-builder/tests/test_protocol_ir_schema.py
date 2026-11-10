@@ -475,6 +475,36 @@ class ProtocolIRSchemaTests(unittest.TestCase):
         self.assertEqual([item["name"] for item in actual], ["alpha", "beta"])
         self.assertEqual(actual[0]["default_value"], 3)
 
+    def test_xscr_variable_values_use_native_direct_child_texts(self):
+        from unittest.mock import patch
+
+        from tecan_common import native_acceleration
+        from fluent_pipeline import protocol_ir
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_direct_child_texts"
+        ):
+            self.skipTest("optional Rust XML child-text collector is not built")
+        root = protocol_ir.ET.fromstring(
+            "<Variable><Values><Value> 1 </Value><Empty> </Empty>"
+            "<Nested><Value>ignored</Value></Nested><Value>2.5</Value>"
+            "<Label>alpha</Label></Values></Variable>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = protocol_ir._xscr_variable_values(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_direct_child_texts",
+                wraps=native_acceleration.xml_direct_child_texts,
+            ) as native_call:
+                actual = protocol_ir._xscr_variable_values(root)
+                native_call.assert_called_once()
+                self.assertIs(native_call.call_args.args[1], protocol_ir.ET.Element)
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [1, 2.5, "alpha"])
+
     def test_selected_tip_channels_use_native_integer_tag_selection(self):
         from unittest.mock import patch
 
