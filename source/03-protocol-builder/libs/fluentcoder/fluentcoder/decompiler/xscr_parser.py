@@ -32,7 +32,7 @@ from tecan_common.native_acceleration import (
 from tecan_common.performance import performance_marker
 from tecan_common.xml_helpers import elements_by_name
 
-from ..catalog.xcmp import _direct_child, _direct_children, _find, _local, _text
+from ..catalog.xcmp import _direct_child, _direct_children, _find, _findall, _local, _text
 from ..expressions import is_expression_field, parse_or_preserve_source_expression
 from ..ir.subroutine_semantics import normalize_subroutine_execution_mode
 from ..ir.driver_recovery import parse_driver_recovery_policy
@@ -751,8 +751,8 @@ def _parse_leave(obj: ET.Element) -> LeaveStep:
 
 def _parse_move_axis_command(obj: ET.Element) -> MoveAxisCommandStep:
     charge = None
-    for elem in obj.iter():
-        if isinstance(elem.tag, str) and _local(elem.tag) == "ChargeCondition" and elem.text:
+    for elem in _findall(obj, "ChargeCondition"):
+        if elem.text:
             charge = elem.text.strip()
             break
     return MoveAxisCommandStep(
@@ -787,8 +787,8 @@ def _parse_wait_for_async_response(obj: ET.Element) -> WaitForAsyncResponseStep:
 
 def _parse_end_script(obj: ET.Element) -> EndScriptStep:
     return_code = "Success"
-    for elem in obj.iter():
-        if isinstance(elem.tag, str) and _local(elem.tag) == "ScriptExecutionResult" and elem.text:
+    for elem in _findall(obj, "ScriptExecutionResult"):
+        if elem.text:
             return_code = elem.text.strip()
             break
     return EndScriptStep(
@@ -798,8 +798,8 @@ def _parse_end_script(obj: ET.Element) -> EndScriptStep:
 
 
 def _extract_nested_available_id(obj: ET.Element) -> Optional[str]:
-    for elem in obj.iter():
-        if isinstance(elem.tag, str) and _local(elem.tag) == "AvailableID" and elem.text:
+    for elem in _findall(obj, "AvailableID"):
+        if elem.text:
             return elem.text.strip()
     return None
 

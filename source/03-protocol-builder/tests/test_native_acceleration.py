@@ -79,6 +79,59 @@ class NativeAccelerationTests(unittest.TestCase):
             actual = parse_xscr(path).model_dump(mode="json")
         self.assertEqual(actual, expected)
 
+    def test_decompiler_scalar_field_scans_use_native_selectors(self) -> None:
+        from fluentcoder.decompiler import xscr_parser
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        move = ET.fromstring(
+            "<Object><ChargeCondition/><Nested><ChargeCondition> ready </ChargeCondition>"
+            "</Nested><ChargeCondition>later</ChargeCondition></Object>"
+        )
+        end = ET.fromstring(
+            "<Object><ScriptExecutionResult/><Nested><ScriptExecutionResult> exit </ScriptExecutionResult>"
+            "</Nested><ScriptExecutionResult>later</ScriptExecutionResult></Object>"
+        )
+        available_id = ET.fromstring(
+            "<Object><AvailableID/><Nested><AvailableID> identifier </AvailableID>"
+            "</Nested><AvailableID>later</AvailableID></Object>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = (
+                xscr_parser._parse_move_axis_command(move),
+                xscr_parser._parse_end_script(end),
+                xscr_parser._extract_nested_available_id(available_id),
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = (
+                    xscr_parser._parse_move_axis_command(move),
+                    xscr_parser._parse_end_script(end),
+                    xscr_parser._extract_nested_available_id(available_id),
+                )
+                for root, names in (
+                    (move, {"ChargeCondition"}),
+                    (end, {"ScriptExecutionResult"}),
+                    (available_id, {"AvailableID"}),
+                ):
+                    self.assertTrue(
+                        any(
+                            call.args[0] is root and call.args[1] == names
+                            for call in native_call.call_args_list
+                        )
+                    )
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual[0].charge_condition, "ready")
+        self.assertEqual(actual[1].return_code, "exit")
+        self.assertEqual(actual[2], "identifier")
+
     def test_native_pattern_window_order_and_confidence(self) -> None:
         if not native_acceleration.available():
             self.skipTest("optional Rust extension is not built")
