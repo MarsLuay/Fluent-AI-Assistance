@@ -166,8 +166,9 @@ class ScriptTests(unittest.TestCase):
             )
 
     def test_startup_variable_values_use_native_ascii_with_unicode_fallback(self) -> None:
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "xml_container_child_texts"
+        if not native_acceleration.available() or not all(
+            hasattr(native_acceleration._native, name)
+            for name in ("xml_container_child_texts", "ascii_casefold_equals")
         ):
             self.skipTest("optional Rust XML child-text collector is not built")
         source = (
@@ -185,9 +186,14 @@ class ScriptTests(unittest.TestCase):
                 native_acceleration,
                 "xml_container_child_texts",
                 wraps=native_acceleration.xml_container_child_texts,
-            ) as native_call:
+            ) as native_call, patch.object(
+                native_acceleration,
+                "ascii_casefold_equals",
+                wraps=native_acceleration.ascii_casefold_equals,
+            ) as native_bool_call:
                 actual = script._startup_variables(root)
                 native_call.assert_called_once()
+                self.assertEqual(native_bool_call.call_count, 2)
         self.assertEqual(actual, expected)
         self.assertEqual(actual[0]["default_values"], ["first", "second", "first"])
         self.assertTrue(actual[0]["query_on_startup"])
@@ -195,7 +201,7 @@ class ScriptTests(unittest.TestCase):
         unicode_root = script.parse_xml_text(
             "<Root><anyType Type=\"VariableDefinitionHelper\"><Name>Sample</Name>"
             "<TypeName>String</TypeName><Values><Value>café</Value></Values>"
-            "</anyType></Root>"
+            "<QueryOnStartup>trué</QueryOnStartup></anyType></Root>"
         )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             unicode_expected = script._startup_variables(unicode_root)
@@ -204,6 +210,9 @@ class ScriptTests(unittest.TestCase):
                 native_acceleration.xml_container_child_texts(
                     unicode_root[0], "Values", script.ET.Element
                 )
+            )
+            self.assertIsNone(
+                native_acceleration.ascii_casefold_equals("trué", "true")
             )
             unicode_actual = script._startup_variables(unicode_root)
         self.assertEqual(unicode_actual, unicode_expected)

@@ -1412,6 +1412,15 @@ fn unique_ascii_tuple_indices<'py>(
 }
 
 #[pyfunction]
+fn ascii_casefold_equals(value: &str, expected: &str) -> Option<bool> {
+    if value.is_ascii() && expected.is_ascii() {
+        Some(value.eq_ignore_ascii_case(expected))
+    } else {
+        None
+    }
+}
+
+#[pyfunction]
 fn sorted_unique_ascii_strings<'py>(
     py: Python<'py>,
     groups: &Bound<'py, PyAny>,
@@ -3599,6 +3608,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(any_ascii_casefold_in, module)?)?;
     module.add_function(wrap_pyfunction!(ordered_ascii_string_counts, module)?)?;
     module.add_function(wrap_pyfunction!(sorted_unique_ascii_strings, module)?)?;
+    module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
     module.add_function(wrap_pyfunction!(unique_ascii_tuple_indices, module)?)?;
     module.add_function(wrap_pyfunction!(delimited_row_fields, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_command_records, module)?)?;

@@ -367,6 +367,13 @@ def _all_text_values(root: ET.Element) -> list[str]:
     return all_text_values(root)
 
 
+def _casefold_equals(value: str, expected: str) -> bool:
+    native = native_acceleration.ascii_casefold_equals(value, expected)
+    if native is not None:
+        return native
+    return value.casefold() == expected
+
+
 def _startup_variables(root: ET.Element) -> list[dict[str, Any]]:
     variables: list[dict[str, Any]] = []
     for element in _variable_definition_elements(root):
@@ -387,7 +394,7 @@ def _startup_variables(root: ET.Element) -> list[dict[str, Any]]:
                 if (child.text or "").strip()
             ]
         )
-        query = child_text(element, "QueryOnStartup").casefold() == "true"
+        query = _casefold_equals(child_text(element, "QueryOnStartup"), "true")
         prompt = child_text(element, "QueryOnStartupString")
         variables.append(
             {
@@ -396,7 +403,7 @@ def _startup_variables(root: ET.Element) -> list[dict[str, Any]]:
                 "type": child_text(element, "TypeName"),
                 "query_on_startup": query,
                 "prompt": prompt,
-                "read_only": child_text(element, "ReadOnly").casefold() == "true",
+                "read_only": _casefold_equals(child_text(element, "ReadOnly"), "true"),
                 "default_values": values,
                 "manual_review_required": query or bool(prompt),
             }

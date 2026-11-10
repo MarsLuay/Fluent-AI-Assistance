@@ -1555,6 +1555,23 @@ def delimited_row_fields(
         return None
 
 
+def ascii_casefold_equals(value: Any, expected: Any) -> bool | None:
+    """Compare supported ASCII strings with Python-compatible case-folding."""
+    if (
+        not enabled()
+        or type(value) is not str
+        or type(expected) is not str
+        or not value.isascii()
+        or not expected.isascii()
+    ):
+        return None
+    try:
+        result = _native.ascii_casefold_equals(value, expected)
+        return result if type(result) is bool else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def any_ascii_casefold_in(values: Any, candidates: Any) -> bool | None:
     """Check ASCII strings against a Python-owned case-folded candidate set."""
     if (
