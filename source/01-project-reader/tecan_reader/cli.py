@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 from collections import Counter
 
+from tecan_common import native_acceleration
+
 from .archive import inspect_archive
 from .common import TECAN_EXTENSIONS, extension_counts
 from .compare import compare_archives
@@ -184,6 +186,13 @@ def _cmd_patterns_types(args: argparse.Namespace) -> int:
     return 0
 
 
+def _most_common_counts(counter: Counter[str], limit: int | None = None) -> dict[str, int]:
+    native = native_acceleration.most_common_ascii_counts(dict(counter), limit)
+    if native is not None:
+        return native
+    return dict(counter.most_common(limit))
+
+
 def inspect_path(path: Path, *, script_limit: int | None, object_limit: int | None) -> dict[str, Any]:
     if path.is_dir():
         return _inspect_directory(path, script_limit=script_limit, object_limit=object_limit)
@@ -236,9 +245,9 @@ def _inspect_directory(path: Path, *, script_limit: int | None, object_limit: in
         "file_count": len(files),
         "extension_counts": extension_counts(files),
         "script_names": script_names,
-        "family_counts": dict(family_counts.most_common()),
-        "command_counts": dict(command_counts.most_common(40)),
-        "warning_counts": dict(warnings.most_common()),
+        "family_counts": _most_common_counts(family_counts),
+        "command_counts": _most_common_counts(command_counts, 40),
+        "warning_counts": _most_common_counts(warnings),
         "items": items,
     }
 
