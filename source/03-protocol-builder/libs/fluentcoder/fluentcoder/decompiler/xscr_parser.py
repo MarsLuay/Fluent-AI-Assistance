@@ -214,10 +214,8 @@ def _parse_variable_declarations(
     variables: list[str] = []
     defaults: dict[str, Union[float, int, str]] = {}
     metadata: dict[str, dict[str, str]] = {}
-    for elem in var_root.iter():
+    for elem in elements_by_name(var_root, {"anyType"}):
         if not isinstance(elem.tag, str):
-            continue
-        if _local(elem.tag) != "anyType":
             continue
         declaration_fields: dict[str, ET.Element] = {}
         for field in elements_by_name(elem, {"Name", "TypeName", "Values", "Scope"}):

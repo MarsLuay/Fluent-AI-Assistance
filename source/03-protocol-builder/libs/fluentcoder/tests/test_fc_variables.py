@@ -51,7 +51,7 @@ def test_xscr_variable_declarations_use_native_candidate_scan_with_python_parity
             wraps=xml_helpers._native_xml_elements_by_name,
         ) as native_call:
             actual = xscr_parser._parse_variable_declarations(root)
-            assert native_call.call_count == 3
+            assert native_call.call_count == 4
 
     assert actual == expected
     assert actual == (
