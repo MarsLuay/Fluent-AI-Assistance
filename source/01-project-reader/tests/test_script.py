@@ -117,6 +117,51 @@ class ScriptTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, {"Name": "Alpha | Beta", "LineNumber": "7"})
 
+    def test_command_fallback_uses_native_object_selector(self) -> None:
+        from tecan_common import xml_helpers
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        root = script.parse_xml_text(
+            '<Root><Object Type="A.Command"><Name> first </Name>'
+            "<LineNumber>1</LineNumber><Name>second</Name></Object>"
+            '<Ignored Type="X.Command"><Name>skip</Name></Ignored>'
+            '<Nested><Object Type="B.Command"><Name>third</Name></Object></Nested>'
+            '<Object><Name>missing type</Name></Object></Root>'
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration, "xscr_command_records", return_value=None
+            ):
+                expected = script._commands(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration, "xscr_command_records", return_value=None
+            ):
+                with patch.object(
+                    xml_helpers,
+                    "_native_xml_elements_by_name",
+                    wraps=xml_helpers._native_xml_elements_by_name,
+                ) as native_call:
+                    actual = script._commands(root)
+                    object_scans = [
+                        call
+                        for call in native_call.call_args_list
+                        if call.args[1] == {"Object"}
+                    ]
+                    self.assertEqual(len(object_scans), 1)
+                    self.assertIs(object_scans[0].args[0], root)
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            [command["raw_type"] for command in actual], ["A.Command", "B.Command"]
+        )
+        self.assertEqual(
+            actual[0]["fields"], {"Name": "first | second", "LineNumber": "1"}
+        )
+
     def test_inspect_xscr_reads_from_path(self) -> None:
         with TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir) / "test.xscr"

@@ -243,8 +243,8 @@ def _commands(root: ET.Element) -> list[dict[str, Any]]:
             )
         return commands
     commands: list[dict[str, Any]] = []
-    for el in root.iter():
-        if local_name(el.tag) != "Object" or "Type" not in el.attrib:
+    for el in elements_by_name(root, {"Object"}):
+        if "Type" not in el.attrib:
             continue
         type_name = el.attrib["Type"]
         fields = _interesting_fields(el)
