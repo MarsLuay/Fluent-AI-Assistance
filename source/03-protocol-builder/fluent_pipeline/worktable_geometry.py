@@ -741,7 +741,8 @@ def _site_index_sort_key(value: str) -> tuple[int, str]:
 
 def _stable_fingerprint(value: Mapping[str, Any]) -> str:
     payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    native = native_acceleration.sha256_text(payload)
+    return native if native is not None else hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _component_pipettable(template: ET.Element | None) -> dict[str, Any] | None:

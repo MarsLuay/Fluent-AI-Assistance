@@ -563,6 +563,35 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         )
         self.assertEqual(actual[10:], ["東京", "\ud800", "", "", "Custom"])
 
+    def test_stable_fingerprint_hashes_python_json_payload_natively(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "sha256_text"
+        ):
+            self.skipTest("optional Rust SHA-256 helper is not built")
+
+        values = [
+            {},
+            {"z": [1, True, None], "a": {"ratio": 0.125, "integer": 2.0}},
+            {"unicode": "µ 🧪", "linebreak": "first\nsecond", "float": -1e-7},
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [worktable_geometry._stable_fingerprint(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "sha256_text",
+                wraps=native_acceleration.sha256_text,
+            ) as native_call:
+                actual = [worktable_geometry._stable_fingerprint(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertEqual(
+                native_acceleration.sha256_text("µ 🧪"),
+                worktable_geometry.hashlib.sha256("µ 🧪".encode("utf-8")).hexdigest(),
+            )
+            with self.assertRaises(UnicodeEncodeError):
+                worktable_geometry._stable_fingerprint({"surrogate": "\ud800"})
+        self.assertEqual(actual, expected)
+
     def test_clean_uses_native_for_safe_containers_and_falls_back_conservatively(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "clean_empty_containers"

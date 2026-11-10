@@ -1366,6 +1366,23 @@ def deepcopy_json(value: Any) -> Any | None:
         return None
 
 
+def sha256_text(value: Any) -> str | None:
+    """Hash exact Unicode text natively, or request the Python hashing fallback."""
+    if not enabled() or type(value) is not str:
+        return None
+    try:
+        result = _native.sha256_text(value)
+        if (
+            type(result) is str
+            and len(result) == 64
+            and all(character in "0123456789abcdef" for character in result)
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def canonical_json(value: Any) -> str | None:
     """Serialize JSON-compatible values with sorted keys, or request fallback."""
     if not enabled():

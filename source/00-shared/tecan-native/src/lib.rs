@@ -3230,6 +3230,11 @@ fn read_utf8_sig_file(path: &str) -> Option<String> {
 }
 
 #[pyfunction]
+fn sha256_text(value: &str) -> String {
+    format!("{:x}", Sha256::digest(value.as_bytes()))
+}
+
+#[pyfunction]
 fn canonical_json(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<String> {
     let json = py_to_json(py, value)?;
     let compact =
@@ -4391,6 +4396,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(catalog_stat_fingerprint, module)?)?;
     module.add_function(wrap_pyfunction!(source_content_fingerprint, module)?)?;
     module.add_function(wrap_pyfunction!(catalog_content_fingerprints, module)?)?;
+    module.add_function(wrap_pyfunction!(sha256_text, module)?)?;
     module.add_function(wrap_pyfunction!(canonical_json, module)?)?;
     module.add_function(wrap_pyfunction!(canonical_json_compact, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_sort_indices, module)?)?;
