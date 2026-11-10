@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import random
 from pathlib import Path
 import tempfile
 import unittest
@@ -37,6 +38,37 @@ class IngestionDiagnosticTests(unittest.TestCase):
         self.assertEqual([item["entry_path"] for item in ordered], ["a.xscr", "b.xscr"])
         self.assertEqual(json.dumps(ordered, sort_keys=True), json.dumps(sort_diagnostics([later, earlier]), sort_keys=True))
         self.assertEqual(ordered[0]["schema_version"], "tecan.ingestion_diagnostic.v1")
+
+    def test_native_diagnostic_sort_matches_generated_unicode_keys(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "diagnostic_sort_indices"
+        ):
+            self.skipTest("optional Rust diagnostic sorter is not built")
+        generator = random.Random(0xD1A6)
+        choices = (None, "", "a", "Z", "é", "µ", "Ω", "中", "𝄞")
+        fields = ("archive_path", "entry_path", "code", "severity", "message")
+        items = [
+            {**dict(zip(fields, (generator.choice(choices) for _ in fields))), "index": index}
+            for index in range(96)
+        ]
+        duplicate_key = {field: items[3][field] for field in fields}
+        items.extend(
+            [{**duplicate_key, "index": 96}, {**duplicate_key, "index": 97}]
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = sort_diagnostics(tuple(items))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                diagnostics_module,
+                "_native_diagnostic_sort_indices",
+                wraps=diagnostics_module._native_diagnostic_sort_indices,
+            ) as native_sort:
+                actual = sort_diagnostics(tuple(items))
+                native_sort.assert_called_once()
+        self.assertEqual(actual, expected)
+        tied_indices = [item["index"] for item in actual if all(item[field] == duplicate_key[field] for field in fields)]
+        self.assertLess(tied_indices.index(3), tied_indices.index(96))
+        self.assertLess(tied_indices.index(96), tied_indices.index(97))
 
     def test_native_diagnostic_message_preserves_fallback_cases(self) -> None:
         if not native_acceleration.available() or not hasattr(
