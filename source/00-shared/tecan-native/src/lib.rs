@@ -1516,6 +1516,19 @@ fn ascii_casefold_equals(value: &str, expected: &str) -> Option<bool> {
 }
 
 #[pyfunction]
+fn ascii_lower_alnum_compact(value: &str) -> Option<String> {
+    if !value.is_ascii() {
+        return None;
+    }
+    Some(
+        value
+            .chars()
+            .filter(|character| character.is_ascii_lowercase() || character.is_ascii_digit())
+            .collect(),
+    )
+}
+
+#[pyfunction]
 fn ascii_word_boundary_contains(value: &str, word: &str) -> Option<bool> {
     if !value.is_ascii() || !word.is_ascii() || word.is_empty() {
         return None;
@@ -4609,6 +4622,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(most_common_string_counts, module)?)?;
     module.add_function(wrap_pyfunction!(sorted_unique_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
+    module.add_function(wrap_pyfunction!(ascii_lower_alnum_compact, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_word_boundary_contains, module)?)?;
     module.add_function(wrap_pyfunction!(label_base_ascii_text, module)?)?;
     module.add_function(wrap_pyfunction!(is_guid_text, module)?)?;
@@ -4707,6 +4721,17 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ascii_lower_alnum_compaction_matches_python_regex_filter() {
+        assert_eq!(
+            ascii_lower_alnum_compact("7mm nest-template"),
+            Some("7mmnesttemplate".into())
+        );
+        assert_eq!(ascii_lower_alnum_compact("AZ_09"), Some("09".into()));
+        assert_eq!(ascii_lower_alnum_compact(""), Some(String::new()));
+        assert_eq!(ascii_lower_alnum_compact("東京"), None);
+    }
 
     #[test]
     fn ascii_word_boundary_matches_python_character_class() {

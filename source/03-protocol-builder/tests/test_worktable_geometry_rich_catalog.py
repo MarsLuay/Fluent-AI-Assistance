@@ -321,6 +321,9 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             or not hasattr(
                 native_acceleration._native, "ascii_word_boundary_contains"
             )
+            or not hasattr(
+                native_acceleration._native, "ascii_lower_alnum_compact"
+            )
         ):
             self.skipTest("optional Rust site-name matchers are not built")
         cases = [
@@ -354,15 +357,21 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
                     "ascii_word_boundary_contains",
                     wraps=native_acceleration.ascii_word_boundary_contains,
                 ) as native_word_call:
-                    actual = [
-                        worktable_geometry.classify_site_kind(*parts)
-                        for parts, _ in cases
-                    ]
-                    self.assertEqual(
-                        native_call.call_count,
-                        sum(expected_value != "pin" for _, expected_value in cases),
-                    )
-                    self.assertEqual(native_word_call.call_count, 7)
+                    with patch.object(
+                        native_acceleration,
+                        "ascii_lower_alnum_compact",
+                        wraps=native_acceleration.ascii_lower_alnum_compact,
+                    ) as native_compact_call:
+                        actual = [
+                            worktable_geometry.classify_site_kind(*parts)
+                            for parts, _ in cases
+                        ]
+                        self.assertEqual(
+                            native_call.call_count,
+                            sum(expected_value != "pin" for _, expected_value in cases),
+                        )
+                        self.assertEqual(native_word_call.call_count, 7)
+                        self.assertEqual(native_compact_call.call_count, len(cases))
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [expected_value for _, expected_value in cases])
 

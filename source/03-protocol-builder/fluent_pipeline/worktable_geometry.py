@@ -1399,7 +1399,12 @@ def classify_site_kind(location_group: Any = "", type_name: Any = "", object_nam
     if not blob:
         return ""
     lower = blob.casefold()
-    compact = re.sub(r"[^a-z0-9]+", "", lower)
+    native_compact = native_acceleration.ascii_lower_alnum_compact(lower)
+    compact = (
+        native_compact
+        if native_compact is not None
+        else re.sub(r"[^a-z0-9]+", "", lower)
+    )
 
     if "pin" in lower:
         return "pin"
