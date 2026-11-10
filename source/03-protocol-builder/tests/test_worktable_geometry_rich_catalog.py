@@ -563,6 +563,32 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         )
         self.assertEqual(actual[10:], ["東京", "\ud800", "", "", "Custom"])
 
+    def test_matrix_double_rows_use_native_direct_selection_with_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_direct_elements_by_name"
+        ):
+            self.skipTest("optional Rust direct XML child selector is not built")
+        root = worktable_geometry.ET.fromstring(
+            "<Root><Mat>"
+            "<ArrayOfdouble><double>1</double><double>2.5</double></ArrayOfdouble>"
+            "<ArrayOfdouble><double>3</double><double>-4</double><!--skip--></ArrayOfdouble>"
+            "<ArrayOfdouble><Group><double>99</double></Group></ArrayOfdouble>"
+            "<ArrayOfdouble><double>invalid</double></ArrayOfdouble>"
+            "</Mat></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = worktable_geometry._matrix(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_direct_elements_by_name",
+                wraps=native_acceleration.xml_direct_elements_by_name,
+            ) as native_call:
+                actual = worktable_geometry._matrix(root)
+                self.assertEqual(native_call.call_count, 5)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [[1.0, 2.5], [3.0, -4.0]])
+
     def test_position_label_uses_native_for_bounded_integer_paths(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "format_site_path"

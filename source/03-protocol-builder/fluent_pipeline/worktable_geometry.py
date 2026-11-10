@@ -1245,7 +1245,7 @@ def _matrix(elem: ET.Element | None) -> list[list[float]]:
     mat = _find(elem, "Mat")
     rows: list[list[float]] = []
     for row in _direct_children(mat, "ArrayOfdouble"):
-        values = [_float_text(child) for child in list(row) if isinstance(child.tag, str) and _local_name(child.tag) == "double"]
+        values = [_float_text(child) for child in _direct_children(row, "double")]
         if all(value is not None for value in values) and values:
             rows.append([float(value) for value in values if value is not None])
     return rows if rows else []
