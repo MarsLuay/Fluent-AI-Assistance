@@ -126,6 +126,26 @@ class NativeAccelerationTests(unittest.TestCase):
         )
         self.assertIs(copied_tuple_key[tuple_key], tuple_key)
 
+    def test_native_deepcopy_cycles_fall_back_to_python(self) -> None:
+        if not native_acceleration.available():
+            self.skipTest("optional Rust extension is not built")
+        from tecan_reader.project_model import deepcopy as project_deepcopy
+
+        cyclic_list: list[object] = []
+        cyclic_list.append(cyclic_list)
+        indirect_list: list[object] = []
+        indirect_tuple = (indirect_list,)
+        indirect_list.append(indirect_tuple)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.deepcopy_json(cyclic_list))
+            copied_list = project_deepcopy(cyclic_list)
+            self.assertIsNone(native_acceleration.deepcopy_json(indirect_list))
+            copied_indirect = project_deepcopy(indirect_list)
+
+        self.assertIs(copied_list[0], copied_list)
+        self.assertIs(copied_indirect[0][0], copied_indirect)
+
     def test_native_deepcopy_falls_back_for_overridden_python_types(self) -> None:
         if not native_acceleration.available():
             self.skipTest("optional Rust extension is not built")
