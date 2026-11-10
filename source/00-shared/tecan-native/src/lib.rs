@@ -1200,6 +1200,71 @@ fn render_gwl_report(
     Some(format!("{}\n", lines.join("\n")))
 }
 
+#[allow(clippy::too_many_arguments)] // Keep the XSCR report adapter's inputs explicit.
+#[pyfunction]
+fn render_xscr_report(
+    header: Vec<String>,
+    references: Vec<Vec<String>>,
+    family_counts: Vec<(String, String)>,
+    command_counts: Vec<(String, String)>,
+    variables: Vec<String>,
+    query_prompts: Vec<String>,
+    dependencies_present: bool,
+    dependencies: Vec<Vec<String>>,
+    comments: Vec<String>,
+    warnings: Vec<String>,
+    commands: Vec<Vec<String>>,
+) -> Option<String> {
+    if header.len() != 4
+        || references.iter().any(|reference| reference.len() != 3)
+        || dependencies.iter().any(|dependency| dependency.len() != 2)
+        || commands.iter().any(|command| command.len() != 5)
+    {
+        return None;
+    }
+    let mut lines = vec![
+        format!("# XSCR Report: {}", header[0]),
+        String::new(),
+        format!("- Source: `{}`", header[1]),
+        format!("- Script version: `{}`", header[2]),
+        format!("- Command count: `{}`", header[3]),
+    ];
+    if !references.is_empty() {
+        lines.push(String::new());
+        lines.push("## References".to_string());
+        for reference in references.iter().take(20) {
+            lines.push(format!(
+                "- {}: `{}` (`{}`)",
+                reference[0], reference[1], reference[2]
+            ));
+        }
+    }
+    lines.extend(render_append_dict("Command Families", family_counts, 20));
+    lines.extend(render_append_dict("Command Types", command_counts, 30));
+    lines.extend(render_append_list("Variables", variables, 20));
+    lines.extend(render_append_list("Query Prompts", query_prompts, 20));
+    if dependencies_present {
+        lines.push(String::new());
+        lines.push("## Dependencies And Mentions".to_string());
+        for dependency in dependencies {
+            lines.push(format!("- {}: {}", dependency[0], dependency[1]));
+        }
+    }
+    lines.extend(render_append_list("Comments", comments, 12));
+    lines.extend(render_append_list("Warnings", warnings, 20));
+    if !commands.is_empty() {
+        lines.push(String::new());
+        lines.push("## First Commands".to_string());
+        for command in commands.iter().take(40) {
+            lines.push(format!(
+                "- #{} line {}: `{}` ({}) {}",
+                command[0], command[1], command[2], command[3], command[4]
+            ));
+        }
+    }
+    Some(format!("{}\n", lines.join("\n")))
+}
+
 #[pyfunction]
 fn render_zeia_report(
     header: Vec<String>,
@@ -2436,6 +2501,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_project_index_summary, module)?)?;
     module.add_function(wrap_pyfunction!(render_directory_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_zeia_report, module)?)?;
+    module.add_function(wrap_pyfunction!(render_xscr_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_join_lines, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(read_text_file, module)?)?;
@@ -2541,6 +2607,43 @@ mod tests {
                 Vec::new(),
             ),
             "# ZEIA Compare Report\n\n- Left: `left-x`\n- Right: `right-x`\n- Entries: `2` -> `3`\n- Common script names: `1`\n\n## Scripts Added\n- added-x\n\n## Left Command Families\n- `family-x`: 2\n"
+        );
+    }
+
+    #[test]
+    fn xscr_report_preserves_section_order_and_command_formatting() {
+        assert_eq!(
+            render_xscr_report(
+                vec![
+                    "title-x".into(),
+                    "source-x".into(),
+                    "unknown".into(),
+                    "4".into(),
+                ],
+                vec![vec!["Reference".into(), "object-x".into(), "guid-x".into(),]],
+                vec![("family-x".into(), "2".into())],
+                vec![("operation-x".into(), "1".into())],
+                vec!["variable-x (unknown)".into()],
+                vec!["prompt-x: question-x [1..2]".into()],
+                true,
+                vec![vec![
+                    "dependency-x".into(),
+                    "`mention-a`, `mention-b`".into(),
+                ]],
+                vec!["comment-x".into()],
+                vec!["warning-x".into()],
+                vec![vec![
+                    "1".into(),
+                    "?".into(),
+                    "operation-x".into(),
+                    "family-x".into(),
+                    "label-x".into(),
+                ]],
+            )
+            .as_deref(),
+            Some(
+                "# XSCR Report: title-x\n\n- Source: `source-x`\n- Script version: `unknown`\n- Command count: `4`\n\n## References\n- Reference: `object-x` (`guid-x`)\n\n## Command Families\n- `family-x`: 2\n\n## Command Types\n- `operation-x`: 1\n\n## Variables\n- variable-x (unknown)\n\n## Query Prompts\n- prompt-x: question-x [1..2]\n\n## Dependencies And Mentions\n- dependency-x: `mention-a`, `mention-b`\n\n## Comments\n- comment-x\n\n## Warnings\n- warning-x\n\n## First Commands\n- #1 line ?: `operation-x` (family-x) label-x\n"
+            )
         );
     }
 

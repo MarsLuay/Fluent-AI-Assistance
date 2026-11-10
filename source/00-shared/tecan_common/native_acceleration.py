@@ -348,6 +348,167 @@ def render_compare_report(
         return None
 
 
+def render_xscr_report(report: Any) -> str | None:
+    """Render supported XSCR summaries natively, leaving edge cases to Python."""
+    if not enabled() or type(report) is not dict:
+        return None
+    safe_values = (str, bool, int, float, type(None))
+    object_name = report.get("object_name")
+    source = report.get("source")
+    script_version = report.get("script_version")
+    command_count = report.get("command_count")
+    if not all(
+        type(value) in safe_values
+        for value in (object_name, source, script_version, command_count)
+    ):
+        return None
+    mappings = [
+        report.get("family_counts", {}),
+        report.get("command_counts", {}),
+    ]
+    references = report.get("references", [])
+    variables = report.get("variables", [])
+    query_prompts = report.get("query_prompts", [])
+    dependencies = report.get("dependencies", {})
+    comments = report.get("comments", [])
+    warnings = report.get("warnings", [])
+    commands = report.get("commands", [])
+    if (
+        any(type(mapping) is not dict for mapping in mappings)
+        or type(references) not in (list, tuple)
+        or type(variables) not in (list, tuple)
+        or type(query_prompts) not in (list, tuple)
+        or type(dependencies) is not dict
+        or type(comments) not in (list, tuple)
+        or not all(type(value) in safe_values for value in comments)
+        or type(warnings) not in (list, tuple)
+        or not all(type(value) in safe_values for value in warnings)
+        or type(commands) not in (list, tuple)
+    ):
+        return None
+    try:
+        count_sections: list[list[tuple[str, str]]] = []
+        for mapping in mappings:
+            entries: list[tuple[str, str]] = []
+            for key, value in mapping.items():
+                if type(key) is not str or type(value) not in safe_values:
+                    return None
+                entries.append((key, str(value)))
+            count_sections.append(entries)
+
+        reference_rows: list[list[str]] = []
+        for reference in references[:20]:
+            if type(reference) is not dict:
+                return None
+            values = [
+                reference.get("type_id"),
+                reference.get("object_name"),
+                reference.get("guid"),
+            ]
+            if not all(type(value) in safe_values for value in values):
+                return None
+            reference_rows.append(
+                [str(values[0] or "Reference"), str(values[1]), str(values[2])]
+            )
+
+        rendered_variables: list[str] = []
+        for variable in variables:
+            if type(variable) is not dict:
+                return None
+            name = variable.get("name")
+            variable_type = variable.get("type")
+            if type(name) not in safe_values or type(variable_type) not in safe_values:
+                return None
+            rendered_variables.append(
+                f"{name} ({variable_type or 'unknown'})"
+            )
+
+        rendered_prompts: list[str] = []
+        for prompt in query_prompts:
+            if type(prompt) is not dict:
+                return None
+            values = [
+                prompt.get("name"),
+                prompt.get("prompt"),
+                prompt.get("minimum"),
+                prompt.get("maximum"),
+            ]
+            if not all(type(value) in safe_values for value in values):
+                return None
+            rendered_prompts.append(
+                f"{values[0]}: {values[1]} [{values[2]}..{values[3]}]"
+            )
+
+        dependency_rows: list[list[str]] = []
+        for key, values in dependencies.items():
+            if type(key) is not str or type(values) not in (list, tuple):
+                return None
+            if not values:
+                continue
+            if not all(type(value) is str for value in values):
+                return None
+            unique_values = compact_list(values, limit=20)
+            if unique_values is None:
+                return None
+            rendered_values = ", ".join(f"`{value}`" for value in unique_values)
+            dependency_rows.append([key, rendered_values])
+
+        command_rows: list[list[str]] = []
+        for command in commands[:40]:
+            if type(command) is not dict:
+                return None
+            name = command.get("name")
+            line = command.get("line")
+            index = command.get("index")
+            command_type = command.get("type")
+            family = command.get("family")
+            if not all(
+                type(value) in safe_values
+                for value in (name, line, index, command_type, family)
+            ):
+                return None
+            label = name
+            if not label:
+                fields = command.get("fields", {})
+                if type(fields) is not dict:
+                    return None
+                comment = fields.get("Comment")
+                if type(comment) not in safe_values:
+                    return None
+                label = comment or ""
+            command_rows.append(
+                [
+                    str(index),
+                    str(line or "?"),
+                    str(command_type),
+                    str(family),
+                    str(label),
+                ]
+            )
+
+        result = _native.render_xscr_report(
+            [
+                str(object_name or source),
+                str(source),
+                str(script_version or "unknown"),
+                str(command_count),
+            ],
+            reference_rows,
+            count_sections[0],
+            count_sections[1],
+            [str(value) for value in rendered_variables],
+            [str(value) for value in rendered_prompts],
+            bool(dependencies),
+            dependency_rows,
+            [str(value) for value in comments],
+            [str(value) for value in warnings],
+            command_rows,
+        )
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def render_zeia_report(report: Any) -> str | None:
     """Render supported ZEIA summary data natively, or request fallback."""
     if not enabled() or type(report) is not dict:

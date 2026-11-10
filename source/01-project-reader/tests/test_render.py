@@ -169,18 +169,30 @@ class RenderListTests(unittest.TestCase):
             with (
                 patch.object(
                     render,
-                    "_native_render_append_list",
-                    wraps=render._native_render_append_list,
-                ) as native_list,
+                    "_native_render_xscr_report",
+                    wraps=render._native_render_xscr_report,
+                ) as native_xscr,
                 patch.object(
                     render,
-                    "_native_render_append_dict",
-                    wraps=render._native_render_append_dict,
-                ) as native_dict,
+                    "_native_render_zeia_report",
+                    wraps=render._native_render_zeia_report,
+                ) as native_zeia,
+                patch.object(
+                    render,
+                    "_native_render_directory_report",
+                    wraps=render._native_render_directory_report,
+                ) as native_directory,
+                patch.object(
+                    render,
+                    "_native_render_compare_report",
+                    wraps=render._native_render_compare_report,
+                ) as native_compare,
             ):
                 actual = [render.render_markdown(report) for report in reports]
-            self.assertGreater(native_list.call_count, 0)
-            self.assertGreater(native_dict.call_count, 0)
+            self.assertEqual(native_xscr.call_count, 1)
+            self.assertEqual(native_zeia.call_count, 1)
+            self.assertEqual(native_directory.call_count, 1)
+            self.assertEqual(native_compare.call_count, 1)
         self.assertEqual(actual, expected)
 
     def test_native_markdown_join_matches_python_with_fallbacks(self) -> None:
@@ -260,6 +272,122 @@ class RenderListTests(unittest.TestCase):
             actual_fallback = []
             render._append_pattern_specs(actual_fallback, unsupported)
         self.assertEqual(custom.str_calls, 1)
+        self.assertEqual(actual_fallback, expected_fallback)
+
+    def test_native_xscr_report_matches_python_limits_and_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "render_xscr_report"
+        ):
+            self.skipTest("optional Rust XSCR report renderer is not built")
+        report = {
+            "kind": "xscr",
+            "object_name": "",
+            "source": "source-x",
+            "script_version": "",
+            "command_count": 42,
+            "references": [
+                {
+                    "type_id": "" if index == 0 else "type-x",
+                    "object_name": f"object-{index}",
+                    "guid": f"guid-{index}",
+                }
+                for index in range(22)
+            ],
+            "family_counts": {f"family-{index}": index for index in range(21)},
+            "command_counts": {f"operation-{index}": index for index in range(31)},
+            "variables": [
+                {"name": f"variable-{index}", "type": "" if index == 0 else "text"}
+                for index in range(22)
+            ],
+            "query_prompts": [
+                {
+                    "name": f"prompt-{index}",
+                    "prompt": "question-x",
+                    "minimum": index,
+                    "maximum": index + 1,
+                }
+                for index in range(22)
+            ],
+            "dependencies": {
+                "empty-x": [],
+                "dependency-x": [
+                    f"mention-{index}" for index in range(21)
+                ]
+                + ["mention-0"],
+            },
+            "comments": [f"comment-{index}" for index in range(15)],
+            "warnings": [f"warning-{index}" for index in range(22)],
+            "commands": [
+                {
+                    "index": index,
+                    "line": 0 if index == 0 else index,
+                    "type": "operation-x",
+                    "family": "family-x",
+                    "name": "" if index == 0 else f"label-{index}",
+                    "fields": {"Comment": "field-label-x"},
+                }
+                for index in range(42)
+            ],
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = render.render_markdown(report)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            direct = native_acceleration.render_xscr_report(report)
+            self.assertEqual(direct, expected)
+            with patch.object(
+                render,
+                "_native_render_xscr_report",
+                wraps=render._native_render_xscr_report,
+            ) as native_call:
+                actual = render.render_markdown(report)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertIn("# XSCR Report: source-x", actual)
+        self.assertIn("- Reference: `object-0` (`guid-0`)", actual)
+        self.assertNotIn("object-20", actual)
+        self.assertNotIn("family-20", actual)
+        self.assertNotIn("variable-20", actual)
+        self.assertNotIn("prompt-20", actual)
+        self.assertNotIn("mention-20", actual)
+        self.assertNotIn("empty-x", actual)
+        self.assertNotIn("comment-12", actual)
+        self.assertNotIn("warning-20", actual)
+        self.assertIn("field-label-x", actual)
+        self.assertNotIn("label-40", actual)
+
+        class CustomLabel:
+            def __init__(self) -> None:
+                self.bool_calls = 0
+                self.str_calls = 0
+
+            def __bool__(self) -> bool:
+                self.bool_calls += 1
+                return True
+
+            def __str__(self) -> str:
+                self.str_calls += 1
+                return "custom-label"
+
+        custom = CustomLabel()
+        unsupported = {
+            "kind": "xscr",
+            "commands": [
+                {
+                    "name": custom,
+                    "line": 1,
+                    "index": 1,
+                    "type": "operation-x",
+                    "family": "family-x",
+                }
+            ],
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_fallback = render.render_markdown(unsupported)
+        self.assertEqual((custom.bool_calls, custom.str_calls), (1, 1))
+        custom.bool_calls = custom.str_calls = 0
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual_fallback = render.render_markdown(unsupported)
+        self.assertEqual((custom.bool_calls, custom.str_calls), (1, 1))
         self.assertEqual(actual_fallback, expected_fallback)
 
     def test_native_zeia_report_matches_python_limits_and_fallback(self) -> None:
