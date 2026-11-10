@@ -919,6 +919,19 @@ fn canonical_json(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<String> 
 }
 
 #[pyfunction]
+fn diagnostic_sort_indices(keys_json: &str) -> PyResult<Option<String>> {
+    let Ok(keys) = serde_json::from_str::<Vec<Vec<String>>>(keys_json) else {
+        return Ok(None);
+    };
+    if keys.iter().any(|key| key.len() != 5) {
+        return Ok(None);
+    }
+    let mut indices = (0..keys.len()).collect::<Vec<_>>();
+    indices.sort_by(|left, right| keys[*left].cmp(&keys[*right]));
+    Ok(serde_json::to_string(&indices).ok())
+}
+
+#[pyfunction]
 fn command_short_name(type_name: &str) -> Option<String> {
     if !type_name.is_ascii() {
         return None;
@@ -1691,6 +1704,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(source_content_fingerprint, module)?)?;
     module.add_function(wrap_pyfunction!(catalog_content_fingerprints, module)?)?;
     module.add_function(wrap_pyfunction!(canonical_json, module)?)?;
+    module.add_function(wrap_pyfunction!(diagnostic_sort_indices, module)?)?;
     module.add_function(wrap_pyfunction!(command_short_name, module)?)?;
     module.add_function(wrap_pyfunction!(compact_list, module)?)?;
     module.add_function(wrap_pyfunction!(extension_counts, module)?)?;

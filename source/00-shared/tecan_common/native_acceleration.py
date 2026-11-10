@@ -157,6 +157,42 @@ def extension_counts(suffixes: Any) -> dict[str, int] | None:
         return None
 
 
+def diagnostic_sort_indices(keys: Any) -> list[int] | None:
+    """Return stable native ordering for pre-normalized five-string keys."""
+    if (
+        not enabled()
+        or type(keys) not in (list, tuple)
+        or not all(
+            type(key) in (list, tuple)
+            and len(key) == 5
+            and all(type(value) is str for value in key)
+            for key in keys
+        )
+    ):
+        return None
+    try:
+        encoded = _native.diagnostic_sort_indices(_encode_json(keys))
+        if not isinstance(encoded, str):
+            return None
+        order = json.loads(encoded)
+        if (
+            type(order) is list
+            and all(type(index) is int for index in order)
+            and sorted(order) == list(range(len(keys)))
+        ):
+            return order
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def command_short_name(type_name: Any) -> str | None:
     """Shorten supported ASCII command type names natively, or request fallback."""
     if not enabled() or type(type_name) is not str or not type_name.isascii():

@@ -4,8 +4,11 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
+from tecan_common import native_acceleration
+import tecan_reader.diagnostics as diagnostics_module
 from tecan_reader.diagnostics import (
     DiagnosticCode,
     IngestionArchiveError,
@@ -33,6 +36,73 @@ class IngestionDiagnosticTests(unittest.TestCase):
         self.assertEqual([item["entry_path"] for item in ordered], ["a.xscr", "b.xscr"])
         self.assertEqual(json.dumps(ordered, sort_keys=True), json.dumps(sort_diagnostics([later, earlier]), sort_keys=True))
         self.assertEqual(ordered[0]["schema_version"], "tecan.ingestion_diagnostic.v1")
+
+    def test_native_sort_is_stable_and_keeps_shallow_copy_semantics(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "diagnostic_sort_indices"
+        ):
+            self.skipTest("optional Rust diagnostic sorter is not built")
+        nested = {"mutable": []}
+        later = {
+            "archive_path": "z.zeia",
+            "entry_path": "last.xscr",
+            "code": "PARSER_FAILED",
+            "severity": "error",
+            "message": "later",
+            "nested": nested,
+        }
+        tied_first = {
+            "archive_path": "a.zeia",
+            "entry_path": "same.xscr",
+            "code": "PARSER_FAILED",
+            "severity": "error",
+            "message": "same",
+            "tag": "first",
+            "nested": nested,
+        }
+        tied_second = {**tied_first, "tag": "second"}
+        earlier = {
+            "archive_path": None,
+            "entry_path": "first.xscr",
+            "code": "ENCODING_DECODE_FAILED",
+            "severity": "error",
+            "message": "earlier",
+        }
+        items = [later, tied_first, tied_second, earlier]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = sort_diagnostics(items)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                diagnostics_module,
+                "_native_diagnostic_sort_indices",
+                wraps=diagnostics_module._native_diagnostic_sort_indices,
+            ) as native_sort:
+                actual = sort_diagnostics(items)
+                native_sort.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual([item.get("tag") for item in actual[1:3]], ["first", "second"])
+        self.assertIsNot(actual[1], tied_first)
+        self.assertIs(actual[1]["nested"], nested)
+
+        class StringSubclass(str):
+            pass
+
+        unsupported = [
+            {"archive_path": 10, "entry_path": "b", "code": "c", "severity": "e", "message": "m"},
+            {"archive_path": 2, "entry_path": "a", "code": "c", "severity": "e", "message": "m"},
+            {"archive_path": StringSubclass("a"), "entry_path": "x", "code": "c", "severity": "e", "message": "m"},
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_fallback = sort_diagnostics(unsupported)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                diagnostics_module,
+                "_native_diagnostic_sort_indices",
+                wraps=diagnostics_module._native_diagnostic_sort_indices,
+            ) as native_sort:
+                actual_fallback = sort_diagnostics(unsupported)
+                native_sort.assert_not_called()
+        self.assertEqual(actual_fallback, expected_fallback)
 
     def test_sensitive_message_and_exception_details_are_redacted(self) -> None:
         diagnostic = make_diagnostic(

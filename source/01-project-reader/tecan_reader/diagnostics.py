@@ -7,6 +7,8 @@ import re
 from typing import Any, Iterable, Mapping
 import zipfile
 
+from tecan_common.native_acceleration import diagnostic_sort_indices as _native_diagnostic_sort_indices
+
 
 DIAGNOSTIC_SCHEMA_VERSION = "tecan.ingestion_diagnostic.v1"
 _SENSITIVE_VALUE_RE = re.compile(
@@ -131,11 +133,31 @@ def make_diagnostic(
 
 def sort_diagnostics(items: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """Return stable copies sorted by provenance and code."""
+    sort_fields = ("archive_path", "entry_path", "code", "severity", "message")
+    if type(items) in (list, tuple) and all(type(item) is dict for item in items):
+        keys: list[list[str]] = []
+        for item in items:
+            key: list[str] = []
+            for field in sort_fields:
+                value = item.get(field)
+                if value is None:
+                    key.append("")
+                elif type(value) is str:
+                    key.append(value or "")
+                else:
+                    keys = []
+                    break
+            if len(key) != len(sort_fields):
+                break
+            keys.append(key)
+        else:
+            order = _native_diagnostic_sort_indices(keys)
+            if order is not None:
+                return [dict(items[index]) for index in order]
+
     return sorted(
         [dict(item) for item in items],
-        key=lambda item: tuple(str(item.get(key) or "") for key in (
-            "archive_path", "entry_path", "code", "severity", "message",
-        )),
+        key=lambda item: tuple(str(item.get(key) or "") for key in sort_fields),
     )
 
 
