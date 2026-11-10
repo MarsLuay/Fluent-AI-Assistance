@@ -2650,7 +2650,12 @@ def _rga_transfer_parameters(command_object: ET.Element) -> dict[str, Any]:
         inner = ET.fromstring(html.unescape(inner_text))
     except ET.ParseError:
         return params
-    for element in inner.iter():
+    field_names = {"Labware", "Location", "Site", "MoveToBase", "FixedSite"}
+    native = native_acceleration.xml_elements_by_name(
+        inner, field_names, ET.Element
+    )
+    elements = native if native is not None else inner.iter()
+    for element in elements:
         if not isinstance(element.tag, str) or element.text is None:
             continue
         key = _local_name(element.tag)

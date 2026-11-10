@@ -566,6 +566,56 @@ class ProtocolIRSchemaTests(unittest.TestCase):
                 with self.assertRaises(AttributeError):
                     protocol_ir._first_nested_text(comment_before, "Site")
 
+    def test_rga_transfer_fields_use_native_tag_filter_in_source_order(self):
+        import html
+        from unittest.mock import patch
+
+        from tecan_common import native_acceleration
+        from fluent_pipeline import protocol_ir
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        inner = (
+            "<Root><Labware>first</Labware><Location>Deck A</Location>"
+            "<Site>3.5</Site><MoveToBase>True</MoveToBase><FixedSite>FALSE</FixedSite>"
+            "<Branch><Labware>second</Labware><Site>4</Site></Branch></Root>"
+        )
+        command = protocol_ir.ET.Element("Command")
+        protocol_ir.ET.SubElement(command, "ExecutionSettings").text = html.escape(
+            inner, quote=False
+        )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = protocol_ir._rga_transfer_parameters(command)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = protocol_ir._rga_transfer_parameters(command)
+                field_scan_calls = [
+                    call
+                    for call in native_call.call_args_list
+                    if call.args[1]
+                    == {"Labware", "Location", "Site", "MoveToBase", "FixedSite"}
+                ]
+                self.assertEqual(len(field_scan_calls), 1)
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            {
+                "labware": "second",
+                "destination_location": "Deck A",
+                "destination_site": 4,
+                "move_to_base": True,
+                "fixed_site": False,
+            },
+        )
+
     def test_validate_document_rejects_missing_fields_and_invalid_operations(self):
         missing = {
             "ir_version": CANONICAL_IR_VERSION,
