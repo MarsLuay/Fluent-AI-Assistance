@@ -371,6 +371,14 @@ class ReaderTests(unittest.TestCase):
             ),
             ([], []),
             ({}, {}),
+            (
+                Counter({"warning": 2, "opaque": (1,)}),
+                {"warning": 2, "opaque": (1,)},
+            ),
+            (
+                [Counter({"warning": 2, "opaque": (1,)})],
+                [{"warning": 2, "opaque": (1,)}],
+            ),
             ({"é", "z", "A", "a", "Å"}, ["A", "a", "z", "Å", "é"]),
             (
                 {
@@ -423,9 +431,12 @@ class ReaderTests(unittest.TestCase):
             )
         self.assertEqual(custom_key.string_calls, 0)
 
+        class DerivedCounter(Counter):
+            pass
+
         fallback_values = [
             Path("sample.xscr"),
-            Counter({"warning": 2}),
+            DerivedCounter({"warning": 2}),
             {2, 1},
             {"path": Path("nested.xml"), "values": (1, 2)},
             custom_key_mapping,

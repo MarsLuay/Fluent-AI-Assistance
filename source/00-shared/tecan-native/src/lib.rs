@@ -539,6 +539,7 @@ fn is_safe_json_key(py: Python<'_>, value: &Bound<'_, PyAny>, depth: usize) -> P
 fn try_to_jsonable_containers<'py>(
     py: Python<'py>,
     value: &Bound<'py, PyAny>,
+    counter_type: &Bound<'py, PyAny>,
     active: &mut HashSet<usize>,
     depth: usize,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -546,6 +547,14 @@ fn try_to_jsonable_containers<'py>(
         return Ok(None);
     }
     let value_type = value.get_type();
+    if value_type.is(counter_type) {
+        let items = value.cast::<PyDict>()?;
+        let output = PyDict::new(py);
+        for (key, item) in items.iter() {
+            output.set_item(key, item)?;
+        }
+        return Ok(Some(output.into_any()));
+    }
     if value.is_none()
         || value_type.is(py.get_type::<PyBool>())
         || value_type.is(py.get_type::<PyInt>())
@@ -593,7 +602,9 @@ fn try_to_jsonable_containers<'py>(
         let items = value.cast::<PyList>()?;
         let output = PyList::empty(py);
         for item in items.iter() {
-            let Some(converted) = try_to_jsonable_containers(py, &item, active, depth + 1)? else {
+            let Some(converted) =
+                try_to_jsonable_containers(py, &item, counter_type, active, depth + 1)?
+            else {
                 active.remove(&pointer);
                 return Ok(None);
             };
@@ -615,7 +626,9 @@ fn try_to_jsonable_containers<'py>(
                 return Ok(None);
             }
             let string_key = key.str()?;
-            let Some(converted) = try_to_jsonable_containers(py, &item, active, depth + 1)? else {
+            let Some(converted) =
+                try_to_jsonable_containers(py, &item, counter_type, active, depth + 1)?
+            else {
                 active.remove(&pointer);
                 return Ok(None);
             };
@@ -629,8 +642,12 @@ fn try_to_jsonable_containers<'py>(
 }
 
 #[pyfunction]
-fn to_jsonable_containers(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<(bool, Py<PyAny>)> {
-    match try_to_jsonable_containers(py, value, &mut HashSet::new(), 0)? {
+fn to_jsonable_containers(
+    py: Python<'_>,
+    value: &Bound<'_, PyAny>,
+    counter_type: &Bound<'_, PyAny>,
+) -> PyResult<(bool, Py<PyAny>)> {
+    match try_to_jsonable_containers(py, value, counter_type, &mut HashSet::new(), 0)? {
         Some(converted) => Ok((true, converted.unbind())),
         None => Ok((false, py.None())),
     }

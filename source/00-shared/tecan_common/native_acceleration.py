@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter as _Counter
 import json
 import os
 from pathlib import Path
@@ -51,7 +52,7 @@ def to_jsonable_containers(value: Any) -> tuple[bool, Any] | None:
     if not enabled():
         return None
     try:
-        supported, result = _native.to_jsonable_containers(value)
+        supported, result = _native.to_jsonable_containers(value, _Counter)
         if type(supported) is bool and supported:
             return True, result
         return None
