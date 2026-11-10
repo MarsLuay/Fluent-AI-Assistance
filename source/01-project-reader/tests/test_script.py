@@ -109,7 +109,7 @@ class ScriptTests(unittest.TestCase):
                 self.assertGreater(native_call.call_count, 0)
         self.assertEqual(actual_report, expected_report)
 
-    def test_variable_declaration_dedup_uses_rust_with_unicode_fallback(self) -> None:
+    def test_variable_declaration_dedup_uses_rust_for_unicode_with_surrogate_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "unique_ascii_tuple_indices"
         ):
@@ -152,27 +152,54 @@ class ScriptTests(unittest.TestCase):
         )
 
         unicode_root = script.parse_xml_text(
-            "<Root><anyType Type=\"VariableDefinitionHelper\"><Name>é</Name>"
-            "<TypeName>String</TypeName><Scope>Script</Scope></anyType></Root>"
+            "<Root>"
+            "<anyType Type=\"VariableDefinitionHelper\"><Name>é</Name>"
+            "<TypeName>String</TypeName><Scope>Script</Scope>"
+            "<QueryOnStartup>first</QueryOnStartup></anyType>"
+            "<anyType Type=\"VariableDefinitionHelper\"><Name>é</Name>"
+            "<TypeName>String</TypeName><Scope>Script</Scope>"
+            "<QueryOnStartup>duplicate</QueryOnStartup></anyType>"
+            "<anyType Type=\"VariableDefinitionHelper\"><Name>e&#x301;</Name>"
+            "<TypeName>String</TypeName><Scope>Script</Scope></anyType>"
+            "</Root>"
         )
+        unicode_rows = [
+            ("é", "Script", "String"),
+            ("e\u0301", "Script", "String"),
+            ("é", "Script", "String"),
+            ("東京", "Script", "String"),
+            ("東京", "Script", "String"),
+        ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.unique_ascii_tuple_indices(unicode_rows),
+                [0, 1, 3],
+            )
             self.assertIsNone(
                 native_acceleration.unique_ascii_tuple_indices(
-                    [("é", "Script", "String")]
+                    [(chr(0xD800), "Script", "String")]
                 )
             )
-            self.assertEqual(
-                script._variable_declarations(unicode_root),
-                [
-                    {
-                        "name": "é",
-                        "type": "String",
-                        "scope": "Script",
-                        "query_on_startup": "",
-                        "read_only": "",
-                    }
-                ],
-            )
+            unicode_actual = script._variable_declarations(unicode_root)
+        self.assertEqual(
+            unicode_actual,
+            [
+                {
+                    "name": "é",
+                    "type": "String",
+                    "scope": "Script",
+                    "query_on_startup": "first",
+                    "read_only": "",
+                },
+                {
+                    "name": "e\u0301",
+                    "type": "String",
+                    "scope": "Script",
+                    "query_on_startup": "",
+                    "read_only": "",
+                },
+            ],
+        )
 
     def test_startup_variable_values_use_native_with_unicode_text(self) -> None:
         if not native_acceleration.available() or not all(

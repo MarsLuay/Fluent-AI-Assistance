@@ -1626,14 +1626,14 @@ def any_ascii_casefold_in(values: Any, candidates: Any) -> bool | None:
 
 
 def unique_ascii_tuple_indices(rows: Any) -> list[int] | None:
-    """Keep the first row for each exact three-string ASCII tuple."""
+    """Keep first rows for exact three-string tuples (legacy helper name)."""
     if (
         not enabled()
         or type(rows) not in (list, tuple)
         or not all(
             type(row) is tuple
             and len(row) == 3
-            and all(type(value) is str and value.isascii() for value in row)
+            and all(type(value) is str for value in row)
             for row in rows
         )
     ):

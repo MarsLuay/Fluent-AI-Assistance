@@ -1359,9 +1359,6 @@ fn unique_ascii_tuple_indices<'py>(
                 return Ok(None);
             }
             let value = value.extract::<String>()?;
-            if !value.is_ascii() {
-                return Ok(None);
-            }
             fields.push(value);
         }
         let key = (fields.remove(0), fields.remove(0), fields.remove(0));
