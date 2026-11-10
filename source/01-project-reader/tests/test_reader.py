@@ -898,6 +898,68 @@ class ReaderTests(unittest.TestCase):
             )
             self.assertEqual(reader_script._pin_refs(unicode_values), unicode_expected)
 
+    def test_variable_definition_selection_uses_rust_with_python_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_variable_definition_elements"
+        ):
+            self.skipTest("optional Rust variable-definition selector is not built")
+        namespace = "{urn:test}"
+        root = ET.Element(f"{namespace}Root")
+        variable = ET.SubElement(
+            root,
+            f"{namespace}anyType",
+            {"{urn:instance}type": "VariableDefinitionHelper"},
+        )
+        ET.SubElement(variable, f"{namespace}Name").text = "Volume"
+        ET.SubElement(variable, f"{namespace}TypeName").text = "Float"
+        ET.SubElement(variable, f"{namespace}Scope").text = "Script"
+        ET.SubElement(variable, f"{namespace}QueryOnStartup").text = "TRUE"
+        ET.SubElement(variable, f"{namespace}QueryOnStartupString").text = "Enter volume"
+        ET.SubElement(variable, f"{namespace}ReadOnly").text = "false"
+        values = ET.SubElement(variable, f"{namespace}Values")
+        ET.SubElement(values, f"{namespace}Value").text = "1"
+        ET.SubElement(values, f"{namespace}Value").text = "2"
+
+        hinted = ET.SubElement(root, f"{namespace}Other", {"metadata": "VariableDefinitionHelper"})
+        ET.SubElement(hinted, f"{namespace}Name").text = "Operator"
+        ET.SubElement(hinted, f"{namespace}TypeName").text = "String"
+        ignored = ET.SubElement(root, f"{namespace}Other", {"metadata": "ordinary"})
+        ET.SubElement(ignored, f"{namespace}Name").text = "Ignored"
+        ET.SubElement(ignored, f"{namespace}TypeName").text = "String"
+        incomplete = ET.SubElement(root, f"{namespace}anyType")
+        ET.SubElement(incomplete, f"{namespace}Name").text = "Incomplete"
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_declarations = reader_script._variable_declarations(root)
+            expected_startup = reader_script._startup_variables(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                reader_script.native_acceleration,
+                "xml_variable_definition_elements",
+                wraps=native_acceleration.xml_variable_definition_elements,
+            ) as native_call:
+                declarations = reader_script._variable_declarations(root)
+                startup = reader_script._startup_variables(root)
+                self.assertEqual(native_call.call_count, 2)
+        self.assertEqual(declarations, expected_declarations)
+        self.assertEqual(startup, expected_startup)
+        self.assertEqual([item["name"] for item in declarations], ["Volume", "Operator"])
+        self.assertEqual([item["name"] for item in startup], ["Volume", "Operator"])
+        self.assertEqual(startup[0]["default_values"], ["1", "2"])
+
+        ET.SubElement(root, f"{namespace}Café").text = "unicode fallback"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_declarations = reader_script._variable_declarations(root)
+            fallback_startup = reader_script._startup_variables(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_variable_definition_elements(root, ET.Element)
+            )
+            self.assertEqual(
+                reader_script._variable_declarations(root), fallback_declarations
+            )
+            self.assertEqual(reader_script._startup_variables(root), fallback_startup)
+
     def test_xml_object_unknown_fields_use_native_grouping_with_python_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_grouped_texts_excluding"

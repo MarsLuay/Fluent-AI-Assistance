@@ -150,19 +150,26 @@ def _references(root: ET.Element) -> list[dict[str, str]]:
     return refs
 
 
+def _variable_definition_elements(root: ET.Element) -> list[ET.Element]:
+    native = native_acceleration.xml_variable_definition_elements(root, ET.Element)
+    if native is not None:
+        return native
+    elements: list[ET.Element] = []
+    for element in root.iter():
+        direct_names = {local_name(child.tag) for child in list(element)}
+        type_hint = " ".join(str(value) for value in element.attrib.values())
+        if (
+            local_name(element.tag) in {"anyType", "VariableDefinitionHelper"}
+            or "VariableDefinitionHelper" in type_hint
+        ) and {"Name", "TypeName"}.issubset(direct_names):
+            elements.append(element)
+    return elements
+
+
 def _variable_declarations(root: ET.Element) -> list[dict[str, str]]:
     variables: list[dict[str, str]] = []
     seen: set[tuple[str, str, str]] = set()
-    for el in root.iter():
-        direct_names = {local_name(child.tag) for child in list(el)}
-        type_hint = " ".join(str(v) for v in el.attrib.values())
-        if (
-            local_name(el.tag) not in {"anyType", "VariableDefinitionHelper"}
-            and "VariableDefinitionHelper" not in type_hint
-        ):
-            continue
-        if not {"Name", "TypeName"}.issubset(direct_names):
-            continue
+    for el in _variable_definition_elements(root):
         name = child_text(el, "Name")
         variable_type = child_text(el, "TypeName")
         scope = child_text(el, "Scope")
@@ -335,16 +342,7 @@ def _all_text_values(root: ET.Element) -> list[str]:
 
 def _startup_variables(root: ET.Element) -> list[dict[str, Any]]:
     variables: list[dict[str, Any]] = []
-    for element in root.iter():
-        direct_names = {local_name(child.tag) for child in list(element)}
-        type_hint = " ".join(str(value) for value in element.attrib.values())
-        if (
-            local_name(element.tag) not in {"anyType", "VariableDefinitionHelper"}
-            and "VariableDefinitionHelper" not in type_hint
-        ):
-            continue
-        if not {"Name", "TypeName"}.issubset(direct_names):
-            continue
+    for element in _variable_definition_elements(root):
         name = child_text(element, "Name")
         if not name:
             continue

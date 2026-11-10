@@ -1270,6 +1270,82 @@ fn xscr_command_records<'py>(
 }
 
 #[pyfunction]
+fn xml_variable_definition_elements<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let output = PyList::empty(py);
+    let iterator = root.call_method0("iter")?;
+    for element in iterator.try_iter()? {
+        let element = element?;
+        if !element.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = element.getattr("tag")?;
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        if !tag.is_ascii() {
+            return Ok(None);
+        }
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        let attributes = element.getattr("attrib")?;
+        if !attributes.get_type().is(py.get_type::<PyDict>()) {
+            return Ok(None);
+        }
+        let attribute_values = attributes.call_method0("values")?;
+        let mut type_hint = String::new();
+        for value in attribute_values.try_iter()? {
+            let value = value?;
+            if !value.get_type().is(py.get_type::<PyString>()) {
+                return Ok(None);
+            }
+            let value = value.extract::<String>()?;
+            if !value.is_ascii() {
+                return Ok(None);
+            }
+            if !type_hint.is_empty() {
+                type_hint.push(' ');
+            }
+            type_hint.push_str(&value);
+        }
+        let is_variable_helper = matches!(local, "anyType" | "VariableDefinitionHelper")
+            || type_hint.contains("VariableDefinitionHelper");
+        if !is_variable_helper {
+            continue;
+        }
+        let mut has_name = false;
+        let mut has_type_name = false;
+        for child in element.try_iter()? {
+            let child = child?;
+            if !child.get_type().is(element_type) {
+                return Ok(None);
+            }
+            let child_tag = child.getattr("tag")?;
+            if !child_tag.get_type().is(py.get_type::<PyString>()) {
+                return Ok(None);
+            }
+            let child_tag = child_tag.extract::<String>()?;
+            if !child_tag.is_ascii() {
+                return Ok(None);
+            }
+            let child_local = child_tag.rsplit('}').next().unwrap_or(child_tag.as_str());
+            has_name |= child_local == "Name";
+            has_type_name |= child_local == "TypeName";
+        }
+        if has_name && has_type_name {
+            output.append(element)?;
+        }
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn xml_elements_by_name<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -3081,6 +3157,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_all_unique_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_grouped_texts_excluding, module)?)?;
     module.add_function(wrap_pyfunction!(xml_elements_by_name, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_variable_definition_elements, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_command_records, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_dict, module)?)?;
