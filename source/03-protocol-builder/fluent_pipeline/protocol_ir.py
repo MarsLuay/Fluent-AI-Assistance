@@ -3626,15 +3626,13 @@ def _xscr_expression_field_values(
     if len(parts) == 1:
         return [
             (element.text or "").strip()
-            for element in command_object.iter()
-            if _local_name(element.tag) == parts[0] and not list(element)
+            for element in _iter_local(command_object, parts[0])
+            if not list(element)
         ]
     values: list[str] = []
-    for container in command_object.iter():
-        if _local_name(container.tag) != parts[0]:
-            continue
-        for element in container.iter():
-            if element is not container and _local_name(element.tag) == parts[-1]:
+    for container in _iter_local(command_object, parts[0]):
+        for element in _iter_local(container, parts[-1]):
+            if element is not container:
                 values.append((element.text or "").strip())
     return values
 

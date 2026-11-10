@@ -505,6 +505,54 @@ class ProtocolIRSchemaTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [1, 2.5, "alpha"])
 
+    def test_xscr_expression_field_paths_use_native_tag_selection(self):
+        from unittest.mock import patch
+
+        from tecan_common import native_acceleration
+        from fluent_pipeline import protocol_ir
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        root = protocol_ir.ET.fromstring(
+            '<Command xmlns:ns="urn:fixture"><Value> root </Value><Value/>'
+            "<Value>parent<Child/></Value><ns:Value> namespaced </ns:Value>"
+            "<Container><Value> first </Value><Nested><Value> second </Value>"
+            "</Nested></Container><Container><Value>third</Value></Container></Command>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_leaf = protocol_ir._xscr_expression_field_values(root, "Value")
+            expected_path = protocol_ir._xscr_expression_field_values(
+                root, "Container/Value"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual_leaf = protocol_ir._xscr_expression_field_values(root, "Value")
+                actual_path = protocol_ir._xscr_expression_field_values(
+                    root, "Container/Value"
+                )
+                self.assertEqual(
+                    sum(call.args[1] == {"Value"} for call in native_call.call_args_list),
+                    3,
+                )
+                self.assertEqual(
+                    sum(
+                        call.args[1] == {"Container"}
+                        for call in native_call.call_args_list
+                    ),
+                    1,
+                )
+
+        self.assertEqual(actual_leaf, expected_leaf)
+        self.assertEqual(actual_path, expected_path)
+        self.assertEqual(actual_leaf, ["root", "", "namespaced", "first", "second", "third"])
+        self.assertEqual(actual_path, ["first", "second", "third"])
+
     def test_selected_tip_channels_use_native_integer_tag_selection(self):
         from unittest.mock import patch
 
