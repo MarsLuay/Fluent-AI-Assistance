@@ -406,11 +406,28 @@ class ReaderTests(unittest.TestCase):
                 self.assertEqual(python_result, expected)
                 self.assertEqual(actual, expected)
 
+        class CustomKey:
+            def __init__(self) -> None:
+                self.string_calls = 0
+
+            def __str__(self) -> str:
+                self.string_calls += 1
+                return "custom"
+
+        custom_key = CustomKey()
+        custom_key_mapping = {custom_key: "value"}
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.to_jsonable_containers(custom_key_mapping)
+            )
+        self.assertEqual(custom_key.string_calls, 0)
+
         fallback_values = [
             Path("sample.xscr"),
             Counter({"warning": 2}),
             {2, 1},
             {"path": Path("nested.xml"), "values": (1, 2)},
+            custom_key_mapping,
         ]
         for value in fallback_values:
             with self.subTest(fallback_type=type(value).__name__):
@@ -429,6 +446,7 @@ class ReaderTests(unittest.TestCase):
                 ):
                     actual = to_jsonable(value)
                 self.assertEqual(actual, expected)
+        self.assertEqual(custom_key.string_calls, 2)
 
         nested_list: list[object] = []
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
