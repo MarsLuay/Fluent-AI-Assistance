@@ -37,6 +37,7 @@ from fluentcoder.catalog.xcmp import (  # noqa: E402
     _int_text,
     _local,
     _text,
+    _vec3,
 )
 
 
@@ -142,6 +143,46 @@ class CatalogIncrementalIndexTests(unittest.TestCase):
         self.assertEqual(math.copysign(1.0, expected["negative_zero"]), -1.0)
         self.assertTrue(math.isnan(expected_nan))
         self.assertTrue(math.isnan(actual_nan))
+
+    def test_catalog_vectors_use_native_only_for_exact_supported_axes(self):
+        complete = ET.Element("Vector")
+        for axis, text in (("X", "1.5"), ("Y", "-0.0"), ("Z", "3e2")):
+            ET.SubElement(complete, axis).text = text
+
+        lowercase = ET.Element("Vector")
+        for axis, text in (("x", "1"), ("y", "2"), ("z", "3")):
+            ET.SubElement(lowercase, axis).text = text
+
+        invalid_duplicate = ET.Element("Vector")
+        ET.SubElement(invalid_duplicate, "X").text = "4"
+        ET.SubElement(invalid_duplicate, "X").text = "invalid"
+        ET.SubElement(invalid_duplicate, "Y").text = "5"
+        ET.SubElement(invalid_duplicate, "Z").text = "6"
+
+        special_float = ET.Element("Vector")
+        ET.SubElement(special_float, "X").text = "nan"
+        ET.SubElement(special_float, "Y").text = "2"
+        ET.SubElement(special_float, "Z").text = "3"
+        vectors = [complete, lowercase, invalid_duplicate, special_float]
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [_vec3(vector) for vector in vectors]
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                native_acceleration,
+                "xml_vec3_case_sensitive",
+                wraps=native_acceleration.xml_vec3_case_sensitive,
+            ) as native_call:
+                actual = [_vec3(vector) for vector in vectors]
+                self.assertEqual(native_call.call_count, len(vectors))
+        self.assertEqual(actual[:3], expected[:3])
+        self.assertEqual(actual[0], (1.5, -0.0, 300.0))
+        self.assertEqual(actual[1], expected[1])
+        self.assertEqual(actual[2], (4.0, 5.0, 6.0))
+        self.assertTrue(math.isnan(expected[3][0]))
+        self.assertTrue(math.isnan(actual[3][0]))
+        self.assertEqual(actual[3][1:], expected[3][1:])
+        self.assertEqual(math.copysign(1.0, actual[0][1]), -1.0)
 
     def test_stat_fingerprint_ignores_mtime_reset(self):
         with tempfile.TemporaryDirectory() as tmp:

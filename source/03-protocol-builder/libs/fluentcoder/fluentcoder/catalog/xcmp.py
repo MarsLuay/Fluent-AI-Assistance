@@ -109,6 +109,9 @@ def _vec3(elem: Optional[ET.Element]) -> Optional[tuple[float, float, float]]:
     """Read an X/Y/Z vector from an element (children with local-name X, Y, Z)."""
     if elem is None:
         return None
+    native = native_acceleration.xml_vec3_case_sensitive(elem, ET.Element)
+    if native is not None:
+        return native
     coords: dict[str, float] = {}
     for child in elem:
         if not isinstance(child.tag, str):

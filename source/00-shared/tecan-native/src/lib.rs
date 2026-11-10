@@ -2570,6 +2570,65 @@ fn xml_vec_dict<'py>(
 }
 
 #[pyfunction]
+fn xml_vec3_case_sensitive<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<(f64, f64, f64)>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let mut coordinates = [None, None, None];
+    for child in root.try_iter()? {
+        let child = child?;
+        if !child.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = child.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        let axis = match local {
+            "X" => 0,
+            "Y" => 1,
+            "Z" => 2,
+            _ => continue,
+        };
+        let text = child.getattr("text")?;
+        if text.is_none() {
+            continue;
+        }
+        if !text.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let text = text.extract::<String>()?;
+        if text.is_empty() {
+            continue;
+        }
+        let text = trim_python_whitespace(&text);
+        if text.is_empty() {
+            continue;
+        }
+        if !has_ascii_decimal_float_syntax(text) {
+            return Ok(None);
+        }
+        let Ok(value) = text.parse::<f64>() else {
+            return Ok(None);
+        };
+        coordinates[axis] = Some(value);
+    }
+    let [Some(x), Some(y), Some(z)] = coordinates else {
+        return Ok(None);
+    };
+    Ok(Some((x, y, z)))
+}
+
+#[pyfunction]
 fn xml_indexed_values<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -5416,6 +5475,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_indexed_float_values, module)?)?;
     module.add_function(wrap_pyfunction!(xml_allowed_grip_modes, module)?)?;
     module.add_function(wrap_pyfunction!(xml_vec_dict, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_vec3_case_sensitive, module)?)?;
     module.add_function(wrap_pyfunction!(xml_indexed_vectors, module)?)?;
     module.add_function(wrap_pyfunction!(
         xml_elements_by_ascii_casefolded_name,

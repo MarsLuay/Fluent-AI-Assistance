@@ -334,6 +334,32 @@ def xml_vec_dict(root: Any, element_type: Any) -> dict[str, float] | None:
         return None
 
 
+def xml_vec3_case_sensitive(
+    root: Any, element_type: Any
+) -> tuple[float, float, float] | None:
+    """Read exact uppercase X/Y/Z axes, preserving Python case policy."""
+    if not enabled() or type(root) is not element_type:
+        return None
+    try:
+        result = _native.xml_vec3_case_sensitive(root, element_type)
+        if (
+            type(result) is tuple
+            and len(result) == 3
+            and all(type(value) is float for value in result)
+        ):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_reference_guids(
     root: Any, type_id: Any, element_type: Any
 ) -> list[str] | None:
