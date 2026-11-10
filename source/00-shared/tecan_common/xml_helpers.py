@@ -8,6 +8,7 @@ from typing import Any
 from . import xml_compat as ET
 from .native_acceleration import (
     xml_clean_text as _native_xml_clean_text,
+    xml_find_attribute as _native_xml_find_attribute,
     xml_find_text as _native_xml_find_text,
     xml_local_name as _native_xml_local_name,
     xml_texts_by_name as _native_xml_texts_by_name,
@@ -18,6 +19,7 @@ __all__ = [
     "all_text",
     "child_text",
     "direct_child_text",
+    "first_attribute",
     "first_text",
     "local_name",
     "texts_by_name",
@@ -39,6 +41,19 @@ def _clean_text(value: Any) -> str:
     if native is not None:
         return native
     return str(value or "").strip()
+
+
+def first_attribute(
+    root: ET.Element, name: str, attribute: str, *, default: str = ""
+) -> str:
+    """Return an attribute from the first descendant with the matching local tag."""
+    native = _native_xml_find_attribute(root, name, attribute, default, ET.Element)
+    if native is not None:
+        return native
+    for element in root.iter():
+        if local_name(element.tag) == name:
+            return element.attrib.get(attribute, default)
+    return default
 
 
 def first_text(root: ET.Element, name: str, *, default: str = "") -> str:

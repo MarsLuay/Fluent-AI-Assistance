@@ -25,6 +25,7 @@ from tecan_reader.common import (
 )
 import tecan_reader.gwl as reader_gwl
 import tecan_reader.xmlobj as reader_xmlobj
+import tecan_reader.script as reader_script
 from tecan_reader.gwl import inspect_gwl, inspect_gwl_lines
 from tecan_reader.pattern_library import mine_script_patterns, search_script_patterns, summarize_script_patterns
 import sqlite3
@@ -605,6 +606,54 @@ class ReaderTests(unittest.TestCase):
                 )
             )
             self.assertEqual(xml_helpers.first_text(comment_root, "A"), "after comment")
+
+    def test_native_xml_first_attribute_preserves_first_match_and_default(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_find_attribute"
+        ):
+            self.skipTest("optional Rust XML attribute-search helper is not built")
+        root = ET.Element("Root")
+        ET.SubElement(root, "{urn:test}Script")
+        ET.SubElement(root, "Script", {"version": "later"})
+        valued = ET.Element("Root")
+        ET.SubElement(valued, "{urn:test}Script", {"version": "  v1  "})
+        absent = ET.Element("Root")
+        ET.SubElement(absent, "Other", {"version": "not-a-script"})
+        comment_root = ET.Element("Root")
+        comment_root.append(ET.Comment("comment"))
+        ET.SubElement(comment_root, "Script", {"version": "comment-safe"})
+
+        def results() -> tuple[str, str, str, str]:
+            return (
+                xml_helpers.first_attribute(root, "Script", "version"),
+                xml_helpers.first_attribute(valued, "Script", "version"),
+                xml_helpers.first_attribute(absent, "Script", "version", default="missing"),
+                reader_script._script_version(comment_root),
+            )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = results()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_find_attribute(
+                    valued, "Script", "version", "", ET.Element
+                ),
+                "  v1  ",
+            )
+            self.assertIsNone(
+                native_acceleration.xml_find_attribute(
+                    comment_root, "Script", "version", "", ET.Element
+                )
+            )
+            with patch.object(
+                xml_helpers,
+                "_native_xml_find_attribute",
+                wraps=xml_helpers._native_xml_find_attribute,
+            ) as native_call:
+                actual = results()
+                self.assertEqual(native_call.call_count, 4)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ("", "  v1  ", "missing", "comment-safe"))
 
     def test_native_extension_counts_match_path_suffix_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(

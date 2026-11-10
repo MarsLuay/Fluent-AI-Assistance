@@ -1096,6 +1096,49 @@ fn xml_find_text<'py>(
 }
 
 #[pyfunction]
+fn xml_find_attribute<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    name: &str,
+    attribute: &str,
+    default: &str,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let iterator = root.call_method0("iter")?;
+    for element in iterator.try_iter()? {
+        let element = element?;
+        if !element.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = element.getattr("tag")?;
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        if local != name {
+            continue;
+        }
+        let attributes = element.getattr("attrib")?;
+        if !attributes.get_type().is(py.get_type::<PyDict>()) {
+            return Ok(None);
+        }
+        let attributes = attributes.cast::<PyDict>()?;
+        let Some(value) = attributes.get_item(attribute)? else {
+            return Ok(Some(PyString::new(py, default).into_any()));
+        };
+        if !value.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        return Ok(Some(value));
+    }
+    Ok(Some(PyString::new(py, default).into_any()))
+}
+
+#[pyfunction]
 fn render_append_list(title: &str, values: Vec<String>, limit: i64) -> Vec<String> {
     if values.is_empty() {
         return Vec::new();
@@ -2488,6 +2531,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_unique_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_texts_by_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_find_text, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_find_attribute, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_dict, module)?)?;
     module.add_function(wrap_pyfunction!(render_object_report, module)?)?;

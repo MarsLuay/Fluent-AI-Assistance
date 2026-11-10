@@ -10,6 +10,7 @@ import re
 from tecan_common.xml_compat import ET
 from tecan_common.xml_helpers import (
     child_text,
+    first_attribute,
     first_text,
     local_name,
     texts_by_name,
@@ -123,10 +124,7 @@ def inspect_xscr_text(
 
 
 def _script_version(root: ET.Element) -> str:
-    for el in root.iter():
-        if local_name(el.tag) == "Script":
-            return el.attrib.get("version", "")
-    return ""
+    return first_attribute(root, "Script", "version")
 
 
 def _references(root: ET.Element) -> list[dict[str, str]]:

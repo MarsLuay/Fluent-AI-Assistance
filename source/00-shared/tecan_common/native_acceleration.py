@@ -138,6 +138,34 @@ def xml_texts_by_name(root: Any, names: Any, element_type: Any) -> list[list[str
         return None
 
 
+def xml_find_attribute(
+    root: Any, name: Any, attribute: Any, default: Any, element_type: Any
+) -> str | None:
+    """Find an XML attribute on the first matching element, or fall back."""
+    if (
+        not enabled()
+        or type(root) is not element_type
+        or type(name) is not str
+        or type(attribute) is not str
+        or type(default) is not str
+    ):
+        return None
+    try:
+        result = _native.xml_find_attribute(
+            root, name, attribute, default, element_type
+        )
+        return result if type(result) is str else None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_find_text(
     root: Any, name: Any, direct: Any, element_type: Any
 ) -> tuple[bool, str | None] | None:
