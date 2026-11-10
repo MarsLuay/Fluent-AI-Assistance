@@ -1200,6 +1200,46 @@ fn render_gwl_report(
     Some(format!("{}\n", lines.join("\n")))
 }
 
+#[pyfunction]
+fn render_project_index_search(
+    database: &str,
+    query: &str,
+    kind_filter: &str,
+    result_count: &str,
+    results: Vec<Vec<String>>,
+) -> Option<String> {
+    if results.iter().any(|result| result.len() != 8) {
+        return None;
+    }
+    let mut lines = vec![
+        "# Tecan Project Index Search".to_string(),
+        String::new(),
+        format!("- Database: `{database}`"),
+        format!("- Query: `{query}`"),
+        format!("- Kind filter: `{kind_filter}`"),
+        format!("- Results: `{result_count}`"),
+    ];
+    if !results.is_empty() {
+        lines.push(String::new());
+        lines.push("## Results".to_string());
+        for (index, result) in results.iter().enumerate() {
+            lines.push(format!("{}. `{}` `{}`", index + 1, result[0], result[1]));
+            if !result[2].is_empty() {
+                lines.push(format!("   - Detail: `{}`", result[2]));
+            }
+            if !result[3].is_empty() {
+                lines.push(format!("   - Script: `{}`", result[3]));
+            }
+            if result[7] == "1" {
+                lines.push(format!("   - Command: `{}`", result[4]));
+            }
+            lines.push(format!("   - ZEIA: `{}`", result[5]));
+            lines.push(format!("   - Path: `{}`", result[6]));
+        }
+    }
+    Some(format!("{}\n", lines.join("\n")))
+}
+
 #[allow(clippy::too_many_arguments)] // Keep the summary contract explicit for the Python adapter.
 #[pyfunction]
 fn render_script_pattern_summary(
@@ -2155,6 +2195,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_pattern_specs, module)?)?;
     module.add_function(wrap_pyfunction!(render_pattern_types_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_script_pattern_summary, module)?)?;
+    module.add_function(wrap_pyfunction!(render_project_index_search, module)?)?;
     module.add_function(wrap_pyfunction!(render_join_lines, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(read_text_file, module)?)?;
@@ -2260,6 +2301,38 @@ mod tests {
                 Vec::new(),
             ),
             "# ZEIA Compare Report\n\n- Left: `left-x`\n- Right: `right-x`\n- Entries: `2` -> `3`\n- Common script names: `1`\n\n## Scripts Added\n- added-x\n\n## Left Command Families\n- `family-x`: 2\n"
+        );
+    }
+
+    #[test]
+    fn project_index_search_preserves_optional_result_fields() {
+        assert_eq!(
+            render_project_index_search(
+                "database-x",
+                "query-β",
+                "any",
+                "1",
+                vec![vec![
+                    "kind-x".into(),
+                    "title-x".into(),
+                    "value-x".into(),
+                    "script-x".into(),
+                    "0".into(),
+                    "file-x".into(),
+                    "path-x".into(),
+                    "1".into(),
+                ]],
+            )
+            .as_deref(),
+            Some(
+                "# Tecan Project Index Search\n\n- Database: `database-x`\n- Query: `query-β`\n- Kind filter: `any`\n- Results: `1`\n\n## Results\n1. `kind-x` `title-x`\n   - Detail: `value-x`\n   - Script: `script-x`\n   - Command: `0`\n   - ZEIA: `file-x`\n   - Path: `path-x`\n"
+            )
+        );
+        assert_eq!(
+            render_project_index_search("", "", "any", "0", Vec::new()).as_deref(),
+            Some(
+                "# Tecan Project Index Search\n\n- Database: ``\n- Query: ``\n- Kind filter: `any`\n- Results: `0`\n"
+            )
         );
     }
 

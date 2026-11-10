@@ -348,6 +348,65 @@ def render_compare_report(
         return None
 
 
+def render_project_index_search(report: Any) -> str | None:
+    """Render supported project-index search data natively, or request fallback."""
+    if not enabled() or type(report) is not dict:
+        return None
+    safe_values = (str, bool, int, float, type(None))
+    header = [
+        report.get("database"),
+        report.get("query"),
+        report.get("kind_filter"),
+        report.get("result_count"),
+    ]
+    results = report.get("results", [])
+    if (
+        not all(type(value) in safe_values for value in header)
+        or type(results) not in (list, tuple)
+    ):
+        return None
+    rendered_results: list[list[str]] = []
+    try:
+        for result in results:
+            if type(result) is not dict:
+                return None
+            values = [
+                result.get("kind"),
+                result.get("name"),
+                result.get("value"),
+                result.get("source_path"),
+                result.get("script"),
+                result.get("command_index"),
+                result.get("zeia_file"),
+            ]
+            if not all(type(value) in safe_values for value in values):
+                return None
+            kind, name, value, source_path, script, command_index, zeia_file = values
+            title = name or value or source_path
+            rendered_results.append(
+                [
+                    str(kind),
+                    str(title),
+                    str(value) if value else "",
+                    str(script) if script else "",
+                    str(command_index) if command_index is not None else "",
+                    str(zeia_file),
+                    str(source_path),
+                    "1" if command_index is not None else "0",
+                ]
+            )
+        result = _native.render_project_index_search(
+            str(header[0]),
+            str(header[1]),
+            str(header[2] or "any"),
+            str(header[3]),
+            rendered_results,
+        )
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def render_script_pattern_summary(report: Any) -> str | None:
     """Render supported script-pattern summary reports natively."""
     if type(report) is not dict:

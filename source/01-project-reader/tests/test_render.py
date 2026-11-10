@@ -262,6 +262,100 @@ class RenderListTests(unittest.TestCase):
         self.assertEqual(custom.str_calls, 1)
         self.assertEqual(actual_fallback, expected_fallback)
 
+    def test_native_project_index_search_matches_python_and_preserves_truthiness(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "render_project_index_search"
+        ):
+            self.skipTest("optional Rust project-index search renderer is not built")
+        report = {
+            "kind": "project_index_search",
+            "database": "database-x",
+            "query": "query-β",
+            "kind_filter": None,
+            "result_count": 3,
+            "results": [
+                {
+                    "kind": "kind-x",
+                    "name": "",
+                    "value": "title-from-value",
+                    "source_path": "path-x",
+                    "script": "script-x",
+                    "command_index": 0,
+                    "zeia_file": "file-x",
+                },
+                {
+                    "kind": "kind-y",
+                    "name": "title-y",
+                    "value": "",
+                    "source_path": "path-y",
+                    "script": False,
+                    "command_index": None,
+                    "zeia_file": "file-y",
+                },
+                {
+                    "kind": "kind-z",
+                    "name": None,
+                    "value": 0,
+                    "source_path": "path-z",
+                    "command_index": "",
+                },
+            ],
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = render.render_markdown(report)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            direct = native_acceleration.render_project_index_search(report)
+            self.assertEqual(direct, expected)
+            with patch.object(
+                render,
+                "_native_render_project_index_search",
+                wraps=render._native_render_project_index_search,
+            ) as native_call:
+                actual = render.render_markdown(report)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertIn("- Kind filter: `any`", actual)
+        self.assertIn("   - Command: `0`", actual)
+        self.assertIn("   - Command: ``", actual)
+        self.assertNotIn("   - Script: `False`", actual)
+
+        class TruthyText:
+            def __init__(self) -> None:
+                self.bool_calls = 0
+                self.str_calls = 0
+
+            def __bool__(self) -> bool:
+                self.bool_calls += 1
+                return True
+
+            def __str__(self) -> str:
+                self.str_calls += 1
+                return "custom title"
+
+        custom = TruthyText()
+        unsupported = {
+            "kind": "project_index_search",
+            "results": [
+                {
+                    "kind": "kind-x",
+                    "name": custom,
+                    "value": None,
+                    "source_path": "path-x",
+                    "script": None,
+                    "command_index": None,
+                    "zeia_file": "file-x",
+                }
+            ],
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_fallback = render.render_markdown(unsupported)
+        self.assertEqual((custom.bool_calls, custom.str_calls), (1, 1))
+        custom.bool_calls = custom.str_calls = 0
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual_fallback = render.render_markdown(unsupported)
+        self.assertEqual((custom.bool_calls, custom.str_calls), (1, 1))
+        self.assertEqual(actual_fallback, expected_fallback)
+
     def test_native_script_pattern_summary_matches_both_modes_and_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "render_script_pattern_summary"
