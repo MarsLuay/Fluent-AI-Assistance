@@ -3706,6 +3706,11 @@ def _first_descendant(parent: ET.Element | None, name: str) -> ET.Element | None
 def _direct_child(parent: ET.Element | None, name: str) -> ET.Element | None:
     if parent is None:
         return None
+    native = native_acceleration.xml_direct_elements_by_name(
+        parent, {name}, ET.Element
+    )
+    if native is not None:
+        return native[0] if native else None
     for child in list(parent):
         if _local_name(child.tag) == name:
             return child

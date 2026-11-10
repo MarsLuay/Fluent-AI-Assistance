@@ -303,6 +303,54 @@ class ProtocolIRSchemaTests(unittest.TestCase):
         self.assertEqual(actual[1], [custom_child])
         self.assertEqual(protocol_ir._direct_children(None, "Target"), [])
 
+    def test_direct_child_uses_native_selector_and_keeps_first_match_semantics(self):
+        from unittest.mock import patch
+
+        from tecan_common import native_acceleration
+        from fluent_pipeline import protocol_ir
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_direct_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        root = protocol_ir.ET.fromstring(
+            '<Root xmlns="urn:test"><Target id="first"/><Branch><Target/></Branch>'
+            '<Target id="last"/></Root>'
+        )
+        first = list(root)[0]
+        missing = protocol_ir.ET.fromstring("<Root><Other/></Root>")
+        roots = [root, missing]
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [protocol_ir._direct_child(item, "Target") for item in roots]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_direct_elements_by_name",
+                wraps=native_acceleration.xml_direct_elements_by_name,
+            ) as native_call:
+                actual = [protocol_ir._direct_child(item, "Target") for item in roots]
+                self.assertEqual(native_call.call_count, 2)
+
+        self.assertEqual(actual, expected)
+        self.assertIs(actual[0], first)
+        self.assertIsNone(actual[1])
+
+        comment_after = protocol_ir.ET.Element("Root")
+        comment_first = protocol_ir.ET.SubElement(comment_after, "Target")
+        comment_after.append(protocol_ir.ET.Comment("after first match"))
+        for disabled in ("1", "0"):
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": disabled}):
+                self.assertIs(protocol_ir._direct_child(comment_after, "Target"), comment_first)
+
+        comment_before = protocol_ir.ET.Element("Root")
+        comment_before.append(protocol_ir.ET.Comment("before first match"))
+        protocol_ir.ET.SubElement(comment_before, "Target")
+        for disabled in ("1", "0"):
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": disabled}):
+                with self.assertRaises(AttributeError):
+                    protocol_ir._direct_child(comment_before, "Target")
+
     def test_text_uses_native_cleaner_with_unicode_and_custom_fallbacks(self):
         from unittest.mock import patch
 
