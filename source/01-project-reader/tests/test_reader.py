@@ -371,6 +371,25 @@ class ReaderTests(unittest.TestCase):
             ),
             ([], []),
             ({}, {}),
+            (
+                {
+                    1: "integer",
+                    "1": "string",
+                    2.5: "float",
+                    False: "boolean",
+                    None: "none",
+                    b"raw": "bytes",
+                    (1, ("x",)): "tuple",
+                },
+                {
+                    "1": "string",
+                    "2.5": "float",
+                    "False": "boolean",
+                    "None": "none",
+                    "b'raw'": "bytes",
+                    "(1, ('x',))": "tuple",
+                },
+            ),
         ]
         for value, expected in cases:
             with self.subTest(value_type=type(value).__name__):
@@ -391,7 +410,6 @@ class ReaderTests(unittest.TestCase):
             Path("sample.xscr"),
             Counter({"warning": 2}),
             {2, 1},
-            {1: ("value",)},
             {"path": Path("nested.xml"), "values": (1, 2)},
         ]
         for value in fallback_values:

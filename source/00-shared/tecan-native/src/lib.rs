@@ -510,6 +510,30 @@ fn clone_json_value<'py>(
     )))
 }
 
+fn is_safe_json_key(py: Python<'_>, value: &Bound<'_, PyAny>, depth: usize) -> PyResult<bool> {
+    if value.is_none() {
+        return Ok(true);
+    }
+    let value_type = value.get_type();
+    if value_type.is(py.get_type::<PyBool>())
+        || value_type.is(py.get_type::<PyInt>())
+        || value_type.is(py.get_type::<PyFloat>())
+        || value_type.is(py.get_type::<PyString>())
+        || value_type.is(py.get_type::<PyBytes>())
+    {
+        return Ok(true);
+    }
+    if depth >= 64 || !value_type.is(py.get_type::<PyTuple>()) {
+        return Ok(false);
+    }
+    for item in value.cast::<PyTuple>()?.iter() {
+        if !is_safe_json_key(py, &item, depth + 1)? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 fn try_to_jsonable_containers<'py>(
     py: Python<'py>,
     value: &Bound<'py, PyAny>,
@@ -564,15 +588,16 @@ fn try_to_jsonable_containers<'py>(
         let items = value.cast::<PyDict>()?;
         let output = PyDict::new(py);
         for (key, item) in items.iter() {
-            if !key.get_type().is(py.get_type::<PyString>()) {
+            if !is_safe_json_key(py, &key, 0)? {
                 active.remove(&pointer);
                 return Ok(None);
             }
+            let string_key = key.str()?;
             let Some(converted) = try_to_jsonable_containers(py, &item, active, depth + 1)? else {
                 active.remove(&pointer);
                 return Ok(None);
             };
-            output.set_item(key, converted)?;
+            output.set_item(string_key, converted)?;
         }
         active.remove(&pointer);
         return Ok(Some(output.into_any()));
