@@ -460,10 +460,11 @@ class ReaderTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             unicode_expected = xml_helpers.all_text(unicode_root, {"Value"})
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            self.assertIsNone(
+            self.assertEqual(
                 native_acceleration.xml_unique_texts(
                     unicode_root, {"Value"}, (1 << 63) - 1, ET.Element
-                )
+                ),
+                unicode_expected,
             )
             self.assertEqual(xml_helpers.all_text(unicode_root, {"Value"}), unicode_expected)
 
@@ -511,16 +512,49 @@ class ReaderTests(unittest.TestCase):
         )
 
         unicode_root = ET.Element("Root")
-        ET.SubElement(unicode_root, "A").text = "café"
+        ET.SubElement(unicode_root, "A").text = "\u00a0café\u2003"
+        ET.SubElement(unicode_root, "Étiquette").text = "\x1céclair\x1f"
+        unicode_names = {"A", "Étiquette"}
+        whitespace_chars = [
+            chr(codepoint)
+            for codepoint in range(sys.maxunicode + 1)
+            if chr(codepoint).isspace()
+        ]
+        for index, character in enumerate(whitespace_chars):
+            name = f"Whitespace_{index:02d}"
+            ET.SubElement(unicode_root, name).text = (
+                f"{character}value-{index}{character}"
+            )
+            unicode_names.add(name)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            unicode_expected = xml_helpers.unique_texts(unicode_root, {"A"})
+            unicode_expected = xml_helpers.unique_texts(unicode_root, unicode_names)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            native_unicode = native_acceleration.xml_unique_texts(
+                unicode_root, unicode_names, 200, ET.Element
+            )
+            self.assertEqual(native_unicode, unicode_expected)
+            with patch.object(
+                xml_helpers,
+                "_native_xml_unique_texts",
+                wraps=xml_helpers._native_xml_unique_texts,
+            ) as native_call:
+                self.assertEqual(
+                    xml_helpers.unique_texts(unicode_root, unicode_names),
+                    unicode_expected,
+                )
+                native_call.assert_called_once()
+
+        surrogate_root = ET.Element("Root")
+        ET.SubElement(surrogate_root, "A").text = chr(0xD800)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(
                 native_acceleration.xml_unique_texts(
-                    unicode_root, {"A"}, 200, ET.Element
+                    surrogate_root, {"A"}, 200, ET.Element
                 )
             )
-            self.assertEqual(xml_helpers.unique_texts(unicode_root, {"A"}), unicode_expected)
+            self.assertEqual(
+                xml_helpers.unique_texts(surrogate_root, {"A"}), [chr(0xD800)]
+            )
 
         comment_root = ET.Element("Root")
         comment_root.append(ET.Comment("comment"))
