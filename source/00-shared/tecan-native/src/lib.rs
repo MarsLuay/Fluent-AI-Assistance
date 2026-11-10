@@ -2332,6 +2332,39 @@ fn xml_direct_elements_by_name<'py>(
     Ok(Some(output.into_any()))
 }
 
+#[pyfunction]
+fn xml_direct_elements_by_ascii_casefolded_name<'py>(
+    py: Python<'py>,
+    parent: &Bound<'py, PyAny>,
+    names: Vec<String>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !parent.get_type().is(element_type) || names.iter().any(|name| !name.is_ascii()) {
+        return Ok(None);
+    }
+    let output = PyList::empty(py);
+    for child in parent.try_iter()? {
+        let child = child?;
+        if !child.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = child.getattr("tag")?;
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        if !local.is_ascii() {
+            return Ok(None);
+        }
+        let folded_local = local.to_ascii_lowercase();
+        if names.iter().any(|name| name == &folded_local) {
+            output.append(child)?;
+        }
+    }
+    Ok(Some(output.into_any()))
+}
+
 fn is_python_whitespace(character: char) -> bool {
     character.is_whitespace() || ('\u{001c}'..='\u{001f}').contains(&character)
 }
@@ -4376,6 +4409,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     module.add_function(wrap_pyfunction!(xml_direct_elements_by_name, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        xml_direct_elements_by_ascii_casefolded_name,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(xml_leaf_texts, module)?)?;
     module.add_function(wrap_pyfunction!(
         xml_elements_by_folded_name_with_children,

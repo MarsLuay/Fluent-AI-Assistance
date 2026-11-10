@@ -681,6 +681,11 @@ def _named_descendants(elem: ET.Element | None, names: set[str]) -> list[ET.Elem
 def _first_named_direct_child(elem: ET.Element | None, names: set[str]) -> ET.Element | None:
     if elem is None:
         return None
+    native = native_acceleration.xml_direct_elements_by_ascii_casefolded_name(
+        elem, names, ET.Element
+    )
+    if native is not None:
+        return native[0] if native else None
     for child in list(elem):
         if isinstance(child.tag, str) and _local_name(child.tag).casefold() in names:
             return child
