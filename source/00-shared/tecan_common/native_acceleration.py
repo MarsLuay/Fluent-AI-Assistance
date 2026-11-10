@@ -186,6 +186,48 @@ def xml_all_unique_texts(root: Any, element_type: Any) -> list[str] | None:
         return None
 
 
+def xml_grouped_texts_excluding(
+    root: Any, excluded_names: Any, limit: Any, element_type: Any
+) -> list[tuple[str, list[str]]] | None:
+    """Group unique supported XML text by tag, excluding known local names."""
+    if (
+        not enabled()
+        or type(root) is not element_type
+        or type(excluded_names) not in (set, frozenset, list, tuple)
+        or not all(type(name) is str for name in excluded_names)
+        or type(limit) is not int
+        or not 0 <= limit < (1 << 63)
+    ):
+        return None
+    try:
+        result = _native.xml_grouped_texts_excluding(
+            root, list(excluded_names), limit, element_type
+        )
+        if type(result) is not list:
+            return None
+        rows: list[tuple[str, list[str]]] = []
+        for row in result:
+            if (
+                type(row) is not list
+                or len(row) != 2
+                or type(row[0]) is not str
+                or type(row[1]) is not list
+                or not all(type(value) is str for value in row[1])
+            ):
+                return None
+            rows.append((row[0], row[1]))
+        return rows
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_records_by_name(
     root: Any, record_name: Any, field_names: Any, element_type: Any, *, direct: Any = False
 ) -> list[list[str]] | None:

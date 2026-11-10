@@ -11,6 +11,7 @@ from .native_acceleration import (
     xml_clean_text as _native_xml_clean_text,
     xml_find_attribute as _native_xml_find_attribute,
     xml_find_text as _native_xml_find_text,
+    xml_grouped_texts_excluding as _native_xml_grouped_texts_excluding,
     xml_local_name as _native_xml_local_name,
     xml_records_by_name as _native_xml_records_by_name,
     xml_texts_by_name as _native_xml_texts_by_name,
@@ -24,6 +25,7 @@ __all__ = [
     "direct_child_text",
     "first_attribute",
     "first_text",
+    "grouped_texts_excluding",
     "local_name",
     "records_by_name",
     "texts_by_name",
@@ -162,6 +164,28 @@ def records_by_name(
             else:
                 records.append([first_text(element, name) for name in names])
     return records
+
+
+def grouped_texts_excluding(
+    root: ET.Element, excluded_names: Iterable[str], *, limit: int = 20
+) -> dict[str, list[str]]:
+    """Group unique descendant text by local tag, omitting known names."""
+    excluded = set(excluded_names)
+    native = _native_xml_grouped_texts_excluding(
+        root, excluded, limit, ET.Element
+    )
+    if native is not None:
+        return dict(native)
+    values: dict[str, list[str]] = {}
+    for element in root.iter():
+        name = local_name(element.tag)
+        value = (element.text or "").strip()
+        if not value or name in excluded:
+            continue
+        bucket = values.setdefault(name, [])
+        if value not in bucket and len(bucket) < limit:
+            bucket.append(value)
+    return {name: values[name] for name in sorted(values)}
 
 
 def unique_texts(root: ET.Element, names: Iterable[str], *, limit: int = 200) -> list[str]:

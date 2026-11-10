@@ -13,6 +13,7 @@ from tecan_common.xml_helpers import (
     child_text,
     first_attribute,
     first_text,
+    grouped_texts_excluding,
     local_name,
     records_by_name,
     texts_by_name,
@@ -402,6 +403,9 @@ def _unknown_fields(root: ET.Element) -> dict[str, list[str]]:
         "Instructions", "RUPDisplayAndWait", "RUPAutoClose", "RUPTimeOut",
         "VariableName", "DisplayText", "DisplayType", "AllowedValues", "IsEnabled",
     }
+    native = grouped_texts_excluding(root, known, limit=20)
+    if native is not None:
+        return native
     values: dict[str, list[str]] = {}
     for element in root.iter():
         name = local_name(element.tag)

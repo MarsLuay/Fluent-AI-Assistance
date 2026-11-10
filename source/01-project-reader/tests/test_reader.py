@@ -785,6 +785,45 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(actual[0]["object_subfolder_path"], actual[0]["object_path"])
         self.assertEqual(actual[1]["type_id"], "type-y")
 
+    def test_native_unknown_xscr_fields_match_python_grouping_and_limits(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_grouped_texts_excluding"
+        ):
+            self.skipTest("optional Rust XML grouped-text helper is not built")
+        root = ET.Element("Root")
+        ET.SubElement(root, "Name").text = "known-field-x"
+        for index in range(22):
+            ET.SubElement(root, "UnknownZ").text = f" value-{index} "
+        ET.SubElement(root, "UnknownA").text = " first-a "
+        ET.SubElement(root, "UnknownA").text = " first-a "
+        ET.SubElement(root, "UnknownA").text = " second-a "
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = reader_script._unknown_fields(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                xml_helpers,
+                "_native_xml_grouped_texts_excluding",
+                wraps=xml_helpers._native_xml_grouped_texts_excluding,
+            ) as native_call:
+                actual = reader_script._unknown_fields(root)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(list(actual), ["UnknownA", "UnknownZ"])
+        self.assertEqual(actual["UnknownA"], ["first-a", "second-a"])
+        self.assertEqual(actual["UnknownZ"], [f"value-{index}" for index in range(20)])
+        self.assertNotIn("Name", actual)
+
+        unicode_root = ET.Element("Root")
+        ET.SubElement(unicode_root, "Unknown").text = " café "
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_grouped_texts_excluding(
+                    unicode_root, {"Name"}, 20, ET.Element
+                )
+            )
+            self.assertEqual(reader_script._unknown_fields(unicode_root), {"Unknown": ["café"]})
+
     def test_native_rup_variable_record_extraction_matches_python(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_records_by_name"

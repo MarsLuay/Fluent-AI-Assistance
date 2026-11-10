@@ -1180,6 +1180,68 @@ fn xml_all_unique_texts<'py>(
 }
 
 #[pyfunction]
+fn xml_grouped_texts_excluding<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    excluded_names: Vec<String>,
+    limit: i64,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) || limit < 0 {
+        return Ok(None);
+    }
+    let excluded = excluded_names.into_iter().collect::<HashSet<_>>();
+    let mut groups: BTreeMap<String, (Vec<String>, HashSet<String>)> = BTreeMap::new();
+    let iterator = root.call_method0("iter")?;
+    for element in iterator.try_iter()? {
+        let element = element?;
+        if !element.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = element.getattr("tag")?;
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        let text = element.getattr("text")?;
+        if text.is_none() {
+            continue;
+        }
+        if !text.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let text_value = text.extract::<String>()?;
+        if excluded.contains(local) {
+            continue;
+        }
+        if !text_value.is_ascii()
+            || text_value
+                .chars()
+                .any(|ch| ('\u{1c}'..='\u{1f}').contains(&ch))
+        {
+            return Ok(None);
+        }
+        let cleaned = text_value.trim();
+        if cleaned.is_empty() {
+            continue;
+        }
+        let (values, seen) = groups.entry(local.to_owned()).or_default();
+        if values.len() < limit as usize && seen.insert(cleaned.to_owned()) {
+            values.push(cleaned.to_owned());
+        }
+    }
+    let output = PyList::empty(py);
+    for (name, (values, _)) in groups {
+        let row = PyList::empty(py);
+        row.append(name)?;
+        row.append(PyList::new(py, values)?)?;
+        output.append(row)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn xml_records_by_name<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -2647,6 +2709,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_find_attribute, module)?)?;
     module.add_function(wrap_pyfunction!(xml_records_by_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_all_unique_texts, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_grouped_texts_excluding, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_dict, module)?)?;
     module.add_function(wrap_pyfunction!(render_object_report, module)?)?;
