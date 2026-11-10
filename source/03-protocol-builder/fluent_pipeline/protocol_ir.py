@@ -2399,7 +2399,11 @@ def _xscr_selected_tip_channels(command_object: ET.Element) -> list[int] | None:
     if selected is None:
         return None
     channels: list[int] = []
-    for element in selected.iter():
+    native = native_acceleration.xml_elements_by_name(
+        selected, {"int"}, ET.Element
+    )
+    elements = native if native is not None else selected.iter()
+    for element in elements:
         if _local_name(element.tag) != "int" or element.text is None:
             continue
         value = _number_or_text(element.text.strip())

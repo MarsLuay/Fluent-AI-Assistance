@@ -475,6 +475,51 @@ class ProtocolIRSchemaTests(unittest.TestCase):
         self.assertEqual([item["name"] for item in actual], ["alpha", "beta"])
         self.assertEqual(actual[0]["default_value"], 3)
 
+    def test_selected_tip_channels_use_native_integer_tag_selection(self):
+        from unittest.mock import patch
+
+        from tecan_common import native_acceleration
+        from fluent_pipeline import protocol_ir
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        selected = protocol_ir.ET.fromstring(
+            "<SelectedTipsIndexes><Object><int>1</int></Object><int>2.5</int>"
+            "<Branch><int>3</int></Branch><int/></SelectedTipsIndexes>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = protocol_ir._xscr_selected_tip_channels(selected)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = protocol_ir._xscr_selected_tip_channels(selected)
+                integer_scan_calls = [
+                    call
+                    for call in native_call.call_args_list
+                    if call.args[0] is selected and call.args[1] == {"int"}
+                ]
+                self.assertEqual(len(integer_scan_calls), 1)
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [1, 3])
+
+        plain = protocol_ir.ET.Element("SelectedTipsIndexes")
+        plain.text = "4, 5"
+        self.assertEqual(protocol_ir._xscr_selected_tip_channels(plain), [4, 5])
+
+        commented = protocol_ir.ET.Element("SelectedTipsIndexes")
+        commented.append(protocol_ir.ET.Comment("unsupported tree"))
+        protocol_ir.ET.SubElement(commented, "int").text = "6"
+        for disabled in ("1", "0"):
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": disabled}):
+                with self.assertRaises(AttributeError):
+                    protocol_ir._xscr_selected_tip_channels(commented)
+
     def test_validate_document_rejects_missing_fields_and_invalid_operations(self):
         missing = {
             "ir_version": CANONICAL_IR_VERSION,
