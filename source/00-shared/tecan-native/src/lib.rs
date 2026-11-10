@@ -2349,6 +2349,34 @@ fn xml_first_exact_local_text<'py>(
     Ok((true, None))
 }
 
+fn xml_first_exact_local_element<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    target: &str,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<(bool, Option<Bound<'py, PyAny>>)> {
+    let iterator = root.call_method0("iter")?;
+    for element in iterator.try_iter()? {
+        let element = element?;
+        if !element.get_type().is(element_type) {
+            return Ok((false, None));
+        }
+        let tag = element.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok((false, None));
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        if local == target {
+            return Ok((true, Some(element)));
+        }
+    }
+    Ok((true, None))
+}
+
 #[pyfunction]
 fn xml_vec_dict<'py>(
     py: Python<'py>,
@@ -2461,6 +2489,61 @@ fn xml_indexed_values<'py>(
             continue;
         }
         output.set_item(key.to_string(), value)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
+fn xml_indexed_vectors<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let output = PyDict::new(py);
+    for child in root.try_iter()? {
+        let child = child?;
+        if !child.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = child.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let (key_supported, key_text) =
+            xml_first_exact_local_text(py, &child, "Key", element_type)?;
+        if !key_supported {
+            return Ok(None);
+        }
+        let Some(key_text) = key_text else {
+            continue;
+        };
+        let key_text = trim_python_whitespace(&key_text);
+        if key_text.is_empty() {
+            continue;
+        }
+        let Ok(key) = key_text.parse::<i64>() else {
+            return Ok(None);
+        };
+        let (value_supported, value_element) =
+            xml_first_exact_local_element(py, &child, "Value", element_type)?;
+        if !value_supported {
+            return Ok(None);
+        }
+        let Some(value_element) = value_element else {
+            continue;
+        };
+        let Some(vector) = xml_vec_dict(py, &value_element, element_type)? else {
+            return Ok(None);
+        };
+        if vector.call_method0("__len__")?.extract::<usize>()? == 3 {
+            output.set_item(key.to_string(), vector)?;
+        }
     }
     Ok(Some(output.into_any()))
 }
@@ -4751,6 +4834,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_elements_by_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_indexed_values, module)?)?;
     module.add_function(wrap_pyfunction!(xml_vec_dict, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_indexed_vectors, module)?)?;
     module.add_function(wrap_pyfunction!(
         xml_elements_by_ascii_casefolded_name,
         module

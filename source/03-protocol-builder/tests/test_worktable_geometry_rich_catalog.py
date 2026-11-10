@@ -325,6 +325,56 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             {"1000": "wide-python-int", "12": "unicode-int", "9223372036854775808": "large-int"},
         )
 
+    def test_indexed_vectors_uses_native_xml_traversal_with_python_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_indexed_vectors"
+        ):
+            self.skipTest("optional Rust indexed vector reader is not built")
+        parser = worktable_geometry.ET.XMLParser(
+            target=worktable_geometry.ET.TreeBuilder(insert_comments=True)
+        )
+        root = worktable_geometry.ET.fromstring(
+            "<Root xmlns='urn:test'><KV><Key>10</Key><Value><X>1</X><Y>2</Y><Z>3</Z></Value></KV>"
+            "<!-- ignored non-element child -->"
+            "<KV><Key>+10</Key><Value><x>-0.0</x><y>4</y><z>5</z></Value></KV>"
+            "<KV><Key>20</Key><Value><X>1</X><Y>2</Y></Value></KV>"
+            "<KV><Key>30</Key><Value><X>3</X><Y>4</Y><Z>5</Z></Value></KV></Root>",
+            parser=parser,
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = worktable_geometry._indexed_vectors(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_indexed_vectors(
+                    root, worktable_geometry.ET.Element
+                ),
+                expected,
+            )
+            with patch.object(
+                native_acceleration,
+                "xml_indexed_vectors",
+                wraps=native_acceleration.xml_indexed_vectors,
+            ) as native_call:
+                actual = worktable_geometry._indexed_vectors(root)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(list(actual.items()), [("10", {"x": 0.0, "y": 4.0, "z": 5.0}), ("30", {"x": 3.0, "y": 4.0, "z": 5.0})])
+
+        fallback_root = worktable_geometry.ET.fromstring(
+            "<Root><KV><Key>1_000</Key><Value><X>1_000.5</X><Y>2</Y><Z>3</Z></Value></KV></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = worktable_geometry._indexed_vectors(fallback_root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_indexed_vectors(
+                    fallback_root, worktable_geometry.ET.Element
+                )
+            )
+            fallback_actual = worktable_geometry._indexed_vectors(fallback_root)
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, {"1000": {"x": 1000.5, "y": 2.0, "z": 3.0}})
+
     def test_vec_dict_uses_native_axis_parser_with_python_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_vec_dict"

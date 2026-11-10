@@ -334,6 +334,39 @@ def xml_vec_dict(root: Any, element_type: Any) -> dict[str, float] | None:
         return None
 
 
+def xml_indexed_vectors(
+    root: Any, element_type: Any
+) -> dict[str, dict[str, float]] | None:
+    """Extract complete i64-keyed XML vectors with strict-input fallback."""
+    if not enabled() or type(root) is not element_type:
+        return None
+    try:
+        result = _native.xml_indexed_vectors(root, element_type)
+        if (
+            type(result) is dict
+            and all(
+                type(key) is str
+                and type(value) is dict
+                and all(
+                    type(axis) is str and type(number) is float
+                    for axis, number in value.items()
+                )
+                for key, value in result.items()
+            )
+        ):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_indexed_values(
     root: Any, element_type: Any, zero_guid: Any
 ) -> dict[str, str] | None:
