@@ -262,6 +262,79 @@ class RenderListTests(unittest.TestCase):
         self.assertEqual(custom.str_calls, 1)
         self.assertEqual(actual_fallback, expected_fallback)
 
+    def test_native_directory_report_matches_python_limits_and_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "render_directory_report"
+        ):
+            self.skipTest("optional Rust directory report renderer is not built")
+        items = [
+            {
+                "kind": "xscr",
+                "source": f"path-{index}",
+                "object_name": f"object-{index}",
+                "command_count": index,
+                "family_counts": {f"key-{key}": key for key in range(6)},
+            }
+            for index in range(82)
+        ]
+        items.extend(
+            {"kind": "other", "source": f"path-{index}"}
+            for index in range(82, 102)
+        )
+        report = {
+            "kind": "directory",
+            "source": "source-x",
+            "file_count": 102,
+            "extension_counts": {f"extension-{index}": index for index in range(21)},
+            "family_counts": {f"key-{index}": index for index in range(31)},
+            "command_counts": {f"command-{index}": index for index in range(31)},
+            "warning_counts": {f"warning-{index}": index for index in range(21)},
+            "script_names": [f"script-{index}" for index in range(102)],
+            "items": items,
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = render.render_markdown(report)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            direct = native_acceleration.render_directory_report(report)
+            self.assertEqual(direct, expected)
+            with patch.object(
+                render,
+                "_native_render_directory_report",
+                wraps=render._native_render_directory_report,
+            ) as native_call:
+                actual = render.render_markdown(report)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertIn("object-79", actual)
+        self.assertNotIn("object-80", actual)
+        self.assertIn("key-4=4", actual)
+        self.assertNotIn("key-5=5", actual)
+        self.assertIn("- ... 2 more", actual)
+
+        class TextValue:
+            def __init__(self) -> None:
+                self.str_calls = 0
+
+            def __str__(self) -> str:
+                self.str_calls += 1
+                return "custom file source"
+
+        custom = TextValue()
+        unsupported = {
+            "kind": "directory",
+            "source": "source-x",
+            "file_count": 1,
+            "items": [{"kind": "other", "source": custom}],
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_fallback = render.render_markdown(unsupported)
+        self.assertEqual(custom.str_calls, 1)
+        custom.str_calls = 0
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual_fallback = render.render_markdown(unsupported)
+        self.assertEqual(custom.str_calls, 1)
+        self.assertEqual(actual_fallback, expected_fallback)
+
     def test_native_project_index_summary_matches_build_modes_and_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "render_project_index_summary"

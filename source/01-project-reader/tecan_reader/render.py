@@ -9,6 +9,7 @@ from tecan_common.native_acceleration import (
     render_append_dict as _native_render_append_dict,
     render_append_list as _native_render_append_list,
     render_compare_report as _native_render_compare_report,
+    render_directory_report as _native_render_directory_report,
     render_gwl_report as _native_render_gwl_report,
     render_join_lines as _native_render_join_lines,
     render_object_report as _native_render_object_report,
@@ -322,6 +323,10 @@ def _append_pattern_specs(lines: list[str], specs: dict[str, Any]) -> None:
 
 
 def _render_directory(report: dict[str, Any]) -> str:
+    if type(report) is dict:
+        native = _native_render_directory_report(report)
+        if native is not None:
+            return native
     lines = [
         f"# Directory Report: {report.get('source')}",
         "",

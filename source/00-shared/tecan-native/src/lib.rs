@@ -1200,6 +1200,55 @@ fn render_gwl_report(
     Some(format!("{}\n", lines.join("\n")))
 }
 
+#[allow(clippy::too_many_arguments)] // Keep report sections explicit for the Python adapter.
+#[pyfunction]
+fn render_directory_report(
+    header: Vec<String>,
+    extension_counts: Vec<(String, String)>,
+    family_counts: Vec<(String, String)>,
+    command_counts: Vec<(String, String)>,
+    warning_counts: Vec<(String, String)>,
+    script_names: Vec<String>,
+    scripts: Vec<Vec<String>>,
+    file_sources: Vec<String>,
+) -> Option<String> {
+    if header.len() != 2
+        || scripts
+            .iter()
+            .any(|script| script.len() < 2 || (script.len() - 2) % 2 != 0)
+    {
+        return None;
+    }
+    let mut lines = vec![
+        format!("# Directory Report: {}", header[0]),
+        String::new(),
+        format!("- Files found: `{}`", header[1]),
+    ];
+    lines.extend(render_append_dict("File Extensions", extension_counts, 20));
+    lines.extend(render_append_dict("Command Families", family_counts, 30));
+    lines.extend(render_append_dict("Command Types", command_counts, 30));
+    lines.extend(render_append_dict("Warning Counts", warning_counts, 20));
+    lines.extend(render_append_list("Script Names", script_names, 100));
+    if !scripts.is_empty() {
+        lines.push(String::new());
+        lines.push("## Script Summaries".to_string());
+        for script in scripts.iter().take(80) {
+            let families = script[2..]
+                .chunks_exact(2)
+                .take(5)
+                .map(|pair| format!("{}={}", pair[0], pair[1]))
+                .collect::<Vec<_>>()
+                .join(", ");
+            lines.push(format!(
+                "- `{}`: {} commands ({families})",
+                script[0], script[1]
+            ));
+        }
+    }
+    lines.extend(render_append_list("Files", file_sources, 100));
+    Some(format!("{}\n", lines.join("\n")))
+}
+
 #[pyfunction]
 fn render_project_index_summary(
     header: Vec<String>,
@@ -2248,6 +2297,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_script_pattern_summary, module)?)?;
     module.add_function(wrap_pyfunction!(render_project_index_search, module)?)?;
     module.add_function(wrap_pyfunction!(render_project_index_summary, module)?)?;
+    module.add_function(wrap_pyfunction!(render_directory_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_join_lines, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(read_text_file, module)?)?;
@@ -2353,6 +2403,46 @@ mod tests {
                 Vec::new(),
             ),
             "# ZEIA Compare Report\n\n- Left: `left-x`\n- Right: `right-x`\n- Entries: `2` -> `3`\n- Common script names: `1`\n\n## Scripts Added\n- added-x\n\n## Left Command Families\n- `family-x`: 2\n"
+        );
+    }
+
+    #[test]
+    fn directory_report_preserves_sections_and_script_family_order() {
+        assert_eq!(
+            render_directory_report(
+                vec!["source-x".into(), "file-count-x".into()],
+                vec![("extension-x".into(), "1".into())],
+                vec![("family-x".into(), "2".into())],
+                Vec::new(),
+                Vec::new(),
+                vec!["script-name-x".into()],
+                vec![vec![
+                    "object-x".into(),
+                    "command-count-x".into(),
+                    "key-a".into(),
+                    "value-a".into(),
+                    "key-b".into(),
+                    "value-b".into(),
+                ]],
+                vec!["file-source-x".into()],
+            )
+            .as_deref(),
+            Some(
+                "# Directory Report: source-x\n\n- Files found: `file-count-x`\n\n## File Extensions\n- `extension-x`: 1\n\n## Command Families\n- `family-x`: 2\n\n## Script Names\n- script-name-x\n\n## Script Summaries\n- `object-x`: command-count-x commands (key-a=value-a, key-b=value-b)\n\n## Files\n- file-source-x\n"
+            )
+        );
+        assert!(
+            render_directory_report(
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                vec![vec!["short".into()]],
+                Vec::new()
+            )
+            .is_none()
         );
     }
 

@@ -348,6 +348,81 @@ def render_compare_report(
         return None
 
 
+def render_directory_report(report: Any) -> str | None:
+    """Render supported directory summary data natively, or request fallback."""
+    if not enabled() or type(report) is not dict:
+        return None
+    safe_values = (str, bool, int, float, type(None))
+    header = [report.get("source"), report.get("file_count")]
+    mappings = [
+        report.get("extension_counts", {}),
+        report.get("family_counts", {}),
+        report.get("command_counts", {}),
+        report.get("warning_counts", {}),
+    ]
+    script_names = report.get("script_names", [])
+    items = report.get("items", [])
+    if (
+        not all(type(value) in safe_values for value in header)
+        or any(type(mapping) is not dict for mapping in mappings)
+        or type(script_names) not in (list, tuple)
+        or not all(type(value) in safe_values for value in script_names)
+        or type(items) not in (list, tuple)
+    ):
+        return None
+    try:
+        count_entries: list[list[tuple[str, str]]] = []
+        for mapping in mappings:
+            entries: list[tuple[str, str]] = []
+            for key, value in mapping.items():
+                if type(key) is not str or type(value) not in safe_values:
+                    return None
+                entries.append((key, str(value)))
+            count_entries.append(entries)
+
+        script_rows: list[list[str]] = []
+        file_sources: list[str] = []
+        for item in items:
+            if type(item) is not dict:
+                return None
+            kind = item.get("kind")
+            source = item.get("source", "")
+            if type(kind) not in safe_values or type(source) not in safe_values:
+                return None
+            file_sources.append(str(source))
+            if kind != "xscr" or len(script_rows) >= 80:
+                continue
+            object_name = item.get("object_name")
+            command_count = item.get("command_count")
+            script_families = item.get("family_counts", {})
+            if (
+                type(object_name) not in safe_values
+                or type(command_count) not in safe_values
+                or type(script_families) is not dict
+            ):
+                return None
+            row = [str(object_name), str(command_count)]
+            for key, value in list(script_families.items())[:5]:
+                if type(key) not in safe_values or type(value) not in safe_values:
+                    return None
+                row.extend((str(key), str(value)))
+            script_rows.append(row)
+
+        result = _native.render_directory_report(
+            [str(header[0]), str(header[1])],
+            count_entries[0],
+            count_entries[1],
+            count_entries[2],
+            count_entries[3],
+            [str(value) for value in script_names],
+            script_rows,
+            file_sources,
+        )
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def render_project_index_summary(report: Any) -> str | None:
     """Render supported project-index summary data natively, or request fallback."""
     if not enabled() or type(report) is not dict:
