@@ -97,6 +97,106 @@ class PatternSummaryHelperTests(unittest.TestCase):
             pattern_library._append_unique(numeric_values, 0)
             self.assertEqual(numeric_values, ["3"])
 
+    def test_specification_groups_batch_ascii_values_and_preserve_python_fallback(self) -> None:
+        raw_groups = {
+            "labware": [" Plate A ", None, "Plate A", "Plate B"],
+            "rack_labels": ["\x1cRack 1\x1f", "Rack 1"],
+            "empty": [None, " \t "],
+        }
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_groups = {}
+            for key, values in raw_groups.items():
+                expected_groups[key] = []
+                for value in values:
+                    pattern_library._append_unique(expected_groups[key], value)
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual_groups = native_acceleration.pattern_specification_groups(
+                raw_groups
+            )
+            if native_acceleration.available() and hasattr(
+                native_acceleration._native, "pattern_specification_groups"
+            ):
+                self.assertEqual(actual_groups, expected_groups)
+                self.assertEqual(tuple(actual_groups), tuple(raw_groups))
+
+            steps = [
+                {
+                    "fields": {
+                        "LabwareName": " Plate A ",
+                        "LabwareLable": "Plate A",
+                        "LabwareLabel": "Plate B",
+                        "RackLabel": "Rack 1",
+                        "RackType": "Rack X",
+                        "LiquidClassName": "Water",
+                        "LiquidClassNameBySelection": " Water ",
+                        "Volume": "10",
+                        "DeviceAlias": "Pipette",
+                        "WorklistName": "orders.gwl",
+                        "FileName": "Orders.GWL",
+                        "Name": "V",
+                        "LoopVariable": "V",
+                        "Condition": "ready",
+                    }
+                },
+                {"fields": {"LabwareName": "Plate B", "Name": "W"}},
+            ]
+            with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                expected = pattern_library._collect_specifications(steps)
+            with patch.object(
+                pattern_library,
+                "_native_pattern_specification_groups",
+                wraps=native_acceleration.pattern_specification_groups,
+            ) as native_call:
+                actual = pattern_library._collect_specifications(steps)
+                native_call.assert_called_once()
+            self.assertEqual(actual, expected)
+            self.assertEqual(
+                list(actual),
+                [
+                    "labware",
+                    "rack_labels",
+                    "rack_types",
+                    "liquid_classes",
+                    "volumes",
+                    "device_aliases",
+                    "worklists",
+                    "variables",
+                    "conditions",
+                ],
+            )
+            self.assertEqual(actual["labware"], ["Plate A", "Plate B", "Rack 1"])
+            self.assertEqual(
+                actual["worklists"], ["orders.gwl", "Orders.GWL"]
+            )
+
+            events: list[str] = []
+
+            class StringRecorder:
+                def __init__(self, name: str) -> None:
+                    self.name = name
+
+                def __str__(self) -> str:
+                    events.append(self.name)
+                    return self.name
+
+            unsupported_steps = [
+                {
+                    "fields": {
+                        "LabwareName": StringRecorder("first"),
+                        "RackType": StringRecorder("second"),
+                    }
+                }
+            ]
+            with patch.object(
+                pattern_library, "_native_pattern_specification_groups"
+            ) as batch_native:
+                fallback = pattern_library._collect_specifications(unsupported_steps)
+                batch_native.assert_not_called()
+            self.assertEqual(events, ["first", "second"])
+            self.assertEqual(
+                fallback, {"labware": ["first"], "rack_types": ["second"]}
+            )
+
     def test_liquid_step_uses_rust_for_supported_ascii_and_falls_back(self) -> None:
         values = ("Aspirate", "Plate A", "10", "Water")
         with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):

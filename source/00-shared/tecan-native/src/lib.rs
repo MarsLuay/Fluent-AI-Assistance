@@ -2510,6 +2510,49 @@ fn append_unique_ascii_string<'py>(
 }
 
 #[pyfunction]
+fn pattern_specification_groups<'py>(
+    py: Python<'py>,
+    mapping: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !mapping.get_type().is(py.get_type::<PyDict>()) {
+        return Ok(None);
+    }
+    let output = PyDict::new(py);
+    for (key, values) in mapping.cast::<PyDict>()?.iter() {
+        if !key.get_type().is(py.get_type::<PyString>())
+            || !values.get_type().is(py.get_type::<PyList>())
+        {
+            return Ok(None);
+        }
+        let key_text = key.extract::<String>()?;
+        if !key_text.is_ascii() {
+            return Ok(None);
+        }
+        let values = values.cast::<PyList>()?;
+        let output_values = PyList::empty(py);
+        let mut seen = HashSet::new();
+        for value in values.iter() {
+            if value.is_none() {
+                continue;
+            }
+            if !value.get_type().is(py.get_type::<PyString>()) {
+                return Ok(None);
+            }
+            let value = value.extract::<String>()?;
+            if !value.is_ascii() {
+                return Ok(None);
+            }
+            let normalized = trim_python_ascii_whitespace(&value);
+            if !normalized.is_empty() && seen.insert(normalized.to_string()) {
+                output_values.append(normalized)?;
+            }
+        }
+        output.set_item(key_text, output_values)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn pattern_join_summary<'py>(
     py: Python<'py>,
     parts: &Bound<'py, PyAny>,
@@ -3850,6 +3893,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_compare_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_pattern_specs, module)?)?;
     module.add_function(wrap_pyfunction!(append_unique_ascii_string, module)?)?;
+    module.add_function(wrap_pyfunction!(pattern_specification_groups, module)?)?;
     module.add_function(wrap_pyfunction!(pattern_join_summary, module)?)?;
     module.add_function(wrap_pyfunction!(pattern_liquid_step, module)?)?;
     module.add_function(wrap_pyfunction!(render_pattern_types_report, module)?)?;

@@ -1732,6 +1732,41 @@ def ordered_string_counts(values: Any) -> dict[str, int] | None:
         return None
 
 
+def pattern_specification_groups(groups: Any) -> dict[str, list[str]] | None:
+    """Normalize and deduplicate exact ASCII pattern specification groups."""
+    if (
+        not enabled()
+        or type(groups) is not dict
+        or not all(
+            type(key) is str
+            and key.isascii()
+            and type(values) is list
+            and all(
+                value is None or (type(value) is str and value.isascii())
+                for value in values
+            )
+            for key, values in groups.items()
+        )
+    ):
+        return None
+    try:
+        result = _native.pattern_specification_groups(groups)
+        if (
+            type(result) is dict
+            and tuple(result) == tuple(groups)
+            and all(
+                type(key) is str
+                and type(values) is list
+                and all(type(value) is str for value in values)
+                for key, values in result.items()
+            )
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def append_unique_ascii_string(values: Any, value: Any) -> bool | None:
     """Append one supported ASCII string with Python-compatible whitespace handling."""
     if (

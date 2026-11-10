@@ -13,6 +13,7 @@ from .common import _connect, _connection_arg, fast_json_dumps, to_jsonable
 from tecan_common.native_acceleration import (
     append_unique_ascii_string as _native_append_unique_ascii_string,
     pattern_join_summary as _native_pattern_join_summary,
+    pattern_specification_groups as _native_pattern_specification_groups,
     pattern_liquid_step as _native_pattern_liquid_step,
     pattern_windows as _native_pattern_windows,
 )
@@ -576,6 +577,89 @@ def _pattern_name(
 
 
 def _collect_specifications(steps: list[dict[str, Any]]) -> dict[str, list[str]]:
+    if not _pattern_specification_inputs_supported(steps):
+        return _collect_specifications_python(steps)
+
+    raw_specs: dict[str, list[Any]] = {
+        "labware": [],
+        "rack_labels": [],
+        "rack_types": [],
+        "liquid_classes": [],
+        "volumes": [],
+        "device_aliases": [],
+        "worklists": [],
+        "variables": [],
+        "conditions": [],
+    }
+
+    def add(group: str, value: Any) -> None:
+        raw_specs[group].append(value)
+
+    for step in steps:
+        fields = step.get("fields", {})
+        add("labware", fields.get("LabwareName"))
+        add("labware", fields.get("LabwareLable"))
+        add("labware", fields.get("LabwareLabel"))
+        add("labware", fields.get("RackLabel"))
+        add("rack_labels", fields.get("RackLabel"))
+        add("rack_types", fields.get("RackType"))
+        add("liquid_classes", fields.get("LiquidClassName"))
+        add("liquid_classes", fields.get("LiquidClassNameBySelection"))
+        add("volumes", fields.get("Volume"))
+        add("device_aliases", fields.get("DeviceAlias"))
+        add("worklists", fields.get("WorklistName"))
+        value = fields.get("FileName") or fields.get("Path")
+        if value and str(value).lower().endswith(".gwl"):
+            add("worklists", value)
+        add("variables", fields.get("Name"))
+        add("variables", fields.get("LoopVariable"))
+        add("conditions", fields.get("Condition"))
+
+    specs = _native_pattern_specification_groups(raw_specs)
+    if specs is None:
+        specs = {key: [] for key in raw_specs}
+        for key, values in raw_specs.items():
+            for value in values:
+                _append_unique(specs[key], value)
+    return {key: values for key, values in specs.items() if values}
+
+
+def _pattern_specification_inputs_supported(steps: Any) -> bool:
+    if type(steps) is not list:
+        return False
+    field_names = (
+        "LabwareName",
+        "LabwareLable",
+        "LabwareLabel",
+        "RackLabel",
+        "RackType",
+        "LiquidClassName",
+        "LiquidClassNameBySelection",
+        "Volume",
+        "DeviceAlias",
+        "WorklistName",
+        "FileName",
+        "Path",
+        "Name",
+        "LoopVariable",
+        "Condition",
+    )
+    for step in steps:
+        if type(step) is not dict or not all(type(key) is str for key in step):
+            return False
+        fields = step.get("fields", {})
+        if type(fields) is not dict or not all(type(key) is str for key in fields):
+            return False
+        for name in field_names:
+            value = fields.get(name)
+            if value is not None and (type(value) is not str or not value.isascii()):
+                return False
+    return True
+
+
+def _collect_specifications_python(
+    steps: list[dict[str, Any]],
+) -> dict[str, list[str]]:
     specs: dict[str, list[str]] = {
         "labware": [],
         "rack_labels": [],
