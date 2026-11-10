@@ -1535,14 +1535,14 @@ def merge_unique_string_groups(groups: Any, limit: Any) -> dict[str, list[str]] 
 def delimited_row_fields(
     row: Any, header: Any, has_header: Any
 ) -> dict[str, str] | None:
-    """Normalize supported ASCII CSV row fields with Python fallback otherwise."""
+    """Normalize Unicode CSV row fields with Python fallback for unsupported types."""
     if (
         not enabled()
         or type(row) is not list
         or type(header) is not list
         or type(has_header) is not bool
-        or not all(type(value) is str and value.isascii() for value in row)
-        or not all(type(value) is str and value.isascii() for value in header)
+        or not all(type(value) is str for value in row)
+        or not all(type(value) is str for value in header)
     ):
         return None
     try:

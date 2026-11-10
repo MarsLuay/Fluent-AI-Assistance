@@ -193,7 +193,7 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
                 native_acceleration.collapse_ascii_whitespace(chr(0xD800))
             )
 
-    def test_delimited_row_field_normalization_preserves_python_rules(self) -> None:
+    def test_delimited_row_field_normalization_matches_python_for_unicode(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "delimited_row_fields"
         ):
@@ -213,14 +213,58 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, {"duplicate": "first", "": "42", "column_4": "extra"})
 
-        unicode_row = ["\u00a0text\u00a0"]
+        unicode_row = ["\u00a0text\u00a0", "\x1cβ\x1f", "東京", "\u2003"]
+        unicode_header = ["列", "列", "", "ignored"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unicode_expected = task_input._row_fields(
+                unicode_row, unicode_header, True
+            )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            self.assertIsNone(
-                native_acceleration.delimited_row_fields(unicode_row, [], False)
+            self.assertEqual(
+                native_acceleration.delimited_row_fields(
+                    unicode_row, unicode_header, True
+                ),
+                unicode_expected,
             )
             self.assertEqual(
-                task_input._row_fields(unicode_row, [], False),
-                {"column_1": "text"},
+                task_input._row_fields(unicode_row, unicode_header, True),
+                unicode_expected,
+            )
+        self.assertEqual(unicode_expected, {"列": "β", "": "東京"})
+
+        whitespace_chars = [
+            chr(codepoint)
+            for codepoint in range(0x110000)
+            if chr(codepoint).isspace()
+        ]
+        whitespace_row = [
+            f"{character}value-{index}{character}"
+            for index, character in enumerate(whitespace_chars)
+        ]
+        whitespace_header = [f"field_{index}" for index in range(len(whitespace_row))]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            whitespace_expected = task_input._row_fields(
+                whitespace_row, whitespace_header, True
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.delimited_row_fields(
+                    whitespace_row, whitespace_header, True
+                ),
+                whitespace_expected,
+            )
+        self.assertEqual(
+            list(whitespace_expected.values()),
+            [f"value-{index}" for index in range(len(whitespace_chars))],
+        )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.delimited_row_fields([chr(0xD800)], [], False)
+            )
+            self.assertEqual(
+                task_input._row_fields([chr(0xD800)], [], False),
+                {"column_1": chr(0xD800)},
             )
 
     def test_delimited_header_detection_uses_native_ascii_and_unicode_fallback(self) -> None:

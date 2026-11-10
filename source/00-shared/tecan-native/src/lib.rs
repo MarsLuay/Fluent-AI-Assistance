@@ -1302,9 +1302,6 @@ fn delimited_row_fields<'py>(
             return Ok(None);
         }
         let value = value.extract::<String>()?;
-        if !value.is_ascii() {
-            return Ok(None);
-        }
         row_values.push(value);
     }
     let mut header_values = Vec::new();
@@ -1314,16 +1311,11 @@ fn delimited_row_fields<'py>(
             return Ok(None);
         }
         let value = value.extract::<String>()?;
-        if !value.is_ascii() {
-            return Ok(None);
-        }
         header_values.push(value);
     }
     let output = PyDict::new(py);
     for (column, value) in row_values.iter().enumerate() {
-        let value = value.trim_matches(|character: char| {
-            character.is_ascii_whitespace() || matches!(character as u32, 0x1c..=0x1f)
-        });
+        let value = trim_python_whitespace(value);
         if value.is_empty() {
             continue;
         }
