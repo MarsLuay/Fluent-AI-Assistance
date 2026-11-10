@@ -1,3 +1,4 @@
+use csv::ReaderBuilder;
 use pyo3::exceptions::{PyOSError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{
@@ -1325,6 +1326,44 @@ fn delimited_row_fields<'py>(
             format!("column_{}", column + 1)
         };
         output.set_item(key, value)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
+fn delimited_text_rows<'py>(
+    py: Python<'py>,
+    text: &str,
+    delimiter: char,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    let bytes = text.as_bytes();
+    if !matches!(delimiter, ',' | '\t')
+        || text.contains('"')
+        || bytes
+            .iter()
+            .enumerate()
+            .any(|(index, byte)| *byte == b'\r' && bytes.get(index + 1) != Some(&b'\n'))
+    {
+        return Ok(None);
+    }
+    let mut reader = ReaderBuilder::new()
+        .delimiter(delimiter as u8)
+        .has_headers(false)
+        .flexible(true)
+        .from_reader(text.as_bytes());
+    let output = PyList::empty(py);
+    for record in reader.records() {
+        let Ok(record) = record else {
+            return Ok(None);
+        };
+        if record.len() == 1 && record.get(0) == Some("") {
+            continue;
+        }
+        let row = PyList::empty(py);
+        for value in record.iter() {
+            row.append(value)?;
+        }
+        output.append(row)?;
     }
     Ok(Some(output.into_any()))
 }
@@ -3817,6 +3856,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     module.add_function(wrap_pyfunction!(unique_ascii_tuple_indices, module)?)?;
     module.add_function(wrap_pyfunction!(delimited_row_fields, module)?)?;
+    module.add_function(wrap_pyfunction!(delimited_text_rows, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_command_records, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_dict, module)?)?;

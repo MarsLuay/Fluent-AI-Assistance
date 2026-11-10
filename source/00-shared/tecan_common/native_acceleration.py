@@ -1532,6 +1532,27 @@ def merge_unique_string_groups(groups: Any, limit: Any) -> dict[str, list[str]] 
         return None
 
 
+def delimited_text_rows(text: Any, delimiter: Any) -> list[list[str]] | None:
+    """Parse a conservative unquoted CSV subset natively; use Python otherwise."""
+    if (
+        not enabled()
+        or type(text) is not str
+        or type(delimiter) is not str
+        or delimiter not in (",", "\t")
+    ):
+        return None
+    try:
+        result = _native.delimited_text_rows(text, delimiter)
+        if type(result) is list and all(
+            type(row) is list and all(type(value) is str for value in row)
+            for row in result
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def delimited_row_fields(
     row: Any, header: Any, has_header: Any
 ) -> dict[str, str] | None:

@@ -267,6 +267,66 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
                 {"column_1": chr(0xD800)},
             )
 
+    def test_plain_twl_delimited_rows_use_native_with_quoted_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "delimited_text_rows"
+        ):
+            self.skipTest("optional Rust delimited-text reader is not built")
+        plain = (
+            "taskname,parameter\r\n"
+            "Run-1,\u00a0β\u00a0\r\n"
+            "\r\n"
+            "Run-2,東京\r\n"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = inspect_twl_text(plain, source_name="Inputs/plain.twl")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                task_input,
+                "delimited_text_rows",
+                wraps=native_acceleration.delimited_text_rows,
+            ) as native_call:
+                actual = inspect_twl_text(plain, source_name="Inputs/plain.twl")
+                native_call.assert_called_once_with(plain, ",")
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["record_count"], 2)
+        self.assertEqual(actual["records"][0]["parameter"], "β")
+        self.assertEqual(actual["records"][1]["task_name"], "Run-2")
+
+        tab_text = "TASKNAME\tPARAMETER\nRun-3\tλ\n"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            tab_expected = inspect_twl_text(
+                tab_text, source_name="Inputs/tab-separated.twl"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            tab_actual = inspect_twl_text(
+                tab_text, source_name="Inputs/tab-separated.twl"
+            )
+            self.assertIsNone(
+                native_acceleration.delimited_text_rows(
+                    "taskname,parameter\rRun-4,value", ","
+                )
+            )
+        self.assertEqual(tab_actual, tab_expected)
+        self.assertEqual(tab_actual["records"][0]["parameter"], "λ")
+
+        quoted = 'taskname,parameter\nRun-1,"alpha,beta"\n'
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            quoted_expected = inspect_twl_text(quoted, source_name="Inputs/quoted.twl")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.delimited_text_rows(quoted, ","))
+            with patch.object(
+                task_input,
+                "delimited_text_rows",
+                wraps=native_acceleration.delimited_text_rows,
+            ) as native_call:
+                quoted_actual = inspect_twl_text(
+                    quoted, source_name="Inputs/quoted.twl"
+                )
+                native_call.assert_called_once_with(quoted, ",")
+        self.assertEqual(quoted_actual, quoted_expected)
+        self.assertEqual(quoted_actual["records"][0]["parameter"], "alpha,beta")
+
     def test_delimited_header_detection_uses_native_ascii_and_unicode_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "any_ascii_casefold_in"

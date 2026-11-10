@@ -16,6 +16,7 @@ from tecan_common import xml_compat as ET
 from tecan_common.native_acceleration import (
     any_ascii_casefold_in,
     delimited_row_fields,
+    delimited_text_rows,
     casefold_alias_values,
     collapse_ascii_whitespace,
     merge_unique_string_groups,
@@ -200,7 +201,10 @@ def _normalized_task_fields(values: dict[str, Any]) -> dict[str, Any]:
 
 
 def _inspect_delimited(text: str, *, source_name: str) -> dict[str, Any]:
-    rows = list(csv.reader(io.StringIO(text), delimiter="\t" if "\t" in text else ","))
+    delimiter = "\t" if "\t" in text else ","
+    rows = delimited_text_rows(text, delimiter)
+    if rows is None:
+        rows = list(csv.reader(io.StringIO(text), delimiter=delimiter))
     rows = [row for row in rows if any(cell.strip() for cell in row)]
     if not rows:
         return {
