@@ -1317,14 +1317,56 @@ class ReaderTests(unittest.TestCase):
         self.assertNotIn("Name", actual)
 
         unicode_root = ET.Element("Root")
-        ET.SubElement(unicode_root, "Unknown").text = " café "
+        ET.SubElement(unicode_root, "Unknown").text = "\u00a0café\u2003"
+        ET.SubElement(unicode_root, "Étiquette").text = "\x1céclair\x1f"
+        unicode_expected = {"Unknown": ["café"], "Étiquette": ["éclair"]}
+        whitespace_chars = [
+            chr(codepoint)
+            for codepoint in range(sys.maxunicode + 1)
+            if chr(codepoint).isspace()
+        ]
+        for index, character in enumerate(whitespace_chars):
+            name = f"Whitespace_{index:02d}"
+            ET.SubElement(unicode_root, name).text = (
+                f"{character}value-{index}{character}"
+            )
+            unicode_expected[name] = [f"value-{index}"]
+        unicode_expected = {
+            name: unicode_expected[name] for name in sorted(unicode_expected)
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            self.assertEqual(reader_script._unknown_fields(unicode_root), unicode_expected)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            native_unicode = native_acceleration.xml_grouped_texts_excluding(
+                unicode_root, {"Name"}, 20, ET.Element
+            )
+            self.assertIsNotNone(native_unicode)
+            self.assertEqual(dict(native_unicode), unicode_expected)
+            self.assertEqual(
+                [name for name, _values in native_unicode], list(unicode_expected)
+            )
+            with patch.object(
+                xml_helpers,
+                "_native_xml_grouped_texts_excluding",
+                wraps=xml_helpers._native_xml_grouped_texts_excluding,
+            ) as native_call:
+                self.assertEqual(
+                    reader_script._unknown_fields(unicode_root), unicode_expected
+                )
+                native_call.assert_called_once()
+
+        surrogate_root = ET.Element("Root")
+        ET.SubElement(surrogate_root, "Unknown").text = chr(0xD800)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(
                 native_acceleration.xml_grouped_texts_excluding(
-                    unicode_root, {"Name"}, 20, ET.Element
+                    surrogate_root, {"Name"}, 20, ET.Element
                 )
             )
-            self.assertEqual(reader_script._unknown_fields(unicode_root), {"Unknown": ["café"]})
+            self.assertEqual(
+                reader_script._unknown_fields(surrogate_root),
+                {"Unknown": [chr(0xD800)]},
+            )
 
     def test_native_rup_variable_record_extraction_matches_python(self) -> None:
         if not native_acceleration.available() or not hasattr(

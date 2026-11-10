@@ -1889,6 +1889,12 @@ fn xml_elements_by_name<'py>(
     Ok(Some(output.into_any()))
 }
 
+fn trim_python_whitespace(value: &str) -> &str {
+    value.trim_matches(|character: char| {
+        character.is_whitespace() || ('\u{001c}'..='\u{001f}').contains(&character)
+    })
+}
+
 #[pyfunction]
 fn xml_grouped_texts_excluding<'py>(
     py: Python<'py>,
@@ -1925,14 +1931,7 @@ fn xml_grouped_texts_excluding<'py>(
         if excluded.contains(local) {
             continue;
         }
-        if !text_value.is_ascii()
-            || text_value
-                .chars()
-                .any(|ch| ('\u{1c}'..='\u{1f}').contains(&ch))
-        {
-            return Ok(None);
-        }
-        let cleaned = text_value.trim();
+        let cleaned = trim_python_whitespace(&text_value);
         if cleaned.is_empty() {
             continue;
         }
