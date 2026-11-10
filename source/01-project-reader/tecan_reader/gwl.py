@@ -8,8 +8,8 @@ from typing import Any
 
 from tecan_common.gwl import Pipette, parse_gwl_line, parse_gwl_lines
 from tecan_common.native_acceleration import (
-    first_seen_ascii_string_counts as _native_first_seen_ascii_string_counts,
     read_utf8_sig_file as _native_read_utf8_sig_file,
+    worklist_count_record_types as _native_worklist_count_record_types,
     worklist_inspect_gwl_lines as _native_worklist_inspect_gwl_lines,
 )
 
@@ -71,7 +71,7 @@ def inspect_gwl_lines(lines: list[str], *, source_name: str) -> dict[str, Any]:
                     "liquid_class": str(record.liquid_class),
                 }
             )
-    native_counts = _native_first_seen_ascii_string_counts(record_types)
+    native_counts = _native_worklist_count_record_types(record_types)
     counts = native_counts if native_counts is not None else dict(Counter(record_types))
     return {
         "kind": "gwl",
