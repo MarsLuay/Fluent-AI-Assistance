@@ -1454,6 +1454,45 @@ fn sorted_unique_ascii_strings<'py>(
 }
 
 #[pyfunction]
+fn most_common_ascii_counts<'py>(
+    py: Python<'py>,
+    mapping: &Bound<'py, PyAny>,
+    limit: Option<i64>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !mapping.get_type().is(py.get_type::<PyDict>()) || limit.is_some_and(|value| value < 0) {
+        return Ok(None);
+    }
+    let mut counts = Vec::new();
+    for (index, item) in mapping.call_method0("items")?.try_iter()?.enumerate() {
+        let item = item?;
+        let key = item.get_item(0)?;
+        let value = item.get_item(1)?;
+        if !key.get_type().is(py.get_type::<PyString>())
+            || !value.get_type().is(py.get_type::<PyInt>())
+        {
+            return Ok(None);
+        }
+        let key = key.extract::<String>()?;
+        if !key.is_ascii() {
+            return Ok(None);
+        }
+        let Ok(value) = value.extract::<i64>() else {
+            return Ok(None);
+        };
+        counts.push((key, value, index));
+    }
+    counts.sort_by(|left, right| right.1.cmp(&left.1).then_with(|| left.2.cmp(&right.2)));
+    if let Some(limit) = limit {
+        counts.truncate(usize::try_from(limit).unwrap_or(usize::MAX));
+    }
+    let output = PyDict::new(py);
+    for (key, value, _) in counts {
+        output.set_item(key, value)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn ordered_ascii_string_counts<'py>(
     py: Python<'py>,
     values: &Bound<'py, PyAny>,
@@ -3607,6 +3646,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(sort_ascii_string_keys, module)?)?;
     module.add_function(wrap_pyfunction!(any_ascii_casefold_in, module)?)?;
     module.add_function(wrap_pyfunction!(ordered_ascii_string_counts, module)?)?;
+    module.add_function(wrap_pyfunction!(most_common_ascii_counts, module)?)?;
     module.add_function(wrap_pyfunction!(sorted_unique_ascii_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
     module.add_function(wrap_pyfunction!(unique_ascii_tuple_indices, module)?)?;

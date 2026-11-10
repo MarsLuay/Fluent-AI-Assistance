@@ -1641,6 +1641,36 @@ def sorted_unique_ascii_strings(groups: Any) -> list[str] | None:
         return None
 
 
+def most_common_ascii_counts(
+    mapping: Any, limit: Any = None
+) -> dict[str, int] | None:
+    """Order exact ASCII integer counts like ``Counter.most_common``."""
+    if (
+        not enabled()
+        or type(mapping) is not dict
+        or (limit is not None and (type(limit) is not int or not 0 <= limit < (1 << 63)))
+        or not all(
+            type(key) is str
+            and key.isascii()
+            and type(count) is int
+            and -(1 << 63) <= count < (1 << 63)
+            for key, count in mapping.items()
+        )
+    ):
+        return None
+    try:
+        result = _native.most_common_ascii_counts(mapping, limit)
+        if (
+            type(result) is dict
+            and all(type(key) is str and type(count) is int for key, count in result.items())
+            and (limit is None or len(result) <= limit)
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def ordered_ascii_string_counts(values: Any) -> dict[str, int] | None:
     """Count ASCII string values in stable ``Counter.most_common`` order."""
     if (

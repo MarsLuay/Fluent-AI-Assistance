@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 import json
 import tempfile
 import unittest
@@ -74,6 +75,67 @@ class ProjectModelTests(unittest.TestCase):
                 unicode_result["eligible_member_counts"], {"a": 2, "é": 1}
             )
             self.assertEqual(unicode_result["oversized_members"], ["a", "é"])
+
+    def test_inspection_counter_aggregation_uses_native_stable_order(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "most_common_ascii_counts"
+        ):
+            self.skipTest("optional Rust counter ordering is not built")
+        commands = {f"Command{index:02d}": 1 for index in range(42)}
+        scripts = [
+            {
+                "object_name": "First",
+                "family_counts": {"Zeta": 2, "Alpha": 2, "Beta": 1},
+                "command_counts": commands,
+                "warnings": ["WarnA", "WarnB", "WarnA"],
+            },
+            {
+                "object_name": "Second",
+                "family_counts": {"Beta": 1},
+                "command_counts": {"Command00": 1},
+                "warnings": ["WarnB"],
+            },
+        ]
+        model = CanonicalProjectModel(
+            source_archive="input.zeia",
+            adapter_id="test",
+            detection={"status": "supported"},
+            scripts=scripts,
+            objects=[],
+            worklists=[],
+            errors=[],
+            source_metadata={},
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = model.inspection_report()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                project_model,
+                "_native_most_common_ascii_counts",
+                wraps=native_acceleration.most_common_ascii_counts,
+            ) as native_call:
+                actual = model.inspection_report()
+                self.assertEqual(native_call.call_count, 3)
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            list(actual["family_counts"].items()),
+            [("Zeta", 2), ("Alpha", 2), ("Beta", 2)],
+        )
+        self.assertEqual(
+            list(actual["command_counts"]),
+            [f"Command{index:02d}" for index in range(40)],
+        )
+        self.assertEqual(list(actual["warning_counts"].items()), [("WarnA", 2), ("WarnB", 2)])
+
+        unicode_counts = Counter({"é": 2, "a": 1})
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.most_common_ascii_counts(dict(unicode_counts))
+            )
+            self.assertEqual(
+                project_model._most_common_counts(unicode_counts),
+                dict(unicode_counts.most_common()),
+            )
 
     def test_provenance_is_json_serializable_and_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

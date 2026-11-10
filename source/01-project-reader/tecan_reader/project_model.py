@@ -16,6 +16,7 @@ from typing import Any, Mapping
 
 from tecan_common.native_acceleration import (
     deepcopy_json as _native_deepcopy_json,
+    most_common_ascii_counts as _native_most_common_ascii_counts,
     sort_ascii_string_keys as _native_sort_ascii_string_keys,
     sorted_unique_ascii_strings as _native_sorted_unique_ascii_strings,
 )
@@ -41,6 +42,13 @@ def _sorted_unique_strings(values: list[str]) -> list[str]:
     if native is not None:
         return native
     return sorted(set(values))
+
+
+def _most_common_counts(counter: Counter[str], limit: int | None = None) -> dict[str, int]:
+    native = _native_most_common_ascii_counts(dict(counter), limit)
+    if native is not None:
+        return native
+    return dict(counter.most_common(limit))
 
 
 CANONICAL_PROJECT_MODEL_SCHEMA_VERSION = "tecan.canonical_project.v1"
@@ -328,9 +336,9 @@ class CanonicalProjectModel:
             "object_count_summarized": len(objects),
             "gwl_count_summarized": len(worklists),
             "script_names": names,
-            "family_counts": dict(family_counts.most_common()),
-            "command_counts": dict(command_counts.most_common(40)),
-            "warning_counts": dict(warning_counts.most_common()),
+            "family_counts": _most_common_counts(family_counts),
+            "command_counts": _most_common_counts(command_counts, 40),
+            "warning_counts": _most_common_counts(warning_counts),
             "scripts": scripts,
             "objects": objects,
             "gwls": worklists,
