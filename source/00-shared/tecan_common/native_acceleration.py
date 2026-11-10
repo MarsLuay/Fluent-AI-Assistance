@@ -348,6 +348,30 @@ def render_compare_report(
         return None
 
 
+def render_pattern_types_report(pattern_types: Any) -> str | None:
+    """Render supported script pattern type rows natively, or request fallback."""
+    if not enabled() or type(pattern_types) not in (list, tuple):
+        return None
+    safe_values = (str, bool, int, float, type(None))
+    rows: list[list[str]] = []
+    try:
+        for pattern_type in pattern_types:
+            if type(pattern_type) is not dict:
+                return None
+            values = [
+                pattern_type.get("pattern_type"),
+                pattern_type.get("label"),
+                pattern_type.get("description"),
+            ]
+            if not all(type(value) in safe_values for value in values):
+                return None
+            rows.append([str(value) for value in values])
+        result = _native.render_pattern_types_report(rows)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def render_pattern_specs(specs: Any) -> list[str] | None:
     """Render supported pattern specification mappings natively."""
     if not enabled() or type(specs) is not dict:

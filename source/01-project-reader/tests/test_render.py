@@ -262,6 +262,60 @@ class RenderListTests(unittest.TestCase):
         self.assertEqual(custom.str_calls, 1)
         self.assertEqual(actual_fallback, expected_fallback)
 
+    def test_native_pattern_types_report_matches_python_and_falls_back(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "render_pattern_types_report"
+        ):
+            self.skipTest("optional Rust pattern-type report renderer is not built")
+        report = {
+            "kind": "script_pattern_types",
+            "pattern_types": [
+                {
+                    "pattern_type": "type-x",
+                    "label": "label-x",
+                    "description": "description-β",
+                },
+                {},
+            ],
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = render.render_markdown(report)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            direct = native_acceleration.render_pattern_types_report(
+                report["pattern_types"]
+            )
+            self.assertEqual(direct, expected)
+            with patch.object(
+                render,
+                "_native_render_pattern_types_report",
+                wraps=render._native_render_pattern_types_report,
+            ) as native_call:
+                actual = render.render_markdown(report)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+
+        class TextValue:
+            def __init__(self) -> None:
+                self.str_calls = 0
+
+            def __str__(self) -> str:
+                self.str_calls += 1
+                return "custom label"
+
+        custom = TextValue()
+        unsupported = {
+            "kind": "script_pattern_types",
+            "pattern_types": [{"pattern_type": "type-x", "label": custom}],
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_fallback = render.render_markdown(unsupported)
+        self.assertEqual(custom.str_calls, 1)
+        custom.str_calls = 0
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual_fallback = render.render_markdown(unsupported)
+        self.assertEqual(custom.str_calls, 1)
+        self.assertEqual(actual_fallback, expected_fallback)
+
     def test_native_compare_report_matches_python_limits_and_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "render_compare_report"

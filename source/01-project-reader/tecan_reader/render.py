@@ -13,6 +13,7 @@ from tecan_common.native_acceleration import (
     render_join_lines as _native_render_join_lines,
     render_object_report as _native_render_object_report,
     render_pattern_specs as _native_render_pattern_specs,
+    render_pattern_types_report as _native_render_pattern_types_report,
 )
 
 from .common import compact_list, to_jsonable
@@ -274,6 +275,12 @@ def _render_script_pattern_search(report: dict[str, Any]) -> str:
 
 
 def _render_script_pattern_types(report: dict[str, Any]) -> str:
+    if type(report) is dict:
+        native = _native_render_pattern_types_report(
+            report.get("pattern_types", [])
+        )
+        if native is not None:
+            return native
     lines = ["# Tecan Script Pattern Types", ""]
     for pattern_type in report.get("pattern_types", []):
         lines.append(f"- `{pattern_type.get('pattern_type')}`: {pattern_type.get('label')}")

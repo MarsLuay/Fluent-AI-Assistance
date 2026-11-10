@@ -1201,6 +1201,19 @@ fn render_gwl_report(
 }
 
 #[pyfunction]
+fn render_pattern_types_report(rows: Vec<Vec<String>>) -> Option<String> {
+    if rows.iter().any(|row| row.len() != 3) {
+        return None;
+    }
+    let mut lines = vec!["# Tecan Script Pattern Types".to_string(), String::new()];
+    for row in rows {
+        lines.push(format!("- `{}`: {}", row[0], row[1]));
+        lines.push(format!("  - {}", row[2]));
+    }
+    Some(format!("{}\n", lines.join("\n")))
+}
+
+#[pyfunction]
 fn render_pattern_specs(entries: Vec<(String, Vec<String>)>) -> Vec<String> {
     if entries.is_empty() {
         return Vec::new();
@@ -2095,6 +2108,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_gwl_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_compare_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_pattern_specs, module)?)?;
+    module.add_function(wrap_pyfunction!(render_pattern_types_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_join_lines, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(read_text_file, module)?)?;
@@ -2201,6 +2215,25 @@ mod tests {
             ),
             "# ZEIA Compare Report\n\n- Left: `left-x`\n- Right: `right-x`\n- Entries: `2` -> `3`\n- Common script names: `1`\n\n## Scripts Added\n- added-x\n\n## Left Command Families\n- `family-x`: 2\n"
         );
+    }
+
+    #[test]
+    fn pattern_types_report_preserves_rows_and_empty_report() {
+        assert_eq!(
+            render_pattern_types_report(vec![
+                vec!["kind-x".into(), "label-x".into(), "description-x".into()],
+                vec!["None".into(), "None".into(), "β".into()],
+            ])
+            .as_deref(),
+            Some(
+                "# Tecan Script Pattern Types\n\n- `kind-x`: label-x\n  - description-x\n- `None`: None\n  - β\n"
+            )
+        );
+        assert_eq!(
+            render_pattern_types_report(Vec::new()).as_deref(),
+            Some("# Tecan Script Pattern Types\n\n")
+        );
+        assert!(render_pattern_types_report(vec![vec!["short".into()]]).is_none());
     }
 
     #[test]
