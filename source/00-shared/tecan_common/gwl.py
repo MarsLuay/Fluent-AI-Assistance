@@ -138,7 +138,9 @@ class Pipette:
     type_character: str = field(init=False)
 
     def __post_init__(self) -> None:
-        op = _clean(self.operation).upper()
+        op = _clean(self.operation)
+        native = native_acceleration.worklist_ascii_uppercase(op)
+        op = native if native is not None else op.upper()
         if not op or op[0] not in {"A", "D"}:
             raise ValueError("Pipette operation must be 'A' or 'D'.")
         object.__setattr__(self, "type_character", op[0])

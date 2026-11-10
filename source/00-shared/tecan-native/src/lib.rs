@@ -1126,6 +1126,11 @@ fn worklist_clean_field(value: Option<&str>) -> String {
 }
 
 #[pyfunction]
+fn worklist_ascii_uppercase(value: &str) -> Option<String> {
+    value.is_ascii().then(|| value.to_ascii_uppercase())
+}
+
+#[pyfunction]
 fn worklist_comment_line(text: &str) -> String {
     format!("C;{}", text.replace('\n', "\\n"))
 }
@@ -1523,6 +1528,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_parse_gwl_text_records, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_format_volume, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_clean_field, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_ascii_uppercase, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_comment_line, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_record_type_line, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_join_gwl_fields, module)?)?;

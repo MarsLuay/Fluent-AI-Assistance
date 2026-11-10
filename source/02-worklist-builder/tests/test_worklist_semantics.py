@@ -60,6 +60,30 @@ def _transfer(index: int, *, tip: str, source: int | None = None, destination: i
 
 
 class WorklistSemanticsTests(unittest.TestCase):
+    def test_pipette_operation_normalization_matches_python(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_ascii_uppercase"
+        ):
+            self.skipTest("optional Rust operation normalizer is not built")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(native_acceleration.worklist_ascii_uppercase("ad"), "AD")
+            self.assertEqual(native_acceleration.worklist_ascii_uppercase(""), "")
+            self.assertIsNone(native_acceleration.worklist_ascii_uppercase("ſ"))
+
+        for operation in (" a ", "d", "X", "ſ", " "):
+            outcomes = []
+            for disabled in ("1", "0"):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": disabled}
+                ):
+                    try:
+                        outcomes.append(
+                            Pipette(operation, "Rack", "Plate", 1, 1).type_character
+                        )
+                    except ValueError as error:
+                        outcomes.append((type(error), str(error)))
+            self.assertEqual(outcomes[0], outcomes[1], operation)
+
     def test_tip_selection_is_automatic_or_one_hot_and_preserves_raw_spelling(self):
         automatic = parse_tip_selection("")
         self.assertEqual((automatic.mode, automatic.value, automatic.channel), ("automatic", None, None))

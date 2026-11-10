@@ -666,6 +666,17 @@ def worklist_clean_field(value: Any) -> str | None:
         return None
 
 
+def worklist_ascii_uppercase(value: Any) -> str | None:
+    """Uppercase exact ASCII strings natively, preserving Unicode fallback."""
+    if not enabled() or type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.worklist_ascii_uppercase(value)
+        return result if isinstance(result, str) else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def worklist_record_type_line(type_character: Any) -> str | None:
     """Format exact-string GWL record types natively, or request fallback."""
     if not enabled() or type(type_character) is not str:
