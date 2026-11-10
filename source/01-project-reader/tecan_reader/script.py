@@ -554,11 +554,26 @@ def _warnings(commands: list[dict[str, Any]]) -> list[str]:
         warnings.append("Contains worklist import/load/execute commands.")
     if matches[3]:
         warnings.append("Contains TouchTools/RUP UI workflow commands.")
-    if any(
-        "pin" in str(value).lower()
+    field_values = [
+        value
         for command in commands
         for value in command.get("fields", {}).values()
-    ):
+    ]
+    pin_match = None
+    if all(type(value) is str and value.isascii() for value in field_values):
+        pin_match = native_acceleration.ascii_case_insensitive_substring_match_groups(
+            field_values, (("pin",),)
+        )
+    contains_pin = (
+        pin_match[0]
+        if pin_match is not None
+        else any(
+            "pin" in str(value).lower()
+            for command in commands
+            for value in command.get("fields", {}).values()
+        )
+    )
+    if contains_pin:
         warnings.append("Contains pin-controlled or pin-located hardware references.")
     unknown = [command for command in commands if command["family"] == "Other"]
     if unknown:

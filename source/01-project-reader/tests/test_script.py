@@ -243,7 +243,8 @@ class ScriptTests(unittest.TestCase):
                 wraps=native_acceleration.ascii_case_insensitive_substring_match_groups,
             ) as native_matcher:
                 actual = script._warnings(commands)
-                native_matcher.assert_called_once_with(
+                self.assertEqual(native_matcher.call_count, 2)
+                native_matcher.assert_any_call(
                     [command["raw_type"] for command in commands],
                     (
                         ("subroutine",),
@@ -252,6 +253,7 @@ class ScriptTests(unittest.TestCase):
                         ("touchtools", ".rup."),
                     ),
                 )
+                native_matcher.assert_any_call(["PIN-2"], (("pin",),))
         self.assertEqual(actual, expected)
         self.assertEqual(
             actual,
@@ -277,6 +279,30 @@ class ScriptTests(unittest.TestCase):
                 )
             )
             self.assertEqual(script._warnings(unicode_commands), unicode_expected)
+
+        unicode_field_commands = [
+            {
+                "raw_type": "FcaPipette",
+                "family": "LiHa/FCA",
+                "fields": {"Location": "İPIN-controlled"},
+            }
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unicode_field_expected = script._warnings(unicode_field_commands)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_case_insensitive_substring_match_groups",
+                wraps=native_acceleration.ascii_case_insensitive_substring_match_groups,
+            ) as native_matcher:
+                self.assertEqual(
+                    script._warnings(unicode_field_commands), unicode_field_expected
+                )
+                native_matcher.assert_called_once()
+        self.assertIn(
+            "Contains pin-controlled or pin-located hardware references.",
+            unicode_field_expected,
+        )
 
     def test_ordered_command_counts_use_rust_with_unicode_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
