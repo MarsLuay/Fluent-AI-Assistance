@@ -3730,7 +3730,8 @@ def _iter_local(parent: ET.Element, name: str):
 
 
 def _local_name(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1]
+    native = native_acceleration.xml_local_name(tag)
+    return native if native is not None else tag.rsplit("}", 1)[-1]
 
 
 def _number_or_text(value: str) -> Any:

@@ -149,6 +149,44 @@ class ProtocolIRSchemaTests(unittest.TestCase):
         self.assertEqual(actual[:5], [None, 0, 2, 2.25, 100])
         self.assertEqual(actual[-1], "bad")
 
+    def test_local_name_uses_native_xml_tag_helper_with_python_fallback(self):
+        from unittest.mock import patch
+
+        from tecan_common import native_acceleration
+        from fluent_pipeline import protocol_ir
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_tag_local_name"
+        ):
+            self.skipTest("optional Rust XML helper is not built")
+        tags = [
+            "",
+            "local",
+            "{urn:test}local",
+            "{first}{second}name",
+            "a:b",
+            "a}",
+        ]
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [protocol_ir._local_name(tag) for tag in tags]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_local_name",
+                wraps=native_acceleration.xml_local_name,
+            ) as native_call:
+                actual = [protocol_ir._local_name(tag) for tag in tags]
+                self.assertEqual(native_call.call_count, len(tags))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["", "local", "local", "name", "a:b", ""])
+
+        class CustomTag(str):
+            def rsplit(self, separator, maxsplit=-1):
+                return ["custom-local"]
+
+        self.assertEqual(protocol_ir._local_name(CustomTag("ignored")), "custom-local")
+
     def test_validate_document_rejects_missing_fields_and_invalid_operations(self):
         missing = {
             "ir_version": CANONICAL_IR_VERSION,
