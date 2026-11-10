@@ -193,6 +193,21 @@ def diagnostic_sort_indices(keys: Any) -> list[int] | None:
         return None
 
 
+def diagnostic_message(message: Any, code: Any) -> str | None:
+    """Select a diagnostic's exact-string message or code natively."""
+    if (
+        not enabled()
+        or (message is not None and type(message) is not str)
+        or (code is not None and type(code) is not str)
+    ):
+        return None
+    try:
+        result = _native.diagnostic_message(message, code)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def command_short_name(type_name: Any) -> str | None:
     """Shorten supported ASCII command type names natively, or request fallback."""
     if not enabled() or type(type_name) is not str or not type_name.isascii():

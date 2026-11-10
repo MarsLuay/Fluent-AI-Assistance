@@ -7,7 +7,10 @@ import re
 from typing import Any, Iterable, Mapping
 import zipfile
 
-from tecan_common.native_acceleration import diagnostic_sort_indices as _native_diagnostic_sort_indices
+from tecan_common.native_acceleration import (
+    diagnostic_message as _native_diagnostic_message,
+    diagnostic_sort_indices as _native_diagnostic_sort_indices,
+)
 
 
 DIAGNOSTIC_SCHEMA_VERSION = "tecan.ingestion_diagnostic.v1"
@@ -163,6 +166,10 @@ def sort_diagnostics(items: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]
 
 def diagnostic_message(item: Mapping[str, Any]) -> str:
     """Provide the legacy human-readable text used by compatibility callers."""
+    if type(item) is dict:
+        native = _native_diagnostic_message(item.get("message"), item.get("code"))
+        if native is not None:
+            return native
     return str(item.get("message") or item.get("code") or "ingestion diagnostic")
 
 

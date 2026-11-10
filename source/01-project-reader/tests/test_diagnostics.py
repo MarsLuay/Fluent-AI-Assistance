@@ -12,6 +12,7 @@ import tecan_reader.diagnostics as diagnostics_module
 from tecan_reader.diagnostics import (
     DiagnosticCode,
     IngestionArchiveError,
+    diagnostic_message,
     make_diagnostic,
     sort_diagnostics,
 )
@@ -36,6 +37,40 @@ class IngestionDiagnosticTests(unittest.TestCase):
         self.assertEqual([item["entry_path"] for item in ordered], ["a.xscr", "b.xscr"])
         self.assertEqual(json.dumps(ordered, sort_keys=True), json.dumps(sort_diagnostics([later, earlier]), sort_keys=True))
         self.assertEqual(ordered[0]["schema_version"], "tecan.ingestion_diagnostic.v1")
+
+    def test_native_diagnostic_message_preserves_fallback_cases(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "diagnostic_message"
+        ):
+            self.skipTest("optional Rust diagnostic message helper is not built")
+        supported = [
+            {"message": "specific", "code": "code"},
+            {"message": "", "code": "code"},
+            {"message": None, "code": ""},
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [diagnostic_message(item) for item in supported]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                diagnostics_module,
+                "_native_diagnostic_message",
+                wraps=diagnostics_module._native_diagnostic_message,
+            ) as native_message:
+                actual = [diagnostic_message(item) for item in supported]
+                self.assertEqual(native_message.call_count, len(supported))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["specific", "code", "ingestion diagnostic"])
+
+        unsupported = {"message": 0, "code": "fallback"}
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                diagnostics_module,
+                "_native_diagnostic_message",
+                wraps=diagnostics_module._native_diagnostic_message,
+            ) as native_message:
+                self.assertEqual(diagnostic_message(unsupported), "fallback")
+                native_message.assert_called_once_with(0, "fallback")
+                self.assertIsNone(native_acceleration.diagnostic_message(0, "fallback"))
 
     def test_native_sort_is_stable_and_keeps_shallow_copy_semantics(self) -> None:
         if not native_acceleration.available() or not hasattr(

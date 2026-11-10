@@ -932,6 +932,14 @@ fn diagnostic_sort_indices(keys_json: &str) -> PyResult<Option<String>> {
 }
 
 #[pyfunction]
+fn diagnostic_message(message: Option<String>, code: Option<String>) -> String {
+    message
+        .filter(|value| !value.is_empty())
+        .or_else(|| code.filter(|value| !value.is_empty()))
+        .unwrap_or_else(|| "ingestion diagnostic".to_owned())
+}
+
+#[pyfunction]
 fn command_short_name(type_name: &str) -> Option<String> {
     if !type_name.is_ascii() {
         return None;
@@ -1705,6 +1713,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(catalog_content_fingerprints, module)?)?;
     module.add_function(wrap_pyfunction!(canonical_json, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_sort_indices, module)?)?;
+    module.add_function(wrap_pyfunction!(diagnostic_message, module)?)?;
     module.add_function(wrap_pyfunction!(command_short_name, module)?)?;
     module.add_function(wrap_pyfunction!(compact_list, module)?)?;
     module.add_function(wrap_pyfunction!(extension_counts, module)?)?;
