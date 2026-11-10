@@ -1270,6 +1270,62 @@ fn xscr_command_records<'py>(
 }
 
 #[pyfunction]
+fn merge_unique_string_groups<'py>(
+    py: Python<'py>,
+    group_mappings: &Bound<'py, PyAny>,
+    limit: i64,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if limit < 0 {
+        return Ok(None);
+    }
+    let limit = usize::try_from(limit).unwrap_or(usize::MAX);
+    let mut groups: BTreeMap<String, (Vec<String>, HashSet<String>)> = BTreeMap::new();
+    for mapping in group_mappings.try_iter()? {
+        let mapping = mapping?;
+        if !mapping.get_type().is(py.get_type::<PyDict>()) {
+            return Ok(None);
+        }
+        for item in mapping.call_method0("items")?.try_iter()? {
+            let item = item?;
+            let key = item.get_item(0)?;
+            let values = item.get_item(1)?;
+            if !key.get_type().is(py.get_type::<PyString>())
+                || !values.get_type().is(py.get_type::<PyList>())
+            {
+                return Ok(None);
+            }
+            let key = key.extract::<String>()?;
+            if !key.is_ascii() {
+                return Ok(None);
+            }
+            let bucket = groups.entry(key).or_default();
+            for value in values.try_iter()? {
+                let value = value?;
+                if !value.get_type().is(py.get_type::<PyString>()) {
+                    return Ok(None);
+                }
+                let value = value.extract::<String>()?;
+                if !value.is_ascii() {
+                    return Ok(None);
+                }
+                if bucket.0.len() < limit && bucket.1.insert(value.clone()) {
+                    bucket.0.push(value);
+                }
+            }
+        }
+    }
+    let output = PyDict::new(py);
+    for (key, (values, _)) in groups {
+        let bucket = PyList::empty(py);
+        for value in values {
+            bucket.append(value)?;
+        }
+        output.set_item(key, bucket)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn casefold_alias_values<'py>(
     py: Python<'py>,
     mapping: &Bound<'py, PyAny>,
@@ -3276,6 +3332,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     module.add_function(wrap_pyfunction!(xml_variable_definition_elements, module)?)?;
     module.add_function(wrap_pyfunction!(casefold_alias_values, module)?)?;
+    module.add_function(wrap_pyfunction!(merge_unique_string_groups, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_command_records, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_dict, module)?)?;

@@ -1475,6 +1475,40 @@ def casefold_alias_values(mapping: Any, alias_groups: Any) -> list[Any] | None:
         return None
 
 
+def merge_unique_string_groups(groups: Any, limit: Any) -> dict[str, list[str]] | None:
+    """Merge exact ASCII string groups with first-seen deduplication and a cap."""
+    if (
+        not enabled()
+        or type(groups) not in (list, tuple)
+        or type(limit) is not int
+        or not 0 <= limit < (1 << 63)
+        or not all(
+            type(group) is dict
+            and all(
+                type(key) is str
+                and key.isascii()
+                and type(values) is list
+                and all(type(value) is str and value.isascii() for value in values)
+                for key, values in group.items()
+            )
+            for group in groups
+        )
+    ):
+        return None
+    try:
+        result = _native.merge_unique_string_groups(list(groups), limit)
+        if type(result) is dict and all(
+            type(key) is str
+            and type(values) is list
+            and all(type(value) is str for value in values)
+            for key, values in result.items()
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def asset_reference_names(values: Any) -> list[str] | None:
     """Extract and deduplicate ASCII path basenames natively."""
     if (

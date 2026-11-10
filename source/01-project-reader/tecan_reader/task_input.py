@@ -16,6 +16,7 @@ from tecan_common import xml_compat as ET
 from tecan_common.native_acceleration import (
     casefold_alias_values,
     collapse_ascii_whitespace,
+    merge_unique_string_groups,
     xml_elements_by_folded_name_with_children,
 )
 from tecan_common.xml_helpers import local_name
@@ -45,7 +46,7 @@ def inspect_twl_text(text: str, *, source_name: str) -> dict[str, Any]:
 def _inspect_xml(text: str, *, source_name: str) -> dict[str, Any]:
     root = parse_xml_text(text)
     records: list[dict[str, Any]] = []
-    unknown_fields: dict[str, list[str]] = {}
+    unknown_groups: list[dict[str, list[str]]] = []
     record_names = {"task", "taskrecord", "input", "item", "record"}
     record_nodes = xml_elements_by_folded_name_with_children(
         root, record_names, ET.Element
@@ -63,11 +64,19 @@ def _inspect_xml(text: str, *, source_name: str) -> dict[str, Any]:
         record = _element_record(element, index=index)
         if record:
             records.append(record)
-            for name, values in (record.get("unknown_fields") or {}).items():
+            unknown_groups.append(record.get("unknown_fields") or {})
+    unknown_fields = merge_unique_string_groups(unknown_groups, limit=20)
+    if unknown_fields is None:
+        unknown_fields = {}
+        for group in unknown_groups:
+            for name, values in group.items():
                 bucket = unknown_fields.setdefault(name, [])
                 for value in values:
                     if value not in bucket and len(bucket) < 20:
                         bucket.append(value)
+    sorted_unknown_fields = {
+        name: unknown_fields[name] for name in sorted(unknown_fields)
+    }
     return {
         "kind": "task_input",
         "schema_version": TASK_INPUT_SCHEMA_VERSION,
@@ -77,10 +86,10 @@ def _inspect_xml(text: str, *, source_name: str) -> dict[str, Any]:
         "object_name": Path(source_name).stem,
         "records": records,
         "record_count": len(records),
-        "unknown_fields": {name: unknown_fields[name] for name in sorted(unknown_fields)},
+        "unknown_fields": sorted_unknown_fields,
         "source_metadata": {
             "format": "xml",
-            "unknown_fields": {name: unknown_fields[name] for name in sorted(unknown_fields)},
+            "unknown_fields": sorted_unknown_fields.copy(),
         },
     }
 
