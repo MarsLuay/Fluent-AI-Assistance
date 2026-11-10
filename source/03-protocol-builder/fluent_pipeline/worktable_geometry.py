@@ -1406,7 +1406,12 @@ def classify_site_kind(location_group: Any = "", type_name: Any = "", object_nam
         else re.sub(r"[^a-z0-9]+", "", lower)
     )
 
-    if "pin" in lower:
+    native_pin_match = native_acceleration.ascii_case_insensitive_substring_match_values(
+        [lower], "pin"
+    )
+    if (native_pin_match is None and "pin" in lower) or (
+        native_pin_match is not None and native_pin_match[0]
+    ):
         return "pin"
     native_matches = native_acceleration.ascii_case_insensitive_substring_match_groups(
         [compact],
