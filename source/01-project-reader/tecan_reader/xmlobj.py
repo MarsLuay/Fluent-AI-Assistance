@@ -11,7 +11,7 @@ from tecan_common.native_acceleration import (
     xml_asset_reference_names as _native_xml_asset_reference_names,
     xml_kind_from_suffix as _native_xml_kind_from_suffix,
 )
-from tecan_common.xml_helpers import first_text, local_name, texts_by_name
+from tecan_common.xml_helpers import first_text, grouped_texts_excluding, texts_by_name
 
 from .common import parse_xml_text, read_text
 
@@ -87,16 +87,7 @@ def _unknown_fields(root: Any) -> dict[str, list[str]]:
         "Guid", "GUID", "Description", "BaseWorktableName", "BaseWorktableGuid",
         "LiquidClassName", "Name", "ComponentGuid", "SiteGuid",
     }
-    values: dict[str, list[str]] = {}
-    for element in root.iter():
-        name = local_name(element.tag)
-        value = (element.text or "").strip()
-        if not value or name in known:
-            continue
-        bucket = values.setdefault(name, [])
-        if value not in bucket and len(bucket) < 20:
-            bucket.append(value)
-    return {name: values[name] for name in sorted(values)}
+    return grouped_texts_excluding(root, known, limit=20)
 
 
 def _kind_from_suffix(suffix: str) -> str:

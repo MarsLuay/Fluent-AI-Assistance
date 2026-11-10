@@ -898,6 +898,34 @@ class ReaderTests(unittest.TestCase):
             )
             self.assertEqual(reader_script._pin_refs(unicode_values), unicode_expected)
 
+    def test_xml_object_unknown_fields_use_native_grouping_with_python_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_grouped_texts_excluding"
+        ):
+            self.skipTest("optional Rust XML grouping helper is not built")
+        root = ET.Element("Root")
+        ET.SubElement(root, "ObjectName").text = "known"
+        ET.SubElement(root, "Unknown").text = " first "
+        ET.SubElement(root, "Unknown").text = "first"
+        ET.SubElement(root, "Unknown").text = "second"
+        for index in range(22):
+            ET.SubElement(root, "Wide").text = f"value-{index:02d}"
+        expected = {
+            "Unknown": ["first", "second"],
+            "Wide": [f"value-{index:02d}" for index in range(20)],
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            self.assertEqual(reader_xmlobj._unknown_fields(root), expected)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                xml_helpers,
+                "_native_xml_grouped_texts_excluding",
+                wraps=xml_helpers._native_xml_grouped_texts_excluding,
+            ) as native_call:
+                actual = reader_xmlobj._unknown_fields(root)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+
     def test_xml_object_asset_reference_filter_matches_legacy_regex(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_asset_reference_names"
