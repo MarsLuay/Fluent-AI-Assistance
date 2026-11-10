@@ -8,6 +8,7 @@ vendor error codes.
 from __future__ import annotations
 
 from . import xml_compat as ET
+from tecan_common.xml_helpers import elements_by_name
 
 _KNOWN_MACRO_TAGS = {"ApplicationDriverMacro", "LegacyDriverMacro"}
 _KNOWN_ATTRIBUTES = {
@@ -34,11 +35,7 @@ def application_driver_macro_has_unmodeled_source(raw_xml: str | None) -> bool:
         obj = ET.fromstring(raw_xml)
     except ET.ParseError:
         return True
-    macros = [
-        element
-        for element in obj.iter()
-        if isinstance(element.tag, str) and _local(element.tag) in _KNOWN_MACRO_TAGS
-    ]
+    macros = elements_by_name(obj, _KNOWN_MACRO_TAGS)
     if not macros:
         return True
     macro = macros[0]

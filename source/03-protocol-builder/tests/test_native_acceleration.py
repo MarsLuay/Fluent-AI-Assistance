@@ -232,6 +232,44 @@ class NativeAccelerationTests(unittest.TestCase):
             [("Labware", "first"), ("Site", "one"), ("Location", "Deck A")],
         )
 
+    def test_driver_macro_safety_scan_uses_native_tag_selector(self) -> None:
+        from tecan_common import xml_helpers
+        from fluentcoder.driver_macro_source import (
+            application_driver_macro_has_unmodeled_source,
+        )
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        sources = [
+            '<Root xmlns:ns="urn:test"><ns:LegacyDriverMacro Version="1">'
+            "<ExecutionSettings/></ns:LegacyDriverMacro>"
+            "<ApplicationDriverMacro><Unknown/></ApplicationDriverMacro></Root>",
+            "<Root><ApplicationDriverMacro><Unknown/></ApplicationDriverMacro></Root>",
+            '<Root><LegacyDriverMacro unexpected="x"/></Root>',
+            "<Root><Other/></Root>",
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                application_driver_macro_has_unmodeled_source(source)
+                for source in sources
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                xml_helpers,
+                "_native_xml_elements_by_name",
+                wraps=xml_helpers._native_xml_elements_by_name,
+            ) as native_call:
+                actual = [
+                    application_driver_macro_has_unmodeled_source(source)
+                    for source in sources
+                ]
+                self.assertEqual(native_call.call_count, len(sources))
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [False, True, True, True])
+
     def test_native_pattern_window_order_and_confidence(self) -> None:
         if not native_acceleration.available():
             self.skipTest("optional Rust extension is not built")
