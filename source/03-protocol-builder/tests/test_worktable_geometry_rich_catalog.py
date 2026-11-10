@@ -147,6 +147,37 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [expected_value for _, expected_value in cases])
 
+    def test_site_index_sort_key_uses_native_integer_parse_with_python_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "parse_i64_text"
+        ):
+            self.skipTest("optional Rust integer parser is not built")
+        values = [
+            "0",
+            "-1",
+            "+2",
+            " 3 ",
+            "1_000",
+            "١٢",
+            str(1 << 100),
+            "not-an-int",
+            None,
+            7,
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [worktable_geometry._site_index_sort_key(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "parse_i64_text",
+                wraps=native_acceleration.parse_i64_text,
+            ) as native_call:
+                actual = [worktable_geometry._site_index_sort_key(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual[0], (0, "000000000000"))
+        self.assertEqual(actual[-2:], [(1, "None"), (0, "000000000007")])
+
     def test_float_text_uses_native_decimal_subset_and_python_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "parse_f64_decimal_text"

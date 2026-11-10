@@ -727,6 +727,9 @@ def _leaf_texts(elem: ET.Element | None) -> list[str]:
 
 
 def _site_index_sort_key(value: str) -> tuple[int, str]:
+    native = native_acceleration.parse_i64_text(value)
+    if native is not None:
+        return (0, f"{native:012d}")
     try:
         return (0, f"{int(value):012d}")
     except (TypeError, ValueError):
