@@ -520,6 +520,52 @@ class ProtocolIRSchemaTests(unittest.TestCase):
                 with self.assertRaises(AttributeError):
                     protocol_ir._xscr_selected_tip_channels(commented)
 
+    def test_first_nested_text_uses_native_selector_with_ordered_fallback(self):
+        from unittest.mock import patch
+
+        from tecan_common import native_acceleration
+        from fluent_pipeline import protocol_ir
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        root = protocol_ir.ET.fromstring(
+            "<Root><Site> 1 </Site><Branch><Site>2</Site></Branch></Root>"
+        )
+        missing = protocol_ir.ET.fromstring("<Root><Other/></Root>")
+        roots = [root, missing]
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [protocol_ir._first_nested_text(item, "Site") for item in roots]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = [protocol_ir._first_nested_text(item, "Site") for item in roots]
+                self.assertEqual(native_call.call_count, 2)
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["1", ""])
+
+        comment_after = protocol_ir.ET.Element("Root")
+        first = protocol_ir.ET.SubElement(comment_after, "Site")
+        first.text = " first "
+        comment_after.append(protocol_ir.ET.Comment("after first match"))
+        for disabled in ("1", "0"):
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": disabled}):
+                self.assertEqual(protocol_ir._first_nested_text(comment_after, "Site"), "first")
+
+        comment_before = protocol_ir.ET.Element("Root")
+        comment_before.append(protocol_ir.ET.Comment("before first match"))
+        protocol_ir.ET.SubElement(comment_before, "Site").text = "later"
+        for disabled in ("1", "0"):
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": disabled}):
+                with self.assertRaises(AttributeError):
+                    protocol_ir._first_nested_text(comment_before, "Site")
+
     def test_validate_document_rejects_missing_fields_and_invalid_operations(self):
         missing = {
             "ir_version": CANONICAL_IR_VERSION,

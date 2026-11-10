@@ -2684,7 +2684,11 @@ def _rga_transfer_parameters(command_object: ET.Element) -> dict[str, Any]:
 
 
 def _first_nested_text(element: ET.Element, name: str) -> str:
-    for child in element.iter():
+    native = native_acceleration.xml_elements_by_name(
+        element, {name}, ET.Element
+    )
+    children = native if native is not None else element.iter()
+    for child in children:
         if _local_name(child.tag) == name:
             return str(child.text or "").strip()
     return ""
