@@ -8,6 +8,7 @@ from typing import Any
 from tecan_common.native_acceleration import (
     render_append_dict as _native_render_append_dict,
     render_append_list as _native_render_append_list,
+    render_compare_report as _native_render_compare_report,
     render_gwl_report as _native_render_gwl_report,
     render_join_lines as _native_render_join_lines,
     render_object_report as _native_render_object_report,
@@ -115,6 +116,20 @@ def _render_zeia(report: dict[str, Any]) -> str:
 
 
 def _render_compare(report: dict[str, Any]) -> str:
+    if type(report) is dict:
+        native = _native_render_compare_report(
+            report.get("left"),
+            report.get("right"),
+            report.get("left_entry_count"),
+            report.get("right_entry_count"),
+            report.get("script_names_common_count"),
+            report.get("script_names_added", []),
+            report.get("script_names_removed", []),
+            report.get("left_family_counts", {}),
+            report.get("right_family_counts", {}),
+        )
+        if native is not None:
+            return native
     lines = [
         "# ZEIA Compare Report",
         "",

@@ -1133,6 +1133,42 @@ fn render_append_dict(title: &str, entries: Vec<(String, String)>, limit: i64) -
     output
 }
 
+#[allow(clippy::too_many_arguments)] // Keep the report inputs aligned with its compatibility wrapper.
+#[pyfunction]
+fn render_compare_report(
+    left: &str,
+    right: &str,
+    left_entry_count: &str,
+    right_entry_count: &str,
+    common_script_count: &str,
+    scripts_added: Vec<String>,
+    scripts_removed: Vec<String>,
+    left_families: Vec<(String, String)>,
+    right_families: Vec<(String, String)>,
+) -> String {
+    let mut lines = vec![
+        "# ZEIA Compare Report".to_string(),
+        String::new(),
+        format!("- Left: `{left}`"),
+        format!("- Right: `{right}`"),
+        format!("- Entries: `{left_entry_count}` -> `{right_entry_count}`"),
+        format!("- Common script names: `{common_script_count}`"),
+    ];
+    lines.extend(render_append_list("Scripts Added", scripts_added, 100));
+    lines.extend(render_append_list("Scripts Removed", scripts_removed, 100));
+    lines.extend(render_append_dict(
+        "Left Command Families",
+        left_families,
+        20,
+    ));
+    lines.extend(render_append_dict(
+        "Right Command Families",
+        right_families,
+        20,
+    ));
+    format!("{}\n", lines.join("\n"))
+}
+
 #[pyfunction]
 fn render_gwl_report(
     source: &str,
@@ -2057,6 +2093,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_append_dict, module)?)?;
     module.add_function(wrap_pyfunction!(render_object_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_gwl_report, module)?)?;
+    module.add_function(wrap_pyfunction!(render_compare_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_pattern_specs, module)?)?;
     module.add_function(wrap_pyfunction!(render_join_lines, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
@@ -2146,6 +2183,24 @@ mod tests {
             Some("# GWL Report: source\n\n- Lines: `0`\n- Transfer pairs estimate: `0`\n")
         );
         assert!(render_gwl_report("", "", "", Vec::new(), vec![vec!["short".into()]]).is_none());
+    }
+
+    #[test]
+    fn compare_report_render_preserves_section_order_and_empty_sections() {
+        assert_eq!(
+            render_compare_report(
+                "left-x",
+                "right-x",
+                "2",
+                "3",
+                "1",
+                vec!["added-x".into()],
+                Vec::new(),
+                vec![("family-x".into(), "2".into())],
+                Vec::new(),
+            ),
+            "# ZEIA Compare Report\n\n- Left: `left-x`\n- Right: `right-x`\n- Entries: `2` -> `3`\n- Common script names: `1`\n\n## Scripts Added\n- added-x\n\n## Left Command Families\n- `family-x`: 2\n"
+        );
     }
 
     #[test]

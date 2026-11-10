@@ -262,6 +262,81 @@ class RenderListTests(unittest.TestCase):
         self.assertEqual(custom.str_calls, 1)
         self.assertEqual(actual_fallback, expected_fallback)
 
+    def test_native_compare_report_matches_python_limits_and_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "render_compare_report"
+        ):
+            self.skipTest("optional Rust compare-report renderer is not built")
+        report = {
+            "kind": "zeia_compare",
+            "left": "left-x",
+            "right": "right-x",
+            "left_entry_count": 2,
+            "right_entry_count": 3,
+            "script_names_common_count": 1,
+            "script_names_added": [f"added-{index}" for index in range(102)],
+            "script_names_removed": ("removed-β",),
+            "left_family_counts": {f"key-{index}": index for index in range(22)},
+            "right_family_counts": {"key-z": "last"},
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = render.render_markdown(report)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            direct = native_acceleration.render_compare_report(
+                report["left"],
+                report["right"],
+                report["left_entry_count"],
+                report["right_entry_count"],
+                report["script_names_common_count"],
+                report["script_names_added"],
+                report["script_names_removed"],
+                report["left_family_counts"],
+                report["right_family_counts"],
+            )
+            self.assertEqual(direct, expected)
+            with patch.object(
+                render,
+                "_native_render_compare_report",
+                wraps=render._native_render_compare_report,
+            ) as native_call:
+                actual = render.render_markdown(report)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual.count("- ... 2 more"), 2)
+
+        class TextValue:
+            def __init__(self) -> None:
+                self.str_calls = 0
+
+            def __str__(self) -> str:
+                self.str_calls += 1
+                return "custom left"
+
+        custom = TextValue()
+        unsupported = {**report, "left": custom}
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_fallback = render.render_markdown(unsupported)
+        self.assertEqual(custom.str_calls, 1)
+        custom.str_calls = 0
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.render_compare_report(
+                    custom,
+                    report["right"],
+                    report["left_entry_count"],
+                    report["right_entry_count"],
+                    report["script_names_common_count"],
+                    report["script_names_added"],
+                    report["script_names_removed"],
+                    report["left_family_counts"],
+                    report["right_family_counts"],
+                )
+            )
+            self.assertEqual(custom.str_calls, 0)
+            actual_fallback = render.render_markdown(unsupported)
+        self.assertEqual(custom.str_calls, 1)
+        self.assertEqual(actual_fallback, expected_fallback)
+
     def test_native_gwl_report_matches_python_and_falls_back_safely(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "render_gwl_report"

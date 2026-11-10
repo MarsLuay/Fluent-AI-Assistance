@@ -290,6 +290,64 @@ def render_gwl_report(
         return None
 
 
+def render_compare_report(
+    left: Any,
+    right: Any,
+    left_entry_count: Any,
+    right_entry_count: Any,
+    common_script_count: Any,
+    scripts_added: Any,
+    scripts_removed: Any,
+    left_families: Any,
+    right_families: Any,
+) -> str | None:
+    """Render supported compare-report data natively, or request Python fallback."""
+    safe_values = (str, bool, int, float, type(None))
+    if (
+        not enabled()
+        or any(
+            type(value) not in safe_values
+            for value in (
+                left,
+                right,
+                left_entry_count,
+                right_entry_count,
+                common_script_count,
+            )
+        )
+        or type(scripts_added) not in (list, tuple)
+        or not all(type(value) is str for value in scripts_added)
+        or type(scripts_removed) not in (list, tuple)
+        or not all(type(value) is str for value in scripts_removed)
+        or type(left_families) is not dict
+        or type(right_families) is not dict
+    ):
+        return None
+    family_entries: list[list[tuple[str, str]]] = []
+    try:
+        for mapping in (left_families, right_families):
+            entries: list[tuple[str, str]] = []
+            for key, value in mapping.items():
+                if type(key) is not str or type(value) not in safe_values:
+                    return None
+                entries.append((key, str(value)))
+            family_entries.append(entries)
+        result = _native.render_compare_report(
+            str(left),
+            str(right),
+            str(left_entry_count),
+            str(right_entry_count),
+            str(common_script_count),
+            list(scripts_added),
+            list(scripts_removed),
+            family_entries[0],
+            family_entries[1],
+        )
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def render_pattern_specs(specs: Any) -> list[str] | None:
     """Render supported pattern specification mappings natively."""
     if not enabled() or type(specs) is not dict:
