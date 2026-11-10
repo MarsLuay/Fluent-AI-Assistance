@@ -2547,6 +2547,12 @@ fn canonical_json(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<String> 
 }
 
 #[pyfunction]
+fn canonical_json_compact(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<String> {
+    let json = py_to_json(py, value)?;
+    serde_json::to_string(&json).map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+#[pyfunction]
 fn diagnostic_sort_indices(keys_json: &str) -> PyResult<Option<String>> {
     let Ok(keys) = serde_json::from_str::<Vec<Vec<String>>>(keys_json) else {
         return Ok(None);
@@ -3675,6 +3681,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(source_content_fingerprint, module)?)?;
     module.add_function(wrap_pyfunction!(catalog_content_fingerprints, module)?)?;
     module.add_function(wrap_pyfunction!(canonical_json, module)?)?;
+    module.add_function(wrap_pyfunction!(canonical_json_compact, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_sort_indices, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_message, module)?)?;
     module.add_function(wrap_pyfunction!(xml_kind_from_suffix, module)?)?;

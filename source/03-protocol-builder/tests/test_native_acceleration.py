@@ -279,8 +279,10 @@ class NativeAccelerationTests(unittest.TestCase):
                     self.assertEqual(fast_json_dumps(custom_value), expected)
 
     def test_native_canonical_json_randomized_builtin_parity(self) -> None:
-        if not native_acceleration.available():
-            self.skipTest("optional Rust extension is not built")
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "canonical_json_compact"
+        ):
+            self.skipTest("optional Rust compact JSON serializer is not built")
         generator = random.Random(20260312)
         scalars = [
             None,
@@ -325,6 +327,12 @@ class NativeAccelerationTests(unittest.TestCase):
                 actual = native_acceleration.canonical_json(value)
                 self.assertIsNotNone(actual)
                 self.assertEqual(actual, expected)
+                expected_compact = json.dumps(
+                    value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+                )
+                actual_compact = native_acceleration.canonical_json_compact(value)
+                self.assertIsNotNone(actual_compact)
+                self.assertEqual(actual_compact, expected_compact)
 
     def test_catalog_path_and_fingerprint_parity(self) -> None:
         if not native_acceleration.available():

@@ -15,6 +15,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
 from tecan_common.native_acceleration import (
+    canonical_json_compact as _native_canonical_json_compact,
     deepcopy_json as _native_deepcopy_json,
     most_common_ascii_counts as _native_most_common_ascii_counts,
     sort_ascii_string_keys as _native_sort_ascii_string_keys,
@@ -291,7 +292,11 @@ class CanonicalProjectModel:
         }
 
     def to_json(self) -> str:
-        return json.dumps(self.to_dict(), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        value = self.to_dict()
+        native = _native_canonical_json_compact(value)
+        if native is not None:
+            return native
+        return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
     def inspection_report(self) -> dict[str, Any]:
         """Project-reader compatibility view backed by this canonical model."""

@@ -137,6 +137,64 @@ class ProjectModelTests(unittest.TestCase):
                 dict(unicode_counts.most_common()),
             )
 
+    def test_model_json_uses_native_compact_serializer_with_python_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "canonical_json_compact"
+        ):
+            self.skipTest("optional Rust compact JSON serializer is not built")
+        model = CanonicalProjectModel(
+            source_archive="input.zeia",
+            adapter_id="test",
+            detection={"name": "café", "flags": [True, None]},
+            scripts=[],
+            objects=[],
+            worklists=[],
+            errors=[],
+            source_metadata={"nested": {"z": 1, "a": "μ"}},
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = json.dumps(
+                model.to_dict(),
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                project_model,
+                "_native_canonical_json_compact",
+                wraps=native_acceleration.canonical_json_compact,
+            ) as native_call:
+                actual = model.to_json()
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertNotIn(": ", actual)
+
+        nonfinite_model = CanonicalProjectModel(
+            source_archive="input.zeia",
+            adapter_id="test",
+            detection={"measurement": float("nan")},
+            scripts=[],
+            objects=[],
+            worklists=[],
+            errors=[],
+            source_metadata={},
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            nonfinite_expected = json.dumps(
+                nonfinite_model.to_dict(),
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.canonical_json_compact(
+                    nonfinite_model.to_dict()
+                )
+            )
+            self.assertEqual(nonfinite_model.to_json(), nonfinite_expected)
+
     def test_provenance_is_json_serializable_and_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             record = normalize_record(

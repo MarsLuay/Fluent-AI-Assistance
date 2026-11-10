@@ -1322,6 +1322,17 @@ def canonical_json(value: Any) -> str | None:
         return None
 
 
+def canonical_json_compact(value: Any) -> str | None:
+    """Serialize JSON-compatible values with compact separators, or fall back."""
+    if not enabled():
+        return None
+    try:
+        result = _native.canonical_json_compact(value)
+        return result if type(result) is str else None
+    except (ValueError, TypeError, UnicodeError, OverflowError):
+        return None
+
+
 def compact_list(values: Any, limit: Any = 20) -> list[str] | None:
     """Deduplicate exact string sequences natively, preserving order and limit rules."""
     if (
