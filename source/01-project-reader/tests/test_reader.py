@@ -530,6 +530,44 @@ class ReaderTests(unittest.TestCase):
             with self.assertRaises(RecursionError):
                 to_jsonable(cyclic)
 
+    def test_native_jsonable_sorted_sets_match_python_on_generated_inputs(self) -> None:
+        if not native_acceleration.available():
+            self.skipTest("optional Rust set converter is not built")
+        generator = random.Random(20260311)
+        pools = [
+            [
+                False,
+                True,
+                -11,
+                0,
+                3,
+                2**80,
+                -(2**100),
+                -2.75,
+                0.5,
+                19.25,
+                float("inf"),
+                float("-inf"),
+            ],
+            ["", "ascii", "é", "Å", "a", "\x00", "𝄞", "\ud800"],
+            [b"", b"\x00", b"a", b"\xff", b"\x00a", b"a\x00"],
+        ]
+        for case in range(60):
+            value = set(generator.choices(generator.choice(pools), k=generator.randrange(10)))
+            with self.subTest(case=case, size=len(value)):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    expected = to_jsonable(value)
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    self.assertIsNotNone(
+                        native_acceleration.to_jsonable_containers(value)
+                    )
+                    actual = to_jsonable(value)
+                self.assertEqual(actual, expected)
+
     def test_inspect_xscr_text(self) -> None:
         report = inspect_xscr_text(SAMPLE_XSCR, source_name="sample.xscr")
         self.assertEqual(report["object_name"], "UnitTestScript")
