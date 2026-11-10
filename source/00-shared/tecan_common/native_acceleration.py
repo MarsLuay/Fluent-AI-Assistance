@@ -621,6 +621,27 @@ def worklist_parse_gwl_text_records(
         return None
 
 
+def worklist_read_gwl_records(
+    path: str | Path, permissive: bool
+) -> list[dict[str, Any]] | None:
+    """Read and parse supported GWL files natively, preserving Python fallback."""
+    if not enabled() or type(permissive) is not bool:
+        return None
+    try:
+        encoded = _native.worklist_read_gwl_records(str(path), permissive)
+        return _decode_worklist_record_payload(encoded)
+    except (
+        AttributeError,
+        OSError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def worklist_format_volume(value: Any) -> str | None:
     """Format supported exact numeric GWL volumes natively, or request fallback."""
     if not enabled() or type(value) not in (str, int, float):

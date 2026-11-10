@@ -596,6 +596,48 @@ class WorklistSemanticsTests(unittest.TestCase):
                 parse_gwl_text("A;short", name="error")
         self.assertEqual(str(native_error.exception), str(python_error.exception))
 
+    def test_native_gwl_file_parser_matches_python_newline_and_bom_behavior(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_read_gwl_records"
+        ):
+            self.skipTest("optional Rust GWL file reader is not built")
+        cases = [
+            (b"\xef\xbb\xbfC;first\r\nC;second\rW1;\n", False, True),
+            (b"C;one\rC;two\r", False, True),
+            ("C;one\u2028C;two\n".encode("utf-8"), False, False),
+            (b"X;opaque\n", True, True),
+            (b"", False, True),
+        ]
+        with tempfile.TemporaryDirectory() as raw_directory:
+            path = Path(raw_directory) / "sample.gwl"
+            for content, permissive, native_supported in cases:
+                path.write_bytes(content)
+                with self.subTest(content=content, permissive=permissive):
+                    with patch.dict(
+                        "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                    ):
+                        expected = parse_gwl(path, permissive=permissive)
+                    with patch.dict(
+                        "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                    ):
+                        native = native_acceleration.worklist_read_gwl_records(
+                            path, permissive
+                        )
+                        if native_supported:
+                            self.assertIsNotNone(native)
+                        else:
+                            self.assertIsNone(native)
+                        actual = parse_gwl(path, permissive=permissive)
+                    self.assertEqual(actual.name, expected.name)
+                    self.assertEqual(actual.to_text(), expected.to_text())
+                    self.assertEqual(actual.counts(), expected.counts())
+
+            path.write_bytes(b"\xff")
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                self.assertIsNone(native_acceleration.worklist_read_gwl_records(path, False))
+                with self.assertRaises(UnicodeDecodeError):
+                    parse_gwl(path)
+
     def test_native_single_gwl_record_parser_matches_python(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "worklist_parse_gwl_records"

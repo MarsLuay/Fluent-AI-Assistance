@@ -1079,6 +1079,21 @@ fn worklist_parse_gwl_text_records(text: &str, permissive: bool) -> PyResult<Opt
     Ok(serde_json::to_string(&records).ok())
 }
 
+#[pyfunction]
+fn worklist_read_gwl_records(path: &str, permissive: bool) -> PyResult<Option<String>> {
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return Ok(None);
+    };
+    let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
+    let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+    let Some(records) =
+        tecan_worklist_builder::parse_gwl_text_records_for_python(&normalized, permissive)
+    else {
+        return Ok(None);
+    };
+    Ok(serde_json::to_string(&records).ok())
+}
+
 fn is_ascii_float_literal(value: &str) -> bool {
     !value.is_empty()
         && value.bytes().any(|byte| byte.is_ascii_digit())
@@ -1540,6 +1555,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_parse_gwl, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_gwl_records, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_gwl_text_records, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_read_gwl_records, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_format_volume, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_clean_field, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_ascii_uppercase, module)?)?;

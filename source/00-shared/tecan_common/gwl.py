@@ -302,7 +302,15 @@ def serialize_gwl(records: Iterable[Record]) -> str:
 
 def parse_gwl(path: str | Path, *, permissive: bool = False) -> Worklist:
     source = Path(path)
-    return parse_gwl_text(source.read_text(encoding="utf-8-sig"), name=source.stem, permissive=permissive)
+    if type(permissive) is bool:
+        native = native_acceleration.worklist_read_gwl_records(source, permissive)
+        if native is not None:
+            return _worklist_from_native_gwl_records(native, source.stem)
+    return parse_gwl_text(
+        source.read_text(encoding="utf-8-sig"),
+        name=source.stem,
+        permissive=permissive,
+    )
 
 
 def parse_gwl_text(text: str, *, name: str = "worklist", permissive: bool = False) -> Worklist:
