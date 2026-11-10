@@ -1810,6 +1810,25 @@ def format_site_path(value: Any) -> str | None:
         return None
 
 
+def site_index_sort_key(value: Any) -> tuple[int, str] | None:
+    """Format an ASCII i64 worktable index as its stable numeric sort key."""
+    if not enabled() or type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.site_index_sort_key(value)
+        if (
+            type(result) is tuple
+            and len(result) == 2
+            and type(result[0]) is int
+            and result[0] == 0
+            and type(result[1]) is str
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def parse_i64_text(value: Any) -> int | None:
     """Parse signed ASCII i64 text, leaving broader Python integer forms to fallback."""
     if not enabled() or type(value) is not str or not value.isascii():

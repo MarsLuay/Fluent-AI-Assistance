@@ -222,11 +222,11 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
                 native_acceleration.xml_leaf_texts(deep_root, worktable_geometry.ET.Element)
             )
 
-    def test_site_index_sort_key_uses_native_integer_parse_with_python_fallback(self):
+    def test_site_index_sort_key_uses_native_formatting_with_python_fallback(self):
         if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "parse_i64_text"
+            native_acceleration._native, "site_index_sort_key"
         ):
-            self.skipTest("optional Rust integer parser is not built")
+            self.skipTest("optional Rust site-index formatter is not built")
         values = [
             "0",
             "-1",
@@ -244,13 +244,15 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
-                "parse_i64_text",
-                wraps=native_acceleration.parse_i64_text,
+                "site_index_sort_key",
+                wraps=native_acceleration.site_index_sort_key,
             ) as native_call:
                 actual = [worktable_geometry._site_index_sort_key(value) for value in values]
                 self.assertEqual(native_call.call_count, len(values))
         self.assertEqual(actual, expected)
         self.assertEqual(actual[0], (0, "000000000000"))
+        self.assertEqual(actual[1], (0, "-00000000001"))
+        self.assertEqual(actual[2], (0, "000000000002"))
         self.assertEqual(actual[-2:], [(1, "None"), (0, "000000000007")])
 
     def test_float_text_uses_native_decimal_subset_and_python_fallback(self):

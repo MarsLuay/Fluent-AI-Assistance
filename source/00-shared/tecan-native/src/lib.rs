@@ -1627,6 +1627,12 @@ fn format_site_path<'py>(py: Python<'py>, path: &Bound<'py, PyAny>) -> PyResult<
 }
 
 #[pyfunction]
+fn site_index_sort_key(value: &str) -> Option<(i8, String)> {
+    let parsed = value.parse::<i64>().ok()?;
+    Some((0, format!("{parsed:012}")))
+}
+
+#[pyfunction]
 fn parse_i64_text<'py>(py: Python<'py>, text: &Bound<'py, PyAny>) -> PyResult<Option<i64>> {
     if !text.get_type().is(py.get_type::<PyString>()) {
         return Ok(None);
@@ -4627,6 +4633,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(label_base_ascii_text, module)?)?;
     module.add_function(wrap_pyfunction!(is_guid_text, module)?)?;
     module.add_function(wrap_pyfunction!(format_site_path, module)?)?;
+    module.add_function(wrap_pyfunction!(site_index_sort_key, module)?)?;
     module.add_function(wrap_pyfunction!(parse_i64_text, module)?)?;
     module.add_function(wrap_pyfunction!(parse_orientation_ascii, module)?)?;
     module.add_function(wrap_pyfunction!(parse_f64_decimal_text, module)?)?;
@@ -4721,6 +4728,15 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn site_index_sort_format_matches_python_zero_padding() {
+        assert_eq!(site_index_sort_key("0"), Some((0, "000000000000".into())));
+        assert_eq!(site_index_sort_key("-1"), Some((0, "-00000000001".into())));
+        assert_eq!(site_index_sort_key("+2"), Some((0, "000000000002".into())));
+        assert_eq!(site_index_sort_key(" 3 "), None);
+        assert_eq!(site_index_sort_key("9223372036854775808"), None);
+    }
 
     #[test]
     fn ascii_lower_alnum_compaction_matches_python_regex_filter() {
