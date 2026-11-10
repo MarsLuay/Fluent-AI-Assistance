@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from pathlib import Path
@@ -164,6 +165,48 @@ class NativeAccelerationTests(unittest.TestCase):
                 ):
                     self.assertIsNone(native_acceleration.deepcopy_json(value))
                     actual = project_deepcopy(value)
+                self.assertEqual(actual, expected)
+
+    def test_native_deepcopy_randomized_builtin_parity(self) -> None:
+        if not native_acceleration.available():
+            self.skipTest("optional Rust extension is not built")
+        generator = random.Random(20260313)
+        scalars = [
+            None,
+            True,
+            False,
+            -5,
+            0,
+            2**80,
+            -2.5,
+            0.125,
+            "",
+            "plain",
+            "μ",
+            b"raw",
+        ]
+        keys = ["", "key", "μ", 0, 1, True, 2.5, b"key", (1, "nested")]
+
+        def make_value(depth: int):
+            if depth == 0 or generator.randrange(4) == 0:
+                return generator.choice(scalars)
+            kind = generator.randrange(3)
+            if kind == 0:
+                return [make_value(depth - 1) for _ in range(generator.randrange(4))]
+            if kind == 1:
+                return tuple(
+                    make_value(depth - 1) for _ in range(generator.randrange(4))
+                )
+            return {
+                generator.choice(keys): make_value(depth - 1)
+                for _ in range(generator.randrange(4))
+            }
+
+        for case in range(80):
+            value = make_value(4)
+            with self.subTest(case=case):
+                expected = copy.deepcopy(value)
+                actual = native_acceleration._native.deepcopy_json(value)
                 self.assertEqual(actual, expected)
 
     def test_native_canonical_json_matches_python_format(self) -> None:
