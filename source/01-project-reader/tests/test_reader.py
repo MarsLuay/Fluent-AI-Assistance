@@ -386,6 +386,7 @@ class ReaderTests(unittest.TestCase):
             ({}, {}),
             (set(), []),
             ({False, True}, [False, True]),
+            ({True, 2.5, -3, 2**80}, [-3, True, 2.5, 2**80]),
             (
                 {float("-inf"), -1.5, 2.5, float("inf")},
                 [float("-inf"), -1.5, 2.5, float("inf")],
@@ -485,7 +486,6 @@ class ReaderTests(unittest.TestCase):
             DerivedCounter({"warning": 2}),
             DerivedDefaultDict(list, {"value": (1,)}),
             DerivedOrderedDict([("value", (1,))]),
-            {True, 2},
             custom_key_mapping,
         ]
         for value in fallback_values:
