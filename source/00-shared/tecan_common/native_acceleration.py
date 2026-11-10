@@ -562,6 +562,38 @@ def xml_indexed_values(
         return None
 
 
+def xml_first_element_by_name(
+    root: Any, name: Any, element_type: Any
+) -> tuple[bool, Any] | None:
+    """Find one namespace-free XML element without collecting all matches."""
+    if (
+        not enabled()
+        or type(root) is not element_type
+        or type(name) is not str
+    ):
+        return None
+    try:
+        supported, result = _native.xml_first_element_by_name(
+            root, name, element_type
+        )
+        if (
+            type(supported) is bool
+            and supported
+            and (result is None or type(result) is element_type)
+        ):
+            return True, result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_elements_by_name(
     root: Any, names: Any, element_type: Any
 ) -> list[Any] | None:

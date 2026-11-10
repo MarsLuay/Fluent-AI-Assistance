@@ -1460,11 +1460,11 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         self.assertIs(actual_children[0], first)
         self.assertEqual([element.attrib["id"] for element in actual_children], ["first", "last"])
 
-    def test_geometry_find_uses_native_element_selection_with_fallback(self):
+    def test_geometry_find_uses_native_first_match_with_fallback(self):
         if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "xml_elements_by_name"
+            native_acceleration._native, "xml_first_element_by_name"
         ):
-            self.skipTest("optional Rust XML element selector is not built")
+            self.skipTest("optional Rust first-element selector is not built")
         root = worktable_geometry.ET.fromstring(
             '<Root xmlns="urn:test"><Item id="first"/><Group><Item id="second"/></Group></Root>'
         )
@@ -1474,8 +1474,8 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
-                "xml_elements_by_name",
-                wraps=native_acceleration.xml_elements_by_name,
+                "xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
             ) as native_call:
                 actual = [worktable_geometry._find(root, name) for name in names]
                 self.assertEqual(native_call.call_count, len(names))

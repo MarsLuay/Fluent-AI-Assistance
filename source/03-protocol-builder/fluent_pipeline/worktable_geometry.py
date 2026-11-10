@@ -1181,11 +1181,11 @@ def _local_name(tag: str) -> str:
 def _find(elem: ET.Element | None, local_name: str) -> ET.Element | None:
     if elem is None:
         return None
-    native = native_acceleration.xml_elements_by_name(
-        elem, {local_name}, ET.Element
+    native = native_acceleration.xml_first_element_by_name(
+        elem, local_name, ET.Element
     )
     if native is not None:
-        return native[0] if native else None
+        return native[1]
     for child in elem.iter():
         if isinstance(child.tag, str) and _local_name(child.tag) == local_name:
             return child
