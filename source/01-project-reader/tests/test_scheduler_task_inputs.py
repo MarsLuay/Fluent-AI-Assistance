@@ -570,18 +570,20 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
             "Task_Name": "café",
             "taskname": "",
             "TâskName": "unmatched",
+            "TaſkName": "casefolded",
         }
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             unicode_expected = task_input._normalized_task_fields(unicode_values)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            self.assertIsNone(
-                native_acceleration.casefold_alias_values(
-                    unicode_values, (("taskname", "task_name", "task", "name"),)
-                )
-            )
-            self.assertEqual(
-                task_input._normalized_task_fields(unicode_values), unicode_expected
-            )
+            with patch.object(
+                task_input,
+                "casefold_alias_values",
+                wraps=native_acceleration.casefold_alias_values,
+            ) as native_call:
+                unicode_actual = task_input._normalized_task_fields(unicode_values)
+                native_call.assert_called_once()
+        self.assertEqual(unicode_actual, unicode_expected)
+        self.assertEqual(unicode_actual["task_name"], "casefolded")
 
     def test_twl_xml_preserves_additive_record_fields_and_order(self) -> None:
         result = inspect_twl_text(

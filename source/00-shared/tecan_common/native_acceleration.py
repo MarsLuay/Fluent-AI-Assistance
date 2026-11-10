@@ -1472,7 +1472,7 @@ def pin_reference_candidates(values: Any) -> list[str] | None:
 
 
 def casefold_alias_values(mapping: Any, alias_groups: Any) -> list[Any] | None:
-    """Resolve ordered ASCII aliases in exact built-in string/dictionary fields."""
+    """Resolve ASCII aliases against exact built-in fields using Python casefold."""
     if (
         not enabled()
         or type(mapping) is not dict
@@ -1484,7 +1484,6 @@ def casefold_alias_values(mapping: Any, alias_groups: Any) -> list[Any] | None:
         )
         or not all(
             type(key) is str
-            and key.isascii()
             and type(value) in (str, dict)
             for key, value in mapping.items()
         )

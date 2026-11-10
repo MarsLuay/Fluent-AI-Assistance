@@ -1701,10 +1701,14 @@ fn casefold_alias_values<'py>(
             return Ok(None);
         }
         let key = key.extract::<String>()?;
-        if !key.is_ascii() {
-            return Ok(None);
-        }
-        folded.set_item(key.to_ascii_lowercase(), value)?;
+        let key = if key.is_ascii() {
+            key.to_ascii_lowercase()
+        } else {
+            PyString::new(py, &key)
+                .call_method0("casefold")?
+                .extract::<String>()?
+        };
+        folded.set_item(key, value)?;
     }
     let output = PyList::empty(py);
     for aliases in alias_groups {
