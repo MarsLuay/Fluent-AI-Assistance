@@ -785,6 +785,75 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(actual[0]["object_subfolder_path"], actual[0]["object_path"])
         self.assertEqual(actual[1]["type_id"], "type-y")
 
+    def test_native_pin_reference_filter_matches_python_regex(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "pin_reference_candidates"
+        ):
+            self.skipTest("optional Rust pin-reference filter is not built")
+        values = [
+            "prefixGIO1_Pin2",
+            "(GIO1_Pin2) GIO12_Pin3",
+            "xWorktable_Pin",
+            "Worktable_Pin Worktable_namePin_suffix",
+            "WorktablePin_extra WorktablePin_",
+            "GIO3_Pin4x",
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = reader_script._pin_refs(values)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.pin_reference_candidates(values), expected
+            )
+            with patch.object(
+                reader_script.native_acceleration,
+                "pin_reference_candidates",
+                wraps=reader_script.native_acceleration.pin_reference_candidates,
+            ) as native_call:
+                actual = reader_script._pin_refs(values)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [
+                "GIO12_Pin3",
+                "GIO1_Pin2",
+                "WorktablePin_extra",
+                "Worktable_Pin",
+                "Worktable_namePin_suffix",
+            ],
+        )
+
+        generated = [
+            prefix + token + suffix
+            for prefix in ("", "x", "_", " ", "(", "/")
+            for token in (
+                "GIO1_Pin2",
+                "GIO12_Pin345",
+                "Worktable_Pin",
+                "Worktable_xPinY",
+                "WorktablePin_x",
+                "GIO_Pin",
+                "Worktable_xPin",
+                "WorktablePin_",
+            )
+            for suffix in ("", "x", "_", " ", ".", "-", "9")
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            generated_expected = reader_script._pin_refs(generated)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.pin_reference_candidates(generated),
+                generated_expected,
+            )
+        unicode_values = ["éGIO1_Pin2", "GIO2_Pin3 café"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unicode_expected = reader_script._pin_refs(unicode_values)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.pin_reference_candidates(unicode_values)
+            )
+            self.assertEqual(reader_script._pin_refs(unicode_values), unicode_expected)
+
     def test_native_asset_reference_suffix_filter_matches_python_regex(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "asset_reference_candidates"

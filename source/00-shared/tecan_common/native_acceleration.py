@@ -1344,6 +1344,23 @@ def xml_kind_from_suffix(suffix: Any) -> str | None:
         return None
 
 
+def pin_reference_candidates(values: Any) -> list[str] | None:
+    """Filter exact ASCII pin-reference tokens with Python fallback for Unicode."""
+    if (
+        not enabled()
+        or type(values) not in (list, tuple)
+        or not all(type(value) is str and value.isascii() for value in values)
+    ):
+        return None
+    try:
+        result = _native.pin_reference_candidates(list(values))
+        if type(result) is list and all(type(value) is str for value in result):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def asset_reference_candidates(values: Any) -> list[str] | None:
     """Filter exact ASCII image-reference text, retaining Python regex fallback."""
     if (

@@ -10,7 +10,7 @@ use rayon::prelude::*;
 use serde_json::{Map, Number, Value};
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -2126,6 +2126,72 @@ fn has_supported_asset_extension(value: &str) -> bool {
     false
 }
 
+fn ascii_word_byte(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || byte == b'_'
+}
+
+fn ascii_pin_references(value: &str, output: &mut BTreeSet<String>) {
+    let bytes = value.as_bytes();
+    for start in 0..bytes.len() {
+        if start > 0 && ascii_word_byte(bytes[start - 1]) {
+            continue;
+        }
+        if value[start..].starts_with("GIO") {
+            let mut position = start + 3;
+            let digits_start = position;
+            while position < bytes.len() && bytes[position].is_ascii_digit() {
+                position += 1;
+            }
+            if position > digits_start && value[position..].starts_with("_Pin") {
+                position += 4;
+                let pin_digits_start = position;
+                while position < bytes.len() && bytes[position].is_ascii_digit() {
+                    position += 1;
+                }
+                if position > pin_digits_start
+                    && (position == bytes.len() || !ascii_word_byte(bytes[position]))
+                {
+                    output.insert(value[start..position].to_owned());
+                }
+            }
+        }
+        for prefix in ["Worktable_", "WorktablePin_"] {
+            if !value[start..].starts_with(prefix) {
+                continue;
+            }
+            let body_start = start + prefix.len();
+            let mut end = body_start;
+            while end < bytes.len() && ascii_word_byte(bytes[end]) {
+                end += 1;
+            }
+            if end == body_start || end < bytes.len() && ascii_word_byte(bytes[end]) {
+                continue;
+            }
+            let body = &value[body_start..end];
+            let matched = if prefix == "Worktable_" {
+                body.contains("Pin")
+            } else {
+                true
+            };
+            if matched && (end == bytes.len() || !ascii_word_byte(bytes[end])) {
+                output.insert(value[start..end].to_owned());
+            }
+        }
+    }
+}
+
+#[pyfunction]
+fn pin_reference_candidates(values: Vec<String>) -> Option<Vec<String>> {
+    if values.iter().any(|value| !value.is_ascii()) {
+        return None;
+    }
+    let mut output = BTreeSet::new();
+    for value in &values {
+        ascii_pin_references(value, &mut output);
+    }
+    Some(output.into_iter().collect())
+}
+
 #[pyfunction]
 fn asset_reference_candidates(values: Vec<String>) -> Option<Vec<String>> {
     if values.iter().any(|value| !value.is_ascii()) {
@@ -2927,6 +2993,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(command_short_name, module)?)?;
     module.add_function(wrap_pyfunction!(entry_object_guid, module)?)?;
     module.add_function(wrap_pyfunction!(asset_reference_candidates, module)?)?;
+    module.add_function(wrap_pyfunction!(pin_reference_candidates, module)?)?;
     module.add_function(wrap_pyfunction!(compact_list, module)?)?;
     module.add_function(wrap_pyfunction!(extension_counts, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_execution_contract, module)?)?;
@@ -3384,6 +3451,27 @@ mod tests {
             )
         );
         assert!(render_object_report("Example", Vec::new(), Vec::new(), Vec::new()).is_none());
+    }
+
+    #[test]
+    fn pin_reference_matching_preserves_boundaries_and_sorting() {
+        assert_eq!(
+            pin_reference_candidates(vec![
+                "prefixGIO1_Pin2".into(),
+                "(GIO1_Pin2) GIO12_Pin3".into(),
+                "xWorktable_Pin".into(),
+                "Worktable_Pin Worktable_namePin_suffix".into(),
+                "WorktablePin_extra WorktablePin_".into(),
+                "GIO3_Pin4x".into(),
+            ]),
+            Some(vec![
+                "GIO12_Pin3".to_string(),
+                "GIO1_Pin2".to_string(),
+                "WorktablePin_extra".to_string(),
+                "Worktable_Pin".to_string(),
+                "Worktable_namePin_suffix".to_string(),
+            ])
+        );
     }
 
     #[test]

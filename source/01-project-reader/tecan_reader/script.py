@@ -470,6 +470,9 @@ def _asset_refs_from_text(values: list[str]) -> list[str]:
 
 
 def _pin_refs(values: list[str]) -> list[str]:
+    native = native_acceleration.pin_reference_candidates(values)
+    if native is not None:
+        return native
     return sorted({
         match
         for value in values
