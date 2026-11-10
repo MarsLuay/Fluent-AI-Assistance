@@ -528,19 +528,20 @@ def _comments(root: ET.Element) -> list[str]:
 
 def _warnings(commands: list[dict[str, Any]]) -> list[str]:
     warnings: list[str] = []
-    raw_types = [command["raw_type"].lower() for command in commands]
+    raw_types = [command["raw_type"] for command in commands]
     search_groups = (
         ("subroutine",),
         ("executevbscript", "executeapplication"),
         ("worklist",),
         ("touchtools", ".rup."),
     )
-    matches = native_acceleration.ascii_substring_match_groups(
+    matches = native_acceleration.ascii_case_insensitive_substring_match_groups(
         raw_types, search_groups
     )
     if matches is None:
+        lowered_types = [raw_type.lower() for raw_type in raw_types]
         matches = [
-            any(needle in value for value in raw_types for needle in group)
+            any(needle in value for value in lowered_types for needle in group)
             for group in search_groups
         ]
     if matches[0]:

@@ -220,7 +220,7 @@ class ScriptTests(unittest.TestCase):
 
     def test_warning_substring_scans_use_rust_with_unicode_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "ascii_substring_match_groups"
+            native_acceleration._native, "ascii_case_insensitive_substring_match_groups"
         ):
             self.skipTest("optional Rust ASCII substring matcher is not built")
         commands = [
@@ -239,11 +239,19 @@ class ScriptTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
-                "ascii_substring_match_groups",
-                wraps=native_acceleration.ascii_substring_match_groups,
+                "ascii_case_insensitive_substring_match_groups",
+                wraps=native_acceleration.ascii_case_insensitive_substring_match_groups,
             ) as native_matcher:
                 actual = script._warnings(commands)
-                native_matcher.assert_called_once()
+                native_matcher.assert_called_once_with(
+                    [command["raw_type"] for command in commands],
+                    (
+                        ("subroutine",),
+                        ("executevbscript", "executeapplication"),
+                        ("worklist",),
+                        ("touchtools", ".rup."),
+                    ),
+                )
         self.assertEqual(actual, expected)
         self.assertEqual(
             actual,
@@ -264,8 +272,8 @@ class ScriptTests(unittest.TestCase):
             unicode_expected = script._warnings(unicode_commands)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(
-                native_acceleration.ascii_substring_match_groups(
-                    [unicode_commands[0]["raw_type"].lower()], [("subroutine",)]
+                native_acceleration.ascii_case_insensitive_substring_match_groups(
+                    [unicode_commands[0]["raw_type"]], [("subroutine",)]
                 )
             )
             self.assertEqual(script._warnings(unicode_commands), unicode_expected)

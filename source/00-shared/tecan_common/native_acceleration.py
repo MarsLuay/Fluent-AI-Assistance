@@ -1583,8 +1583,10 @@ def ascii_casefold_equals(value: Any, expected: Any) -> bool | None:
         return None
 
 
-def ascii_substring_match_groups(values: Any, groups: Any) -> list[bool] | None:
-    """Match ASCII substrings for Python-owned groups of search terms."""
+def ascii_case_insensitive_substring_match_groups(
+    values: Any, groups: Any
+) -> list[bool] | None:
+    """Match ASCII substrings without case sensitivity for Python-owned terms."""
     if (
         not enabled()
         or type(values) not in (list, tuple)
@@ -1598,7 +1600,7 @@ def ascii_substring_match_groups(values: Any, groups: Any) -> list[bool] | None:
     ):
         return None
     try:
-        result = _native.ascii_substring_match_groups(
+        result = _native.ascii_case_insensitive_substring_match_groups(
             list(values), [list(group) for group in groups]
         )
         if (
