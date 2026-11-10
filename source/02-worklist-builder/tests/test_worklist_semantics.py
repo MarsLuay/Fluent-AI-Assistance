@@ -46,6 +46,7 @@ from tecan_worklist.transfer import (
     load_transfers,
     validate_transfers,
     well_to_position,
+    _parse_bool as parse_transfer_bool,
 )
 from tecan_worklist.gwl import Worklist
 
@@ -110,6 +111,55 @@ class WorklistSemanticsTests(unittest.TestCase):
                     except ValueError as error:
                         outcomes.append((type(error), str(error)))
             self.assertEqual(outcomes[0], outcomes[1], repr(scheme))
+
+    def test_transfer_boolean_parser_matches_python_and_falls_back(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_parse_bool"
+        ):
+            self.skipTest("optional Rust transfer boolean parser is not built")
+
+        class StringSubclass(str):
+            pass
+
+        cases = (
+            "",
+            "1",
+            " true ",
+            "YES",
+            "y",
+            "0",
+            " FALSE ",
+            "No",
+            "n",
+            "\tTrue\r\n",
+            "\x1cY",
+            "\u00a0yes",
+            "on",
+            "maybe",
+            StringSubclass("true"),
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            for value in cases:
+                with self.subTest(value=repr(value)):
+                    if type(value) is str and value.isascii() and value.strip().lower() in {
+                        "1", "true", "yes", "y", "0", "false", "no", "n"
+                    }:
+                        self.assertIsNotNone(
+                            native_acceleration.worklist_parse_bool(value)
+                        )
+                    else:
+                        self.assertIsNone(native_acceleration.worklist_parse_bool(value))
+                    outcomes = []
+                    for disabled in ("1", "0"):
+                        with patch.dict(
+                            "os.environ",
+                            {"TECAN_DISABLE_RUST_ACCELERATION": disabled},
+                        ):
+                            try:
+                                outcomes.append(parse_transfer_bool(value))
+                            except ValueError as error:
+                                outcomes.append((type(error), str(error)))
+                    self.assertEqual(outcomes[0], outcomes[1])
 
     def test_tip_selection_is_automatic_or_one_hot_and_preserves_raw_spelling(self):
         automatic = parse_tip_selection("")

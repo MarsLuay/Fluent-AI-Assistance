@@ -1014,6 +1014,21 @@ fn worklist_parse_enabled_tip_mask(
 }
 
 #[pyfunction]
+fn worklist_parse_bool(value: &str) -> Option<bool> {
+    if !value.is_ascii() {
+        return None;
+    }
+    let normalized = value
+        .trim_matches(|character: char| matches!(character as u32, 0x09..=0x0d | 0x1c..=0x20))
+        .to_ascii_lowercase();
+    match normalized.as_str() {
+        "1" | "true" | "yes" | "y" => Some(true),
+        "0" | "false" | "no" | "n" => Some(false),
+        _ => None,
+    }
+}
+
+#[pyfunction]
 fn worklist_well_to_position(value: &str, rows: i64) -> PyResult<Option<u64>> {
     Ok(tecan_worklist_builder::well_to_position(value, rows).ok())
 }
@@ -1558,6 +1573,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_load_contract, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_validate_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_load_transfers, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_parse_bool, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_well_to_position, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_tip_selection, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_enabled_tip_mask, module)?)?;

@@ -304,6 +304,17 @@ def worklist_validate_transfers(
         return None
 
 
+def worklist_parse_bool(value: Any) -> bool | None:
+    """Parse supported exact ASCII worklist booleans; invalid forms fall back."""
+    if not enabled() or type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.worklist_parse_bool(value)
+        return result if type(result) is bool else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def worklist_well_to_position(value: str, rows: int) -> int | None:
     """Convert a supported well coordinate natively, or request Python fallback."""
     if not enabled():

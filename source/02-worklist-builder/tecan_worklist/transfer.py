@@ -374,6 +374,9 @@ def _parse_optional_bool(value: str) -> bool | None:
 
 
 def _parse_bool(value: str) -> bool:
+    native = native_acceleration.worklist_parse_bool(value)
+    if native is not None:
+        return native
     if not value:
         return False
     normalized = value.strip().lower()
