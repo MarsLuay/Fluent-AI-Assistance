@@ -129,16 +129,17 @@ def _script_version(root: ET.Element) -> str:
 
 
 def _references(root: ET.Element) -> list[dict[str, str]]:
+    names = ("Guid", "TypeId", "ObjectName", "ObjectSubfolderPath")
     refs: list[dict[str, str]] = []
-    for el in root.iter():
-        if local_name(el.tag) != "Reference":
-            continue
+    for guid, type_id, object_name, object_path in records_by_name(
+        root, "Reference", names, direct=True
+    ):
         ref = {
-            "guid": child_text(el, "Guid"),
-            "type_id": child_text(el, "TypeId"),
-            "object_name": child_text(el, "ObjectName"),
-            "object_subfolder_path": child_text(el, "ObjectSubfolderPath"),
-            "object_path": child_text(el, "ObjectSubfolderPath"),
+            "guid": guid,
+            "type_id": type_id,
+            "object_name": object_name,
+            "object_subfolder_path": object_path,
+            "object_path": object_path,
         }
         if any(ref.values()):
             refs.append(ref)

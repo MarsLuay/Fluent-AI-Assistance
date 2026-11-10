@@ -126,17 +126,26 @@ def texts_by_name(root: ET.Element, names: Iterable[str]) -> dict[str, list[str]
 
 
 def records_by_name(
-    root: ET.Element, record_name: str, field_names: Iterable[str]
+    root: ET.Element,
+    record_name: str,
+    field_names: Iterable[str],
+    *,
+    direct: bool = False,
 ) -> list[list[str]]:
     """Extract descendant text fields from each element with the local tag."""
     names = tuple(field_names)
-    native = _native_xml_records_by_name(root, record_name, names, ET.Element)
+    native = _native_xml_records_by_name(
+        root, record_name, names, ET.Element, direct=direct
+    )
     if native is not None:
         return native
     records: list[list[str]] = []
     for element in root.iter():
         if local_name(element.tag) == record_name:
-            records.append([first_text(element, name) for name in names])
+            if direct:
+                records.append([child_text(element, name) for name in names])
+            else:
+                records.append([first_text(element, name) for name in names])
     return records
 
 

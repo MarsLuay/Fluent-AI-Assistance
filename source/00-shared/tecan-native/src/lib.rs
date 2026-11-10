@@ -1144,6 +1144,7 @@ fn xml_records_by_name<'py>(
     root: &Bound<'py, PyAny>,
     record_name: &str,
     field_names: Vec<String>,
+    direct: bool,
     element_type: &Bound<'py, PyAny>,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
     if !root.get_type().is(element_type) {
@@ -1167,8 +1168,12 @@ fn xml_records_by_name<'py>(
         let row = PyList::empty(py);
         for field_name in &field_names {
             let mut value = String::new();
-            let children = element.call_method0("iter")?;
-            for child in children.try_iter()? {
+            let children = if direct {
+                element.try_iter()?
+            } else {
+                element.call_method0("iter")?.try_iter()?
+            };
+            for child in children {
                 let child = child?;
                 if !child.get_type().is(element_type) {
                     return Ok(None);

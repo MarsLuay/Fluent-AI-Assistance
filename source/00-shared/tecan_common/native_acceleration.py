@@ -167,7 +167,7 @@ def xml_find_attribute(
 
 
 def xml_records_by_name(
-    root: Any, record_name: Any, field_names: Any, element_type: Any
+    root: Any, record_name: Any, field_names: Any, element_type: Any, *, direct: Any = False
 ) -> list[list[str]] | None:
     """Extract bounded descendant text rows for matching XML records."""
     if (
@@ -176,11 +176,12 @@ def xml_records_by_name(
         or type(record_name) is not str
         or type(field_names) not in (list, tuple)
         or not all(type(name) is str for name in field_names)
+        or type(direct) is not bool
     ):
         return None
     try:
         result = _native.xml_records_by_name(
-            root, record_name, list(field_names), element_type
+            root, record_name, list(field_names), direct, element_type
         )
         if (
             type(result) is list

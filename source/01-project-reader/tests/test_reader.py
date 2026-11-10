@@ -733,6 +733,58 @@ class ReaderTests(unittest.TestCase):
                 reader_script._query_prompts(unicode_root)[0]["prompt"], "café"
             )
 
+    def test_native_xml_direct_records_match_reference_extraction(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_records_by_name"
+        ):
+            self.skipTest("optional Rust XML record extractor is not built")
+        root = ET.Element("Root")
+        first = ET.SubElement(root, "{urn:test}Reference")
+        ET.SubElement(first, "Guid").text = "   "
+        ET.SubElement(first, "Guid").text = " guid-x "
+        ET.SubElement(first, "TypeId").text = "type-x"
+        nested = ET.SubElement(first, "Nested")
+        ET.SubElement(nested, "ObjectName").text = "nested-name-x"
+        ET.SubElement(first, "ObjectSubfolderPath").text = " path-x "
+        empty = ET.SubElement(root, "Reference")
+        ET.SubElement(empty, "Nested")
+        third = ET.SubElement(root, "Reference")
+        ET.SubElement(third, "TypeId").text = "type-y"
+
+        def references() -> list[dict[str, str]]:
+            return reader_script._references(root)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = references()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_records_by_name(
+                    root,
+                    "Reference",
+                    ("Guid", "TypeId", "ObjectName", "ObjectSubfolderPath"),
+                    ET.Element,
+                    direct=True,
+                ),
+                [
+                    ["guid-x", "type-x", "", "path-x"],
+                    ["", "", "", ""],
+                    ["", "type-y", "", ""],
+                ],
+            )
+            with patch.object(
+                xml_helpers,
+                "_native_xml_records_by_name",
+                wraps=xml_helpers._native_xml_records_by_name,
+            ) as native_call:
+                actual = references()
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(len(actual), 2)
+        self.assertEqual(actual[0]["guid"], "guid-x")
+        self.assertEqual(actual[0]["object_name"], "")
+        self.assertEqual(actual[0]["object_subfolder_path"], actual[0]["object_path"])
+        self.assertEqual(actual[1]["type_id"], "type-y")
+
     def test_native_extension_counts_match_path_suffix_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "extension_counts"
