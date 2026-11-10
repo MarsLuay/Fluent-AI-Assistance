@@ -1626,6 +1626,17 @@ def delimited_row_fields(
         return None
 
 
+def label_base_ascii_text(value: Any) -> str | None:
+    """Remove a terminal ASCII bracket suffix and trim, otherwise use Python."""
+    if not enabled() or type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.label_base_ascii_text(value)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def is_guid_text(value: Any) -> bool | None:
     """Validate exact ASCII GUID syntax; unsupported Python strings use fallback."""
     if not enabled() or type(value) is not str or not value.isascii():

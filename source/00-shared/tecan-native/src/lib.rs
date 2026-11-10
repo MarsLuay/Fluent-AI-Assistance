@@ -1412,6 +1412,39 @@ fn ascii_casefold_equals(value: &str, expected: &str) -> Option<bool> {
     }
 }
 
+fn label_base_ascii(value: &str) -> Option<String> {
+    if !value.is_ascii() {
+        return None;
+    }
+    let bytes = value.as_bytes();
+    let effective_len = if bytes.last() == Some(&b'\n') {
+        bytes.len() - 1
+    } else {
+        bytes.len()
+    };
+    let opening = if effective_len > 0 && bytes[effective_len - 1] == b']' {
+        let closing = effective_len - 1;
+        let search_start = bytes[..closing]
+            .iter()
+            .rposition(|byte| *byte == b']')
+            .map_or(0, |index| index + 1);
+        bytes[search_start..closing]
+            .iter()
+            .position(|byte| *byte == b'[')
+            .map(|relative| search_start + relative)
+            .filter(|opening| opening + 1 < closing)
+    } else {
+        None
+    };
+    let base = opening.map_or(value, |opening| &value[..opening]);
+    Some(trim_python_whitespace(base).to_owned())
+}
+
+#[pyfunction]
+fn label_base_ascii_text(value: &str) -> Option<String> {
+    label_base_ascii(value)
+}
+
 fn is_ascii_guid(value: &str) -> bool {
     let bytes = value.as_bytes();
     bytes.len() == 36
@@ -4093,6 +4126,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(most_common_string_counts, module)?)?;
     module.add_function(wrap_pyfunction!(sorted_unique_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
+    module.add_function(wrap_pyfunction!(label_base_ascii_text, module)?)?;
     module.add_function(wrap_pyfunction!(is_guid_text, module)?)?;
     module.add_function(wrap_pyfunction!(format_site_path, module)?)?;
     module.add_function(wrap_pyfunction!(parse_i64_text, module)?)?;
@@ -4186,6 +4220,29 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ascii_label_base_matches_bracket_suffix_regex_semantics() {
+        for (value, expected) in [
+            (" Name [alias] ", "Name [alias]"),
+            ("Name [alias]", "Name"),
+            ("Name [alias]\n", "Name"),
+            ("Name [alias]\n\n", "Name [alias]"),
+            ("Name [alias]\r\n", "Name [alias]"),
+            ("Name []", "Name []"),
+            ("Name [[alias]", "Name"),
+            ("Name [first][last]", "Name [first]"),
+            ("Name [line\nbreak]", "Name"),
+            ("[alias]", ""),
+        ] {
+            assert_eq!(
+                label_base_ascii(value).as_deref(),
+                Some(expected),
+                "unexpected label base for {value:?}"
+            );
+        }
+        assert_eq!(label_base_ascii("東京 [alias]"), None);
+    }
 
     #[test]
     fn ascii_guid_match_preserves_fullmatch_and_case_semantics() {

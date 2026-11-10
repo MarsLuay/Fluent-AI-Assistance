@@ -388,6 +388,74 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             self.assertIsNone(native_acceleration.is_guid_text(CustomGuid(guid)))
             self.assertTrue(worktable_geometry._looks_like_guid(CustomGuid(guid)))
 
+    def test_label_base_uses_native_ascii_regex_parity_and_unicode_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "label_base_ascii_text"
+        ):
+            self.skipTest("optional Rust label suffix helper is not built")
+
+        class CountedLabel:
+            def __init__(self):
+                self.calls = 0
+
+            def __bool__(self):
+                return True
+
+            def __str__(self):
+                self.calls += 1
+                return "  Custom [suffix]"
+
+        counted = CountedLabel()
+        labels = [
+            " Name [alias] ",
+            "Name [alias]",
+            "Name [alias]\n",
+            "Name [alias]\n\n",
+            "Name [alias]\r\n",
+            "Name []",
+            "Name [[alias]",
+            "Name [first][last]",
+            "Name [line\nbreak]",
+            "[alias]",
+            "東京 [alias]",
+            "\ud800 [alias]",
+            None,
+            "",
+            counted,
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [worktable_geometry._label_base(label) for label in labels]
+        self.assertEqual(counted.calls, 1)
+        counted.calls = 0
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "label_base_ascii_text",
+                wraps=native_acceleration.label_base_ascii_text,
+            ) as native_call:
+                actual = [worktable_geometry._label_base(label) for label in labels]
+                self.assertEqual(native_call.call_count, len(labels))
+            self.assertEqual(native_acceleration.label_base_ascii_text("Name [alias]"), "Name")
+            self.assertIsNone(native_acceleration.label_base_ascii_text("東京 [alias]"))
+        self.assertEqual(counted.calls, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual[:10],
+            [
+                "Name [alias]",
+                "Name",
+                "Name",
+                "Name [alias]",
+                "Name [alias]",
+                "Name []",
+                "Name",
+                "Name [first]",
+                "Name",
+                "",
+            ],
+        )
+        self.assertEqual(actual[10:], ["東京", "\ud800", "", "", "Custom"])
+
     def test_position_label_uses_native_for_bounded_integer_paths(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "format_site_path"

@@ -1427,7 +1427,11 @@ def _non_guid(text: str) -> str:
 
 
 def _label_base(label: str) -> str:
-    return re.sub(r"\[[^\]]+\]$", "", str(label or "")).strip()
+    text = str(label or "")
+    native = native_acceleration.label_base_ascii_text(text)
+    if native is not None:
+        return native
+    return re.sub(r"\[[^\]]+\]$", "", text).strip()
 
 
 def _position_label(connector: dict[str, Any], site_path: tuple[int, ...]) -> str:
