@@ -1417,10 +1417,8 @@ def _first_list_value(obj: ET.Element, list_name: str) -> Optional[str]:
     container = _find_first(obj, list_name)
     if container is None:
         return None
-    for el in container.iter():
-        if not isinstance(el.tag, str):
-            continue
-        if _local(el.tag) in {"string", "double", "int"} and el.text is not None:
+    for el in elements_by_name(container, {"string", "double", "int"}):
+        if el.text is not None:
             return el.text.strip()
     return None
 
@@ -1430,9 +1428,7 @@ def _parse_variable_mappings(obj: ET.Element, container_name: str) -> list[Varia
     if container is None:
         return []
     mappings: list[VariableMapping] = []
-    for child in container:
-        if not isinstance(child.tag, str) or _local(child.tag) != "Object":
-            continue
+    for child in _direct_children(container, "Object"):
         target = _extract_field(child, "Target")
         source = _extract_field(child, "Source")
         if target and source is not None:
@@ -1452,9 +1448,7 @@ def _list_values(obj: ET.Element, list_name: str) -> list[str]:
     if container is None:
         return []
     values: list[str] = []
-    for el in container.iter():
-        if not isinstance(el.tag, str):
-            continue
-        if _local(el.tag) in {"string", "String"} and el.text is not None:
+    for el in elements_by_name(container, {"string", "String"}):
+        if el.text is not None:
             values.append(el.text.strip())
     return values
