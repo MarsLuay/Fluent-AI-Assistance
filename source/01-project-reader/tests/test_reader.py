@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 import json
 import random
 import shutil
@@ -360,6 +360,16 @@ class ReaderTests(unittest.TestCase):
             native_acceleration._native, "to_jsonable_containers"
         ):
             self.skipTest("optional Rust JSON-container converter is not built")
+        default_factory_calls = 0
+
+        def default_factory() -> list[object]:
+            nonlocal default_factory_calls
+            default_factory_calls += 1
+            return []
+
+        default_mapping = defaultdict(
+            default_factory, {"path": Path("nested.xml"), "values": (1, 2)}
+        )
         cases = [
             (
                 {"items": (1, ["two", {"three": (3,)}]), "empty": []},
@@ -374,6 +384,10 @@ class ReaderTests(unittest.TestCase):
             (Path("sample.xscr"), "sample.xscr"),
             (
                 {"path": Path("nested.xml"), "values": (1, 2)},
+                {"path": "nested.xml", "values": [1, 2]},
+            ),
+            (
+                default_mapping,
                 {"path": "nested.xml", "values": [1, 2]},
             ),
             (
@@ -419,6 +433,7 @@ class ReaderTests(unittest.TestCase):
                     actual = to_jsonable(value)
                 self.assertEqual(python_result, expected)
                 self.assertEqual(actual, expected)
+        self.assertEqual(default_factory_calls, 0)
 
         class CustomKey:
             def __init__(self) -> None:
@@ -439,8 +454,12 @@ class ReaderTests(unittest.TestCase):
         class DerivedCounter(Counter):
             pass
 
+        class DerivedDefaultDict(defaultdict):
+            pass
+
         fallback_values = [
             DerivedCounter({"warning": 2}),
+            DerivedDefaultDict(list, {"value": (1,)}),
             {2, 1},
             custom_key_mapping,
         ]

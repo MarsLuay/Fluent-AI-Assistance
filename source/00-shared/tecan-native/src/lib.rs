@@ -541,6 +541,7 @@ fn try_to_jsonable_containers<'py>(
     value: &Bound<'py, PyAny>,
     counter_type: &Bound<'py, PyAny>,
     path_type: &Bound<'py, PyAny>,
+    defaultdict_type: &Bound<'py, PyAny>,
     active: &mut HashSet<usize>,
     depth: usize,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -606,8 +607,15 @@ fn try_to_jsonable_containers<'py>(
         let items = value.cast::<PyList>()?;
         let output = PyList::empty(py);
         for item in items.iter() {
-            let Some(converted) =
-                try_to_jsonable_containers(py, &item, counter_type, path_type, active, depth + 1)?
+            let Some(converted) = try_to_jsonable_containers(
+                py,
+                &item,
+                counter_type,
+                path_type,
+                defaultdict_type,
+                active,
+                depth + 1,
+            )?
             else {
                 active.remove(&pointer);
                 return Ok(None);
@@ -618,7 +626,7 @@ fn try_to_jsonable_containers<'py>(
         return Ok(Some(output.into_any()));
     }
 
-    if value_type.is(py.get_type::<PyDict>()) {
+    if value_type.is(py.get_type::<PyDict>()) || value_type.is(defaultdict_type) {
         if !active.insert(pointer) {
             return Ok(None);
         }
@@ -630,8 +638,15 @@ fn try_to_jsonable_containers<'py>(
                 return Ok(None);
             }
             let string_key = key.str()?;
-            let Some(converted) =
-                try_to_jsonable_containers(py, &item, counter_type, path_type, active, depth + 1)?
+            let Some(converted) = try_to_jsonable_containers(
+                py,
+                &item,
+                counter_type,
+                path_type,
+                defaultdict_type,
+                active,
+                depth + 1,
+            )?
             else {
                 active.remove(&pointer);
                 return Ok(None);
@@ -651,8 +666,17 @@ fn to_jsonable_containers(
     value: &Bound<'_, PyAny>,
     counter_type: &Bound<'_, PyAny>,
     path_type: &Bound<'_, PyAny>,
+    defaultdict_type: &Bound<'_, PyAny>,
 ) -> PyResult<(bool, Py<PyAny>)> {
-    match try_to_jsonable_containers(py, value, counter_type, path_type, &mut HashSet::new(), 0)? {
+    match try_to_jsonable_containers(
+        py,
+        value,
+        counter_type,
+        path_type,
+        defaultdict_type,
+        &mut HashSet::new(),
+        0,
+    )? {
         Some(converted) => Ok((true, converted.unbind())),
         None => Ok((false, py.None())),
     }

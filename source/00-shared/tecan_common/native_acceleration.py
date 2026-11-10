@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections import Counter as _Counter
+from collections import Counter as _Counter, defaultdict as _DefaultDict
 import json
 import os
 from pathlib import Path
@@ -55,7 +55,7 @@ def to_jsonable_containers(value: Any) -> tuple[bool, Any] | None:
         return None
     try:
         supported, result = _native.to_jsonable_containers(
-            value, _Counter, _PathType
+            value, _Counter, _PathType, _DefaultDict
         )
         if type(supported) is bool and supported:
             return True, result
