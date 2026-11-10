@@ -186,6 +186,9 @@ class Wash:
         object.__setattr__(self, "type_character", f"W{self.scheme}")
 
     def to_line(self) -> str:
+        native = native_acceleration.worklist_record_type_line(self.type_character)
+        if native is not None:
+            return native
         return f"{self.type_character};"
 
 
@@ -194,6 +197,9 @@ class Break:
     type_character: str = "B"
 
     def to_line(self) -> str:
+        native = native_acceleration.worklist_record_type_line("B")
+        if native is not None:
+            return native
         return "B;"
 
 

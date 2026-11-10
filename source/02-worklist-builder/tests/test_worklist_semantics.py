@@ -349,6 +349,32 @@ class WorklistSemanticsTests(unittest.TestCase):
             with self.assertRaises(OverflowError):
                 format_gwl_volume(oversized_integer)
 
+    def test_native_gwl_type_only_records_match_python_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_record_type_line"
+        ):
+            self.skipTest("optional Rust GWL record-type formatter is not built")
+        records = [Wash(), Wash(scheme=2), Wash(scheme=4), Break(), Break("ignored")]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [record.to_line() for record in records]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_record_type_line",
+                wraps=native_acceleration.worklist_record_type_line,
+            ) as native_call:
+                actual = [record.to_line() for record in records]
+            self.assertEqual(actual, expected)
+            self.assertEqual(native_call.call_count, len(records))
+
+        class TypeCharacter(str):
+            pass
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.worklist_record_type_line(TypeCharacter("W"))
+            )
+
     def test_native_gwl_comment_serializer_matches_python_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "worklist_comment_line"

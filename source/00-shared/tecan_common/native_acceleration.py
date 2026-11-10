@@ -657,6 +657,17 @@ def worklist_clean_field(value: Any) -> str | None:
         return None
 
 
+def worklist_record_type_line(type_character: Any) -> str | None:
+    """Format exact-string GWL record types natively, or request fallback."""
+    if not enabled() or type(type_character) is not str:
+        return None
+    try:
+        result = _native.worklist_record_type_line(type_character)
+        return result if isinstance(result, str) else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def worklist_join_gwl_fields(fields: Any) -> str | None:
     """Join exact-text GWL fields natively, or request Python fallback."""
     if (
