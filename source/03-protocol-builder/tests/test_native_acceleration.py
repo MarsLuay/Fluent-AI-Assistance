@@ -143,6 +143,60 @@ class NativeAccelerationTests(unittest.TestCase):
         self.assertEqual(actual[2], "identifier")
         self.assertEqual(actual[3], "diti-id")
 
+    def test_rga_transfer_inner_fields_use_native_xml_helpers(self) -> None:
+        from html import escape
+
+        from tecan_common import xml_helpers
+        from fluentcoder.decompiler import xscr_parser
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        inner = (
+            "<Root><Labware>first</Labware><Location>Deck A</Location><Site>2</Site>"
+            "<Nested><Labware>second</Labware><Location>Deck B</Location><Site>4</Site>"
+            "</Nested></Root>"
+        )
+        obj = ET.Element("Object")
+        ET.SubElement(obj, "ExecutionSettings").text = escape(inner, quote=False)
+        first_macro = ET.SubElement(obj, "ApplicationDriverMacro")
+        first_macro.set("ModuleName", "first-module")
+        nested = ET.SubElement(obj, "Nested")
+        second_macro = ET.SubElement(nested, "ApplicationDriverMacro")
+        second_macro.set("ModuleName", "second-module")
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = xscr_parser._parse_rga_transfer(obj)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                xml_helpers,
+                "_native_xml_elements_by_name",
+                wraps=xml_helpers._native_xml_elements_by_name,
+            ) as native_fields:
+                with patch.object(
+                    native_acceleration,
+                    "xml_first_element_by_name",
+                    wraps=native_acceleration.xml_first_element_by_name,
+                ) as native_macro:
+                    actual = xscr_parser._parse_rga_transfer(obj)
+                    self.assertEqual(
+                        sum(
+                            call.args[1] == {"Labware", "Location", "Site"}
+                            for call in native_fields.call_args_list
+                        ),
+                        1,
+                    )
+                    native_macro.assert_any_call(
+                        obj, "ApplicationDriverMacro", ET.Element
+                    )
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual.labware_name, "second")
+        self.assertEqual(actual.destination_location, "Deck B")
+        self.assertEqual(actual.destination_site, 4)
+        self.assertEqual(actual.module_name, "first-module")
+
     def test_native_pattern_window_order_and_confidence(self) -> None:
         if not native_acceleration.available():
             self.skipTest("optional Rust extension is not built")

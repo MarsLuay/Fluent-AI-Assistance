@@ -1240,9 +1240,7 @@ def _parse_rga_transfer(obj: ET.Element) -> RgaTransferLabwareStep:
         unescaped = _html_unescape(inner_text)
         try:
             inner = ET.fromstring(unescaped)
-            for el in inner.iter():
-                if not isinstance(el.tag, str):
-                    continue
+            for el in elements_by_name(inner, {"Labware", "Location", "Site"}):
                 tag = _local(el.tag)
                 if tag == "Labware" and el.text:
                     labware_name = el.text.strip()
@@ -1257,12 +1255,9 @@ def _parse_rga_transfer(obj: ET.Element) -> RgaTransferLabwareStep:
         except ET.ParseError:
             pass
     module_name = ""
-    for el in obj.iter():
-        if not isinstance(el.tag, str):
-            continue
-        if _local(el.tag) == "ApplicationDriverMacro":
-            module_name = (el.attrib.get("ModuleName") or "").strip()
-            break
+    macro = _find(obj, "ApplicationDriverMacro")
+    if macro is not None:
+        module_name = (macro.attrib.get("ModuleName") or "").strip()
     if not module_name:
         module_name = (_extract_field(obj, "ModuleName") or "").strip()
     available_id = _extract_available_id(obj)
