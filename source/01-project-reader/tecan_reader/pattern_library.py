@@ -10,7 +10,11 @@ from typing import Any
 
 from .command_registry import registry_manual_step, registry_pattern_type
 from .common import _connect, _connection_arg, fast_json_dumps, to_jsonable
-from tecan_common.native_acceleration import pattern_windows as _native_pattern_windows
+from tecan_common.native_acceleration import (
+    pattern_join_summary as _native_pattern_join_summary,
+    pattern_liquid_step as _native_pattern_liquid_step,
+    pattern_windows as _native_pattern_windows,
+)
 from tecan_common.performance import (
     finish_performance_marker,
     performance_marker,
@@ -751,11 +755,17 @@ def _command_haystack(command: dict[str, Any]) -> str:
 
 
 def _join_summary(*parts: str) -> str:
+    native = _native_pattern_join_summary(parts)
+    if native is not None:
+        return native
     values = [str(part).strip() for part in parts if str(part or "").strip()]
     return " ".join(values) if values else "Command"
 
 
 def _liquid_step(action: str, labware: str, volume: str, liquid_class: str) -> str:
+    native = _native_pattern_liquid_step(action, labware, volume, liquid_class)
+    if native is not None:
+        return native
     pieces = [action]
     if volume:
         pieces.append(str(volume))

@@ -2460,6 +2460,85 @@ fn render_script_pattern_summary(
     Some(format!("{}\n", lines.join("\n")))
 }
 
+fn trim_python_ascii_whitespace(value: &str) -> &str {
+    value.trim_matches(|character: char| {
+        matches!(
+            character,
+            '\u{0009}'..='\u{000d}' | ' ' | '\u{001c}'..='\u{001f}'
+        )
+    })
+}
+
+#[pyfunction]
+fn pattern_join_summary<'py>(
+    py: Python<'py>,
+    parts: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !parts.get_type().is(py.get_type::<PyList>()) {
+        return Ok(None);
+    }
+    let mut values = Vec::new();
+    for part in parts.try_iter()? {
+        let part = part?;
+        if !part.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let part = part.extract::<String>()?;
+        if !part.is_ascii() {
+            return Ok(None);
+        }
+        let part = trim_python_ascii_whitespace(&part);
+        if !part.is_empty() {
+            values.push(part.to_string());
+        }
+    }
+    let output = if values.is_empty() {
+        "Command".to_string()
+    } else {
+        values.join(" ")
+    };
+    Ok(Some(PyString::new(py, &output).into_any()))
+}
+
+#[pyfunction]
+fn pattern_liquid_step<'py>(
+    py: Python<'py>,
+    values: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !values.get_type().is(py.get_type::<PyList>()) {
+        return Ok(None);
+    }
+    let values = values.cast::<PyList>()?;
+    if values.len() != 4 {
+        return Ok(None);
+    }
+    let mut parts = Vec::with_capacity(4);
+    for value in values.iter() {
+        if !value.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let value = value.extract::<String>()?;
+        if !value.is_ascii() {
+            return Ok(None);
+        }
+        parts.push(value);
+    }
+    let mut output = parts[0].clone();
+    if !parts[2].is_empty() {
+        output.push(' ');
+        output.push_str(&parts[2]);
+    }
+    if !parts[1].is_empty() {
+        output.push_str(" at ");
+        output.push_str(&parts[1]);
+    }
+    if !parts[3].is_empty() {
+        output.push_str(" using ");
+        output.push_str(&parts[3]);
+    }
+    Ok(Some(PyString::new(py, &output).into_any()))
+}
+
 #[pyfunction]
 fn render_pattern_types_report(rows: Vec<Vec<String>>) -> Option<String> {
     if rows.iter().any(|row| row.len() != 3) {
@@ -3730,6 +3809,8 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_gwl_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_compare_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_pattern_specs, module)?)?;
+    module.add_function(wrap_pyfunction!(pattern_join_summary, module)?)?;
+    module.add_function(wrap_pyfunction!(pattern_liquid_step, module)?)?;
     module.add_function(wrap_pyfunction!(render_pattern_types_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_script_pattern_search, module)?)?;
     module.add_function(wrap_pyfunction!(render_script_pattern_summary, module)?)?;

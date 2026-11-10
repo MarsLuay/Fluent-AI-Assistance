@@ -1732,6 +1732,35 @@ def ordered_string_counts(values: Any) -> dict[str, int] | None:
         return None
 
 
+def pattern_join_summary(parts: Any) -> str | None:
+    """Join exact ASCII summary fields with Python-compatible stripping."""
+    if (
+        not enabled()
+        or type(parts) not in (list, tuple)
+        or not all(type(part) is str and part.isascii() for part in parts)
+    ):
+        return None
+    try:
+        result = _native.pattern_join_summary(list(parts))
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
+def pattern_liquid_step(
+    action: Any, labware: Any, volume: Any, liquid_class: Any
+) -> str | None:
+    """Format exact ASCII liquid-step fields without changing policy selection."""
+    parts = (action, labware, volume, liquid_class)
+    if not enabled() or not all(type(part) is str and part.isascii() for part in parts):
+        return None
+    try:
+        result = _native.pattern_liquid_step(list(parts))
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def sort_string_keys(mapping: Any) -> dict[str, Any] | None:
     """Sort exact built-in dictionaries with string keys, preserving value objects."""
     if (
