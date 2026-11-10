@@ -1410,7 +1410,15 @@ def _looks_like_pin_name(value: Any) -> bool:
 
 
 def _looks_like_guid(text: str) -> bool:
-    return bool(re.fullmatch(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", text or ""))
+    native = native_acceleration.is_guid_text(text)
+    if native is not None:
+        return native
+    return bool(
+        re.fullmatch(
+            r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+            text or "",
+        )
+    )
 
 
 def _non_guid(text: str) -> str:

@@ -1412,6 +1412,20 @@ fn ascii_casefold_equals(value: &str, expected: &str) -> Option<bool> {
     }
 }
 
+fn is_ascii_guid(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() == 36
+        && bytes.iter().enumerate().all(|(index, byte)| match index {
+            8 | 13 | 18 | 23 => *byte == b'-',
+            _ => byte.is_ascii_hexdigit(),
+        })
+}
+
+#[pyfunction]
+fn is_guid_text(value: &str) -> bool {
+    is_ascii_guid(value)
+}
+
 #[pyfunction]
 fn parse_i64_text<'py>(py: Python<'py>, text: &Bound<'py, PyAny>) -> PyResult<Option<i64>> {
     if !text.get_type().is(py.get_type::<PyString>()) {
@@ -4054,6 +4068,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(most_common_string_counts, module)?)?;
     module.add_function(wrap_pyfunction!(sorted_unique_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
+    module.add_function(wrap_pyfunction!(is_guid_text, module)?)?;
     module.add_function(wrap_pyfunction!(parse_i64_text, module)?)?;
     module.add_function(wrap_pyfunction!(parse_f64_decimal_text, module)?)?;
     module.add_function(wrap_pyfunction!(
@@ -4145,6 +4160,24 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ascii_guid_match_preserves_fullmatch_and_case_semantics() {
+        let guid = "11111111-1111-1111-1111-111111111111";
+        assert!(is_ascii_guid(guid));
+        assert!(is_ascii_guid(&guid.to_uppercase()));
+        assert!(is_ascii_guid("00000000-0000-0000-0000-000000000000"));
+        for value in [
+            "",
+            "11111111-1111-1111-1111-11111111111",
+            "11111111_1111-1111-1111-111111111111",
+            " 11111111-1111-1111-1111-111111111111",
+            "11111111-1111-1111-1111-111111111111\n",
+            "１１１11111-1111-1111-1111-111111111111",
+        ] {
+            assert!(!is_ascii_guid(value), "unexpected GUID match for {value:?}");
+        }
+    }
 
     #[test]
     fn ascii_case_insensitive_substring_groups_match_python_for_supported_ascii() {

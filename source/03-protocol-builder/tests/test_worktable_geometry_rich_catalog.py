@@ -348,6 +348,46 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [expected_value for _, expected_value in cases])
 
+    def test_guid_text_validation_uses_native_ascii_match_with_python_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "is_guid_text"
+        ):
+            self.skipTest("optional Rust GUID validator is not built")
+        guid = "11111111-1111-1111-1111-111111111111"
+        values = [
+            guid,
+            guid.upper(),
+            "00000000-0000-0000-0000-000000000000",
+            "11111111_1111-1111-1111-111111111111",
+            f"{guid}\n",
+            "東京-11111111-1111-1111-1111-1111111111",
+            "\ud800",
+            None,
+            0,
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [worktable_geometry._looks_like_guid(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "is_guid_text",
+                wraps=native_acceleration.is_guid_text,
+            ) as native_call:
+                actual = [worktable_geometry._looks_like_guid(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertTrue(native_acceleration.is_guid_text(guid))
+            self.assertFalse(native_acceleration.is_guid_text(""))
+            self.assertIsNone(native_acceleration.is_guid_text("東京"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [True, True, True, False, False, False, False, False, False])
+
+        class CustomGuid(str):
+            pass
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.is_guid_text(CustomGuid(guid)))
+            self.assertTrue(worktable_geometry._looks_like_guid(CustomGuid(guid)))
+
     def test_geometry_direct_children_use_native_selection_with_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_direct_elements_by_name"

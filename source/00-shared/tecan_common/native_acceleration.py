@@ -1626,6 +1626,17 @@ def delimited_row_fields(
         return None
 
 
+def is_guid_text(value: Any) -> bool | None:
+    """Validate exact ASCII GUID syntax; unsupported Python strings use fallback."""
+    if not enabled() or type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.is_guid_text(value)
+        return result if type(result) is bool else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def parse_i64_text(value: Any) -> int | None:
     """Parse signed ASCII i64 text, leaving broader Python integer forms to fallback."""
     if not enabled() or type(value) is not str or not value.isascii():
