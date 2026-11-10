@@ -754,14 +754,15 @@ fn deepcopy_json<'py>(py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<Bo
     clone_json_value(py, value, &mut HashMap::new(), &mut HashSet::new(), 0)
 }
 
-fn py_to_json(value: &Bound<'_, PyAny>) -> PyResult<Value> {
+fn py_to_json(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Value> {
     if value.is_none() {
         return Ok(Value::Null);
     }
-    if value.is_instance_of::<PyBool>() {
+    let value_type = value.get_type();
+    if value_type.is(py.get_type::<PyBool>()) {
         return Ok(Value::Bool(value.extract::<bool>()?));
     }
-    if value.is_instance_of::<PyInt>() {
+    if value_type.is(py.get_type::<PyInt>()) {
         if let Ok(integer) = value.extract::<i64>() {
             return Ok(Value::Number(Number::from(integer)));
         }
@@ -772,7 +773,7 @@ fn py_to_json(value: &Bound<'_, PyAny>) -> PyResult<Value> {
             "integer is outside the JSON 64-bit range",
         ));
     }
-    if value.is_instance_of::<PyFloat>() {
+    if value_type.is(py.get_type::<PyFloat>()) {
         let float = value.extract::<f64>()?;
         if float != 0.0 && (float.abs() < 1e-4 || float.abs() >= 1e16) {
             return Err(PyTypeError::new_err(
@@ -784,34 +785,42 @@ fn py_to_json(value: &Bound<'_, PyAny>) -> PyResult<Value> {
         })?;
         return Ok(Value::Number(number));
     }
-    if let Ok(text) = value.extract::<String>() {
-        return Ok(Value::String(text));
+    if value_type.is(py.get_type::<PyString>()) {
+        return Ok(Value::String(value.extract::<String>()?));
     }
-    if let Ok(items) = value.cast::<PyList>() {
+    if value_type.is(py.get_type::<PyList>()) {
+        let items = value.cast::<PyList>()?;
         return items
             .iter()
-            .map(|item| py_to_json(&item))
+            .map(|item| py_to_json(py, &item))
             .collect::<PyResult<Vec<_>>>()
             .map(Value::Array);
     }
-    if let Ok(items) = value.cast::<PyTuple>() {
+    if value_type.is(py.get_type::<PyTuple>()) {
+        let items = value.cast::<PyTuple>()?;
         return items
             .iter()
-            .map(|item| py_to_json(&item))
+            .map(|item| py_to_json(py, &item))
             .collect::<PyResult<Vec<_>>>()
             .map(Value::Array);
     }
-    if let Ok(items) = value.cast::<PyDict>() {
+    if value_type.is(py.get_type::<PyDict>()) {
+        let items = value.cast::<PyDict>()?;
         let mut result = Map::new();
         for (key, item) in items.iter() {
+            if !key.get_type().is(py.get_type::<PyString>()) {
+                return Err(PyTypeError::new_err(
+                    "non-string dictionary keys require Python JSON fallback",
+                ));
+            }
             let key = key.extract::<String>()?;
-            result.insert(key, py_to_json(&item)?);
+            result.insert(key, py_to_json(py, &item)?);
         }
         return Ok(Value::Object(result));
     }
     Err(PyTypeError::new_err(format!(
         "unsupported value for native JSON serialization: {}",
-        value.get_type().name()?
+        value_type.name()?
     )))
 }
 
@@ -884,8 +893,8 @@ fn decode_text_bytes(data: &Bound<'_, PyBytes>) -> String {
 }
 
 #[pyfunction]
-fn canonical_json(value: &Bound<'_, PyAny>) -> PyResult<String> {
-    let json = py_to_json(value)?;
+fn canonical_json(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<String> {
+    let json = py_to_json(py, value)?;
     let compact =
         serde_json::to_string(&json).map_err(|error| PyValueError::new_err(error.to_string()))?;
     Ok(python_json_spacing(&compact))

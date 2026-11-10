@@ -184,6 +184,36 @@ class NativeAccelerationTests(unittest.TestCase):
             json.dumps(edge_values, ensure_ascii=False, sort_keys=True),
         )
 
+        class CustomList(list):
+            def __iter__(self):
+                return iter(["custom-list-value"])
+
+        class CustomTuple(tuple):
+            def __iter__(self):
+                return iter(["custom-tuple-value"])
+
+        class CustomDict(dict):
+            def items(self):
+                return [("custom-dict-key", "custom-dict-value")]
+
+        custom_values = [
+            CustomList(["stored-list-value"]),
+            CustomTuple(("stored-tuple-value",)),
+            CustomDict({"stored-dict-key": "stored-dict-value"}),
+        ]
+        for custom_value in custom_values:
+            with self.subTest(value_type=type(custom_value).__name__):
+                expected = json.dumps(
+                    custom_value, ensure_ascii=False, sort_keys=True
+                )
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    self.assertIsNone(
+                        native_acceleration.canonical_json(custom_value)
+                    )
+                    self.assertEqual(fast_json_dumps(custom_value), expected)
+
     def test_catalog_path_and_fingerprint_parity(self) -> None:
         if not native_acceleration.available():
             self.skipTest("optional Rust extension is not built")
