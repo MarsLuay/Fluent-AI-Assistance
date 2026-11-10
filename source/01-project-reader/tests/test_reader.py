@@ -623,7 +623,7 @@ class ReaderTests(unittest.TestCase):
             )
             self.assertEqual(xml_helpers.unique_texts(root, {"A"}, limit=True), ["first"])
 
-    def test_native_xml_find_text_matches_python_and_preserves_defaults(self) -> None:
+    def test_native_xml_find_text_matches_python_for_unicode_and_preserves_defaults(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_find_text"
         ):
@@ -673,14 +673,44 @@ class ReaderTests(unittest.TestCase):
         self.assertIs(actual[4], absent)
 
         unicode_root = ET.Element("Root")
-        ET.SubElement(unicode_root, "A").text = "\u2003café\u2003"
+        unicode_name = "Étiquette"
+        for codepoint in range(0x110000):
+            character = chr(codepoint)
+            if character.isspace():
+                ET.SubElement(unicode_root, unicode_name).text = character
+        ET.SubElement(unicode_root, unicode_name).text = "\u2003café\u2003"
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            unicode_expected = xml_helpers.first_text(unicode_root, "A")
+            unicode_expected = xml_helpers.first_text(unicode_root, unicode_name)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_find_text(
+                    unicode_root, unicode_name, False, ET.Element
+                ),
+                (True, "café"),
+            )
+            self.assertEqual(
+                xml_helpers.first_text(unicode_root, unicode_name), unicode_expected
+            )
+            self.assertEqual(
+                native_acceleration.xml_find_text(
+                    unicode_root, unicode_name, True, ET.Element
+                ),
+                (True, "café"),
+            )
+            self.assertEqual(
+                xml_helpers.child_text(unicode_root, unicode_name), "café"
+            )
+            self.assertEqual(unicode_expected, "café")
+
+        surrogate_root = ET.Element("Root")
+        ET.SubElement(surrogate_root, "A").text = chr(0xD800)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(
-                native_acceleration.xml_find_text(unicode_root, "A", False, ET.Element)
+                native_acceleration.xml_find_text(
+                    surrogate_root, "A", False, ET.Element
+                )
             )
-            self.assertEqual(xml_helpers.first_text(unicode_root, "A"), unicode_expected)
+            self.assertEqual(xml_helpers.first_text(surrogate_root, "A"), chr(0xD800))
 
         comment_root = ET.Element("Root")
         comment_root.append(ET.Comment("comment"))
