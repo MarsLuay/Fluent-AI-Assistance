@@ -205,6 +205,27 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             ]
         self.assertEqual(generated_actual, generated_expected)
 
+    def test_geometry_bool_text_uses_native_ascii_comparisons(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "ascii_casefold_equals"
+        ):
+            self.skipTest("optional Rust ASCII comparator is not built")
+        texts = ["true", "TRUE", "false", "FALSE", "TrUe", "FaLsE", "yes", " true ", "trüe", ""]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [worktable_geometry._bool_text(text) for text in texts]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_casefold_equals",
+                wraps=native_acceleration.ascii_casefold_equals,
+            ) as native_call:
+                actual = [worktable_geometry._bool_text(text) for text in texts]
+                self.assertGreaterEqual(native_call.call_count, len(texts) - 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual, [True, True, False, False, True, False, None, None, None, None]
+        )
+
     def test_geometry_local_names_use_native_with_python_type_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_tag_local_name"
