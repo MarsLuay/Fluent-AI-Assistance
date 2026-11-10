@@ -1583,6 +1583,35 @@ def ascii_casefold_equals(value: Any, expected: Any) -> bool | None:
         return None
 
 
+def ascii_substring_match_groups(values: Any, groups: Any) -> list[bool] | None:
+    """Match ASCII substrings for Python-owned groups of search terms."""
+    if (
+        not enabled()
+        or type(values) not in (list, tuple)
+        or type(groups) not in (list, tuple)
+        or not all(type(value) is str and value.isascii() for value in values)
+        or not all(
+            type(group) in (list, tuple)
+            and all(type(needle) is str and needle.isascii() for needle in group)
+            for group in groups
+        )
+    ):
+        return None
+    try:
+        result = _native.ascii_substring_match_groups(
+            list(values), [list(group) for group in groups]
+        )
+        if (
+            type(result) is list
+            and len(result) == len(groups)
+            and all(type(matched) is bool for matched in result)
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def any_ascii_casefold_in(values: Any, candidates: Any) -> bool | None:
     """Check ASCII strings against a Python-owned case-folded candidate set."""
     if (

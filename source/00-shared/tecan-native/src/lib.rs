@@ -1420,6 +1420,71 @@ fn ascii_casefold_equals(value: &str, expected: &str) -> Option<bool> {
     }
 }
 
+fn ascii_substring_match_groups(values: &[String], groups: &[Vec<String>]) -> Option<Vec<bool>> {
+    if values
+        .iter()
+        .chain(groups.iter().flatten())
+        .any(|value| !value.is_ascii())
+    {
+        return None;
+    }
+    Some(
+        groups
+            .iter()
+            .map(|needles| {
+                values
+                    .iter()
+                    .any(|value| needles.iter().any(|needle| value.contains(needle)))
+            })
+            .collect(),
+    )
+}
+
+#[pyfunction(name = "ascii_substring_match_groups")]
+fn ascii_substring_match_groups_py<'py>(
+    py: Python<'py>,
+    values: &Bound<'py, PyAny>,
+    groups: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !values.get_type().is(py.get_type::<PyList>())
+        || !groups.get_type().is(py.get_type::<PyList>())
+    {
+        return Ok(None);
+    }
+    let mut strings = Vec::new();
+    for value in values.try_iter()? {
+        let value = value?;
+        if !value.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        strings.push(value.extract::<String>()?);
+    }
+    let mut patterns = Vec::new();
+    for group in groups.try_iter()? {
+        let group = group?;
+        if !group.get_type().is(py.get_type::<PyList>()) {
+            return Ok(None);
+        }
+        let mut needles = Vec::new();
+        for needle in group.try_iter()? {
+            let needle = needle?;
+            if !needle.get_type().is(py.get_type::<PyString>()) {
+                return Ok(None);
+            }
+            needles.push(needle.extract::<String>()?);
+        }
+        patterns.push(needles);
+    }
+    let Some(matches) = ascii_substring_match_groups(&strings, &patterns) else {
+        return Ok(None);
+    };
+    let output = PyList::empty(py);
+    for matched in matches {
+        output.append(matched)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
 #[pyfunction]
 fn sorted_unique_ascii_strings<'py>(
     py: Python<'py>,
@@ -3655,6 +3720,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(most_common_ascii_counts, module)?)?;
     module.add_function(wrap_pyfunction!(sorted_unique_ascii_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
+    module.add_function(wrap_pyfunction!(ascii_substring_match_groups_py, module)?)?;
     module.add_function(wrap_pyfunction!(unique_ascii_tuple_indices, module)?)?;
     module.add_function(wrap_pyfunction!(delimited_row_fields, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_command_records, module)?)?;
@@ -3731,6 +3797,22 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ascii_substring_groups_match_python_contains_for_supported_ascii() {
+        let values = vec!["vendor.subroutine".into(), "executevbscript".into()];
+        let groups = vec![
+            vec!["subroutine".into()],
+            vec!["executevbscript".into(), "executeapplication".into()],
+            vec!["worklist".into()],
+            vec!["".into()],
+        ];
+        assert_eq!(
+            ascii_substring_match_groups(&values, &groups),
+            Some(vec![true, true, false, true])
+        );
+        assert_eq!(ascii_substring_match_groups(&["é".into()], &groups), None);
+    }
 
     #[test]
     fn markdown_join_preserves_embedded_and_final_newlines() {

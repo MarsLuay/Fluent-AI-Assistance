@@ -529,15 +529,29 @@ def _comments(root: ET.Element) -> list[str]:
 def _warnings(commands: list[dict[str, Any]]) -> list[str]:
     warnings: list[str] = []
     raw_types = [command["raw_type"].lower() for command in commands]
-    if any("subroutine" in t for t in raw_types):
+    search_groups = (
+        ("subroutine",),
+        ("executevbscript", "executeapplication"),
+        ("worklist",),
+        ("touchtools", ".rup."),
+    )
+    matches = native_acceleration.ascii_substring_match_groups(
+        raw_types, search_groups
+    )
+    if matches is None:
+        matches = [
+            any(needle in value for value in raw_types for needle in group)
+            for group in search_groups
+        ]
+    if matches[0]:
         warnings.append(
             "Contains subroutine calls; inspect referenced scripts before editing."
         )
-    if any("executevbscript" in t or "executeapplication" in t for t in raw_types):
+    if matches[1]:
         warnings.append("Contains external application or VB script calls.")
-    if any("worklist" in t for t in raw_types):
+    if matches[2]:
         warnings.append("Contains worklist import/load/execute commands.")
-    if any("touchtools" in t or ".rup." in t for t in raw_types):
+    if matches[3]:
         warnings.append("Contains TouchTools/RUP UI workflow commands.")
     if any(
         "pin" in str(value).lower()

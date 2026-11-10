@@ -218,6 +218,58 @@ class ScriptTests(unittest.TestCase):
         self.assertEqual(unicode_actual, unicode_expected)
         self.assertEqual(unicode_actual[0]["default_values"], ["café"])
 
+    def test_warning_substring_scans_use_rust_with_unicode_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "ascii_substring_match_groups"
+        ):
+            self.skipTest("optional Rust ASCII substring matcher is not built")
+        commands = [
+            {"raw_type": "Vendor.SubRoutineCall", "family": "Other", "fields": {}},
+            {"raw_type": "ExecuteVBScript", "family": "Other", "fields": {}},
+            {"raw_type": "LoadWorklist", "family": "Worklist", "fields": {}},
+            {"raw_type": "TouchTools.RUPView", "family": "TouchTools/RUP", "fields": {}},
+            {
+                "raw_type": "FcaPipette",
+                "family": "LiHa/FCA",
+                "fields": {"Location": "PIN-2"},
+            },
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = script._warnings(commands)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_substring_match_groups",
+                wraps=native_acceleration.ascii_substring_match_groups,
+            ) as native_matcher:
+                actual = script._warnings(commands)
+                native_matcher.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [
+                "Contains subroutine calls; inspect referenced scripts before editing.",
+                "Contains external application or VB script calls.",
+                "Contains worklist import/load/execute commands.",
+                "Contains TouchTools/RUP UI workflow commands.",
+                "Contains pin-controlled or pin-located hardware references.",
+                "Contains 2 commands outside the current family classifier.",
+            ],
+        )
+
+        unicode_commands = [
+            {"raw_type": "İSubroutineCall", "family": "Subroutine", "fields": {}}
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unicode_expected = script._warnings(unicode_commands)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.ascii_substring_match_groups(
+                    [unicode_commands[0]["raw_type"].lower()], [("subroutine",)]
+                )
+            )
+            self.assertEqual(script._warnings(unicode_commands), unicode_expected)
+
     def test_ordered_command_counts_use_rust_with_unicode_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "ordered_ascii_string_counts"
