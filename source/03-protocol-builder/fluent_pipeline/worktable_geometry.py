@@ -1374,9 +1374,25 @@ def classify_site_kind(location_group: Any = "", type_name: Any = "", object_nam
 
     if "pin" in lower:
         return "pin"
-    if "capnest" in compact or "capholder" in compact:
+    native_matches = native_acceleration.ascii_case_insensitive_substring_match_groups(
+        [compact],
+        (
+            ("capnest", "capholder"),
+            ("nestplatform", "nestbase", "regripnest"),
+        ),
+    )
+    if native_matches is None:
+        cap_nest_match = "capnest" in compact or "capholder" in compact
+        nest_family_match = (
+            "nestplatform" in compact
+            or "nestbase" in compact
+            or "regripnest" in compact
+        )
+    else:
+        cap_nest_match, nest_family_match = native_matches
+    if cap_nest_match:
         return "cap_nest"
-    if "nestplatform" in compact or "nestbase" in compact or "regripnest" in compact:
+    if nest_family_match:
         return "nest"
     # Nest site templates (7mm Nest, 61mm Nest, Landscape Nest, …) via TypeName/LocationGroup.
     if re.search(r"(^|[^a-z0-9])nest([^a-z0-9]|$)", lower):

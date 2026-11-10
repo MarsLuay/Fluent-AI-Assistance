@@ -311,6 +311,43 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             ]
         self.assertEqual(generated_actual, generated_expected)
 
+    def test_site_kind_ascii_compact_matching_uses_native_with_python_policy(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "ascii_case_insensitive_substring_match_groups"
+        ):
+            self.skipTest("optional Rust substring matcher is not built")
+        cases = [
+            (("pin carrier", "", ""), "pin"),
+            (("Cap nest", "", ""), "cap_nest"),
+            (("cap-holder", "", ""), "cap_nest"),
+            (("Nest platform", "", ""), "nest"),
+            (("nest-base", "", ""), "nest"),
+            (("Regrip nest", "", ""), "nest"),
+            (("7mm nest", "", ""), "nest"),
+            (("東京 nest", "", ""), "nest"),
+            (("nested", "", ""), ""),
+            (("pin plus cap nest", "", ""), "pin"),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                worktable_geometry.classify_site_kind(*parts) for parts, _ in cases
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_case_insensitive_substring_match_groups",
+                wraps=native_acceleration.ascii_case_insensitive_substring_match_groups,
+            ) as native_call:
+                actual = [
+                    worktable_geometry.classify_site_kind(*parts) for parts, _ in cases
+                ]
+                self.assertEqual(
+                    native_call.call_count,
+                    sum(expected_value != "pin" for _, expected_value in cases),
+                )
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [expected_value for _, expected_value in cases])
+
     def test_geometry_direct_children_use_native_selection_with_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_direct_elements_by_name"
