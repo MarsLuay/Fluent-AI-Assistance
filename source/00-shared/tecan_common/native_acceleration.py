@@ -53,6 +53,27 @@ def xml_local_name(tag: Any) -> str | None:
         return None
 
 
+def xml_clean_text(value: Any) -> str | None:
+    """Trim supported ASCII XML text natively, preserving Python fallback cases."""
+    if not enabled():
+        return None
+    if value is None:
+        text = ""
+    elif (
+        type(value) is str
+        and value.isascii()
+        and not any(0x1C <= ord(character) <= 0x1F for character in value)
+    ):
+        text = value
+    else:
+        return None
+    try:
+        result = _native.xml_clean_text(text)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def decode_text_bytes(data: Any) -> str | None:
     """Decode the reader's supported text encodings natively when possible."""
     if not enabled() or type(data) is not bytes:

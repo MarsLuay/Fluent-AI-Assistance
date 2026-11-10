@@ -349,6 +349,36 @@ class ReaderTests(unittest.TestCase):
             self.assertEqual(xml_helpers.local_name(custom), "custom")
             self.assertEqual(custom.str_calls, 1)
 
+    def test_native_xml_clean_text_matches_python_and_falls_back(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_clean_text"
+        ):
+            self.skipTest("optional Rust XML text helper is not built")
+        values = [None, "", " ", "\t value \r\n", "plain", "\x1cvalue\x1c", "\u2003µ\u2003"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [xml_helpers._clean_text(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                xml_helpers,
+                "_native_xml_clean_text",
+                wraps=xml_helpers._native_xml_clean_text,
+            ) as native_call:
+                actual = [xml_helpers._clean_text(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["", "", "", "value", "plain", "value", "µ"])
+
+        class TextValue:
+            def __bool__(self) -> bool:
+                return True
+
+            def __str__(self) -> str:
+                return "  custom text  "
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.xml_clean_text(TextValue()))
+            self.assertEqual(xml_helpers._clean_text(TextValue()), "custom text")
+
     def test_native_extension_counts_match_path_suffix_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "extension_counts"

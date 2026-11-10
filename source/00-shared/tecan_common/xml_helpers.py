@@ -6,7 +6,10 @@ from collections.abc import Iterable
 from typing import Any
 
 from . import xml_compat as ET
-from .native_acceleration import xml_local_name as _native_xml_local_name
+from .native_acceleration import (
+    xml_clean_text as _native_xml_clean_text,
+    xml_local_name as _native_xml_local_name,
+)
 
 __all__ = [
     "all_text",
@@ -29,6 +32,9 @@ def local_name(tag: Any) -> str:
 
 
 def _clean_text(value: Any) -> str:
+    native = _native_xml_clean_text(value)
+    if native is not None:
+        return native
     return str(value or "").strip()
 
 
