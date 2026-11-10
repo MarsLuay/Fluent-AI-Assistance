@@ -981,10 +981,8 @@ def _parse_int_list(obj: ET.Element, field_name: str) -> list[int]:
     if container is None:
         return []
     values: list[int] = []
-    for el in container.iter():
-        if not isinstance(el.tag, str):
-            continue
-        if _local(el.tag) == "int" and el.text:
+    for el in elements_by_name(container, {"int"}):
+        if el.text:
             try:
                 values.append(int(el.text.strip()))
             except ValueError:
