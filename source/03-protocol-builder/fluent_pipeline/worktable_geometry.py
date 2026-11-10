@@ -1331,9 +1331,13 @@ def _is_nil(elem: ET.Element) -> bool:
 
 
 def _orientation_from_text(text: str) -> dict[str, float]:
+    source = text or ""
+    native = native_acceleration.parse_orientation_ascii(source)
+    if native is not None:
+        return {"phi": native[0], "theta": native[1], "psi": native[2]}
     match = re.search(
         r"Phi\s*=\s*(-?\d+(?:\.\d+)?)\s*,\s*Theta\s*=\s*(-?\d+(?:\.\d+)?)\s*,\s*Psi\s*=\s*(-?\d+(?:\.\d+)?)",
-        text or "",
+        source,
         flags=re.IGNORECASE,
     )
     if not match:

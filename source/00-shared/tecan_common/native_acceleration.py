@@ -1670,6 +1670,23 @@ def parse_i64_text(value: Any) -> int | None:
         return None
 
 
+def parse_orientation_ascii(value: Any) -> tuple[float, float, float] | None:
+    """Parse supported ASCII orientation text; Python regex handles everything else."""
+    if not enabled() or type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.parse_orientation_ascii(value)
+        if (
+            type(result) is tuple
+            and len(result) == 3
+            and all(type(number) is float for number in result)
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def parse_f64_decimal_text(value: Any) -> float | None:
     """Parse a conservative decimal-float subset; broader Python forms fall back."""
     if not enabled() or type(value) is not str or not value.isascii():

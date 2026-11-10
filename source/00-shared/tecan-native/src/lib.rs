@@ -1496,6 +1496,124 @@ fn parse_i64_text<'py>(py: Python<'py>, text: &Bound<'py, PyAny>) -> PyResult<Op
     Ok(text.parse::<i64>().ok())
 }
 
+fn skip_python_whitespace(bytes: &[u8], position: &mut usize) {
+    while bytes
+        .get(*position)
+        .is_some_and(|byte| is_python_whitespace(char::from(*byte)))
+    {
+        *position += 1;
+    }
+}
+
+fn consume_ascii_keyword(bytes: &[u8], position: &mut usize, keyword: &[u8]) -> bool {
+    let Some(candidate) = bytes.get(*position..*position + keyword.len()) else {
+        return false;
+    };
+    if !candidate.eq_ignore_ascii_case(keyword) {
+        return false;
+    }
+    *position += keyword.len();
+    true
+}
+
+fn parse_orientation_number(bytes: &[u8], position: &mut usize) -> Option<f64> {
+    let start = *position;
+    if bytes.get(*position) == Some(&b'-') {
+        *position += 1;
+    }
+    let integer_start = *position;
+    while bytes.get(*position).is_some_and(u8::is_ascii_digit) {
+        *position += 1;
+    }
+    if *position == integer_start {
+        return None;
+    }
+    if bytes.get(*position) == Some(&b'.') {
+        let fraction_start = *position + 1;
+        let mut fraction_end = fraction_start;
+        while bytes.get(fraction_end).is_some_and(u8::is_ascii_digit) {
+            fraction_end += 1;
+        }
+        if fraction_end == fraction_start {
+            return None;
+        }
+        *position = fraction_end;
+    }
+    let number = std::str::from_utf8(&bytes[start..*position])
+        .ok()?
+        .parse::<f64>()
+        .ok()?;
+    number.is_finite().then_some(number)
+}
+
+fn parse_orientation_candidate(bytes: &[u8], start: usize) -> Option<[f64; 3]> {
+    let mut position = start + 3;
+    skip_python_whitespace(bytes, &mut position);
+    if bytes.get(position) != Some(&b'=') {
+        return None;
+    }
+    position += 1;
+    skip_python_whitespace(bytes, &mut position);
+    let phi = parse_orientation_number(bytes, &mut position)?;
+    skip_python_whitespace(bytes, &mut position);
+    if bytes.get(position) != Some(&b',') {
+        return None;
+    }
+    position += 1;
+    skip_python_whitespace(bytes, &mut position);
+    if !consume_ascii_keyword(bytes, &mut position, b"theta") {
+        return None;
+    }
+    skip_python_whitespace(bytes, &mut position);
+    if bytes.get(position) != Some(&b'=') {
+        return None;
+    }
+    position += 1;
+    skip_python_whitespace(bytes, &mut position);
+    let theta = parse_orientation_number(bytes, &mut position)?;
+    skip_python_whitespace(bytes, &mut position);
+    if bytes.get(position) != Some(&b',') {
+        return None;
+    }
+    position += 1;
+    skip_python_whitespace(bytes, &mut position);
+    if !consume_ascii_keyword(bytes, &mut position, b"psi") {
+        return None;
+    }
+    skip_python_whitespace(bytes, &mut position);
+    if bytes.get(position) != Some(&b'=') {
+        return None;
+    }
+    position += 1;
+    skip_python_whitespace(bytes, &mut position);
+    let psi = parse_orientation_number(bytes, &mut position)?;
+    Some([phi, theta, psi])
+}
+
+fn parse_orientation_ascii_text(text: &str) -> Option<[f64; 3]> {
+    if !text.is_ascii() {
+        return None;
+    }
+    let bytes = text.as_bytes();
+    if bytes.len() < 3 {
+        return None;
+    }
+    for start in 0..=bytes.len() - 3 {
+        if bytes[start..start + 3].eq_ignore_ascii_case(b"phi") {
+            if let Some(values) = parse_orientation_candidate(bytes, start) {
+                return Some(values);
+            }
+        }
+    }
+    None
+}
+
+#[pyfunction]
+fn parse_orientation_ascii(text: &str) -> Option<(f64, f64, f64)> {
+    let [phi, theta, psi] = parse_orientation_ascii_text(text)?;
+    Some((phi, theta, psi))
+}
+
 fn has_ascii_decimal_float_syntax(text: &str) -> bool {
     let bytes = text.as_bytes();
     if bytes.is_empty() {
@@ -4130,6 +4248,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(is_guid_text, module)?)?;
     module.add_function(wrap_pyfunction!(format_site_path, module)?)?;
     module.add_function(wrap_pyfunction!(parse_i64_text, module)?)?;
+    module.add_function(wrap_pyfunction!(parse_orientation_ascii, module)?)?;
     module.add_function(wrap_pyfunction!(parse_f64_decimal_text, module)?)?;
     module.add_function(wrap_pyfunction!(
         ascii_case_insensitive_substring_match_values,
@@ -4220,6 +4339,20 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn orientation_parser_matches_supported_ascii_regex_cases() {
+        assert_eq!(
+            parse_orientation_ascii_text("prefix PHI \t=\n-1.25,\u{1c} tHeTa=0, PSI=3.5 trailing"),
+            Some([-1.25, 0.0, 3.5])
+        );
+        assert_eq!(
+            parse_orientation_ascii_text("Phi=bad,Theta=0,Psi=0; phi=4,theta=5,psi=-6.25"),
+            Some([4.0, 5.0, -6.25])
+        );
+        assert_eq!(parse_orientation_ascii_text("no orientation here"), None);
+        assert_eq!(parse_orientation_ascii_text("Phi=١,Theta=٢,Psi=٣"), None);
+    }
 
     #[test]
     fn ascii_label_base_matches_bracket_suffix_regex_semantics() {

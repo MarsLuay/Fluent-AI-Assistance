@@ -438,6 +438,63 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             ["", "", "place", "site", "site", "not-a-guid", "", "", "", "\ud800 raw \ud800", "Custom"],
         )
 
+    def test_orientation_text_uses_native_ascii_parser_and_python_regex_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "parse_orientation_ascii"
+        ):
+            self.skipTest("optional Rust orientation parser is not built")
+
+        class OrientationText(str):
+            pass
+
+        overflow = f"Phi={'9' * 400},Theta=0,Psi=0"
+        values = [
+            "Phi=1, Theta=2, Psi=3",
+            "prefix PHI \t=\n-1.25,\x1c tHeTa=0, PSI=3.5 trailing",
+            "Phi=bad,Theta=0,Psi=0; phi=4,theta=5,psi=-6.25",
+            "Phi=1.2.3,Theta=2,Psi=3",
+            "Phi=1,Theta=2,Psi=3.4.5",
+            "Phi=١,Theta=٢,Psi=٣",
+            "Phi=1\u00a0,\u00a0Theta=2,\u00a0Psi=3",
+            overflow,
+            "no orientation",
+            None,
+            OrientationText("Phi=7,Theta=8,Psi=9"),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                worktable_geometry._orientation_from_text(value) for value in values
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "parse_orientation_ascii",
+                wraps=native_acceleration.parse_orientation_ascii,
+            ) as native_call:
+                actual = [
+                    worktable_geometry._orientation_from_text(value) for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertEqual(
+                native_acceleration.parse_orientation_ascii(
+                    "prefix Phi=-1.25,Theta=2,Psi=3.5 suffix"
+                ),
+                (-1.25, 2.0, 3.5),
+            )
+            self.assertIsNone(
+                native_acceleration.parse_orientation_ascii("Phi=١,Theta=2,Psi=3")
+            )
+            self.assertIsNone(native_acceleration.parse_orientation_ascii(overflow))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual[0], {"phi": 1.0, "theta": 2.0, "psi": 3.0})
+        self.assertEqual(actual[1], {"phi": -1.25, "theta": 0.0, "psi": 3.5})
+        self.assertEqual(actual[2], {"phi": 4.0, "theta": 5.0, "psi": -6.25})
+        self.assertEqual(actual[3], {})
+        self.assertEqual(actual[4], {"phi": 1.0, "theta": 2.0, "psi": 3.4})
+        self.assertEqual(actual[5], {"phi": 1.0, "theta": 2.0, "psi": 3.0})
+        self.assertTrue(math.isinf(actual[7]["phi"]))
+        self.assertEqual(actual[-1], {"phi": 7.0, "theta": 8.0, "psi": 9.0})
+
     def test_label_base_uses_native_ascii_regex_parity_and_unicode_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "label_base_ascii_text"
