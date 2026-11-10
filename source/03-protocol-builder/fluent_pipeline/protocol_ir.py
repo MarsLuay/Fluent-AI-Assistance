@@ -3724,6 +3724,10 @@ def _enclosing_raw_command_id(
 
 
 def _iter_local(parent: ET.Element, name: str):
+    native = native_acceleration.xml_elements_by_name(parent, {name}, ET.Element)
+    if native is not None:
+        yield from native
+        return
     for child in parent.iter():
         if _local_name(child.tag) == name:
             yield child
