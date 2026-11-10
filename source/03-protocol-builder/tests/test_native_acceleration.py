@@ -284,6 +284,50 @@ class NativeAccelerationTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [False, True, True, True])
 
+    def test_liquid_class_head_scan_uses_native_selector_with_fallback(self) -> None:
+        from types import SimpleNamespace
+
+        from fluentcoder.catalog import xlqc
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        root = ET.fromstring(
+            '<Root xmlns:ns="urn:test"><Payload><ObjectName>Example</ObjectName>'
+            "<PayloadData><ns:PipettingDeviceType>Fca</ns:PipettingDeviceType>"
+            "<PipettingDeviceType> </PipettingDeviceType>"
+            "<Nested><PipettingDeviceType>Mca96</PipettingDeviceType></Nested>"
+            "<PipettingDeviceType>Fca</PipettingDeviceType></PayloadData>"
+            "</Payload></Root>"
+        )
+        payload_data = root.find("./Payload/PayloadData")
+        fake_tree = SimpleNamespace(getroot=lambda: root)
+        source_path = "synthetic-liquid-class.xlqc"
+        xlqc._load_xlqc_cached.cache_clear()
+        self.addCleanup(xlqc._load_xlqc_cached.cache_clear)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(xlqc.ET, "parse", return_value=fake_tree):
+                expected = xlqc._load_xlqc_cached(source_path)
+        xlqc._load_xlqc_cached.cache_clear()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(xlqc.ET, "parse", return_value=fake_tree):
+                with patch.object(
+                    native_acceleration,
+                    "xml_elements_by_name",
+                    wraps=native_acceleration.xml_elements_by_name,
+                ) as native_call:
+                    actual = xlqc._load_xlqc_cached(source_path)
+                    native_call.assert_called_once_with(
+                        payload_data, {"PipettingDeviceType"}, ET.Element
+                    )
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual.name, "Example")
+        self.assertEqual(actual.head, "Fca")
+        self.assertEqual(actual.supported_heads, ("Fca", "Mca96"))
+
     def test_native_pattern_window_order_and_confidence(self) -> None:
         if not native_acceleration.available():
             self.skipTest("optional Rust extension is not built")
