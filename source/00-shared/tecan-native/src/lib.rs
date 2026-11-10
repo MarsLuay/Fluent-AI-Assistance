@@ -1116,6 +1116,24 @@ fn render_append_list(title: &str, values: Vec<String>, limit: i64) -> Vec<Strin
 }
 
 #[pyfunction]
+fn render_append_dict(title: &str, entries: Vec<(String, String)>, limit: i64) -> Vec<String> {
+    if entries.is_empty() {
+        return Vec::new();
+    }
+    let length = entries.len() as i128;
+    let limit = limit as i128;
+    let mut output = vec![String::new(), format!("## {title}")];
+    for (index, (key, value)) in entries.iter().enumerate() {
+        if index as i128 >= limit {
+            output.push(format!("- ... {} more", length - limit));
+            break;
+        }
+        output.push(format!("- `{key}`: {value}"));
+    }
+    output
+}
+
+#[pyfunction]
 fn read_text_file(path: &str) -> Option<String> {
     std::fs::read(path)
         .ok()
@@ -1953,6 +1971,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_texts_by_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_find_text, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;
+    module.add_function(wrap_pyfunction!(render_append_dict, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(read_text_file, module)?)?;
     module.add_function(wrap_pyfunction!(read_utf8_sig_file, module)?)?;

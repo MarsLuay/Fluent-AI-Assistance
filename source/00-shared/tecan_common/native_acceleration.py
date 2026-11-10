@@ -190,6 +190,30 @@ def render_append_list(title: Any, values: Any, limit: Any) -> list[str] | None:
         return None
 
 
+def render_append_dict(title: Any, values: Any, limit: Any) -> list[str] | None:
+    """Format supported ordered report mappings natively with Python value strings."""
+    if (
+        not enabled()
+        or type(title) is not str
+        or type(values) is not dict
+        or type(limit) is not int
+        or not -(1 << 63) <= limit < (1 << 63)
+    ):
+        return None
+    entries: list[tuple[str, str]] = []
+    try:
+        for key, value in values.items():
+            if type(key) is not str or type(value) not in (str, bool, int, float, type(None)):
+                return None
+            entries.append((key, str(value)))
+        result = _native.render_append_dict(title, entries, limit)
+        if type(result) is list and all(type(line) is str for line in result):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def decode_text_bytes(data: Any) -> str | None:
     """Decode the reader's supported text encodings natively when possible."""
     if not enabled() or type(data) is not bytes:
