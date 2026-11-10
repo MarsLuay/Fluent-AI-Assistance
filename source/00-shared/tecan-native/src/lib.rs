@@ -536,12 +536,14 @@ fn is_safe_json_key(py: Python<'_>, value: &Bound<'_, PyAny>, depth: usize) -> P
     Ok(true)
 }
 
+#[allow(clippy::too_many_arguments)] // Exact Python types and recursion state stay explicit.
 fn try_to_jsonable_containers<'py>(
     py: Python<'py>,
     value: &Bound<'py, PyAny>,
     counter_type: &Bound<'py, PyAny>,
     path_type: &Bound<'py, PyAny>,
     defaultdict_type: &Bound<'py, PyAny>,
+    ordered_dict_type: &Bound<'py, PyAny>,
     active: &mut HashSet<usize>,
     depth: usize,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -613,6 +615,7 @@ fn try_to_jsonable_containers<'py>(
                 counter_type,
                 path_type,
                 defaultdict_type,
+                ordered_dict_type,
                 active,
                 depth + 1,
             )?
@@ -626,7 +629,10 @@ fn try_to_jsonable_containers<'py>(
         return Ok(Some(output.into_any()));
     }
 
-    if value_type.is(py.get_type::<PyDict>()) || value_type.is(defaultdict_type) {
+    if value_type.is(py.get_type::<PyDict>())
+        || value_type.is(defaultdict_type)
+        || value_type.is(ordered_dict_type)
+    {
         if !active.insert(pointer) {
             return Ok(None);
         }
@@ -644,6 +650,7 @@ fn try_to_jsonable_containers<'py>(
                 counter_type,
                 path_type,
                 defaultdict_type,
+                ordered_dict_type,
                 active,
                 depth + 1,
             )?
@@ -667,6 +674,7 @@ fn to_jsonable_containers(
     counter_type: &Bound<'_, PyAny>,
     path_type: &Bound<'_, PyAny>,
     defaultdict_type: &Bound<'_, PyAny>,
+    ordered_dict_type: &Bound<'_, PyAny>,
 ) -> PyResult<(bool, Py<PyAny>)> {
     match try_to_jsonable_containers(
         py,
@@ -674,6 +682,7 @@ fn to_jsonable_containers(
         counter_type,
         path_type,
         defaultdict_type,
+        ordered_dict_type,
         &mut HashSet::new(),
         0,
     )? {

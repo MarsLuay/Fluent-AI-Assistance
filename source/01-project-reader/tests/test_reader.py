@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import Counter, defaultdict
+from collections import Counter, OrderedDict, defaultdict
 import json
 import random
 import shutil
@@ -370,6 +370,9 @@ class ReaderTests(unittest.TestCase):
         default_mapping = defaultdict(
             default_factory, {"path": Path("nested.xml"), "values": (1, 2)}
         )
+        ordered_mapping = OrderedDict(
+            [("second", (2,)), ("first", Path("first.xml"))]
+        )
         cases = [
             (
                 {"items": (1, ["two", {"three": (3,)}]), "empty": []},
@@ -389,6 +392,10 @@ class ReaderTests(unittest.TestCase):
             (
                 default_mapping,
                 {"path": "nested.xml", "values": [1, 2]},
+            ),
+            (
+                ordered_mapping,
+                {"second": [2], "first": "first.xml"},
             ),
             (
                 Counter({"warning": 2, "opaque": (1,)}),
@@ -434,6 +441,9 @@ class ReaderTests(unittest.TestCase):
                 self.assertEqual(python_result, expected)
                 self.assertEqual(actual, expected)
         self.assertEqual(default_factory_calls, 0)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            ordered_result = to_jsonable(ordered_mapping)
+        self.assertEqual(list(ordered_result), ["second", "first"])
 
         class CustomKey:
             def __init__(self) -> None:
@@ -457,9 +467,13 @@ class ReaderTests(unittest.TestCase):
         class DerivedDefaultDict(defaultdict):
             pass
 
+        class DerivedOrderedDict(OrderedDict):
+            pass
+
         fallback_values = [
             DerivedCounter({"warning": 2}),
             DerivedDefaultDict(list, {"value": (1,)}),
+            DerivedOrderedDict([("value", (1,))]),
             {2, 1},
             custom_key_mapping,
         ]
