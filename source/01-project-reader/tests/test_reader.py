@@ -371,6 +371,11 @@ class ReaderTests(unittest.TestCase):
             ),
             ([], []),
             ({}, {}),
+            (Path("sample.xscr"), "sample.xscr"),
+            (
+                {"path": Path("nested.xml"), "values": (1, 2)},
+                {"path": "nested.xml", "values": [1, 2]},
+            ),
             (
                 Counter({"warning": 2, "opaque": (1,)}),
                 {"warning": 2, "opaque": (1,)},
@@ -435,10 +440,8 @@ class ReaderTests(unittest.TestCase):
             pass
 
         fallback_values = [
-            Path("sample.xscr"),
             DerivedCounter({"warning": 2}),
             {2, 1},
-            {"path": Path("nested.xml"), "values": (1, 2)},
             custom_key_mapping,
         ]
         for value in fallback_values:

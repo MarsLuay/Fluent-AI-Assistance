@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+_PathType = type(Path())
+
 try:
     from tecan_native import _native
 except (ImportError, OSError):  # pragma: no cover - depends on optional wheel
@@ -52,7 +54,9 @@ def to_jsonable_containers(value: Any) -> tuple[bool, Any] | None:
     if not enabled():
         return None
     try:
-        supported, result = _native.to_jsonable_containers(value, _Counter)
+        supported, result = _native.to_jsonable_containers(
+            value, _Counter, _PathType
+        )
         if type(supported) is bool and supported:
             return True, result
         return None
