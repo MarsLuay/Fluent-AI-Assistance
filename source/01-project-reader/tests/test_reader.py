@@ -1067,7 +1067,7 @@ class ReaderTests(unittest.TestCase):
             )
             self.assertEqual(reader_script._pin_refs(unicode_values), unicode_expected)
 
-    def test_variable_definition_selection_uses_rust_with_python_fallback(self) -> None:
+    def test_variable_definition_selection_uses_rust_for_unicode_and_falls_back_safely(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_variable_definition_elements"
         ):
@@ -1089,7 +1089,11 @@ class ReaderTests(unittest.TestCase):
         ET.SubElement(values, f"{namespace}Value").text = "1"
         ET.SubElement(values, f"{namespace}Value").text = "2"
 
-        hinted = ET.SubElement(root, f"{namespace}Other", {"metadata": "VariableDefinitionHelper"})
+        hinted = ET.SubElement(
+            root,
+            f"{namespace}Other",
+            {"metadata": "VariableDefinitionHelper café"},
+        )
         ET.SubElement(hinted, f"{namespace}Name").text = "Operator"
         ET.SubElement(hinted, f"{namespace}TypeName").text = "String"
         ignored = ET.SubElement(root, f"{namespace}Other", {"metadata": "ordinary"})
@@ -1116,18 +1120,31 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual([item["name"] for item in startup], ["Volume", "Operator"])
         self.assertEqual(startup[0]["default_values"], ["1", "2"])
 
-        ET.SubElement(root, f"{namespace}Café").text = "unicode fallback"
+        ET.SubElement(root, f"{namespace}Café", {"metadata": "résumé"}).text = (
+            "unrelated unicode element"
+        )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_elements = reader_script._variable_definition_elements(root)
             fallback_declarations = reader_script._variable_declarations(root)
             fallback_startup = reader_script._startup_variables(root)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            selected = native_acceleration.xml_variable_definition_elements(
+                root, ET.Element
+            )
+            self.assertIsNotNone(selected)
+            self.assertEqual(selected, fallback_elements)
+            self.assertEqual(
+                reader_script._variable_declarations(root), fallback_declarations
+            )
+            self.assertEqual(reader_script._startup_variables(root), fallback_startup)
+
+            root.append(ET.Comment("unsupported non-element node"))
             self.assertIsNone(
                 native_acceleration.xml_variable_definition_elements(root, ET.Element)
             )
             self.assertEqual(
                 reader_script._variable_declarations(root), fallback_declarations
             )
-            self.assertEqual(reader_script._startup_variables(root), fallback_startup)
 
     def test_xml_object_unknown_fields_use_native_grouping_with_python_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(

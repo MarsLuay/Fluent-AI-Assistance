@@ -1726,9 +1726,6 @@ fn xml_variable_definition_elements<'py>(
             return Ok(None);
         }
         let tag = tag.extract::<String>()?;
-        if !tag.is_ascii() {
-            return Ok(None);
-        }
         let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
         let attributes = element.getattr("attrib")?;
         if !attributes.get_type().is(py.get_type::<PyDict>()) {
@@ -1742,9 +1739,6 @@ fn xml_variable_definition_elements<'py>(
                 return Ok(None);
             }
             let value = value.extract::<String>()?;
-            if !value.is_ascii() {
-                return Ok(None);
-            }
             if !type_hint.is_empty() {
                 type_hint.push(' ');
             }
@@ -1767,9 +1761,6 @@ fn xml_variable_definition_elements<'py>(
                 return Ok(None);
             }
             let child_tag = child_tag.extract::<String>()?;
-            if !child_tag.is_ascii() {
-                return Ok(None);
-            }
             let child_local = child_tag.rsplit('}').next().unwrap_or(child_tag.as_str());
             has_name |= child_local == "Name";
             has_type_name |= child_local == "TypeName";
