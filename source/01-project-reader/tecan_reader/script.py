@@ -7,6 +7,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 import re
 
+from tecan_common import native_acceleration
 from tecan_common.xml_compat import ET
 from tecan_common.xml_helpers import (
     all_text_values,
@@ -198,6 +199,24 @@ def _set_variables(root: ET.Element) -> list[dict[str, str]]:
 
 
 def _commands(root: ET.Element) -> list[dict[str, Any]]:
+    native_records = native_acceleration.xscr_command_records(
+        root, INTERESTING_FIELDS, ET.Element
+    )
+    if native_records is not None:
+        commands: list[dict[str, Any]] = []
+        for type_name, fields in native_records:
+            commands.append(
+                {
+                    "index": len(commands) + 1,
+                    "type": command_short_name(type_name),
+                    "raw_type": type_name,
+                    "family": command_family(type_name),
+                    "line": fields.get("LineNumber", ""),
+                    "name": fields.get("Name", ""),
+                    "fields": fields,
+                }
+            )
+        return commands
     commands: list[dict[str, Any]] = []
     for el in root.iter():
         if local_name(el.tag) != "Object" or "Type" not in el.attrib:

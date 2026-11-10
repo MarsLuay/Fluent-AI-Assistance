@@ -785,6 +785,89 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(actual[0]["object_subfolder_path"], actual[0]["object_path"])
         self.assertEqual(actual[1]["type_id"], "type-y")
 
+    def test_native_xscr_command_records_preserve_fields_and_python_classification(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xscr_command_records"
+        ):
+            self.skipTest("optional Rust XSCR command extractor is not built")
+        root = ET.Element("Root")
+        ET.SubElement(root, "Object").text = "not-a-command-x"
+        first = ET.SubElement(
+            root, "{urn:test}Object", {"Type": "Namespace.SampleCommandDataV2"}
+        )
+        ET.SubElement(first, "Name").text = "  "
+        ET.SubElement(first, "Name").text = " command-x "
+        ET.SubElement(first, "LineNumber").text = " 9 "
+        ET.SubElement(first, "Comment").text = " alpha | beta "
+        ET.SubElement(first, "Comment").text = "alpha"
+        ET.SubElement(first, "Comment").text = "gamma"
+        ET.SubElement(first, "Value").text = " 1 "
+        nested = ET.SubElement(
+            first, "Object", {"Type": "Namespace.NestedCommandDataV2"}
+        )
+        ET.SubElement(nested, "Name").text = "nested-x"
+        second = ET.SubElement(root, "Object", {"Type": "Namespace.OtherCommand"})
+        ET.SubElement(second, "Value").text = "2"
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = reader_script._commands(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            native_records = native_acceleration.xscr_command_records(
+                root, reader_script.INTERESTING_FIELDS, ET.Element
+            )
+            self.assertEqual(
+                native_records,
+                [
+                    (
+                        "Namespace.SampleCommandDataV2",
+                        {
+                            "Name": "command-x | nested-x",
+                            "LineNumber": "9",
+                            "Comment": "alpha | beta | gamma",
+                            "Value": "1",
+                        },
+                    ),
+                    (
+                        "Namespace.NestedCommandDataV2",
+                        {"Name": "nested-x"},
+                    ),
+                    ("Namespace.OtherCommand", {"Value": "2"}),
+                ],
+            )
+            with patch.object(
+                reader_script.native_acceleration,
+                "xscr_command_records",
+                wraps=reader_script.native_acceleration.xscr_command_records,
+            ) as native_call:
+                actual = reader_script._commands(root)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual([command["index"] for command in actual], [1, 2, 3])
+        self.assertEqual(actual[0]["type"], "SampleCommand")
+        self.assertEqual(actual[0]["family"], "Other")
+        self.assertEqual(actual[0]["line"], "9")
+        self.assertEqual(actual[0]["fields"]["Comment"], "alpha | beta | gamma")
+        self.assertEqual(actual[1]["type"], "NestedCommand")
+        self.assertEqual(actual[1]["name"], "nested-x")
+        self.assertEqual(
+            list(actual[0]["fields"]), ["Name", "LineNumber", "Comment", "Value"]
+        )
+
+        unicode_root = ET.Element("Root")
+        unicode_command = ET.SubElement(
+            unicode_root, "Object", {"Type": "Namespace.SampleCommand"}
+        )
+        ET.SubElement(unicode_command, "Name").text = "café"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xscr_command_records(
+                    unicode_root, reader_script.INTERESTING_FIELDS, ET.Element
+                )
+            )
+            self.assertEqual(
+                reader_script._commands(unicode_root)[0]["name"], "café"
+            )
+
     def test_native_operator_prompt_element_selection_preserves_document_order(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_elements_by_name"

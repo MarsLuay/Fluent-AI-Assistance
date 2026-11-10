@@ -1180,6 +1180,96 @@ fn xml_all_unique_texts<'py>(
 }
 
 #[pyfunction]
+fn xscr_command_records<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    field_names: Vec<String>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let field_names = field_names.into_iter().collect::<HashSet<_>>();
+    let output = PyList::empty(py);
+    let iterator = root.call_method0("iter")?;
+    for element in iterator.try_iter()? {
+        let element = element?;
+        if !element.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = element.getattr("tag")?;
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        if tag.rsplit('}').next().unwrap_or(tag.as_str()) != "Object" {
+            continue;
+        }
+        let attributes = element.getattr("attrib")?;
+        if !attributes.get_type().is(py.get_type::<PyDict>()) {
+            return Ok(None);
+        }
+        let attributes = attributes.cast::<PyDict>()?;
+        let Some(type_name) = attributes.get_item("Type")? else {
+            continue;
+        };
+        if !type_name.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let type_name = type_name.extract::<String>()?;
+        let mut fields: Vec<(String, String)> = Vec::new();
+        let children = element.call_method0("iter")?;
+        for child in children.try_iter()? {
+            let child = child?;
+            if !child.get_type().is(element_type) {
+                return Ok(None);
+            }
+            let child_tag = child.getattr("tag")?;
+            if !child_tag.get_type().is(py.get_type::<PyString>()) {
+                return Ok(None);
+            }
+            let child_tag = child_tag.extract::<String>()?;
+            let local = child_tag.rsplit('}').next().unwrap_or(child_tag.as_str());
+            if !field_names.contains(local) {
+                continue;
+            }
+            let text = child.getattr("text")?;
+            if text.is_none() {
+                continue;
+            }
+            if !text.get_type().is(py.get_type::<PyString>()) {
+                return Ok(None);
+            }
+            let text = text.extract::<String>()?;
+            if !text.is_ascii() || text.chars().any(|ch| ('\u{1c}'..='\u{1f}').contains(&ch)) {
+                return Ok(None);
+            }
+            let value = text.trim();
+            if value.is_empty() {
+                continue;
+            }
+            if let Some((_, previous)) = fields.iter_mut().find(|(name, _)| name == local) {
+                if !previous.split(" | ").any(|part| part == value) {
+                    previous.push_str(" | ");
+                    previous.push_str(value);
+                }
+            } else {
+                fields.push((local.to_owned(), value.to_owned()));
+            }
+        }
+        let row = PyList::empty(py);
+        row.append(type_name)?;
+        let field_rows = PyList::empty(py);
+        for (name, value) in fields {
+            field_rows.append((name, value))?;
+        }
+        row.append(field_rows)?;
+        output.append(row)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn xml_elements_by_name<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -2742,6 +2832,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_all_unique_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_grouped_texts_excluding, module)?)?;
     module.add_function(wrap_pyfunction!(xml_elements_by_name, module)?)?;
+    module.add_function(wrap_pyfunction!(xscr_command_records, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_dict, module)?)?;
     module.add_function(wrap_pyfunction!(render_object_report, module)?)?;

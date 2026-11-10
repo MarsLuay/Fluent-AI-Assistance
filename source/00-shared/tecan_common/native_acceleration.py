@@ -1393,6 +1393,50 @@ def catalog_content_fingerprints(
         return None
 
 
+def xscr_command_records(
+    root: Any, field_names: Any, element_type: Any
+) -> list[tuple[str, dict[str, str]]] | None:
+    """Extract supported XSCR command type and ordered interesting fields."""
+    if (
+        not enabled()
+        or type(root) is not element_type
+        or type(field_names) not in (set, frozenset, list, tuple)
+        or not all(type(name) is str for name in field_names)
+    ):
+        return None
+    try:
+        result = _native.xscr_command_records(root, list(field_names), element_type)
+        if type(result) is not list:
+            return None
+        records: list[tuple[str, dict[str, str]]] = []
+        for row in result:
+            if type(row) is not list or len(row) != 2 or type(row[0]) is not str:
+                return None
+            if type(row[1]) is not list:
+                return None
+            fields: dict[str, str] = {}
+            for pair in row[1]:
+                if (
+                    type(pair) is not tuple
+                    or len(pair) != 2
+                    or type(pair[0]) is not str
+                    or type(pair[1]) is not str
+                ):
+                    return None
+                fields[pair[0]] = pair[1]
+            records.append((row[0], fields))
+        return records
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xscr_object_fields(root: Any) -> dict[Any, dict[str, dict[str, Any]]] | None:
     """Index bounded XSCR Object fields without changing Python IR conversion."""
     if not enabled():
