@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import random
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -213,6 +214,54 @@ class NativeAccelerationTests(unittest.TestCase):
                         native_acceleration.canonical_json(custom_value)
                     )
                     self.assertEqual(fast_json_dumps(custom_value), expected)
+
+    def test_native_canonical_json_randomized_builtin_parity(self) -> None:
+        if not native_acceleration.available():
+            self.skipTest("optional Rust extension is not built")
+        generator = random.Random(20260312)
+        scalars = [
+            None,
+            True,
+            False,
+            -5,
+            0,
+            2**40,
+            -3.5,
+            -0.5,
+            0.0,
+            0.125,
+            12.5,
+            "",
+            "plain",
+            "μ",
+            "𝄞",
+            "quote\"slash\\newline\n",
+            "control\x01",
+        ]
+        keys = ["", "a", "z", "é", "𝄞", "line\nbreak", "quote\""]
+
+        def make_value(depth: int):
+            if depth == 0 or generator.randrange(4) == 0:
+                return generator.choice(scalars)
+            kind = generator.randrange(3)
+            if kind == 0:
+                return [make_value(depth - 1) for _ in range(generator.randrange(4))]
+            if kind == 1:
+                return tuple(
+                    make_value(depth - 1) for _ in range(generator.randrange(4))
+                )
+            return {
+                generator.choice(keys): make_value(depth - 1)
+                for _ in range(generator.randrange(4))
+            }
+
+        for case in range(80):
+            value = make_value(4)
+            with self.subTest(case=case):
+                expected = json.dumps(value, ensure_ascii=False, sort_keys=True)
+                actual = native_acceleration.canonical_json(value)
+                self.assertIsNotNone(actual)
+                self.assertEqual(actual, expected)
 
     def test_catalog_path_and_fingerprint_parity(self) -> None:
         if not native_acceleration.available():
