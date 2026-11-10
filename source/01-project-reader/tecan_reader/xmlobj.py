@@ -6,7 +6,10 @@ from pathlib import Path
 from typing import Any
 import re
 
-from tecan_common.native_acceleration import xml_kind_from_suffix as _native_xml_kind_from_suffix
+from tecan_common.native_acceleration import (
+    pin_reference_candidates as _native_pin_reference_candidates,
+    xml_kind_from_suffix as _native_xml_kind_from_suffix,
+)
 from tecan_common.xml_helpers import first_text, local_name, texts_by_name
 
 from .common import parse_xml_text, read_text
@@ -112,6 +115,9 @@ def _kind_from_suffix(suffix: str) -> str:
 
 
 def _pin_refs(text: str) -> list[str]:
+    native = _native_pin_reference_candidates([text])
+    if native is not None:
+        return native
     refs = set(
         re.findall(
             r"\b(?:GIO\d+_Pin\d+|Worktable_[A-Za-z0-9_]*Pin[A-Za-z0-9_]*|WorktablePin_[A-Za-z0-9_]+)\b",

@@ -898,6 +898,31 @@ class ReaderTests(unittest.TestCase):
             )
             self.assertEqual(reader_script._pin_refs(unicode_values), unicode_expected)
 
+    def test_xml_object_pin_reference_filter_uses_rust_with_unicode_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "pin_reference_candidates"
+        ):
+            self.skipTest("optional Rust pin-reference filter is not built")
+        text = "GIO1_Pin2 Worktable_Pin Worktable_xPin_3 GIO1_Pin2"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = reader_xmlobj._pin_refs(text)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                reader_xmlobj,
+                "_native_pin_reference_candidates",
+                wraps=native_acceleration.pin_reference_candidates,
+            ) as native_call:
+                actual = reader_xmlobj._pin_refs(text)
+                native_call.assert_called_once_with([text])
+        self.assertEqual(actual, expected)
+
+        unicode_text = "éGIO1_Pin2 GIO3_Pin4"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unicode_expected = reader_xmlobj._pin_refs(unicode_text)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.pin_reference_candidates([unicode_text]))
+            self.assertEqual(reader_xmlobj._pin_refs(unicode_text), unicode_expected)
+
     def test_native_asset_reference_suffix_filter_matches_python_regex(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "asset_reference_candidates"
