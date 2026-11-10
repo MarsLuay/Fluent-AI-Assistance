@@ -11,6 +11,7 @@ from tecan_common.xml_compat import ET
 from tecan_common.xml_helpers import (
     all_text_values,
     child_text,
+    elements_by_name,
     first_attribute,
     first_text,
     grouped_texts_excluding,
@@ -354,10 +355,9 @@ def _startup_variables(root: ET.Element) -> list[dict[str, Any]]:
 
 def _operator_prompts(root: ET.Element) -> list[dict[str, Any]]:
     prompts: list[dict[str, Any]] = []
-    for element in root.iter():
+    statement_names = {"RUPVariableStatement", "RUPWorktableStatement", "RUPStandardStatement"}
+    for element in elements_by_name(root, statement_names):
         statement_name = local_name(element.tag)
-        if statement_name not in {"RUPVariableStatement", "RUPWorktableStatement", "RUPStandardStatement"}:
-            continue
         prompt = {
             "kind": statement_name,
             "title": first_text(element, "RUPScreenTitle"),

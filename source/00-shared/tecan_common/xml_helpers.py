@@ -9,6 +9,7 @@ from . import xml_compat as ET
 from .native_acceleration import (
     xml_all_unique_texts as _native_xml_all_unique_texts,
     xml_clean_text as _native_xml_clean_text,
+    xml_elements_by_name as _native_xml_elements_by_name,
     xml_find_attribute as _native_xml_find_attribute,
     xml_find_text as _native_xml_find_text,
     xml_grouped_texts_excluding as _native_xml_grouped_texts_excluding,
@@ -23,6 +24,7 @@ __all__ = [
     "all_text_values",
     "child_text",
     "direct_child_text",
+    "elements_by_name",
     "first_attribute",
     "first_text",
     "grouped_texts_excluding",
@@ -47,6 +49,15 @@ def _clean_text(value: Any) -> str:
     if native is not None:
         return native
     return str(value or "").strip()
+
+
+def elements_by_name(root: ET.Element, names: Iterable[str]) -> list[ET.Element]:
+    """Return matching elements in document order using local tag names."""
+    wanted = set(names)
+    native = _native_xml_elements_by_name(root, wanted, ET.Element)
+    if native is not None:
+        return native
+    return [element for element in root.iter() if local_name(element.tag) in wanted]
 
 
 def first_attribute(

@@ -186,6 +186,33 @@ def xml_all_unique_texts(root: Any, element_type: Any) -> list[str] | None:
         return None
 
 
+def xml_elements_by_name(
+    root: Any, names: Any, element_type: Any
+) -> list[Any] | None:
+    """Select standard XML elements with matching namespace-free names."""
+    if (
+        not enabled()
+        or type(root) is not element_type
+        or type(names) not in (set, frozenset, list, tuple)
+        or not all(type(name) is str for name in names)
+    ):
+        return None
+    try:
+        result = _native.xml_elements_by_name(root, list(names), element_type)
+        if type(result) is list and all(type(element) is element_type for element in result):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_grouped_texts_excluding(
     root: Any, excluded_names: Any, limit: Any, element_type: Any
 ) -> list[tuple[str, list[str]]] | None:

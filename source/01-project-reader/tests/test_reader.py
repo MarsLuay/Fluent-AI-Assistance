@@ -785,6 +785,73 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(actual[0]["object_subfolder_path"], actual[0]["object_path"])
         self.assertEqual(actual[1]["type_id"], "type-y")
 
+    def test_native_operator_prompt_element_selection_preserves_document_order(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML element selector is not built")
+        root = ET.Element("Root")
+        first = ET.SubElement(root, "{urn:test}RUPVariableStatement")
+        ET.SubElement(first, "RUPScreenTitle").text = " title-1 "
+        ET.SubElement(first, "LineNumber").text = "11"
+        variable = ET.SubElement(first, "RupVariableItem")
+        ET.SubElement(variable, "VariableName").text = "variable-x"
+        ET.SubElement(variable, "DisplayText").text = "display-x"
+        second = ET.SubElement(root, "RUPStandardStatement")
+        ET.SubElement(second, "Instructions").text = " instructions-2 "
+        ET.SubElement(root, "RUPWorktableStatement")
+        ET.SubElement(root, "RUPVariableStatement").text = ""
+        fifth = ET.SubElement(root, "RUPStandardStatement")
+        ET.SubElement(fifth, "RUPScreenTitle").text = "title-5"
+        wanted = {
+            "RUPVariableStatement",
+            "RUPWorktableStatement",
+            "RUPStandardStatement",
+        }
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = reader_script._operator_prompts(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            elements = native_acceleration.xml_elements_by_name(root, wanted, ET.Element)
+            self.assertIsNotNone(elements)
+            self.assertEqual(
+                [xml_helpers.local_name(element.tag) for element in elements or []],
+                [
+                    "RUPVariableStatement",
+                    "RUPStandardStatement",
+                    "RUPWorktableStatement",
+                    "RUPVariableStatement",
+                    "RUPStandardStatement",
+                ],
+            )
+            with patch.object(
+                xml_helpers,
+                "_native_xml_elements_by_name",
+                wraps=xml_helpers._native_xml_elements_by_name,
+            ) as native_call:
+                actual = reader_script._operator_prompts(root)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual([prompt["kind"] for prompt in actual], ["RUPVariableStatement", "RUPStandardStatement", "RUPStandardStatement"])
+        self.assertEqual(actual[0]["variables"][0]["name"], "variable-x")
+        self.assertEqual(actual[1]["instructions"], "instructions-2")
+        self.assertEqual(actual[2]["title"], "title-5")
+
+        comment_root = ET.Element("Root")
+        comment_root.append(ET.Comment("comment"))
+        comment_prompt = ET.SubElement(comment_root, "RUPStandardStatement")
+        ET.SubElement(comment_prompt, "Instructions").text = "after-comment"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_name(
+                    comment_root, {"RUPStandardStatement"}, ET.Element
+                )
+            )
+            self.assertEqual(
+                reader_script._operator_prompts(comment_root)[0]["instructions"],
+                "after-comment",
+            )
+
     def test_native_unknown_xscr_fields_match_python_grouping_and_limits(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_grouped_texts_excluding"
