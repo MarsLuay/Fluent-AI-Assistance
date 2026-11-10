@@ -205,6 +205,35 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             ]
         self.assertEqual(generated_actual, generated_expected)
 
+    def test_geometry_local_names_use_native_with_python_type_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_tag_local_name"
+        ):
+            self.skipTest("optional Rust XML local-name helper is not built")
+        tags = ["Plain", "{urn:example}Tag", "{first}second}Tag", "東京"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [worktable_geometry._local_name(tag) for tag in tags]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_local_name",
+                wraps=native_acceleration.xml_local_name,
+            ) as native_call:
+                actual = [worktable_geometry._local_name(tag) for tag in tags]
+                self.assertEqual(native_call.call_count, len(tags))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["Plain", "Tag", "Tag", "東京"])
+
+        class CustomTag(str):
+            def rsplit(self, separator, maxsplit=-1):
+                return ["custom-local-name"]
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                worktable_geometry._local_name(CustomTag("prefix}tag")),
+                "custom-local-name",
+            )
+
     def test_geometry_xml_text_trimming_uses_native_with_unsupported_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_clean_text"

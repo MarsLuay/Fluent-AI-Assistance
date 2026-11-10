@@ -1125,6 +1125,9 @@ def _parse_xml(path: Path, *, max_xml_bytes: int = 4 * 1024 * 1024) -> ET.Elemen
 
 
 def _local_name(tag: str) -> str:
+    native = native_acceleration.xml_local_name(tag)
+    if native is not None:
+        return native
     return tag.rsplit("}", 1)[-1] if "}" in tag else tag
 
 
