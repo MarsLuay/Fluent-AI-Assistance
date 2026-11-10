@@ -1637,6 +1637,17 @@ def is_guid_text(value: Any) -> bool | None:
         return None
 
 
+def format_site_path(value: Any) -> str | None:
+    """Format a bounded tuple of supported indexes; unsupported values use Python."""
+    if not enabled() or type(value) is not tuple:
+        return None
+    try:
+        result = _native.format_site_path(value)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def parse_i64_text(value: Any) -> int | None:
     """Parse signed ASCII i64 text, leaving broader Python integer forms to fallback."""
     if not enabled() or type(value) is not str or not value.isascii():

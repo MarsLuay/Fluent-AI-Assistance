@@ -1427,6 +1427,31 @@ fn is_guid_text(value: &str) -> bool {
 }
 
 #[pyfunction]
+fn format_site_path<'py>(py: Python<'py>, path: &Bound<'py, PyAny>) -> PyResult<Option<String>> {
+    if !path.get_type().is(py.get_type::<PyTuple>()) {
+        return Ok(None);
+    }
+    let path = path.cast::<PyTuple>()?;
+    if path.len() > 256 {
+        return Ok(None);
+    }
+    let mut labels = Vec::with_capacity(path.len());
+    for index in path.iter() {
+        if !index.get_type().is(py.get_type::<PyInt>()) {
+            return Ok(None);
+        }
+        let Ok(index) = index.extract::<i64>() else {
+            return Ok(None);
+        };
+        let Some(label) = index.checked_add(1) else {
+            return Ok(None);
+        };
+        labels.push(label.to_string());
+    }
+    Ok(Some(labels.join(".")))
+}
+
+#[pyfunction]
 fn parse_i64_text<'py>(py: Python<'py>, text: &Bound<'py, PyAny>) -> PyResult<Option<i64>> {
     if !text.get_type().is(py.get_type::<PyString>()) {
         return Ok(None);
@@ -4069,6 +4094,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(sorted_unique_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
     module.add_function(wrap_pyfunction!(is_guid_text, module)?)?;
+    module.add_function(wrap_pyfunction!(format_site_path, module)?)?;
     module.add_function(wrap_pyfunction!(parse_i64_text, module)?)?;
     module.add_function(wrap_pyfunction!(parse_f64_decimal_text, module)?)?;
     module.add_function(wrap_pyfunction!(

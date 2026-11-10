@@ -388,6 +388,50 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             self.assertIsNone(native_acceleration.is_guid_text(CustomGuid(guid)))
             self.assertTrue(worktable_geometry._looks_like_guid(CustomGuid(guid)))
 
+    def test_position_label_uses_native_for_bounded_integer_paths(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "format_site_path"
+        ):
+            self.skipTest("optional Rust site-path formatter is not built")
+
+        class CustomIndex(int):
+            def __add__(self, other):
+                return 41
+
+        class CustomPath(tuple):
+            pass
+
+        paths = [
+            (),
+            (0,),
+            (0, 2, -1),
+            (2**63 - 1,),
+            (2**63,),
+            (True,),
+            (CustomIndex(3),),
+            CustomPath((1, 2)),
+            [0, 2],
+            tuple(range(257)),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [worktable_geometry._position_label({}, path) for path in paths]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "format_site_path",
+                wraps=native_acceleration.format_site_path,
+            ) as native_call:
+                actual = [worktable_geometry._position_label({}, path) for path in paths]
+                self.assertEqual(native_call.call_count, len(paths))
+            self.assertEqual(native_acceleration.format_site_path(()), "")
+            self.assertEqual(native_acceleration.format_site_path((0, 2, -1)), "1.3.0")
+            self.assertIsNone(native_acceleration.format_site_path((2**63 - 1,)))
+            self.assertIsNone(native_acceleration.format_site_path((True,)))
+            self.assertIsNone(native_acceleration.format_site_path(tuple(range(257))))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual[:3], ["", "1", "1.3.0"])
+        self.assertEqual(actual[5:8], ["2", "41", "2.3"])
+
     def test_geometry_direct_children_use_native_selection_with_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_direct_elements_by_name"

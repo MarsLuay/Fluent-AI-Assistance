@@ -1434,6 +1434,9 @@ def _position_label(connector: dict[str, Any], site_path: tuple[int, ...]) -> st
     position = connector.get("position_in_parent_mm") or {}
     if isinstance(position, dict) and position:
         return _format_vec(position)
+    native = native_acceleration.format_site_path(site_path)
+    if native is not None:
+        return native
     return ".".join(str(index + 1) for index in site_path) if site_path else ""
 
 
