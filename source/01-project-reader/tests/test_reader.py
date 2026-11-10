@@ -741,7 +741,7 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, ("", "  v1  ", "missing", "comment-safe"))
 
-    def test_native_xml_records_by_name_matches_python_first_text_traversal(self) -> None:
+    def test_native_xml_records_by_name_matches_python_first_text_traversal_for_unicode(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_records_by_name"
         ):
@@ -808,15 +808,68 @@ class ReaderTests(unittest.TestCase):
             )
         unicode_root = ET.Element("Root")
         unicode_prompt = ET.SubElement(unicode_root, "QueryVariableStatement")
-        ET.SubElement(unicode_prompt, "QueryPrompt").text = "café"
+        ET.SubElement(unicode_prompt, "QueryPrompt").text = "\u00a0café\u2003"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unicode_expected = reader_script._query_prompts(unicode_root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_records_by_name(
+                    unicode_root, "QueryVariableStatement", ("QueryPrompt",), ET.Element
+                ),
+                [["café"]],
+            )
+            self.assertEqual(
+                reader_script._query_prompts(unicode_root), unicode_expected
+            )
+            self.assertEqual(unicode_expected[0]["prompt"], "café")
+
+        grouped_unicode_root = ET.Element("Root")
+        for value in ("éclair", "東京"):
+            record = ET.SubElement(grouped_unicode_root, "Récòrd")
+            ET.SubElement(record, "Fïeld").text = f"\u00a0{value}\u2003"
+        whitespace_chars = [
+            chr(codepoint)
+            for codepoint in range(0x110000)
+            if chr(codepoint).isspace()
+        ]
+        expected_rows = [["éclair"], ["東京"]]
+        for index, character in enumerate(whitespace_chars):
+            record = ET.SubElement(grouped_unicode_root, "Récòrd")
+            ET.SubElement(record, "Fïeld").text = (
+                f"{character}value-{index}{character}"
+            )
+            expected_rows.append([f"value-{index}"])
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            python_rows = xml_helpers.records_by_name(
+                grouped_unicode_root, "Récòrd", ("Fïeld",), direct=True
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_records_by_name(
+                    grouped_unicode_root,
+                    "Récòrd",
+                    ("Fïeld",),
+                    ET.Element,
+                    direct=True,
+                ),
+                python_rows,
+            )
+            self.assertEqual(python_rows, expected_rows)
+
+        surrogate_root = ET.Element("Root")
+        surrogate_record = ET.SubElement(surrogate_root, "QueryVariableStatement")
+        ET.SubElement(surrogate_record, "QueryPrompt").text = chr(0xD800)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(
                 native_acceleration.xml_records_by_name(
-                    unicode_root, "QueryVariableStatement", ("QueryPrompt",), ET.Element
+                    surrogate_root,
+                    "QueryVariableStatement",
+                    ("QueryPrompt",),
+                    ET.Element,
                 )
             )
             self.assertEqual(
-                reader_script._query_prompts(unicode_root)[0]["prompt"], "café"
+                reader_script._query_prompts(surrogate_root)[0]["prompt"], chr(0xD800)
             )
 
     def test_native_xml_direct_records_match_reference_extraction(self) -> None:

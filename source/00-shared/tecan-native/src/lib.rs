@@ -1979,10 +1979,7 @@ fn xml_records_by_name<'py>(
                     return Ok(None);
                 }
                 let text = text.extract::<String>()?;
-                if !text.is_ascii() || text.chars().any(|ch| ('\u{1c}'..='\u{1f}').contains(&ch)) {
-                    return Ok(None);
-                }
-                let cleaned = text.trim();
+                let cleaned = trim_python_whitespace(&text);
                 if !cleaned.is_empty() {
                     value = cleaned.to_owned();
                     break;
