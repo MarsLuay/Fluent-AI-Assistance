@@ -1602,6 +1602,16 @@ fn is_guid_text(value: &str) -> bool {
 }
 
 #[pyfunction]
+fn non_guid_text(value: &str, zero_guid: &str) -> String {
+    let value = trim_python_whitespace(value);
+    if value.is_empty() || value == zero_guid || is_ascii_guid(value) {
+        String::new()
+    } else {
+        value.to_owned()
+    }
+}
+
+#[pyfunction]
 fn format_site_path<'py>(py: Python<'py>, path: &Bound<'py, PyAny>) -> PyResult<Option<String>> {
     if !path.get_type().is(py.get_type::<PyTuple>()) {
         return Ok(None);
@@ -5286,6 +5296,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(ascii_word_boundary_contains, module)?)?;
     module.add_function(wrap_pyfunction!(label_base_ascii_text, module)?)?;
     module.add_function(wrap_pyfunction!(is_guid_text, module)?)?;
+    module.add_function(wrap_pyfunction!(non_guid_text, module)?)?;
     module.add_function(wrap_pyfunction!(format_site_path, module)?)?;
     module.add_function(wrap_pyfunction!(site_index_sort_key, module)?)?;
     module.add_function(wrap_pyfunction!(parse_i64_text, module)?)?;

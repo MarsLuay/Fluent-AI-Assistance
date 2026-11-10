@@ -704,11 +704,11 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             self.assertIsNone(native_acceleration.is_guid_text(CustomGuid(guid)))
             self.assertTrue(worktable_geometry._looks_like_guid(CustomGuid(guid)))
 
-    def test_non_guid_uses_native_whitespace_normalizer_and_guid_match(self):
+    def test_non_guid_uses_native_combined_filter_with_python_fallback(self):
         if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "xml_clean_text"
+            native_acceleration._native, "non_guid_text"
         ):
-            self.skipTest("optional Rust XML text trimmer is not built")
+            self.skipTest("optional Rust identifier filter is not built")
 
         class CountedText:
             def __init__(self):
@@ -742,11 +742,17 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
-                "xml_clean_text",
-                wraps=native_acceleration.xml_clean_text,
-            ) as native_call:
-                actual = [worktable_geometry._non_guid(value) for value in values]
-                self.assertEqual(native_call.call_count, len(values))
+                "non_guid_text",
+                wraps=native_acceleration.non_guid_text,
+            ) as native_filter_call:
+                with patch.object(
+                    native_acceleration,
+                    "xml_clean_text",
+                    wraps=native_acceleration.xml_clean_text,
+                ) as native_trim_call:
+                    actual = [worktable_geometry._non_guid(value) for value in values]
+                    self.assertEqual(native_filter_call.call_count, len(values))
+                    self.assertEqual(native_trim_call.call_count, 1)
         self.assertEqual(counted.calls, 1)
         self.assertEqual(actual, expected)
         self.assertEqual(

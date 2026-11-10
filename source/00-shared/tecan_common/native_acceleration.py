@@ -2053,6 +2053,21 @@ def is_guid_text(value: Any) -> bool | None:
         return None
 
 
+def non_guid_text(value: Any, zero_guid: Any) -> str | None:
+    """Trim identifier text and drop empty, zero-GUID, or GUID-only values."""
+    if (
+        not enabled()
+        or type(value) is not str
+        or type(zero_guid) is not str
+    ):
+        return None
+    try:
+        result = _native.non_guid_text(value, zero_guid)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def format_site_path(value: Any) -> str | None:
     """Format a bounded tuple of supported indexes; unsupported values use Python."""
     if not enabled() or type(value) is not tuple:
