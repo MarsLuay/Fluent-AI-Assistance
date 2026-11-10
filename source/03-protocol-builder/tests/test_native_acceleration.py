@@ -98,11 +98,19 @@ class NativeAccelerationTests(unittest.TestCase):
             "<Object><AvailableID/><Nested><AvailableID> identifier </AvailableID>"
             "</Nested><AvailableID>later</AvailableID></Object>"
         )
+        diti = ET.fromstring(
+            "<Object><DitiType><AvailableID/><Nested><AvailableID> diti-id </AvailableID>"
+            "</Nested><AvailableID>later</AvailableID></DitiType>"
+            "<Object><DitiType><AvailableID>skip</AvailableID></DitiType></Object></Object>"
+        )
+        diti_type = diti.find("DitiType")
+        diti_type.insert(0, ET.Comment("preserve fallback"))
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             expected = (
                 xscr_parser._parse_move_axis_command(move),
                 xscr_parser._parse_end_script(end),
                 xscr_parser._extract_nested_available_id(available_id),
+                xscr_parser._extract_diti_type_available_id(diti),
             )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
@@ -114,11 +122,13 @@ class NativeAccelerationTests(unittest.TestCase):
                     xscr_parser._parse_move_axis_command(move),
                     xscr_parser._parse_end_script(end),
                     xscr_parser._extract_nested_available_id(available_id),
+                    xscr_parser._extract_diti_type_available_id(diti),
                 )
                 for root, names in (
                     (move, {"ChargeCondition"}),
                     (end, {"ScriptExecutionResult"}),
                     (available_id, {"AvailableID"}),
+                    (diti_type, {"AvailableID"}),
                 ):
                     self.assertTrue(
                         any(
@@ -131,6 +141,7 @@ class NativeAccelerationTests(unittest.TestCase):
         self.assertEqual(actual[0].charge_condition, "ready")
         self.assertEqual(actual[1].return_code, "exit")
         self.assertEqual(actual[2], "identifier")
+        self.assertEqual(actual[3], "diti-id")
 
     def test_native_pattern_window_order_and_confidence(self) -> None:
         if not native_acceleration.available():

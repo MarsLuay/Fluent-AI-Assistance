@@ -1019,8 +1019,8 @@ def _extract_diti_type_available_id(obj: ET.Element) -> Optional[str]:
     for elem in _walk_skipping_objects(obj):
         if not isinstance(elem.tag, str) or _local(elem.tag) != "DitiType":
             continue
-        for child in elem.iter():
-            if isinstance(child.tag, str) and _local(child.tag) == "AvailableID" and child.text:
+        for child in _findall(elem, "AvailableID"):
+            if child.text:
                 return child.text.strip()
     return None
 
