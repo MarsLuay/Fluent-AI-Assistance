@@ -632,13 +632,22 @@ def _rga_storage_record(node: ET.Element) -> dict[str, Any]:
     site_index = _first_named_text(node, {"siteindex", "slotindex", "positionindex"})
     record.update(
         {
-            "order": int(order) if order.isdigit() else None,
-            "site_index": int(site_index) if site_index.isdigit() else None,
+            "order": _digit_int(order),
+            "site_index": _digit_int(site_index),
             "group_id": _first_named_text(node, {"groupid", "labwaregroupid", "group"}),
             "transfer_site_id": _first_named_text(node, {"transfersiteid", "transfersiteguid", "transfersite"}),
         }
     )
     return _clean(record)
+
+
+def _digit_int(text: str) -> int | None:
+    if not text.isdigit():
+        return None
+    native = native_acceleration.parse_i64_text(text)
+    if native is not None:
+        return native
+    return int(text)
 
 
 def _rga_source_record(node: ET.Element, *, kind: str) -> dict[str, Any]:

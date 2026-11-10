@@ -147,6 +147,37 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [expected_value for _, expected_value in cases])
 
+    def test_rga_storage_indices_use_native_i64_with_digit_fallbacks(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "parse_i64_text"
+        ):
+            self.skipTest("optional Rust integer parser is not built")
+        xml_values = [
+            "<StorageSite><Order>12</Order><SiteIndex>١٣</SiteIndex></StorageSite>",
+            "<StorageSite><Order>-4</Order><SiteIndex>9223372036854775808</SiteIndex></StorageSite>",
+        ]
+
+        def parse(xml: str):
+            element = worktable_geometry.ET.fromstring(xml)
+            return worktable_geometry._rga_storage_record(element)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [parse(xml) for xml in xml_values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "parse_i64_text",
+                wraps=native_acceleration.parse_i64_text,
+            ) as native_call:
+                actual = [parse(xml) for xml in xml_values]
+                self.assertEqual(native_call.call_count, 3)
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual[0]["order"], 12)
+        self.assertEqual(actual[0]["site_index"], 13)
+        self.assertNotIn("order", actual[1])
+        self.assertEqual(actual[1]["site_index"], 9223372036854775808)
+
     def test_leaf_text_traversal_uses_native_with_tree_and_type_fallbacks(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_leaf_texts"
