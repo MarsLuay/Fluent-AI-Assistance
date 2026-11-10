@@ -638,6 +638,16 @@ class WorklistSemanticsTests(unittest.TestCase):
                 with self.assertRaises(UnicodeDecodeError):
                     parse_gwl(path)
 
+            path.write_bytes(b"A;short\n")
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                with self.assertRaises(ValueError) as python_error:
+                    parse_gwl(path)
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                self.assertIsNone(native_acceleration.worklist_read_gwl_records(path, False))
+                with self.assertRaises(ValueError) as native_error:
+                    parse_gwl(path)
+            self.assertEqual(str(native_error.exception), str(python_error.exception))
+
     def test_native_single_gwl_record_parser_matches_python(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "worklist_parse_gwl_records"
