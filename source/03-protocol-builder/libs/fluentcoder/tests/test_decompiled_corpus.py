@@ -1,14 +1,22 @@
 from __future__ import annotations
 
+from collections import Counter
 import os
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
+
+from tecan_common import native_acceleration
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 from fluentcoder.catalog.catalog import index_exists  # noqa: E402
 from fluentcoder.catalog.indexer import build_index, install_path_default  # noqa: E402
+from fluentcoder.decompiler.corpus import (  # noqa: E402
+    CorpusReportData,
+    render_corpus_report_markdown,
+)
 from fluentcoder.decompiler import (  # noqa: E402
     aggregate_unsupported_command_ids,
     count_generic_step_types,
@@ -24,6 +32,47 @@ from fluentcoder.decompiler import (  # noqa: E402
 CORPUS_DIR = REPO_ROOT / "tests" / "fixtures" / "decompiled_corpus"
 _PRODUCTION_XSCR_ENV = os.environ.get("FLUENTCODER_PRODUCTION_XSCR")
 PRODUCTION_XSCR = Path(_PRODUCTION_XSCR_ENV) if _PRODUCTION_XSCR_ENV else None
+
+
+def test_corpus_report_counter_order_uses_rust_with_unicode_fallback() -> None:
+    if not native_acceleration.available() or not hasattr(
+        native_acceleration._native, "most_common_ascii_counts"
+    ):
+        pytest.skip("optional Rust count sorter is not built")
+    unsupported = Counter({f"Command{index:02d}": 1 for index in range(22)})
+    unsupported["Command00"] += 1
+    data = CorpusReportData(
+        xscr_paths=[],
+        summary={"status_counts": {}, "classification_counts": {}},
+        unsupported_totals=unsupported,
+        generic_totals=Counter({"TypeB": 3, "TypeA": 3, "TypeC": 1}),
+        parser_priorities=[],
+        include_ready_to_import=False,
+        ready_to_import_root=None,
+    )
+    with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = render_corpus_report_markdown(data)
+    with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            native_acceleration,
+            "most_common_ascii_counts",
+            wraps=native_acceleration.most_common_ascii_counts,
+        ) as native_call:
+            actual = render_corpus_report_markdown(data)
+            assert native_call.call_count == 2
+    assert actual == expected
+    assert "| 20 | `Command19` | 1 | 0 |" in actual
+    assert "| 21 | `Command20` | 1 | 0 |" not in actual
+    assert actual.index("| 1 | `TypeB` | 3 | 0 |") < actual.index(
+        "| 2 | `TypeA` | 3 | 0 |"
+    )
+
+    unicode_counts = Counter({"é": 2, "a": 2})
+    with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        assert native_acceleration.most_common_ascii_counts(dict(unicode_counts)) is None
+        from fluentcoder.decompiler.corpus import _most_common_counts
+
+        assert _most_common_counts(unicode_counts, 20) == unicode_counts.most_common(20)
 
 
 def _install_present() -> bool:

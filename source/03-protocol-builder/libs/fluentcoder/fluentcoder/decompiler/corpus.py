@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
+from tecan_common import native_acceleration
+
 from ..ir.schema import GenericStep
 from .codegen import emit_python
 from .xscr_parser import parse_xscr
@@ -288,6 +290,13 @@ def suggest_parser_priorities(
     return ranked[:top_n]
 
 
+def _most_common_counts(counter: Counter[str], limit: int) -> list[tuple[str, int]]:
+    native = native_acceleration.most_common_ascii_counts(dict(counter), limit)
+    if native is not None:
+        return list(native.items())
+    return counter.most_common(limit)
+
+
 def render_corpus_report_markdown(data: CorpusReportData) -> str:
     """Render a markdown mining report for unsupported decompiler/simulator gaps."""
     unsupported_protocols = data.unsupported_protocols or {}
@@ -316,7 +325,7 @@ def render_corpus_report_markdown(data: CorpusReportData) -> str:
     )
     if data.unsupported_totals:
         for rank, (command_id, count) in enumerate(
-            data.unsupported_totals.most_common(20),
+            _most_common_counts(data.unsupported_totals, 20),
             start=1,
         ):
             protocol_count = len(unsupported_protocols.get(command_id, set()))
@@ -336,7 +345,9 @@ def render_corpus_report_markdown(data: CorpusReportData) -> str:
         ]
     )
     if data.generic_totals:
-        for rank, (step_type, count) in enumerate(data.generic_totals.most_common(20), start=1):
+        for rank, (step_type, count) in enumerate(
+            _most_common_counts(data.generic_totals, 20), start=1
+        ):
             protocol_count = len(generic_protocols.get(step_type, set()))
             lines.append(f"| {rank} | `{step_type}` | {count} | {protocol_count} |")
     else:
