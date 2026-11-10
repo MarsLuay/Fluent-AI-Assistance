@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 import re
 
+from tecan_common.native_acceleration import xml_kind_from_suffix as _native_xml_kind_from_suffix
 from tecan_common.xml_helpers import first_text, local_name, texts_by_name
 
 from .common import parse_xml_text, read_text
@@ -95,6 +96,9 @@ def _unknown_fields(root: Any) -> dict[str, list[str]]:
 
 
 def _kind_from_suffix(suffix: str) -> str:
+    native = _native_xml_kind_from_suffix(suffix)
+    if native is not None:
+        return native
     suffix = suffix.lower()
     return {
         ".xcmp": "component",

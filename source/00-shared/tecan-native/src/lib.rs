@@ -940,6 +940,29 @@ fn diagnostic_message(message: Option<String>, code: Option<String>) -> String {
 }
 
 #[pyfunction]
+fn xml_kind_from_suffix(suffix: &str) -> Option<String> {
+    if !suffix.is_ascii() {
+        return None;
+    }
+    let normalized = suffix.to_ascii_lowercase();
+    let kind = match normalized.as_str() {
+        ".xcmp" => "component".to_owned(),
+        ".xwsp" => "workspace".to_owned(),
+        ".xlqc" => "liquid_class".to_owned(),
+        ".xlcp" => "liquid_class_map".to_owned(),
+        ".xsit" => "site".to_owned(),
+        ".xcon" => "connector".to_owned(),
+        ".xml" => "xml".to_owned(),
+        _ => normalized.trim_start_matches('.').to_owned(),
+    };
+    Some(if kind.is_empty() {
+        "xml".to_owned()
+    } else {
+        kind
+    })
+}
+
+#[pyfunction]
 fn command_short_name(type_name: &str) -> Option<String> {
     if !type_name.is_ascii() {
         return None;
@@ -1714,6 +1737,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(canonical_json, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_sort_indices, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_message, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_kind_from_suffix, module)?)?;
     module.add_function(wrap_pyfunction!(command_short_name, module)?)?;
     module.add_function(wrap_pyfunction!(compact_list, module)?)?;
     module.add_function(wrap_pyfunction!(extension_counts, module)?)?;

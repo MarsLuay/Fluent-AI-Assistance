@@ -208,6 +208,17 @@ def diagnostic_message(message: Any, code: Any) -> str | None:
         return None
 
 
+def xml_kind_from_suffix(suffix: Any) -> str | None:
+    """Classify supported ASCII XML suffixes natively, or request Python fallback."""
+    if not enabled() or type(suffix) is not str or not suffix.isascii():
+        return None
+    try:
+        result = _native.xml_kind_from_suffix(suffix)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def command_short_name(type_name: Any) -> str | None:
     """Shorten supported ASCII command type names natively, or request fallback."""
     if not enabled() or type(type_name) is not str or not type_name.isascii():

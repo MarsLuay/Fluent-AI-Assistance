@@ -23,6 +23,7 @@ from tecan_reader.common import (
     to_jsonable,
 )
 import tecan_reader.gwl as reader_gwl
+import tecan_reader.xmlobj as reader_xmlobj
 from tecan_reader.gwl import inspect_gwl, inspect_gwl_lines
 from tecan_reader.pattern_library import mine_script_patterns, search_script_patterns, summarize_script_patterns
 import sqlite3
@@ -272,6 +273,47 @@ class ReaderTests(unittest.TestCase):
                 self.assertEqual(compact_list(iter(["alpha", "alpha", "beta"])), ["alpha", "beta"])
                 self.assertEqual(compact_list(["alpha", "beta"], limit=True), ["alpha"])
             self.assertEqual(native_call.call_count, 2)
+
+    def test_native_xml_kind_from_suffix_matches_python_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_kind_from_suffix"
+        ):
+            self.skipTest("optional Rust XML suffix classifier is not built")
+        cases = [
+            (".xcmp", "component"),
+            (".XWSP", "workspace"),
+            (".XLQC", "liquid_class"),
+            (".xlcp", "liquid_class_map"),
+            (".XSIT", "site"),
+            (".XCON", "connector"),
+            (".XML", "xml"),
+            ("", "xml"),
+            (".", "xml"),
+            ("...", "xml"),
+            ("...custom", "custom"),
+            ("catalog", "catalog"),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [reader_xmlobj._kind_from_suffix(suffix) for suffix, _ in cases]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                reader_xmlobj,
+                "_native_xml_kind_from_suffix",
+                wraps=reader_xmlobj._native_xml_kind_from_suffix,
+            ) as native_call:
+                actual = [reader_xmlobj._kind_from_suffix(suffix) for suffix, _ in cases]
+                self.assertEqual(native_call.call_count, len(cases))
+        self.assertEqual(expected, [value for _, value in cases])
+        self.assertEqual(actual, expected)
+
+        class StringSubclass(str):
+            pass
+
+        unicode_suffix = "\u0130"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.xml_kind_from_suffix(unicode_suffix))
+            self.assertEqual(reader_xmlobj._kind_from_suffix(unicode_suffix), "i\u0307")
+            self.assertEqual(reader_xmlobj._kind_from_suffix(StringSubclass(".xcmp")), "component")
 
     def test_native_extension_counts_match_path_suffix_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
