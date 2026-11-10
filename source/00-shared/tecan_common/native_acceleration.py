@@ -230,6 +230,35 @@ def xml_elements_by_name(
         return None
 
 
+def xml_elements_by_folded_name_with_children(
+    root: Any, names: Any, element_type: Any
+) -> list[Any] | None:
+    """Select ASCII local names case-insensitively when they have children."""
+    if (
+        not enabled()
+        or type(root) is not element_type
+        or type(names) not in (set, frozenset, list, tuple)
+        or not all(type(name) is str and name.isascii() for name in names)
+    ):
+        return None
+    try:
+        result = _native.xml_elements_by_folded_name_with_children(
+            root, list(names), element_type
+        )
+        if type(result) is list and all(type(element) is element_type for element in result):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_variable_definition_elements(root: Any, element_type: Any) -> list[Any] | None:
     """Select supported startup-variable XML definitions in document order."""
     if not enabled() or type(root) is not element_type:

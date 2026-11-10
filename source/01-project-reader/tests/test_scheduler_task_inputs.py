@@ -7,6 +7,7 @@ import zipfile
 from unittest.mock import patch
 
 from tecan_common import native_acceleration
+from tecan_common import xml_compat as ET
 import tecan_reader.task_input as task_input
 from tecan_reader import inspect_twl_text
 from tecan_reader.zeia_adapters import ingest_zeia
@@ -73,6 +74,57 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
         self.assertEqual(model.scheduler_tasks[0]["source_metadata"]["unknown_fields"]["VendorField"], ["preserve"])
         self.assertEqual(model.task_inputs[0]["records"][0]["fields"]["TaskName"], "Task A")
         self.assertNotEqual(model.task_inputs[0]["kind"], "worklist")
+
+    def test_twl_record_selection_uses_native_casefold_with_unicode_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_folded_name_with_children"
+        ):
+            self.skipTest("optional Rust XML record selector is not built")
+        source = (
+            '<TaskInput><Task Name="first"><Value>1</Value></Task>'
+            "<taskrecord><TaskName>second</TaskName><Value>2</Value></taskrecord>"
+            "<ITEM><Name>third</Name></ITEM><Input/><Other><Value>ignored</Value>"
+            "</Other></TaskInput>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = inspect_twl_text(source, source_name="Inputs/records.twl")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                task_input,
+                "xml_elements_by_folded_name_with_children",
+                wraps=native_acceleration.xml_elements_by_folded_name_with_children,
+            ) as native_call:
+                actual = inspect_twl_text(source, source_name="Inputs/records.twl")
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["record_count"], 3)
+        self.assertEqual(
+            [record["fields"].get("Name") or record["fields"].get("TaskName") for record in actual["records"]],
+            ["first", "second", "third"],
+        )
+
+        unicode_root = ET.Element("TaskInput")
+        unicode_task = ET.SubElement(unicode_root, "Taſk")
+        ET.SubElement(unicode_task, "Name").text = "unicode"
+        record_names = {"task", "taskrecord", "input", "item", "record"}
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_folded_name_with_children(
+                    unicode_root, record_names, ET.Element
+                )
+            )
+            fallback_nodes = [
+                element
+                for element in unicode_root.iter()
+                if isinstance(element.tag, str)
+                and task_input.local_name(element.tag).casefold() in record_names
+                and list(element)
+            ]
+        self.assertEqual(fallback_nodes, [unicode_task])
+        self.assertEqual(
+            task_input._element_record(unicode_task, index=0)["fields"]["Name"],
+            "unicode",
+        )
 
     def test_twl_xml_whitespace_normalization_uses_native_ascii_and_unicode_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(

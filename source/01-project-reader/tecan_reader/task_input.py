@@ -12,7 +12,11 @@ import io
 from pathlib import Path
 from typing import Any
 
-from tecan_common.native_acceleration import collapse_ascii_whitespace
+from tecan_common import xml_compat as ET
+from tecan_common.native_acceleration import (
+    collapse_ascii_whitespace,
+    xml_elements_by_folded_name_with_children,
+)
 from tecan_common.xml_helpers import local_name
 
 from .common import parse_xml_text, read_text
@@ -42,12 +46,16 @@ def _inspect_xml(text: str, *, source_name: str) -> dict[str, Any]:
     records: list[dict[str, Any]] = []
     unknown_fields: dict[str, list[str]] = {}
     record_names = {"task", "taskrecord", "input", "item", "record"}
-    record_nodes = [
-        element for element in root.iter()
-        if isinstance(element.tag, str)
-        and local_name(element.tag).casefold() in record_names
-        and list(element)
-    ]
+    record_nodes = xml_elements_by_folded_name_with_children(
+        root, record_names, ET.Element
+    )
+    if record_nodes is None:
+        record_nodes = [
+            element for element in root.iter()
+            if isinstance(element.tag, str)
+            and local_name(element.tag).casefold() in record_names
+            and list(element)
+        ]
     if not record_nodes:
         record_nodes = [root]
     for index, element in enumerate(record_nodes):
