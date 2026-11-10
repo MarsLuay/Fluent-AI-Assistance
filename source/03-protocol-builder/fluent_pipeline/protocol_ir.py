@@ -1532,7 +1532,11 @@ def _infer_transfer_roles(ir: dict[str, Any]) -> None:
 
 def _xscr_variable_declarations(root: ET.Element, source_label: str) -> list[dict[str, Any]]:
     variables: list[dict[str, Any]] = []
-    for element in root.iter():
+    native = native_acceleration.xml_elements_by_name(
+        root, {"anyType", "VariableDefinitionHelper"}, ET.Element
+    )
+    elements = native if native is not None else root.iter()
+    for element in elements:
         local = _local_name(element.tag)
         if local == "anyType":
             type_hint = " ".join(str(value) for value in element.attrib.values())

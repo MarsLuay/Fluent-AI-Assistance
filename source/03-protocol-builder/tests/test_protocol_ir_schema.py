@@ -436,6 +436,45 @@ class ProtocolIRSchemaTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [None, None, "value", "value", None, "custom-strip"])
 
+    def test_xscr_variable_declarations_use_native_tag_filter_with_python_fallback(self):
+        from unittest.mock import patch
+
+        from tecan_common import native_acceleration
+        from fluent_pipeline import protocol_ir
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        root = protocol_ir.ET.fromstring(
+            "<Root><Other><Name>ignored</Name></Other>"
+            '<anyType Type="VariableDefinitionHelper"><Name>alpha</Name>'
+            "<TypeName>Integer</TypeName><Scope>Script</Scope>"
+            "<Values><string>3</string></Values></anyType>"
+            '<anyType Type="System.String"><Name>not-a-variable</Name></anyType>'
+            "<VariableDefinitionHelper><Name>beta</Name></VariableDefinitionHelper></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = protocol_ir._xscr_variable_declarations(root, "synthetic.xscr")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = protocol_ir._xscr_variable_declarations(root, "synthetic.xscr")
+                root_scan_calls = [
+                    call
+                    for call in native_call.call_args_list
+                    if call.args[0] is root
+                    and call.args[1] == {"anyType", "VariableDefinitionHelper"}
+                ]
+                self.assertEqual(len(root_scan_calls), 1)
+
+        self.assertEqual(actual, expected)
+        self.assertEqual([item["name"] for item in actual], ["alpha", "beta"])
+        self.assertEqual(actual[0]["default_value"], 3)
+
     def test_validate_document_rejects_missing_fields_and_invalid_operations(self):
         missing = {
             "ir_version": CANONICAL_IR_VERSION,
