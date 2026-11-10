@@ -1809,6 +1809,30 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(report["pipette_examples"][0]["rack_label"], "Source")
         self.assertEqual(report["line_count"], 3)
 
+    def test_inspect_gwl_fallback_uses_native_first_seen_counts(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "first_seen_ascii_string_counts"
+        ):
+            self.skipTest("optional Rust first-seen string counter is not built")
+        lines = [
+            "C;comment;é",
+            "A;Source;;96 Well Flat;1;;20;Water Free Single;;;",
+            "D;Dest;;96 Well Flat;1;;20;Water Free Single;;;",
+            "C;comment;é",
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = inspect_gwl_lines(lines, source_name="sample.gwl")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                reader_gwl,
+                "_native_first_seen_ascii_string_counts",
+                wraps=reader_gwl._native_first_seen_ascii_string_counts,
+            ) as native_counter:
+                actual = inspect_gwl_lines(lines, source_name="sample.gwl")
+                native_counter.assert_called_once_with(["C", "A", "D", "C"])
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["record_counts"], {"C": 2, "A": 1, "D": 1})
+
     def test_inspect_gwl_file_uses_native_utf8_sig_read_with_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "read_utf8_sig_file"

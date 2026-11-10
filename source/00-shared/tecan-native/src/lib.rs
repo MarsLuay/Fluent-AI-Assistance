@@ -1528,6 +1528,50 @@ fn ordered_ascii_string_counts<'py>(
     Ok(Some(output.into_any()))
 }
 
+fn count_ascii_string_values_in_order(values: &[String]) -> Option<Vec<(String, usize)>> {
+    let mut positions: HashMap<&str, usize> = HashMap::new();
+    let mut counts: Vec<(String, usize)> = Vec::new();
+    for value in values {
+        if !value.is_ascii() {
+            return None;
+        }
+        if let Some(index) = positions.get(value.as_str()) {
+            counts[*index].1 += 1;
+        } else {
+            let index = counts.len();
+            positions.insert(value.as_str(), index);
+            counts.push((value.clone(), 1));
+        }
+    }
+    Some(counts)
+}
+
+#[pyfunction]
+fn first_seen_ascii_string_counts<'py>(
+    py: Python<'py>,
+    values: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !values.get_type().is(py.get_type::<PyList>()) {
+        return Ok(None);
+    }
+    let mut strings = Vec::new();
+    for value in values.try_iter()? {
+        let value = value?;
+        if !value.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        strings.push(value.extract::<String>()?);
+    }
+    let Some(counts) = count_ascii_string_values_in_order(&strings) else {
+        return Ok(None);
+    };
+    let output = PyDict::new(py);
+    for (value, count) in counts {
+        output.set_item(value, count)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
 #[pyfunction]
 fn any_ascii_casefold_in(values: Vec<String>, candidates: Vec<String>) -> Option<bool> {
     if values
@@ -3652,6 +3696,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(sort_ascii_string_keys, module)?)?;
     module.add_function(wrap_pyfunction!(any_ascii_casefold_in, module)?)?;
     module.add_function(wrap_pyfunction!(ordered_ascii_string_counts, module)?)?;
+    module.add_function(wrap_pyfunction!(first_seen_ascii_string_counts, module)?)?;
     module.add_function(wrap_pyfunction!(most_common_ascii_counts, module)?)?;
     module.add_function(wrap_pyfunction!(sorted_unique_ascii_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
@@ -3731,6 +3776,16 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn first_seen_ascii_counts_preserve_insertion_order() {
+        let values = vec!["C".into(), "A".into(), "D".into(), "C".into()];
+        assert_eq!(
+            count_ascii_string_values_in_order(&values),
+            Some(vec![("C".into(), 2), ("A".into(), 1), ("D".into(), 1)])
+        );
+        assert_eq!(count_ascii_string_values_in_order(&["é".into()]), None);
+    }
 
     #[test]
     fn markdown_join_preserves_embedded_and_final_newlines() {

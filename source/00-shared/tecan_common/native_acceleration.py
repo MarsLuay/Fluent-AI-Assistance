@@ -1682,6 +1682,25 @@ def most_common_ascii_counts(
         return None
 
 
+def first_seen_ascii_string_counts(values: Any) -> dict[str, int] | None:
+    """Count ASCII strings while preserving first-seen dictionary order."""
+    if (
+        not enabled()
+        or type(values) not in (list, tuple)
+        or not all(type(value) is str and value.isascii() for value in values)
+    ):
+        return None
+    try:
+        result = _native.first_seen_ascii_string_counts(list(values))
+        if type(result) is dict and all(
+            type(key) is str and type(count) is int for key, count in result.items()
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def ordered_ascii_string_counts(values: Any) -> dict[str, int] | None:
     """Count ASCII string values in stable ``Counter.most_common`` order."""
     if (

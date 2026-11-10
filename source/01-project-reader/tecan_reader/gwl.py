@@ -8,6 +8,7 @@ from typing import Any
 
 from tecan_common.gwl import Pipette, parse_gwl_line, parse_gwl_lines
 from tecan_common.native_acceleration import (
+    first_seen_ascii_string_counts as _native_first_seen_ascii_string_counts,
     read_utf8_sig_file as _native_read_utf8_sig_file,
     worklist_inspect_gwl_lines as _native_worklist_inspect_gwl_lines,
 )
@@ -52,12 +53,12 @@ def inspect_gwl_lines(lines: list[str], *, source_name: str) -> dict[str, Any]:
             for line_no, line in enumerate(lines, start=1)
         )
 
-    counts: Counter[str] = Counter()
+    record_types: list[str] = []
     pipette_examples: list[dict[str, str]] = []
     for line_no, _line, record in records_with_lines:
         if record is None:
             continue
-        counts[record.type_character] += 1
+        record_types.append(record.type_character)
         if isinstance(record, Pipette) and len(pipette_examples) < 12:
             pipette_examples.append(
                 {
@@ -70,10 +71,12 @@ def inspect_gwl_lines(lines: list[str], *, source_name: str) -> dict[str, Any]:
                     "liquid_class": str(record.liquid_class),
                 }
             )
+    native_counts = _native_first_seen_ascii_string_counts(record_types)
+    counts = native_counts if native_counts is not None else dict(Counter(record_types))
     return {
         "kind": "gwl",
         "source": source_name,
-        "record_counts": dict(counts),
+        "record_counts": counts,
         "line_count": len(lines),
         "transfer_pairs_estimate": min(counts.get("A", 0), counts.get("D", 0)),
         "pipette_examples": pipette_examples,
