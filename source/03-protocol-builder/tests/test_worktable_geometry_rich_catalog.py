@@ -205,6 +205,40 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             ]
         self.assertEqual(generated_actual, generated_expected)
 
+    def test_geometry_find_uses_native_element_selection_with_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML element selector is not built")
+        root = worktable_geometry.ET.fromstring(
+            '<Root xmlns="urn:test"><Item id="first"/><Group><Item id="second"/></Group></Root>'
+        )
+        names = ["Root", "Item", "Missing"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [worktable_geometry._find(root, name) for name in names]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = [worktable_geometry._find(root, name) for name in names]
+                self.assertEqual(native_call.call_count, len(names))
+        for actual_element, expected_element in zip(actual, expected):
+            self.assertIs(actual_element, expected_element)
+        self.assertEqual(actual[1].attrib["id"], "first")
+        self.assertIsNone(actual[2])
+
+        root_with_comment = worktable_geometry.ET.Element("Root")
+        root_with_comment.append(worktable_geometry.ET.Comment("ignored"))
+        expected_comment_case = worktable_geometry.ET.SubElement(root_with_comment, "Item")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = worktable_geometry._find(root_with_comment, "Item")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual = worktable_geometry._find(root_with_comment, "Item")
+        self.assertIs(actual, expected_comment_case)
+        self.assertIs(actual, expected)
+
     def test_is_nil_uses_native_true_match_without_changing_attribute_policy(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "ascii_casefold_equals"
