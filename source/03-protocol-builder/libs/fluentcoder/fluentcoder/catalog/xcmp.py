@@ -950,11 +950,7 @@ def _walk_workspace_occupancy(
 
 def _collect_location_names(root: ET.Element) -> set[str]:
     out: set[str] = set()
-    for elem in root.iter():
-        if not isinstance(elem.tag, str):
-            continue
-        if _local(elem.tag) != "LocationGroupName":
-            continue
+    for elem in _findall(root, "LocationGroupName"):
         text = _text(elem)
         if text:
             out.add(text)
@@ -963,14 +959,9 @@ def _collect_location_names(root: ET.Element) -> set[str]:
 
 def _collect_labware_names(root: ET.Element) -> set[str]:
     out: set[str] = set()
-    for elem in root.iter():
-        if not isinstance(elem.tag, str):
-            continue
-        if _local(elem.tag) != "LabwareName":
-            continue
-        for child in elem.iter():
-            if isinstance(child.tag, str) and _local(child.tag) == "Value":
-                txt = _text(child)
-                if txt:
-                    out.add(txt)
+    for elem in _findall(root, "LabwareName"):
+        for child in _findall(elem, "Value"):
+            txt = _text(child)
+            if txt:
+                out.add(txt)
     return out

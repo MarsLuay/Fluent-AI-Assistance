@@ -328,6 +328,60 @@ class NativeAccelerationTests(unittest.TestCase):
         self.assertEqual(actual.head, "Fca")
         self.assertEqual(actual.supported_heads, ("Fca", "Mca96"))
 
+    def test_xcmp_catalog_name_scans_use_native_selectors_with_parity(self) -> None:
+        from fluentcoder.catalog import xcmp
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        root = ET.fromstring(
+            '<Root xmlns:ns="urn:test">'
+            "<ns:LocationGroupName> alpha </ns:LocationGroupName>"
+            "<Nested><LocationGroupName>beta</LocationGroupName>"
+            "<LocationGroupName> </LocationGroupName></Nested>"
+            "<LabwareName><ns:Value> example plate </ns:Value>"
+            "<Nested><Value>example rack</Value><Value> </Value></Nested></LabwareName>"
+            "<ns:LabwareName><Value>example tray</Value></ns:LabwareName>"
+            "</Root>"
+        )
+        labware_nodes = [
+            node
+            for node in root.iter()
+            if isinstance(node.tag, str)
+            and node.tag.rsplit("}", 1)[-1] == "LabwareName"
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_locations = xcmp._collect_location_names(root)
+            expected_labware = xcmp._collect_labware_names(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual_locations = xcmp._collect_location_names(root)
+                native_call.assert_called_once_with(
+                    root, {"LocationGroupName"}, ET.Element
+                )
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual_labware = xcmp._collect_labware_names(root)
+                self.assertEqual(native_call.call_count, 1 + len(labware_nodes))
+                native_call.assert_any_call(root, {"LabwareName"}, ET.Element)
+                for node in labware_nodes:
+                    native_call.assert_any_call(node, {"Value"}, ET.Element)
+
+        self.assertEqual(actual_locations, expected_locations)
+        self.assertEqual(actual_labware, expected_labware)
+        self.assertEqual(actual_locations, {"alpha", "beta"})
+        self.assertEqual(
+            actual_labware, {"example plate", "example rack", "example tray"}
+        )
+
     def test_xcon_orientation_rows_use_native_selector_with_python_parity(self) -> None:
         from fluentcoder.catalog import xcon
 
