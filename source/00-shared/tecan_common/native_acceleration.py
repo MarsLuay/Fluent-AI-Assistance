@@ -2724,6 +2724,17 @@ def worklist_parse_bool(value: Any) -> bool | None:
         return None
 
 
+def worklist_normalize_tip_system(value: Any) -> str | None:
+    """Normalize exact ASCII tip-system aliases in Rust; other values fall back."""
+    if not enabled() or type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.worklist_normalize_tip_system(value)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def worklist_row_name_to_index(value: Any) -> int | None:
     """Convert ASCII alphabetic well rows, leaving Unicode/large integers to Python."""
     if not enabled() or type(value) is not str or not value.isascii():

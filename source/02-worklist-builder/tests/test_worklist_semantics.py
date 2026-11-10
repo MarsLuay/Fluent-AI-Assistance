@@ -13,6 +13,7 @@ from tecan_common.worklist_contract import (
     LoadWorklistContract,
     build_execution_contract,
     normalize_load_worklist,
+    _normalize_tip_system as normalize_tip_system,
 )
 from tecan_worklist.cli import main
 from tecan_common.gwl import (
@@ -819,6 +820,46 @@ class WorklistSemanticsTests(unittest.TestCase):
         result = validate_transfers([valid, invalid])
         self.assertFalse(result.ok)
         self.assertTrue(any("tip_mask_not_one_hot" in error for error in result.errors))
+
+    def test_tip_system_alias_normalization_uses_native_for_ascii_and_falls_back(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_normalize_tip_system"
+        ):
+            self.skipTest("optional Rust tip-system normalizer is not built")
+
+        class CustomValue:
+            def __str__(self):
+                return "Fixed Tips"
+
+        values = [
+            "fixed", "fixed_tip", "FIXEDTIPS", " Fixed Tips ", "fixed\ttips",
+            "diti", "disposable_tip", "Disposable Tips", "DISPOSABLE TIP ADAPTER",
+            "unknown", "Fíxed Tips", None, "", CustomValue(),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [normalize_tip_system(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_normalize_tip_system",
+                wraps=native_acceleration.worklist_normalize_tip_system,
+            ) as native_call:
+                actual = [normalize_tip_system(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertIsNone(native_acceleration.worklist_normalize_tip_system("Fíxed Tips"))
+            self.assertEqual(
+                native_acceleration.worklist_normalize_tip_system("  Fixed Tips  "),
+                "fixed_tip",
+            )
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [
+                "fixed_tip", "fixed_tip", "fixed_tip", "fixed_tip", "unknown",
+                "diti", "diti", "diti", "diti", "unknown", "unknown",
+                "unknown", "unknown", "fixed_tip",
+            ],
+        )
 
     def test_load_contract_normalizes_mask_and_preserves_unknown_fields(self):
         contract = normalize_load_worklist(

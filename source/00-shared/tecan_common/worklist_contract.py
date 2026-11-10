@@ -100,6 +100,9 @@ def parse_selected_tip_indexes(
 
 
 def _normalize_tip_system(value: Any) -> str:
+    native = native_acceleration.worklist_normalize_tip_system(value)
+    if native is not None:
+        return native
     normalized = str(value or "").strip().lower().replace(" ", "_")
     if normalized in {"fixed", "fixed_tip", "fixedtips", "fixed_tips"}:
         return "fixed_tip"

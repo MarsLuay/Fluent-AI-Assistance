@@ -4593,6 +4593,31 @@ fn worklist_parse_bool(value: &str) -> Option<bool> {
 }
 
 #[pyfunction]
+fn worklist_normalize_tip_system(value: &str) -> Option<String> {
+    if !value.is_ascii() {
+        return None;
+    }
+    let normalized = trim_python_whitespace(value)
+        .to_ascii_lowercase()
+        .replace(' ', "_");
+    Some(
+        if matches!(
+            normalized.as_str(),
+            "fixed" | "fixed_tip" | "fixedtips" | "fixed_tips"
+        ) {
+            "fixed_tip".to_owned()
+        } else if matches!(
+            normalized.as_str(),
+            "diti" | "disposable_tip" | "disposable_tips" | "disposable_tip_adapter"
+        ) {
+            "diti".to_owned()
+        } else {
+            "unknown".to_owned()
+        },
+    )
+}
+
+#[pyfunction]
 fn worklist_row_name_to_index(value: &str) -> Option<i64> {
     let mut index = 0_i64;
     for byte in value.bytes() {
@@ -5377,6 +5402,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_load_transfers, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_bool, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_row_name_to_index, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_normalize_tip_system, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_well_to_position, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_tip_selection, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_parse_enabled_tip_mask, module)?)?;
