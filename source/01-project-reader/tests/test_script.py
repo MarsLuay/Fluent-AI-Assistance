@@ -59,9 +59,9 @@ class ScriptTests(unittest.TestCase):
             self.assertEqual(report["source"], str(tmp_path))
             self.assertEqual(report["command_count"], 1)
 
-    def test_dependency_string_sorting_uses_rust_with_unicode_fallback(self) -> None:
+    def test_dependency_string_sorting_uses_rust_for_unicode(self) -> None:
         if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "sorted_unique_ascii_strings"
+            native_acceleration._native, "sorted_unique_strings"
         ):
             self.skipTest("optional Rust string sorter is not built")
         groups = (["zeta", "alpha", "zeta"], ["Alpha", "beta", "alpha"])
@@ -70,22 +70,31 @@ class ScriptTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
-                "sorted_unique_ascii_strings",
-                wraps=native_acceleration.sorted_unique_ascii_strings,
+                "sorted_unique_strings",
+                wraps=native_acceleration.sorted_unique_strings,
             ) as native_call:
                 actual_values = script._sorted_unique_strings(*groups)
                 native_call.assert_called_once_with(groups)
         self.assertEqual(actual_values, expected_values)
         self.assertEqual(actual_values, ["Alpha", "alpha", "beta", "zeta"])
 
-        unicode_groups = (["éclair", "alpha"], ["café"])
+        unicode_groups = (
+            ["éclair", "alpha", "😀", "Å", "e\u0301", "éclair"],
+            ["café", "ß", "Ω", "a"],
+        )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            self.assertIsNone(
-                native_acceleration.sorted_unique_ascii_strings(unicode_groups)
+            expected_unicode = sorted(
+                {value for group in unicode_groups for value in group}
             )
             self.assertEqual(
-                script._sorted_unique_strings(*unicode_groups),
-                sorted({value for group in unicode_groups for value in group}),
+                native_acceleration.sorted_unique_strings(unicode_groups),
+                expected_unicode,
+            )
+            self.assertEqual(
+                script._sorted_unique_strings(*unicode_groups), expected_unicode
+            )
+            self.assertIsNone(
+                native_acceleration.sorted_unique_strings(([chr(0xD800)],))
             )
 
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
@@ -93,8 +102,8 @@ class ScriptTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
-                "sorted_unique_ascii_strings",
-                wraps=native_acceleration.sorted_unique_ascii_strings,
+                "sorted_unique_strings",
+                wraps=native_acceleration.sorted_unique_strings,
             ) as native_call:
                 actual_report = inspect_xscr_text(SAMPLE_XSCR, source_name="deps.xscr")
                 self.assertGreater(native_call.call_count, 0)

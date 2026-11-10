@@ -1495,7 +1495,7 @@ fn ascii_case_insensitive_substring_match_groups_py<'py>(
 }
 
 #[pyfunction]
-fn sorted_unique_ascii_strings<'py>(
+fn sorted_unique_strings<'py>(
     py: Python<'py>,
     groups: &Bound<'py, PyAny>,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -1514,9 +1514,6 @@ fn sorted_unique_ascii_strings<'py>(
                 return Ok(None);
             }
             let value = value.extract::<String>()?;
-            if !value.is_ascii() {
-                return Ok(None);
-            }
             values.insert(value);
         }
     }
@@ -3724,7 +3721,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(any_ascii_casefold_in, module)?)?;
     module.add_function(wrap_pyfunction!(ordered_ascii_string_counts, module)?)?;
     module.add_function(wrap_pyfunction!(most_common_ascii_counts, module)?)?;
-    module.add_function(wrap_pyfunction!(sorted_unique_ascii_strings, module)?)?;
+    module.add_function(wrap_pyfunction!(sorted_unique_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
     module.add_function(wrap_pyfunction!(
         ascii_case_insensitive_substring_match_groups_py,

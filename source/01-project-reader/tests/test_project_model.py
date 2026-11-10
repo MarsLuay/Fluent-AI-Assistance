@@ -22,7 +22,7 @@ class ProjectModelTests(unittest.TestCase):
     def test_completeness_count_keys_use_native_sort_for_unicode(self) -> None:
         if not native_acceleration.available() or not all(
             hasattr(native_acceleration._native, name)
-            for name in ("sort_string_keys", "sorted_unique_ascii_strings")
+            for name in ("sort_string_keys", "sorted_unique_strings")
         ):
             self.skipTest("optional Rust mapping sorter is not built")
         arguments = {
@@ -44,8 +44,8 @@ class ProjectModelTests(unittest.TestCase):
                 self.assertEqual(native_call.call_count, 2)
             with patch.object(
                 project_model,
-                "_native_sorted_unique_ascii_strings",
-                wraps=native_acceleration.sorted_unique_ascii_strings,
+                "_native_sorted_unique_strings",
+                wraps=native_acceleration.sorted_unique_strings,
             ) as unique_call:
                 actual = build_completeness_metadata(**arguments)
                 unique_call.assert_called_once()
@@ -67,8 +67,9 @@ class ProjectModelTests(unittest.TestCase):
             )
             self.assertIsNotNone(native_sorted)
             self.assertEqual(list(native_sorted), ["a", "é"])
-            self.assertIsNone(
-                native_acceleration.sorted_unique_ascii_strings([["é", "a", "é"]])
+            self.assertEqual(
+                native_acceleration.sorted_unique_strings([["é", "a", "é"]]),
+                ["a", "é"],
             )
             unicode_result = build_completeness_metadata(**unicode_arguments)
             self.assertEqual(

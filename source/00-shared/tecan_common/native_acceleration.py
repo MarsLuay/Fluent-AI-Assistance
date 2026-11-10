@@ -1660,20 +1660,20 @@ def unique_ascii_tuple_indices(rows: Any) -> list[int] | None:
         return None
 
 
-def sorted_unique_ascii_strings(groups: Any) -> list[str] | None:
-    """Sort and deduplicate ASCII strings across exact built-in groups."""
+def sorted_unique_strings(groups: Any) -> list[str] | None:
+    """Sort and deduplicate exact built-in Unicode string groups."""
     if (
         not enabled()
         or type(groups) not in (list, tuple)
         or not all(
             type(group) in (list, tuple)
-            and all(type(value) is str and value.isascii() for value in group)
+            and all(type(value) is str for value in group)
             for group in groups
         )
     ):
         return None
     try:
-        result = _native.sorted_unique_ascii_strings(
+        result = _native.sorted_unique_strings(
             [list(group) for group in groups]
         )
         if type(result) is list and all(type(value) is str for value in result):

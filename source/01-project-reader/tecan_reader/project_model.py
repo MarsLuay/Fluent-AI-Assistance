@@ -19,7 +19,7 @@ from tecan_common.native_acceleration import (
     deepcopy_json as _native_deepcopy_json,
     most_common_ascii_counts as _native_most_common_ascii_counts,
     sort_string_keys as _native_sort_string_keys,
-    sorted_unique_ascii_strings as _native_sorted_unique_ascii_strings,
+    sorted_unique_strings as _native_sorted_unique_strings,
 )
 
 
@@ -39,7 +39,7 @@ def _sorted_string_mapping(values: dict[str, Any]) -> dict[str, Any]:
 
 
 def _sorted_unique_strings(values: list[str]) -> list[str]:
-    native = _native_sorted_unique_ascii_strings([values])
+    native = _native_sorted_unique_strings([values])
     if native is not None:
         return native
     return sorted(set(values))
