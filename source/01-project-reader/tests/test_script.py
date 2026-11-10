@@ -90,6 +90,33 @@ class ScriptTests(unittest.TestCase):
             unicode_actual["worktable_pin_locations"], ["Pin café", "spindle"]
         )
 
+    def test_interesting_field_fallback_uses_native_xml_selection(self) -> None:
+        from tecan_common import xml_helpers
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        root = script.parse_xml_text(
+            "<Object><Name>Alpha</Name><LineNumber> 7 </LineNumber>"
+            "<Name>Beta</Name><Name>Alpha</Name></Object>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = script._interesting_fields(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                xml_helpers,
+                "_native_xml_elements_by_name",
+                wraps=xml_helpers._native_xml_elements_by_name,
+            ) as native_call:
+                actual = script._interesting_fields(root)
+                native_call.assert_called_once_with(
+                    root, script.INTERESTING_FIELDS, script.ET.Element
+                )
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, {"Name": "Alpha | Beta", "LineNumber": "7"})
+
     def test_inspect_xscr_reads_from_path(self) -> None:
         with TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir) / "test.xscr"

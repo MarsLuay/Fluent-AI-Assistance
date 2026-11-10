@@ -264,10 +264,8 @@ def _commands(root: ET.Element) -> list[dict[str, Any]]:
 
 def _interesting_fields(el: ET.Element) -> dict[str, str]:
     fields: dict[str, str] = {}
-    for child in el.iter():
+    for child in elements_by_name(el, INTERESTING_FIELDS):
         name = local_name(child.tag)
-        if name not in INTERESTING_FIELDS:
-            continue
         value = (child.text or "").strip()
         if not value:
             continue
