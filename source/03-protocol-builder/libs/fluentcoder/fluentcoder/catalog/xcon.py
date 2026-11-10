@@ -16,7 +16,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-from .xcmp import _find, _text, _vec3
+from .xcmp import _find, _findall, _text, _vec3
 
 
 @dataclass(frozen=True)
@@ -94,11 +94,7 @@ def _parse_orientation(
     if matrix_el is None:
         return None
     rows: list[tuple[float, float, float]] = []
-    for row_el in matrix_el.iter():
-        if not isinstance(row_el.tag, str):
-            continue
-        if row_el.tag.rsplit("}", 1)[-1] != "ArrayOfdouble":
-            continue
+    for row_el in _findall(matrix_el, "ArrayOfdouble"):
         values: list[float] = []
         for child in row_el:
             if child.text is None:

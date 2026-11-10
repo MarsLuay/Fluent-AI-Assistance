@@ -328,6 +328,41 @@ class NativeAccelerationTests(unittest.TestCase):
         self.assertEqual(actual.head, "Fca")
         self.assertEqual(actual.supported_heads, ("Fca", "Mca96"))
 
+    def test_xcon_orientation_rows_use_native_selector_with_python_parity(self) -> None:
+        from fluentcoder.catalog import xcon
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        orientation = ET.fromstring(
+            '<Orientation xmlns:ns="urn:test"><Matrix><Wrapper>'
+            "<ns:ArrayOfdouble><ns:double>1</ns:double><ns:double>0</ns:double>"
+            "<ns:double>0</ns:double></ns:ArrayOfdouble></Wrapper>"
+            "<ns:ArrayOfdouble><ns:double>0</ns:double><ns:double>1</ns:double>"
+            "<ns:double>0</ns:double></ns:ArrayOfdouble>"
+            "<Wrapper><ns:ArrayOfdouble><ns:double>0</ns:double><ns:double>0</ns:double>"
+            "<ns:double>1</ns:double></ns:ArrayOfdouble></Wrapper></Matrix></Orientation>"
+        )
+        matrix = orientation.find("Matrix")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = xcon._parse_orientation(orientation)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = xcon._parse_orientation(orientation)
+                native_call.assert_called_once_with(
+                    matrix, {"ArrayOfdouble"}, ET.Element
+                )
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual, ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
+        )
+
     def test_native_pattern_window_order_and_confidence(self) -> None:
         if not native_acceleration.available():
             self.skipTest("optional Rust extension is not built")
