@@ -785,6 +785,51 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(actual[0]["object_subfolder_path"], actual[0]["object_path"])
         self.assertEqual(actual[1]["type_id"], "type-y")
 
+    def test_native_asset_reference_suffix_filter_matches_python_regex(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "asset_reference_candidates"
+        ):
+            self.skipTest("optional Rust image-reference filter is not built")
+        values = [
+            "C:\\Assets\\MAP.JPEG",
+            "picture.pngsometext",
+            "picture.png\\path",
+            "note.gif' annotation",
+            'chart.tiff"',
+            "picture.png ",
+            "diagram.tif\x1cannotation",
+            "false-positive.bmpx",
+            "not-a-suffix.png/path",
+            "plain text",
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = reader_script._asset_refs_from_text(values)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            candidates = native_acceleration.asset_reference_candidates(values)
+            self.assertEqual(
+                candidates,
+                [values[0], values[1], values[2], values[3], values[4]],
+            )
+            with patch.object(
+                reader_script.native_acceleration,
+                "asset_reference_candidates",
+                wraps=reader_script.native_acceleration.asset_reference_candidates,
+            ) as native_call:
+                actual = reader_script._asset_refs_from_text(values)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+
+        unicode_values = ["picture.png\N{NO-BREAK SPACE}", "picture.g\N{LATIN CAPITAL LETTER I WITH DOT ABOVE}f"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            unicode_expected = reader_script._asset_refs_from_text(unicode_values)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.asset_reference_candidates(unicode_values)
+            )
+            self.assertEqual(
+                reader_script._asset_refs_from_text(unicode_values), unicode_expected
+            )
+
     def test_native_entry_object_guid_matches_pure_posixpath_rules(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "entry_object_guid"

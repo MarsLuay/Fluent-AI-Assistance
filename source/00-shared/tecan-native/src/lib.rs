@@ -2105,6 +2105,40 @@ fn entry_object_guid(source_name: &str) -> String {
     }
 }
 
+fn has_supported_asset_extension(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    let extensions: [&[u8]; 7] = [b"bmp", b"gif", b"jpg", b"jpeg", b"png", b"tif", b"tiff"];
+    for (index, byte) in bytes.iter().enumerate() {
+        if *byte != b'.' {
+            continue;
+        }
+        for extension in extensions {
+            let start = index + 1;
+            let end = start + extension.len();
+            if end > bytes.len() || !bytes[start..end].eq_ignore_ascii_case(extension) {
+                continue;
+            }
+            if end == bytes.len() || matches!(bytes[end], b'\\' | b's' | b'\'' | b'"') {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+#[pyfunction]
+fn asset_reference_candidates(values: Vec<String>) -> Option<Vec<String>> {
+    if values.iter().any(|value| !value.is_ascii()) {
+        return None;
+    }
+    Some(
+        values
+            .into_iter()
+            .filter(|value| has_supported_asset_extension(value))
+            .collect(),
+    )
+}
+
 #[pyfunction]
 fn compact_list(values: Vec<String>, limit: i64) -> Vec<String> {
     let mut output = Vec::new();
@@ -2892,6 +2926,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_kind_from_suffix, module)?)?;
     module.add_function(wrap_pyfunction!(command_short_name, module)?)?;
     module.add_function(wrap_pyfunction!(entry_object_guid, module)?)?;
+    module.add_function(wrap_pyfunction!(asset_reference_candidates, module)?)?;
     module.add_function(wrap_pyfunction!(compact_list, module)?)?;
     module.add_function(wrap_pyfunction!(extension_counts, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_execution_contract, module)?)?;
@@ -3349,6 +3384,30 @@ mod tests {
             )
         );
         assert!(render_object_report("Example", Vec::new(), Vec::new(), Vec::new()).is_none());
+    }
+
+    #[test]
+    fn asset_reference_candidate_matching_preserves_supported_boundaries() {
+        for value in [
+            "folder/ICON.JPEG",
+            "picture.pngsometext",
+            "picture.png\\path",
+            "picture.bmp'quote",
+            "picture.tiff\"quote",
+        ] {
+            assert!(has_supported_asset_extension(value), "{value:?}");
+        }
+        for value in [
+            "picture.bmpx",
+            "picture.png ",
+            "picture.gif\tquote",
+            "picture.tif\u{1c}boundary",
+            "picture.png/path",
+            "picture.jp",
+            "plain text",
+        ] {
+            assert!(!has_supported_asset_extension(value), "{value:?}");
+        }
     }
 
     #[test]

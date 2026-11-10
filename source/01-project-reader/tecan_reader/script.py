@@ -453,6 +453,9 @@ def _entry_object_guid(source_name: str) -> str:
 
 
 def _asset_refs_from_text(values: list[str]) -> list[str]:
+    native = native_acceleration.asset_reference_candidates(values)
+    if native is not None:
+        return _asset_refs(native)
     return _asset_refs(
         [
             value
