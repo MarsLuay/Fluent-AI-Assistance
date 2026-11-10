@@ -716,6 +716,9 @@ def _indexed_source_values(elem: ET.Element | None) -> dict[str, list[str]]:
 def _leaf_texts(elem: ET.Element | None) -> list[str]:
     if elem is None:
         return []
+    native = native_acceleration.xml_leaf_texts(elem, ET.Element)
+    if native is not None:
+        return native
     children = [child for child in list(elem) if isinstance(child.tag, str)]
     if not children:
         value = _text(elem)

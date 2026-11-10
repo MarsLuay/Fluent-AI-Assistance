@@ -147,6 +147,81 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [expected_value for _, expected_value in cases])
 
+    def test_leaf_text_traversal_uses_native_with_tree_and_type_fallbacks(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_leaf_texts"
+        ):
+            self.skipTest("optional Rust XML leaf-text collector is not built")
+        nested = worktable_geometry.ET.fromstring(
+            "<Root>ignored<One> A </One><Branch>ignored<Two>B</Two><Three>\u00a0</Three></Branch><One>A</One></Root>"
+        )
+        comment_only = worktable_geometry.ET.Element("Root")
+        comment_only.text = "\u00a0root\u00a0"
+        comment_only.append(worktable_geometry.ET.Comment("ignored"))
+
+        class CustomText(str):
+            def strip(self):
+                return "custom-text"
+
+        custom_text = worktable_geometry.ET.Element("Leaf")
+        custom_text.text = CustomText("ignored")
+
+        class CustomTag(str):
+            pass
+
+        custom_tag_root = worktable_geometry.ET.Element("Root")
+        custom_tag_child = worktable_geometry.ET.SubElement(custom_tag_root, "Leaf")
+        custom_tag_child.tag = CustomTag("Leaf")
+        custom_tag_child.text = " value "
+
+        whitespace = [
+            chr(codepoint)
+            for codepoint in range(0x110000)
+            if chr(codepoint).isspace()
+        ]
+        whitespace_elements = []
+        for character in whitespace:
+            leaf = worktable_geometry.ET.Element("Leaf")
+            leaf.text = f"{character}value{character}"
+            whitespace_elements.append(leaf)
+        surrogate_text = worktable_geometry.ET.Element("Leaf")
+        surrogate_text.text = "\ud800value\ud800"
+        deep_root = worktable_geometry.ET.Element("Deep")
+        deep_leaf = deep_root
+        for _ in range(260):
+            deep_leaf = worktable_geometry.ET.SubElement(deep_leaf, "Node")
+        deep_leaf.text = "deep"
+        elements = [nested, comment_only, custom_text, custom_tag_root]
+        elements.extend(whitespace_elements)
+        elements.extend([surrogate_text, deep_root])
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [worktable_geometry._leaf_texts(element) for element in elements]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            native_result = native_acceleration.xml_leaf_texts(
+                nested, worktable_geometry.ET.Element
+            )
+            actual = [worktable_geometry._leaf_texts(element) for element in elements]
+        self.assertEqual(native_result, ["A", "B", "A"])
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual[:4], [["A", "B", "A"], ["root"], ["custom-text"], ["value"]]
+        )
+        self.assertEqual(actual[4 : 4 + len(whitespace)], [["value"]] * len(whitespace))
+        self.assertEqual(actual[-2:], [["\ud800value\ud800"], ["deep"]])
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_leaf_texts(custom_text, worktable_geometry.ET.Element)
+            )
+            self.assertIsNone(
+                native_acceleration.xml_leaf_texts(custom_tag_root, worktable_geometry.ET.Element)
+            )
+            self.assertIsNone(
+                native_acceleration.xml_leaf_texts(surrogate_text, worktable_geometry.ET.Element)
+            )
+            self.assertIsNone(
+                native_acceleration.xml_leaf_texts(deep_root, worktable_geometry.ET.Element)
+            )
+
     def test_site_index_sort_key_uses_native_integer_parse_with_python_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "parse_i64_text"

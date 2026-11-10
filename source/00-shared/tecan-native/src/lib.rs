@@ -2013,6 +2013,72 @@ fn trim_python_whitespace(value: &str) -> &str {
     value.trim_matches(is_python_whitespace)
 }
 
+fn collect_xml_leaf_texts<'py>(
+    py: Python<'py>,
+    element: &Bound<'py, PyAny>,
+    element_type: &Bound<'py, PyAny>,
+    depth: usize,
+) -> PyResult<Option<Vec<String>>> {
+    if depth > 256 || !element.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let mut children = Vec::new();
+    for child in element.try_iter()? {
+        let child = child?;
+        if !child.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = child.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        children.push(child);
+    }
+    if children.is_empty() {
+        let text = element.getattr("text")?;
+        if text.is_none() {
+            return Ok(Some(Vec::new()));
+        }
+        if !text.is_instance_of::<PyString>() || !text.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let text = text.extract::<String>()?;
+        let text = trim_python_whitespace(&text);
+        return Ok(Some(if text.is_empty() {
+            Vec::new()
+        } else {
+            vec![text.to_owned()]
+        }));
+    }
+    let mut output = Vec::new();
+    for child in children {
+        let Some(mut values) = collect_xml_leaf_texts(py, &child, element_type, depth + 1)? else {
+            return Ok(None);
+        };
+        output.append(&mut values);
+    }
+    Ok(Some(output))
+}
+
+#[pyfunction]
+fn xml_leaf_texts<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    let Some(values) = collect_xml_leaf_texts(py, root, element_type, 0)? else {
+        return Ok(None);
+    };
+    let output = PyList::empty(py);
+    for value in values {
+        output.append(value)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
 #[pyfunction]
 fn xml_grouped_texts_excluding<'py>(
     py: Python<'py>,
@@ -3974,6 +4040,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_grouped_texts_excluding, module)?)?;
     module.add_function(wrap_pyfunction!(xml_elements_by_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_elements_by_name, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_leaf_texts, module)?)?;
     module.add_function(wrap_pyfunction!(
         xml_elements_by_folded_name_with_children,
         module

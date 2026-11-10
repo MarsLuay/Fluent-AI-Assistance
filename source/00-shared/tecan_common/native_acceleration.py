@@ -272,6 +272,26 @@ def xml_direct_elements_by_name(
         return None
 
 
+def xml_leaf_texts(root: Any, element_type: Any) -> list[str] | None:
+    """Collect trimmed text from leaves with standard Element traversal semantics."""
+    if not enabled() or type(root) is not element_type:
+        return None
+    try:
+        result = _native.xml_leaf_texts(root, element_type)
+        if type(result) is list and all(type(text) is str for text in result):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_elements_by_folded_name_with_children(
     root: Any, names: Any, element_type: Any
 ) -> list[Any] | None:
