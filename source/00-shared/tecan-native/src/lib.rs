@@ -1139,6 +1139,47 @@ fn xml_find_attribute<'py>(
 }
 
 #[pyfunction]
+fn xml_all_unique_texts<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let output = PyList::empty(py);
+    let mut seen = HashSet::new();
+    let iterator = root.call_method0("iter")?;
+    for element in iterator.try_iter()? {
+        let element = element?;
+        if !element.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let text = element.getattr("text")?;
+        if text.is_none() {
+            continue;
+        }
+        if !text.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let text_value = text.extract::<String>()?;
+        if !text_value.is_ascii()
+            || text_value
+                .chars()
+                .any(|ch| ('\u{1c}'..='\u{1f}').contains(&ch))
+        {
+            return Ok(None);
+        }
+        let cleaned = text_value.trim();
+        if cleaned.is_empty() || !seen.insert(cleaned.to_owned()) {
+            continue;
+        }
+        output.append(cleaned)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn xml_records_by_name<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -2605,6 +2646,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_find_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_find_attribute, module)?)?;
     module.add_function(wrap_pyfunction!(xml_records_by_name, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_all_unique_texts, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_dict, module)?)?;
     module.add_function(wrap_pyfunction!(render_object_report, module)?)?;

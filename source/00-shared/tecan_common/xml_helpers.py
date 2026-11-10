@@ -7,6 +7,7 @@ from typing import Any
 
 from . import xml_compat as ET
 from .native_acceleration import (
+    xml_all_unique_texts as _native_xml_all_unique_texts,
     xml_clean_text as _native_xml_clean_text,
     xml_find_attribute as _native_xml_find_attribute,
     xml_find_text as _native_xml_find_text,
@@ -18,6 +19,7 @@ from .native_acceleration import (
 
 __all__ = [
     "all_text",
+    "all_text_values",
     "child_text",
     "direct_child_text",
     "first_attribute",
@@ -102,6 +104,19 @@ def all_text(root: ET.Element, names: Iterable[str]) -> list[str]:
         if local_name(element.tag) not in wanted:
             continue
         value = _clean_text(element.text)
+        if value and value not in values:
+            values.append(value)
+    return values
+
+
+def all_text_values(root: ET.Element) -> list[str]:
+    """Return first-seen unique non-empty text from every XML element."""
+    native = _native_xml_all_unique_texts(root, ET.Element)
+    if native is not None:
+        return native
+    values: list[str] = []
+    for element in root.iter():
+        value = (element.text or "").strip()
         if value and value not in values:
             values.append(value)
     return values

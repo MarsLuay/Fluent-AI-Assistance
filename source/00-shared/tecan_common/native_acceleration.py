@@ -166,6 +166,26 @@ def xml_find_attribute(
         return None
 
 
+def xml_all_unique_texts(root: Any, element_type: Any) -> list[str] | None:
+    """Collect first-seen unique supported XML text values natively."""
+    if not enabled() or type(root) is not element_type:
+        return None
+    try:
+        result = _native.xml_all_unique_texts(root, element_type)
+        if type(result) is list and all(type(value) is str for value in result):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_records_by_name(
     root: Any, record_name: Any, field_names: Any, element_type: Any, *, direct: Any = False
 ) -> list[list[str]] | None:

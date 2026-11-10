@@ -9,6 +9,7 @@ import re
 
 from tecan_common.xml_compat import ET
 from tecan_common.xml_helpers import (
+    all_text_values,
     child_text,
     first_attribute,
     first_text,
@@ -308,12 +309,7 @@ def _dependencies(root: ET.Element) -> dict[str, list[str]]:
 
 
 def _all_text_values(root: ET.Element) -> list[str]:
-    values: list[str] = []
-    for element in root.iter():
-        value = (element.text or "").strip()
-        if value and value not in values:
-            values.append(value)
-    return values
+    return all_text_values(root)
 
 
 def _startup_variables(root: ET.Element) -> list[dict[str, Any]]:

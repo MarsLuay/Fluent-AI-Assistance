@@ -785,6 +785,42 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(actual[0]["object_subfolder_path"], actual[0]["object_path"])
         self.assertEqual(actual[1]["type_id"], "type-y")
 
+    def test_native_xml_all_text_values_preserves_order_comments_and_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_all_unique_texts"
+        ):
+            self.skipTest("optional Rust XML text collector is not built")
+        root = ET.Element("Root")
+        root.text = " root-x "
+        ET.SubElement(root, "First").text = " repeat-x "
+        root.append(ET.Comment("comment-x"))
+        ET.SubElement(root, "Last").text = "repeat-x"
+        ET.SubElement(root, "Empty").text = "  "
+        expected_values = ["root-x", "repeat-x", "comment-x"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = xml_helpers.all_text_values(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.xml_all_unique_texts(root, ET.Element),
+                expected_values,
+            )
+            with patch.object(
+                xml_helpers,
+                "_native_xml_all_unique_texts",
+                wraps=xml_helpers._native_xml_all_unique_texts,
+            ) as native_call:
+                actual = xml_helpers.all_text_values(root)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+
+        unicode_root = ET.Element("Root")
+        ET.SubElement(unicode_root, "Text").text = " café "
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_all_unique_texts(unicode_root, ET.Element)
+            )
+            self.assertEqual(xml_helpers.all_text_values(unicode_root), ["café"])
+
     def test_native_extension_counts_match_path_suffix_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "extension_counts"
