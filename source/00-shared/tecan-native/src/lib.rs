@@ -1200,6 +1200,51 @@ fn render_gwl_report(
     Some(format!("{}\n", lines.join("\n")))
 }
 
+#[allow(clippy::too_many_arguments)] // Keep the summary contract explicit for the Python adapter.
+#[pyfunction]
+fn render_script_pattern_summary(
+    title: &str,
+    database: &str,
+    schema_version: &str,
+    pattern_count: &str,
+    step_count: &str,
+    is_mining: bool,
+    mined_pattern_count: &str,
+    replaced_existing: &str,
+    pattern_counts: Vec<(String, String)>,
+    sources: Vec<Vec<String>>,
+) -> Option<String> {
+    if sources.iter().any(|source| source.len() != 3) {
+        return None;
+    }
+    let mut lines = vec![
+        format!("# {title}"),
+        String::new(),
+        format!("- Database: `{database}`"),
+        format!("- Pattern schema version: `{schema_version}`"),
+        format!("- Patterns: `{pattern_count}`"),
+        format!("- Steps: `{step_count}`"),
+    ];
+    if is_mining {
+        lines.push(format!("- Mined this run: `{mined_pattern_count}`"));
+        lines.push(format!("- Replaced existing: `{replaced_existing}`"));
+    }
+    lines.extend(render_append_dict(
+        "Pattern Type Counts",
+        pattern_counts,
+        40,
+    ));
+    if !sources.is_empty() {
+        lines.push(String::new());
+        lines.push("## Top Source Scripts".to_string());
+        for source in sources {
+            lines.push(format!("- `{}`: {} patterns", source[0], source[1]));
+            lines.push(format!("  - ZEIA: `{}`", source[2]));
+        }
+    }
+    Some(format!("{}\n", lines.join("\n")))
+}
+
 #[pyfunction]
 fn render_pattern_types_report(rows: Vec<Vec<String>>) -> Option<String> {
     if rows.iter().any(|row| row.len() != 3) {
@@ -2109,6 +2154,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_compare_report, module)?)?;
     module.add_function(wrap_pyfunction!(render_pattern_specs, module)?)?;
     module.add_function(wrap_pyfunction!(render_pattern_types_report, module)?)?;
+    module.add_function(wrap_pyfunction!(render_script_pattern_summary, module)?)?;
     module.add_function(wrap_pyfunction!(render_join_lines, module)?)?;
     module.add_function(wrap_pyfunction!(decode_text_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(read_text_file, module)?)?;
@@ -2214,6 +2260,46 @@ mod tests {
                 Vec::new(),
             ),
             "# ZEIA Compare Report\n\n- Left: `left-x`\n- Right: `right-x`\n- Entries: `2` -> `3`\n- Common script names: `1`\n\n## Scripts Added\n- added-x\n\n## Left Command Families\n- `family-x`: 2\n"
+        );
+    }
+
+    #[test]
+    fn script_pattern_summary_preserves_modes_counts_and_sources() {
+        assert_eq!(
+            render_script_pattern_summary(
+                "Tecan Script Pattern Mining",
+                "database-x",
+                "schema-x",
+                "pattern-count-x",
+                "step-count-x",
+                true,
+                "mined-x",
+                "replaced-x",
+                vec![("key-x".into(), "count-x".into())],
+                vec![vec!["source-x".into(), "count-y".into(), "file-x".into()]],
+            )
+            .as_deref(),
+            Some(
+                "# Tecan Script Pattern Mining\n\n- Database: `database-x`\n- Pattern schema version: `schema-x`\n- Patterns: `pattern-count-x`\n- Steps: `step-count-x`\n- Mined this run: `mined-x`\n- Replaced existing: `replaced-x`\n\n## Pattern Type Counts\n- `key-x`: count-x\n\n## Top Source Scripts\n- `source-x`: count-y patterns\n  - ZEIA: `file-x`\n"
+            )
+        );
+        assert_eq!(
+            render_script_pattern_summary(
+                "Tecan Script Patterns",
+                "",
+                "",
+                "",
+                "",
+                false,
+                "",
+                "",
+                Vec::new(),
+                Vec::new(),
+            )
+            .as_deref(),
+            Some(
+                "# Tecan Script Patterns\n\n- Database: ``\n- Pattern schema version: ``\n- Patterns: ``\n- Steps: ``\n"
+            )
         );
     }
 

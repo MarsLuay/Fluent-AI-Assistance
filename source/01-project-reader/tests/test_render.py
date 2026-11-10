@@ -262,6 +262,81 @@ class RenderListTests(unittest.TestCase):
         self.assertEqual(custom.str_calls, 1)
         self.assertEqual(actual_fallback, expected_fallback)
 
+    def test_native_script_pattern_summary_matches_both_modes_and_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "render_script_pattern_summary"
+        ):
+            self.skipTest("optional Rust pattern-summary renderer is not built")
+        reports = [
+            {
+                "kind": "script_pattern_mining",
+                "database": "database-x",
+                "pattern_schema_version": "schema-x",
+                "pattern_count": 41,
+                "step_count": 8,
+                "mined_pattern_count": 3,
+                "replaced_existing": False,
+                "pattern_type_counts": {f"key-{index}": index for index in range(42)},
+                "top_sources": [
+                    {
+                        "source_script": "source-x",
+                        "pattern_count": 2,
+                        "zeia_file": "file-x",
+                    }
+                ],
+            },
+            {
+                "kind": "script_pattern_summary",
+                "database": "database-y",
+                "pattern_schema_version": "schema-y",
+                "pattern_count": 0,
+                "step_count": 0,
+                "pattern_type_counts": {},
+                "top_sources": [],
+            },
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [render.render_markdown(report) for report in reports]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                render,
+                "_native_render_script_pattern_summary",
+                wraps=render._native_render_script_pattern_summary,
+            ) as native_call:
+                actual = [render.render_markdown(report) for report in reports]
+                self.assertEqual(native_call.call_count, len(reports))
+        self.assertEqual(actual, expected)
+        self.assertIn("- ... 2 more", actual[0])
+        self.assertNotIn("Mined this run", actual[1])
+
+        class TextValue:
+            def __init__(self) -> None:
+                self.str_calls = 0
+
+            def __str__(self) -> str:
+                self.str_calls += 1
+                return "custom source"
+
+        custom = TextValue()
+        unsupported = {
+            **reports[0],
+            "top_sources": [
+                {
+                    "source_script": custom,
+                    "pattern_count": 1,
+                    "zeia_file": "file-x",
+                }
+            ],
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_fallback = render.render_markdown(unsupported)
+        self.assertEqual(custom.str_calls, 1)
+        custom.str_calls = 0
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual_fallback = render.render_markdown(unsupported)
+        self.assertEqual(custom.str_calls, 1)
+        self.assertEqual(actual_fallback, expected_fallback)
+
     def test_native_pattern_types_report_matches_python_and_falls_back(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "render_pattern_types_report"

@@ -13,6 +13,7 @@ from tecan_common.native_acceleration import (
     render_join_lines as _native_render_join_lines,
     render_object_report as _native_render_object_report,
     render_pattern_specs as _native_render_pattern_specs,
+    render_script_pattern_summary as _native_render_script_pattern_summary,
     render_pattern_types_report as _native_render_pattern_types_report,
 )
 
@@ -208,6 +209,10 @@ def _render_project_index_search(report: dict[str, Any]) -> str:
 
 
 def _render_script_pattern_summary(report: dict[str, Any]) -> str:
+    if type(report) is dict:
+        native = _native_render_script_pattern_summary(report)
+        if native is not None:
+            return native
     title = "Tecan Script Pattern Mining" if report.get("kind") == "script_pattern_mining" else "Tecan Script Patterns"
     lines = [
         f"# {title}",

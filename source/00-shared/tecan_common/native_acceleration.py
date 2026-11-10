@@ -348,6 +348,67 @@ def render_compare_report(
         return None
 
 
+def render_script_pattern_summary(report: Any) -> str | None:
+    """Render supported script-pattern summary reports natively."""
+    if type(report) is not dict:
+        return None
+    kind = report.get("kind")
+    if type(kind) is not str:
+        return None
+    is_mining = kind == "script_pattern_mining"
+    safe_values = (str, bool, int, float, type(None))
+    fields = [
+        report.get("database"),
+        report.get("pattern_schema_version"),
+        report.get("pattern_count"),
+        report.get("step_count"),
+    ]
+    mining_fields = (
+        [report.get("mined_pattern_count"), report.get("replaced_existing")]
+        if is_mining
+        else ["", ""]
+    )
+    pattern_counts = report.get("pattern_type_counts", {})
+    sources = report.get("top_sources", [])
+    if (
+        not enabled()
+        or not all(type(value) in safe_values for value in fields + mining_fields)
+        or type(pattern_counts) is not dict
+        or type(sources) not in (list, tuple)
+    ):
+        return None
+    count_entries: list[tuple[str, str]] = []
+    source_rows: list[list[str]] = []
+    try:
+        for key, value in pattern_counts.items():
+            if type(key) is not str or type(value) not in safe_values:
+                return None
+            count_entries.append((key, str(value)))
+        for source in sources:
+            if type(source) is not dict:
+                return None
+            values = [
+                source.get("source_script"),
+                source.get("pattern_count"),
+                source.get("zeia_file"),
+            ]
+            if not all(type(value) in safe_values for value in values):
+                return None
+            source_rows.append([str(value) for value in values])
+        title = "Tecan Script Pattern Mining" if is_mining else "Tecan Script Patterns"
+        result = _native.render_script_pattern_summary(
+            title,
+            *(str(value) for value in fields),
+            is_mining,
+            *(str(value) for value in mining_fields),
+            count_entries,
+            source_rows,
+        )
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def render_pattern_types_report(pattern_types: Any) -> str | None:
     """Render supported script pattern type rows natively, or request fallback."""
     if not enabled() or type(pattern_types) not in (list, tuple):
