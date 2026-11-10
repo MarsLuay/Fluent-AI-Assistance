@@ -266,7 +266,7 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
                 dict(sorted(unicode_fields.items())),
             )
 
-    def test_task_unknown_field_groups_merge_natively_with_unicode_fallback(self) -> None:
+    def test_task_unknown_field_groups_merge_natively_with_unicode(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "merge_unique_string_groups"
         ):
@@ -296,21 +296,63 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
             actual["unknown_fields"], actual["source_metadata"]["unknown_fields"]
         )
 
-        unicode_source = "<TaskInput><Task><Future>café</Future></Task></TaskInput>"
+        unicode_groups = [
+            {"étiquette": ["café", "α", "café"]},
+            {"étiquette": ["東京"], "Ω": ["器"], "😀": ["emoji"]},
+        ]
+        unicode_expected = {
+            "étiquette": ["café", "α", "東京"],
+            "Ω": ["器"],
+            "😀": ["emoji"],
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            unicode_merged = native_acceleration.merge_unique_string_groups(
+                unicode_groups, limit=20
+            )
+            self.assertEqual(unicode_merged, unicode_expected)
+            self.assertEqual(list(unicode_merged), list(unicode_expected))
+            self.assertEqual(
+                native_acceleration.merge_unique_string_groups(
+                    unicode_groups, limit=2
+                )["étiquette"],
+                ["café", "α"],
+            )
+            self.assertIsNone(
+                native_acceleration.merge_unique_string_groups(
+                    [{chr(0xD800): ["value"]}], limit=20
+                )
+            )
+            self.assertIsNone(
+                native_acceleration.merge_unique_string_groups(
+                    [{"field": [chr(0xD800)]}], limit=20
+                )
+            )
+
+        unicode_source = (
+            "<TaskInput><Task><Étiquette>café</Étiquette>"
+            "<Future>α</Future></Task><Task><Étiquette>東京</Étiquette>"
+            "</Task></TaskInput>"
+        )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             unicode_expected = inspect_twl_text(
                 unicode_source, source_name="Inputs/unicode-unknowns.twl"
             )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            self.assertIsNone(
-                native_acceleration.merge_unique_string_groups(
-                    [{"Future": ["café"]}], limit=20
+            with patch.object(
+                task_input,
+                "merge_unique_string_groups",
+                wraps=native_acceleration.merge_unique_string_groups,
+            ) as native_call:
+                unicode_actual = inspect_twl_text(
+                    unicode_source, source_name="Inputs/unicode-unknowns.twl"
                 )
-            )
-            self.assertEqual(
-                inspect_twl_text(unicode_source, source_name="Inputs/unicode-unknowns.twl"),
-                unicode_expected,
-            )
+                native_call.assert_called_once()
+        self.assertEqual(unicode_actual, unicode_expected)
+        self.assertEqual(
+            unicode_actual["unknown_fields"],
+            {"Future": ["α"], "Étiquette": ["café", "東京"]},
+        )
+        self.assertEqual(list(unicode_actual["unknown_fields"]), ["Future", "Étiquette"])
 
     def test_task_field_alias_lookup_uses_native_for_ascii_and_falls_back(self) -> None:
         if not native_acceleration.available() or not hasattr(

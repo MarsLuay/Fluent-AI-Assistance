@@ -1508,7 +1508,7 @@ def casefold_alias_values(mapping: Any, alias_groups: Any) -> list[Any] | None:
 
 
 def merge_unique_string_groups(groups: Any, limit: Any) -> dict[str, list[str]] | None:
-    """Merge exact ASCII string groups with first-seen deduplication and a cap."""
+    """Merge exact Unicode string groups with first-seen deduplication and a cap."""
     if (
         not enabled()
         or type(groups) not in (list, tuple)
@@ -1518,9 +1518,8 @@ def merge_unique_string_groups(groups: Any, limit: Any) -> dict[str, list[str]] 
             type(group) is dict
             and all(
                 type(key) is str
-                and key.isascii()
                 and type(values) is list
-                and all(type(value) is str and value.isascii() for value in values)
+                and all(type(value) is str for value in values)
                 for key, values in group.items()
             )
             for group in groups

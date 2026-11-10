@@ -1666,9 +1666,6 @@ fn merge_unique_string_groups<'py>(
                 return Ok(None);
             }
             let key = key.extract::<String>()?;
-            if !key.is_ascii() {
-                return Ok(None);
-            }
             let bucket = groups.entry(key).or_default();
             for value in values.try_iter()? {
                 let value = value?;
@@ -1676,9 +1673,6 @@ fn merge_unique_string_groups<'py>(
                     return Ok(None);
                 }
                 let value = value.extract::<String>()?;
-                if !value.is_ascii() {
-                    return Ok(None);
-                }
                 if bucket.0.len() < limit && bucket.1.insert(value.clone()) {
                     bucket.0.push(value);
                 }
