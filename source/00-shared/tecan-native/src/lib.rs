@@ -1377,6 +1377,41 @@ fn delimited_row_fields<'py>(
 }
 
 #[pyfunction]
+fn unique_ascii_tuple_indices<'py>(
+    py: Python<'py>,
+    rows: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !rows.get_type().is(py.get_type::<PyList>()) {
+        return Ok(None);
+    }
+    let mut seen: HashSet<(String, String, String)> = HashSet::new();
+    let output = PyList::empty(py);
+    for (index, row) in rows.try_iter()?.enumerate() {
+        let row = row?;
+        if !row.get_type().is(py.get_type::<PyTuple>()) || row.len()? != 3 {
+            return Ok(None);
+        }
+        let mut fields = Vec::with_capacity(3);
+        for value in row.try_iter()? {
+            let value = value?;
+            if !value.get_type().is(py.get_type::<PyString>()) {
+                return Ok(None);
+            }
+            let value = value.extract::<String>()?;
+            if !value.is_ascii() {
+                return Ok(None);
+            }
+            fields.push(value);
+        }
+        let key = (fields.remove(0), fields.remove(0), fields.remove(0));
+        if seen.insert(key) {
+            output.append(index)?;
+        }
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn sorted_unique_ascii_strings<'py>(
     py: Python<'py>,
     groups: &Bound<'py, PyAny>,
@@ -3564,6 +3599,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(any_ascii_casefold_in, module)?)?;
     module.add_function(wrap_pyfunction!(ordered_ascii_string_counts, module)?)?;
     module.add_function(wrap_pyfunction!(sorted_unique_ascii_strings, module)?)?;
+    module.add_function(wrap_pyfunction!(unique_ascii_tuple_indices, module)?)?;
     module.add_function(wrap_pyfunction!(delimited_row_fields, module)?)?;
     module.add_function(wrap_pyfunction!(xscr_command_records, module)?)?;
     module.add_function(wrap_pyfunction!(render_append_list, module)?)?;

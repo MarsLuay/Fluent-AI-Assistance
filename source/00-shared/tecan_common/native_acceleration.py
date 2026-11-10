@@ -1575,6 +1575,32 @@ def any_ascii_casefold_in(values: Any, candidates: Any) -> bool | None:
         return None
 
 
+def unique_ascii_tuple_indices(rows: Any) -> list[int] | None:
+    """Keep the first row for each exact three-string ASCII tuple."""
+    if (
+        not enabled()
+        or type(rows) not in (list, tuple)
+        or not all(
+            type(row) is tuple
+            and len(row) == 3
+            and all(type(value) is str and value.isascii() for value in row)
+            for row in rows
+        )
+    ):
+        return None
+    try:
+        result = _native.unique_ascii_tuple_indices(list(rows))
+        if (
+            type(result) is list
+            and all(type(index) is int and 0 <= index < len(rows) for index in result)
+            and result == sorted(set(result))
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def sorted_unique_ascii_strings(groups: Any) -> list[str] | None:
     """Sort and deduplicate ASCII strings across exact built-in groups."""
     if (

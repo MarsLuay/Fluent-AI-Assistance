@@ -100,6 +100,71 @@ class ScriptTests(unittest.TestCase):
                 self.assertGreater(native_call.call_count, 0)
         self.assertEqual(actual_report, expected_report)
 
+    def test_variable_declaration_dedup_uses_rust_with_unicode_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "unique_ascii_tuple_indices"
+        ):
+            self.skipTest("optional Rust variable deduplicator is not built")
+        source = (
+            "<Root>"
+            "<anyType Type=\"VariableDefinitionHelper\"><Name>Sample</Name>"
+            "<TypeName>String</TypeName><Scope>Script</Scope>"
+            "<QueryOnStartup>first</QueryOnStartup></anyType>"
+            "<anyType Type=\"VariableDefinitionHelper\"><Name>Sample</Name>"
+            "<TypeName>String</TypeName><Scope>Script</Scope>"
+            "<QueryOnStartup>duplicate</QueryOnStartup></anyType>"
+            "<anyType Type=\"VariableDefinitionHelper\"><Name>Sample</Name>"
+            "<TypeName>Number</TypeName><Scope>Script</Scope></anyType>"
+            "<anyType Type=\"VariableDefinitionHelper\"><Name>Sample</Name>"
+            "<TypeName>String</TypeName><Scope>Project</Scope></anyType>"
+            "</Root>"
+        )
+        root = script.parse_xml_text(source)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = script._variable_declarations(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "unique_ascii_tuple_indices",
+                wraps=native_acceleration.unique_ascii_tuple_indices,
+            ) as native_call:
+                actual = script._variable_declarations(root)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(len(actual), 3)
+        self.assertEqual(actual[0]["query_on_startup"], "first")
+        self.assertEqual(
+            [(value["name"], value["scope"], value["type"]) for value in actual],
+            [
+                ("Sample", "Script", "String"),
+                ("Sample", "Script", "Number"),
+                ("Sample", "Project", "String"),
+            ],
+        )
+
+        unicode_root = script.parse_xml_text(
+            "<Root><anyType Type=\"VariableDefinitionHelper\"><Name>é</Name>"
+            "<TypeName>String</TypeName><Scope>Script</Scope></anyType></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.unique_ascii_tuple_indices(
+                    [("é", "Script", "String")]
+                )
+            )
+            self.assertEqual(
+                script._variable_declarations(unicode_root),
+                [
+                    {
+                        "name": "é",
+                        "type": "String",
+                        "scope": "Script",
+                        "query_on_startup": "",
+                        "read_only": "",
+                    }
+                ],
+            )
+
     def test_startup_variable_values_use_native_ascii_with_unicode_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_container_child_texts"

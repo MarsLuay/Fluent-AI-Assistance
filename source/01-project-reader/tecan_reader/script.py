@@ -174,16 +174,27 @@ def _variable_definition_elements(root: ET.Element) -> list[ET.Element]:
 
 
 def _variable_declarations(root: ET.Element) -> list[dict[str, str]]:
-    variables: list[dict[str, str]] = []
-    seen: set[tuple[str, str, str]] = set()
+    candidates: list[tuple[ET.Element, str, str, str]] = []
     for el in _variable_definition_elements(root):
         name = child_text(el, "Name")
         variable_type = child_text(el, "TypeName")
         scope = child_text(el, "Scope")
-        key = (name, scope, variable_type)
-        if not name or key in seen:
-            continue
-        seen.add(key)
+        if name:
+            candidates.append((el, name, scope, variable_type))
+
+    keys = [(name, scope, variable_type) for _, name, scope, variable_type in candidates]
+    unique_indices = native_acceleration.unique_ascii_tuple_indices(keys)
+    if unique_indices is None:
+        unique_indices = []
+        seen: set[tuple[str, str, str]] = set()
+        for index, key in enumerate(keys):
+            if key not in seen:
+                seen.add(key)
+                unique_indices.append(index)
+
+    variables: list[dict[str, str]] = []
+    for index in unique_indices:
+        el, name, scope, variable_type = candidates[index]
         variables.append(
             {
                 "name": name,
