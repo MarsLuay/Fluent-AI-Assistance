@@ -2788,6 +2788,30 @@ fn ascii_safe_component(value: &str, lowercase: bool) -> Option<String> {
 }
 
 #[pyfunction]
+fn ascii_safe_filesystem_key(value: &str) -> Option<String> {
+    if !value.is_ascii() {
+        return None;
+    }
+    let mut output = String::new();
+    let mut separator_pending = false;
+    for character in value.chars() {
+        if character.is_ascii_alphanumeric() || matches!(character, '_' | '.' | '-') {
+            output.push(character);
+            separator_pending = false;
+        } else if !separator_pending {
+            output.push('_');
+            separator_pending = true;
+        }
+    }
+    let cleaned = output.trim_matches(|character| matches!(character, '.' | '_'));
+    Some(if cleaned.is_empty() {
+        "dup".to_owned()
+    } else {
+        cleaned.to_owned()
+    })
+}
+
+#[pyfunction]
 fn ascii_word_boundary_contains(value: &str, word: &str) -> Option<bool> {
     if !value.is_ascii() || !word.is_ascii() || word.is_empty() {
         return None;
@@ -7857,6 +7881,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(ascii_variable_name_is_valid, module)?)?;
     module.add_function(wrap_pyfunction!(windows_drive_path_prefix, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_safe_component, module)?)?;
+    module.add_function(wrap_pyfunction!(ascii_safe_filesystem_key, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_word_boundary_contains, module)?)?;
     module.add_function(wrap_pyfunction!(label_base_ascii_text, module)?)?;
     module.add_function(wrap_pyfunction!(is_guid_text, module)?)?;
@@ -8093,6 +8118,21 @@ mod tests {
         );
         assert_eq!(ascii_safe_component("!!!", true), Some(String::new()));
         assert_eq!(ascii_safe_component("東京", true), None);
+    }
+
+    #[test]
+    fn ascii_safe_filesystem_key_matches_python_regex_and_default() {
+        for (input, expected) in [
+            ("Beta Key", "Beta_Key"),
+            ("..__Beta-Key__.", "Beta-Key"),
+            ("-Beta-", "-Beta-"),
+            ("...___", "dup"),
+            ("a+++b", "a_b"),
+            ("", "dup"),
+        ] {
+            assert_eq!(ascii_safe_filesystem_key(input), Some(expected.into()));
+        }
+        assert_eq!(ascii_safe_filesystem_key("über"), None);
     }
 
     #[test]

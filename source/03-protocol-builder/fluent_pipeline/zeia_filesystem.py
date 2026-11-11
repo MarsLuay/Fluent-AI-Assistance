@@ -11,6 +11,7 @@ from typing import Any, Mapping
 
 from .checksums import entry_checksum_state, recompute_checksum_bytes
 from tecan_common.native_acceleration import (
+    ascii_safe_filesystem_key as _native_ascii_safe_filesystem_key,
     collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
     windows_drive_path_prefix as _native_windows_drive_path_prefix,
 )
@@ -693,7 +694,14 @@ def extract_archive_filesystem_payloads(
             destination = destination_dir / filename
             if destination.exists() and destination.read_bytes() != payload:
                 fs_key = parts[1] if len(parts) >= 3 else "dup"
-                safe_key = re.sub(r"[^A-Za-z0-9._-]+", "_", str(fs_key)).strip("._") or "dup"
+                fs_key_text = str(fs_key)
+                native = _native_ascii_safe_filesystem_key(fs_key_text)
+                safe_key = (
+                    native
+                    if native is not None
+                    else re.sub(r"[^A-Za-z0-9._-]+", "_", fs_key_text).strip("._")
+                    or "dup"
+                )
                 destination = destination_dir / f"{safe_key}__{filename}"
                 suffix = 2
                 while destination.exists() and destination.read_bytes() != payload:

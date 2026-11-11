@@ -3155,6 +3155,17 @@ def ascii_safe_component(value: Any, lowercase: Any) -> str | None:
         return None
 
 
+def ascii_safe_filesystem_key(value: Any) -> str | None:
+    """Sanitize ASCII ZEIA filesystem keys with the Python default, or fall back."""
+    if not enabled() or type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.ascii_safe_filesystem_key(value)
+        return result if type(result) is str and result.isascii() else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def ascii_word_boundary_contains(value: Any, word: Any) -> bool | None:
     """Match an ASCII word using explicit lowercase-letter/digit boundaries."""
     if (

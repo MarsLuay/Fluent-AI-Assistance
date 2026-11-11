@@ -491,6 +491,56 @@ def test_file_reference_path_filter_uses_native_drive_prefix(monkeypatch) -> Non
     assert native_prefix(r"é:\path") is False
 
 
+def test_archive_collision_key_uses_native_ascii_sanitizer(tmp_path, monkeypatch) -> None:
+    archive_path = tmp_path / "source.zeia"
+    destination_dir = tmp_path / "media"
+    entries = [
+        ("base", b"base"),
+        ("..__Beta Key__.", b"second"),
+        ("-Beta-", b"third"),
+        ("...___", b"fourth"),
+        ("über", b"fifth"),
+    ]
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        for key, payload in entries:
+            archive.writestr(f"fs/{key}/shared.gif", payload)
+
+    monkeypatch.setenv("TECAN_DISABLE_RUST_ACCELERATION", "1")
+    expected = zeia_filesystem_module.extract_archive_filesystem_payloads(
+        archive_path, destination_dir
+    )
+    for path in expected:
+        path.unlink()
+
+    calls: list[str] = []
+    native_key = native_acceleration.ascii_safe_filesystem_key
+
+    def track_key(value):
+        calls.append(value)
+        return native_key(value)
+
+    monkeypatch.setenv("TECAN_DISABLE_RUST_ACCELERATION", "0")
+    monkeypatch.setattr(
+        zeia_filesystem_module,
+        "_native_ascii_safe_filesystem_key",
+        track_key,
+    )
+    actual = zeia_filesystem_module.extract_archive_filesystem_payloads(
+        archive_path, destination_dir
+    )
+
+    assert [path.name for path in actual] == [path.name for path in expected]
+    assert [path.name for path in actual] == [
+        "shared.gif",
+        "Beta_Key__shared.gif",
+        "-Beta-__shared.gif",
+        "dup__shared.gif",
+        "ber__shared.gif",
+    ]
+    assert calls == ["..__Beta Key__.", "-Beta-", "...___", "über"]
+    assert [path.read_bytes() for path in actual] == [payload for _, payload in entries]
+
+
 def test_audio_path_in_media_path_map() -> None:
     ir = {
         "protocol": {"name": "AudioDemo"},
