@@ -377,6 +377,31 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
             )
         self.assertEqual(actual_attribute_fallback, expected_attribute_fallback)
 
+    def test_scheduler_python_leaf_scan_uses_native_whitespace_helper(self) -> None:
+        root = ET.Element("Process")
+        ET.SubElement(root, "Description").text = " \tAlpha\nBeta\u2003 "
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = scheduler._record(
+                root, index=1, kind="scheduler_task", source_name="synthetic.xml"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                scheduler,
+                "_native_xml_direct_leaf_name_texts",
+                return_value=None,
+            ) as leaf_scan, patch.object(
+                scheduler,
+                "_native_collapse_ascii_whitespace",
+                wraps=native_acceleration.collapse_ascii_whitespace,
+            ) as whitespace_call:
+                actual = scheduler._record(
+                    root, index=1, kind="scheduler_task", source_name="synthetic.xml"
+                )
+                leaf_scan.assert_called_once_with(root, ET.Element)
+                whitespace_call.assert_called_once_with(" \tAlpha\nBeta\u2003 ")
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["fields"]["Description"], "Alpha Beta")
+
     def test_scheduler_processes_tasks_are_distinct_from_gwl(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             archive = self._archive(

@@ -8,6 +8,7 @@ from typing import Any
 from tecan_common import xml_compat as ET
 from tecan_common.native_acceleration import (
     ascii_case_insensitive_substring_match_groups as _native_substring_match_groups,
+    collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
     casefold_alias_values as _native_casefold_alias_values,
     merge_unique_string_groups as _native_merge_unique_string_groups,
     sort_string_keys as _native_sort_string_keys,
@@ -139,7 +140,13 @@ def _record(element: Any, *, index: int, kind: str, source_name: str) -> dict[st
             if not isinstance(child.tag, str):
                 continue
             name = local_name(child.tag)
-            value = " ".join((child.text or "").split())
+            raw_value = child.text or ""
+            native_value = _native_collapse_ascii_whitespace(raw_value)
+            value = (
+                native_value
+                if native_value is not None
+                else " ".join(raw_value.split())
+            )
             if value and not list(child):
                 _store_field(fields, unknown, name, value)
     else:
