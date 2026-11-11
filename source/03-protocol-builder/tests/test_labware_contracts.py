@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import unittest
+from unittest.mock import patch
 
+import fluent_pipeline.labware_contracts as labware_contracts
+from tecan_common import native_acceleration
 from fluent_pipeline.labware_contracts import (
     LABEL_CATALOG_MISMATCH_CODE,
     ir_label_catalog_issues,
@@ -13,6 +17,32 @@ from fluent_pipeline.labware_contracts import (
 
 
 class PreferredLabelCatalogTests(unittest.TestCase):
+    def test_label_key_normalization_uses_native_ascii_and_unicode_fallback(self):
+        values = [" AdapterA200 ", "Straße", "İmage", None, 0, ""]
+        expected = [str(value or "").strip().casefold() for value in values]
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [labware_contracts._norm(value) for value in values]
+        self.assertEqual(disabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                labware_contracts,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = [labware_contracts._norm(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(enabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                labware_contracts,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = [labware_contracts._norm(value) for value in values]
+        self.assertEqual(fallback, expected)
+
     def test_geometry_unanimous_label_catalog(self):
         preferred = preferred_label_catalogs_from_geometry(
             {

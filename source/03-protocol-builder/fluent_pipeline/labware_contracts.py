@@ -10,6 +10,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping
 
+from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
+)
+
 from .labware_catalog_export import (
     alias_maps_from_labware_catalog,
     load_labware_catalog,
@@ -26,7 +30,9 @@ A200_ADAPTER_PLAIN_CATALOG = ""
 
 
 def _norm(value: Any) -> str:
-    return str(value or "").strip().casefold()
+    text = str(value or "")
+    native = _native_ascii_casefold_trim(text)
+    return native if native is not None else text.strip().casefold()
 
 
 def labware_base_label(label: Any) -> str:
