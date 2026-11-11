@@ -12,7 +12,9 @@ from fluent_pipeline.expression_provenance import (
     build_expression_provenance_ledger,
     write_expression_provenance_ledger,
 )
+import fluent_pipeline.gates.evaluators as gate_evaluators
 from fluent_pipeline.gates import ValidationContext, readiness_evaluator
+from tecan_common import native_acceleration
 from fluent_pipeline.protocol_ir import protocol_ir_from_python, write_protocol_ir
 from fluent_pipeline.readiness import REVIEWABLE_READY, STRICT_READY
 from fluent_pipeline.readiness_gates import readiness_gate, readiness_gates
@@ -264,6 +266,30 @@ def _gate_record(gate_id: str, status: str, summary: str, details: dict | None =
         "summary": summary,
         "details": details or {},
     }
+
+
+class GateEvaluatorNativeNormalizationTests(unittest.TestCase):
+    def test_subroutine_dependency_key_uses_native_ascii_compaction_with_fallback(self):
+        values = [None, 0, '  "Name-01" ', "Straße", "東京", "A.B_C", "ß"]
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                gate_evaluators._norm_subroutine_dependency_key(value)
+                for value in values
+            ]
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                gate_evaluators,
+                "_native_ascii_lower_alnum_compact",
+                wraps=native_acceleration.ascii_lower_alnum_compact,
+            ) as native_call:
+                actual = [
+                    gate_evaluators._norm_subroutine_dependency_key(value)
+                    for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertIsNone(native_acceleration.ascii_lower_alnum_compact("東京"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["", "", "name01", "strasse", "", "abc", "ss"])
 
 
 class ValidationTests(unittest.TestCase):

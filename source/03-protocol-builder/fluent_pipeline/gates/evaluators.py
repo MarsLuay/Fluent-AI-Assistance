@@ -12,6 +12,10 @@ import re
 from pathlib import Path
 from typing import Any, Mapping
 
+from tecan_common.native_acceleration import (
+    ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
+)
+
 from fluentcoder.expressions import (
     canonical_expression_key,
     expression_fields_for_command,
@@ -1570,7 +1574,9 @@ def _subroutine_package_findings(
     return findings
 
 def _norm_subroutine_dependency_key(value: Any) -> str:
-    return re.sub(r"[^a-z0-9]+", "", str(value or "").strip().strip('"').casefold())
+    text = str(value or "").strip().strip('"').casefold()
+    native = _native_ascii_lower_alnum_compact(text)
+    return native if native is not None else re.sub(r"[^a-z0-9]+", "", text)
 
 def _manifest_name_inventory(
     source_manifest: dict[str, Any] | None,
