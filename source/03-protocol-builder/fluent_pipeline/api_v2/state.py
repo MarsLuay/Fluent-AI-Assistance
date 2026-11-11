@@ -11,6 +11,10 @@ import re
 from enum import Enum
 from typing import Any, Mapping, MutableMapping
 
+from tecan_common.native_acceleration import (
+    ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
+)
+
 from .types import StateMachineStates
 
 # Best-effort offline mirror of VisionX ``StateMachineStates`` integer values.
@@ -45,7 +49,9 @@ _STATE_PREFIX_RE = re.compile(r"^state\s*=\s*", re.IGNORECASE)
 
 
 def _compact(text: str) -> str:
-    return re.sub(r"[^a-z0-9]", "", text.casefold())
+    folded = text.casefold()
+    native = _native_ascii_lower_alnum_compact(folded)
+    return native if native is not None else re.sub(r"[^a-z0-9]", "", folded)
 
 
 def format_state_machine_state(state: StateMachineStates | Any) -> str:
