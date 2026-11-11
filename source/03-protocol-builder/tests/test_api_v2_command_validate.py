@@ -123,6 +123,35 @@ class ApiV2CommandValidateTests(unittest.TestCase):
         self.assertEqual(commented_actual, commented_expected)
         self.assertEqual(commented_actual, [])
 
+    def test_validation_candidate_scans_use_native_xml_selectors(self):
+        root = command_validate.ET.fromstring(
+            '<Root xmlns:x="urn:test" xmlns:i="urn:types">'
+            '<x:anyType i:type="i:VariableDefinitionHelper">'
+            "<x:Name>first</x:Name></x:anyType>"
+            "<VariableDefinitionHelper><Name>second</Name></VariableDefinitionHelper>"
+            '<anyType i:type="i:Unrelated"><Name>ignored</Name></anyType>'
+            "<LabwareName>first</LabwareName><LabwareLable>first</LabwareLable>"
+            "<LabwareLabel>second</LabwareLabel></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_variables = command_validate._compiled_variable_declarations(root)
+            expected_labware = command_validate._compiled_labware_name_fields(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual_variables = command_validate._compiled_variable_declarations(
+                    root
+                )
+                actual_labware = command_validate._compiled_labware_name_fields(root)
+                self.assertEqual(native_call.call_count, 2)
+        self.assertEqual(actual_variables, expected_variables)
+        self.assertEqual(actual_variables, {"first", "second"})
+        self.assertEqual(actual_labware, expected_labware)
+        self.assertEqual(actual_labware, ["first", "second"])
+
     def test_structured_failures_for_bad_xscr(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "bad.xscr"

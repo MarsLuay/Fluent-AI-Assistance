@@ -740,7 +740,9 @@ def _compiled_element_for_labware_name(root: ET.Element, labware_name: str) -> E
 
 def _compiled_variable_declarations(root: ET.Element) -> set[str]:
     names: set[str] = set()
-    for element in root.iter():
+    for element in _elements_by_local_names(
+        root, ("anyType", "VariableDefinitionHelper")
+    ):
         local = _local_name(element.tag)
         if local == "anyType":
             type_hint = " ".join(str(value) for value in element.attrib.values())
@@ -779,7 +781,9 @@ def _compiled_labware_types_by_label(root: ET.Element) -> dict[str, str]:
 def _compiled_labware_name_fields(root: ET.Element) -> list[str]:
     names: list[str] = []
     seen: set[str] = set()
-    for element in root.iter():
+    for element in _elements_by_local_names(
+        root, ("LabwareName", "LabwareLable", "LabwareLabel")
+    ):
         local = _local_name(element.tag)
         if local not in {"LabwareName", "LabwareLable", "LabwareLabel"}:
             continue
@@ -802,8 +806,19 @@ def _compiled_element_disabled(element: ET.Element) -> bool:
     return _first_text(element, "IsDisabledForExecution").casefold() == "true"
 
 
+def _elements_by_local_names(
+    root: ET.Element, names: tuple[str, ...]
+) -> list[ET.Element]:
+    elements = _native_xml_elements_by_name(root, names, ET.Element)
+    if elements is not None:
+        return elements
+    return [
+        element for element in root.iter() if _local_name(element.tag) in names
+    ]
+
+
 def _elements_by_local_name(root: ET.Element, name: str) -> list[ET.Element]:
-    return [element for element in root.iter() if _local_name(element.tag) == name]
+    return _elements_by_local_names(root, (name,))
 
 
 def _bracket_variable_names(value: Any) -> set[str]:
