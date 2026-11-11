@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Mapping, Protocol
 
 from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
     parse_ascii_bool_text as _native_parse_ascii_bool_text,
     ascii_casefold_equals as _native_ascii_casefold_equals,
@@ -510,7 +511,7 @@ def validate_cross_command_heuristics(
             record = _record_for_element(commands, command, command_name)
             labware_name = _first_text(command, "LabwareName")
             labware_type = labware_types.get(_norm_name(labware_name), "")
-            if labware_type and "adapter" in labware_type.casefold():
+            if labware_type and _contains_casefolded(labware_type, "adapter"):
                 failures.append(
                     _failure_for_record(
                         record,
@@ -844,6 +845,12 @@ def _first_text(root: ET.Element, name: str, default: str = "") -> str:
 def _text_is_true(value: str) -> bool:
     native = _native_parse_ascii_bool_text(value)
     return native if native is not None else value.lower() == "true"
+
+
+def _contains_casefolded(value: str, needle: str) -> bool:
+    native = _native_ascii_casefold_trim(value)
+    haystack = native if native is not None else value.casefold()
+    return needle.casefold() in haystack
 
 
 def _compiled_element_disabled(element: ET.Element) -> bool:

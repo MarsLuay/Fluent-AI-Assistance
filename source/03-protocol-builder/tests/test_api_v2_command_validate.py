@@ -79,6 +79,46 @@ GOOD_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ApiV2CommandValidateTests(unittest.TestCase):
+    def test_casefolded_adapter_detection_uses_native_ascii_with_unicode_fallback(self):
+        cases = [
+            ("Adapter A200", "adapter", True),
+            ("LABWARE ADAPTER", "adapter", True),
+            ("Straße", "STRASSE", True),
+            ("Labware", "adapter", False),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [
+                command_validate._contains_casefolded(value, needle)
+                for value, needle, _ in cases
+            ]
+        expected = [matched for _, _, matched in cases]
+        self.assertEqual(disabled, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = [
+                    command_validate._contains_casefolded(value, needle)
+                    for value, needle, _ in cases
+                ]
+                self.assertEqual(native_call.call_count, len(cases))
+        self.assertEqual(enabled, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = [
+                    command_validate._contains_casefolded(value, needle)
+                    for value, needle, _ in cases
+                ]
+        self.assertEqual(fallback, expected)
+
     def test_text_true_uses_native_ascii_parser_and_python_lower_fallback(self):
         values = ["true", "TRUE", "False", "truſe", " true\u2003", ""]
         expected = [value.lower() == "true" for value in values]
@@ -678,7 +718,14 @@ class ApiV2CommandValidateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "bad.xscr"
             path.write_text(BAD_XSCR, encoding="utf-8")
-            report = validate_compiled_xscr_commands(path)
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    command_validate,
+                    "_native_ascii_casefold_trim",
+                    wraps=native_acceleration.ascii_casefold_trim,
+                ) as native_call:
+                    report = validate_compiled_xscr_commands(path)
+                    self.assertGreater(native_call.call_count, 0)
 
         self.assertFalse(report.ok)
         self.assertGreater(report.failure_count, 0)
