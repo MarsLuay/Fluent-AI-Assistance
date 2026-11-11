@@ -7,6 +7,8 @@ from dataclasses import replace as dataclass_replace
 from pathlib import Path
 from typing import Any
 
+from tecan_common.native_acceleration import ascii_lower as _native_ascii_lower
+
 from ..application_services import (
     BundleVerificationRequest,
     LogAnalysisRequest,
@@ -323,8 +325,12 @@ def resolve_ir_source(ctx: ProjectLike | None, value: Path) -> Path:
         cwd_relative = (Path.cwd() / path).resolve()
         if cwd_relative.exists():
             return cwd_relative
-    if ctx is not None and value.suffix.lower() == ".xscr":
-        return resolve_context_script(ctx, value)
+    if ctx is not None:
+        suffix = value.suffix
+        native_suffix = _native_ascii_lower(suffix)
+        suffix = native_suffix if native_suffix is not None else suffix.lower()
+        if suffix == ".xscr":
+            return resolve_context_script(ctx, value)
     return resolve_context_path(ctx, value)
 
 

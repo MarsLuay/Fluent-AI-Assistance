@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 import fluent_pipeline.cli.rendering as rendering_module
+import fluent_pipeline.cli.requests as requests_module
 from tecan_common import native_acceleration
 from fluent_pipeline.application_services import GenerationResult
 from fluent_pipeline.cli import _cmd_analyze, _cmd_generate, _cmd_map_media, _resolve_generation_event_log, _resolve_ir_source
@@ -521,6 +522,77 @@ class CliPathResolutionTests(unittest.TestCase):
         self.assertEqual(merged.collection, "verification-sources")
         self.assertEqual(merged.context, [])
         self.assertEqual(merged.project_archive, [])
+
+    def test_ir_source_suffix_uses_native_ascii_lower_with_unicode_fallback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            context = SimpleNamespace(root=Path(tmp))
+            xscr_path = Path(tmp) / "Prötokol.XSCR"
+            other_path = Path(tmp) / "Script.İ"
+            script_result = Path("resolved-script")
+            context_result = Path("resolved-context")
+            with mock.patch.dict(
+                "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+            ):
+                with mock.patch.object(
+                    requests_module,
+                    "resolve_context_script",
+                    return_value=script_result,
+                ), mock.patch.object(
+                    requests_module,
+                    "resolve_context_path",
+                    return_value=context_result,
+                ):
+                    expected = [
+                        _resolve_ir_source(context, xscr_path),
+                        _resolve_ir_source(context, other_path),
+                    ]
+            self.assertEqual(expected, [script_result, context_result])
+
+            with mock.patch.dict(
+                "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+            ):
+                with mock.patch.object(
+                    requests_module,
+                    "resolve_context_script",
+                    return_value=script_result,
+                ) as script_resolver, mock.patch.object(
+                    requests_module,
+                    "resolve_context_path",
+                    return_value=context_result,
+                ) as context_resolver, mock.patch.object(
+                    requests_module,
+                    "_native_ascii_lower",
+                    wraps=native_acceleration.ascii_lower,
+                ) as native_call:
+                    actual = [
+                        _resolve_ir_source(context, xscr_path),
+                        _resolve_ir_source(context, other_path),
+                    ]
+                    script_resolver.assert_called_once_with(context, xscr_path)
+                    context_resolver.assert_called_once_with(context, other_path)
+                    native_call.assert_any_call(".XSCR")
+                    native_call.assert_any_call(".İ")
+            self.assertEqual(actual, expected)
+
+            with mock.patch.dict(
+                "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+            ):
+                with mock.patch.object(
+                    requests_module,
+                    "resolve_context_script",
+                    return_value=script_result,
+                ), mock.patch.object(
+                    requests_module,
+                    "resolve_context_path",
+                    return_value=context_result,
+                ), mock.patch.object(
+                    requests_module, "_native_ascii_lower", return_value=None
+                ):
+                    forced_fallback = [
+                        _resolve_ir_source(context, xscr_path),
+                        _resolve_ir_source(context, other_path),
+                    ]
+            self.assertEqual(forced_fallback, expected)
 
     def test_ir_source_prefers_existing_cwd_relative_path_over_context_build_path(self):
         original_cwd = Path.cwd()
