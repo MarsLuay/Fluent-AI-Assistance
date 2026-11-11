@@ -610,6 +610,95 @@ class NativeAccelerationTests(unittest.TestCase):
         self.assertEqual(actual_text, "example")
         self.assertEqual(actual_volume, 1.25)
 
+    def test_expression_validation_uses_native_xml_selectors_with_parity(self) -> None:
+        from fluentcoder.expressions import validation
+
+        if not native_acceleration.available() or not all(
+            hasattr(native_acceleration._native, name)
+            for name in (
+                "xml_elements_by_name",
+                "xml_first_element_by_name",
+            )
+        ):
+            self.skipTest("optional Rust XML selectors are not built")
+        root = ET.fromstring(
+            '<Root xmlns:ns="urn:test"><Section><ns:Value> first </ns:Value>'
+            "<Nested><Value> second </Value></Nested></Section>"
+            "<Section><Value>third</Value></Section>"
+            "<VariableDefinitionHelper><Name>alpha</Name><TypeName>Number</TypeName>"
+            "</VariableDefinitionHelper><anyType Type=\"VariableDefinitionHelper\">"
+            "<Name>beta</Name><TypeName>Boolean</TypeName></anyType></Root>"
+        )
+        sections = [element for element in root.iter() if element.tag == "Section"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_values = validation._expression_field_values(
+                root, "Section/Value"
+            )
+            expected_declarations = validation._variable_declarations(root)
+            expected_first_name = validation._first_text(root, "Name")
+            expected_elements = validation._elements_by_local_name(root, "Value")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as elements_native_call:
+                actual_values = validation._expression_field_values(
+                    root, "Section/Value"
+                )
+                self.assertEqual(elements_native_call.call_count, 3)
+                elements_native_call.assert_any_call(root, {"Section"}, ET.Element)
+                for section in sections:
+                    elements_native_call.assert_any_call(
+                        section, {"Value"}, ET.Element
+                    )
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as declaration_native_call:
+                with patch.object(
+                    native_acceleration,
+                    "xml_first_element_by_name",
+                    wraps=native_acceleration.xml_first_element_by_name,
+                ) as first_native_call:
+                    actual_declarations = validation._variable_declarations(root)
+                    declaration_native_call.assert_called_once_with(
+                        root,
+                        {"anyType", "VariableDefinitionHelper"},
+                        ET.Element,
+                    )
+                    self.assertEqual(first_native_call.call_count, 4)
+            with patch.object(
+                native_acceleration,
+                "xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
+            ) as first_native_call:
+                actual_first_name = validation._first_text(root, "Name")
+                first_native_call.assert_called_once_with(
+                    root, "Name", ET.Element
+                )
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as elements_native_call:
+                actual_elements = validation._elements_by_local_name(root, "Value")
+                elements_native_call.assert_called_once_with(
+                    root, {"Value"}, ET.Element
+                )
+
+        self.assertEqual(actual_values, expected_values)
+        self.assertEqual(actual_declarations, expected_declarations)
+        self.assertEqual(actual_first_name, expected_first_name)
+        self.assertEqual(actual_elements, expected_elements)
+        self.assertEqual(actual_values, ["first", "second", "third"])
+        self.assertEqual(
+            actual_declarations, {"alpha": "Number", "beta": "Boolean"}
+        )
+        self.assertEqual(actual_first_name, "alpha")
+        self.assertEqual(len(actual_elements), 3)
+
     def test_xcon_orientation_rows_use_native_selector_with_python_parity(self) -> None:
         from fluentcoder.catalog import xcon
 

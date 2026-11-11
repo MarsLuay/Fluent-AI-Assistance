@@ -10,6 +10,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from tecan_common import native_acceleration
+
 from .. import xml_compat as ET
 from .ast import expression_kind
 from .attributes import attribute_conflict_diagnostics, attribute_references_in_expression
@@ -570,21 +572,36 @@ def _expression_field_values(root: ET.Element, field_path: str) -> list[str]:
     parts = tuple(part for part in field_path.split("/") if part)
     if not parts:
         return []
+    containers_native = native_acceleration.xml_elements_by_name(
+        root, {parts[0]}, ET.Element
+    )
+    containers = containers_native if containers_native is not None else root.iter()
     if len(parts) == 1:
         return [
             (element.text or "").strip()
-            for element in root.iter()
-            if _local_name(element.tag) == parts[0] and not list(element)
+            for element in containers
+            if (
+                containers_native is not None
+                or _local_name(element.tag) == parts[0]
+            )
+            and not list(element)
         ]
 
     values: list[str] = []
-    for container in root.iter():
-        if _local_name(container.tag) != parts[0]:
+    for container in containers:
+        if (
+            containers_native is None
+            and _local_name(container.tag) != parts[0]
+        ):
             continue
-        for element in container.iter():
+        elements_native = native_acceleration.xml_elements_by_name(
+            container, {parts[-1]}, ET.Element
+        )
+        elements = elements_native if elements_native is not None else container.iter()
+        for element in elements:
             if element is container:
                 continue
-            if _local_name(element.tag) == parts[-1]:
+            if elements_native is not None or _local_name(element.tag) == parts[-1]:
                 values.append((element.text or "").strip())
     return values
 
@@ -667,7 +684,11 @@ def expression_inventory_ok(inventory: dict[str, Any]) -> bool:
 
 def _variable_declarations(root: ET.Element) -> dict[str, str]:
     variables: dict[str, str] = {}
-    for element in root.iter():
+    native = native_acceleration.xml_elements_by_name(
+        root, {"anyType", "VariableDefinitionHelper"}, ET.Element
+    )
+    elements = native if native is not None else root.iter()
+    for element in elements:
         local = _local_name(element.tag)
         if local == "anyType":
             type_hint = " ".join(str(value) for value in element.attrib.values())
@@ -689,10 +710,19 @@ def _compiled_command_id(element: ET.Element) -> str:
 
 
 def _elements_by_local_name(root: ET.Element, name: str) -> list[ET.Element]:
+    native = native_acceleration.xml_elements_by_name(root, {name}, ET.Element)
+    if native is not None:
+        return native
     return [element for element in root.iter() if _local_name(element.tag) == name]
 
 
 def _first_text(root: ET.Element, name: str) -> str:
+    native = native_acceleration.xml_first_element_by_name(
+        root, name, ET.Element
+    )
+    if native is not None:
+        element = native[1]
+        return (element.text or "").strip() if element is not None else ""
     for element in root.iter():
         if _local_name(element.tag) == name:
             return (element.text or "").strip()
