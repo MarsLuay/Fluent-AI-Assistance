@@ -3546,7 +3546,8 @@ def _literal_text(node: ast.AST) -> Any:
 
 def _source_path(draft_name: str, current_group: str, source: str, node: ast.AST) -> str:
     segment = ast.get_source_segment(source, node) or ""
-    segment = " ".join(segment.split())
+    native = native_acceleration.collapse_ascii_whitespace(segment)
+    segment = native if native is not None else " ".join(segment.split())
     if len(segment) > 140:
         segment = segment[:137].rstrip() + "..."
     return f"{draft_name} -> build_worktable() -> {current_group} -> {segment}"

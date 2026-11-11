@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import unittest
 from unittest.mock import patch
 
@@ -10,6 +11,55 @@ from tecan_common import native_acceleration
 
 
 class ProtocolIrNativeStringsTests(unittest.TestCase):
+    def test_source_path_whitespace_uses_rust_with_python_fallback(self):
+        sources = [
+            "result = choose('alpha\u2003beta')",
+            "result = invoke('" + "x" * 180 + "')",
+        ]
+        cases = [
+            (source, ast.parse(source).body[0].value)
+            for source in sources
+        ]
+
+        def reference(source: str, node: ast.AST) -> str:
+            segment = " ".join((ast.get_source_segment(source, node) or "").split())
+            if len(segment) > 140:
+                segment = segment[:137].rstrip() + "..."
+            return f"Draft -> build_worktable() -> Group -> {segment}"
+
+        expected = [reference(source, node) for source, node in cases]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback = [
+                protocol_ir_module._source_path("Draft", "Group", source, node)
+                for source, node in cases
+            ]
+        self.assertEqual(fallback, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "collapse_ascii_whitespace",
+                wraps=native_acceleration.collapse_ascii_whitespace,
+            ) as native_call:
+                actual = [
+                    protocol_ir_module._source_path("Draft", "Group", source, node)
+                    for source, node in cases
+                ]
+                self.assertEqual(native_call.call_count, len(cases))
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "collapse_ascii_whitespace",
+                return_value=None,
+            ):
+                unsupported_fallback = [
+                    protocol_ir_module._source_path("Draft", "Group", source, node)
+                    for source, node in cases
+                ]
+        self.assertEqual(unsupported_fallback, expected)
+
     def test_safe_variable_base_matches_python_with_collision_policy_retained(self):
         cases = [
             ("Tecan Pump", set()),
