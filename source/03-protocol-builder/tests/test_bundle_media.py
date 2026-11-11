@@ -56,6 +56,44 @@ def test_media_kind_normalization_uses_native_ascii_with_python_fallback() -> No
     assert unsupported_fallback == expected
 
 
+def test_deployable_media_name_and_suffix_use_native_lower_fallback(tmp_path: Path) -> None:
+    cases = [
+        ("photo.GIF", True),
+        ("README.MD", False),
+        ("media_manifest.JSON", False),
+        ("PhotoÜ.GIF", True),
+        ("Photo.İ", False),
+    ]
+    paths = []
+    for name, _ in cases:
+        path = tmp_path / name
+        path.write_bytes(b"media")
+        paths.append(path)
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = [bundle_media._is_deployable_prompt_media(path) for path in paths]
+    assert expected == [allowed for _, allowed in cases]
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            bundle_media,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            actual = [bundle_media._is_deployable_prompt_media(path) for path in paths]
+        native_call.assert_any_call("photo.GIF")
+        native_call.assert_any_call("PhotoÜ.GIF")
+        native_call.assert_any_call(".İ")
+    assert actual == expected
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(bundle_media, "_native_ascii_lower", return_value=None):
+            forced_fallback = [
+                bundle_media._is_deployable_prompt_media(path) for path in paths
+            ]
+    assert forced_fallback == expected
+
+
 def test_stage_generation_media_originals_copies_dropped_video(tmp_path: Path) -> None:
     build_dir = tmp_path / "build"
     media_dir = build_dir / "media"

@@ -12,6 +12,7 @@ from typing import Any, Mapping
 
 from tecan_common.native_acceleration import (
     ascii_casefold_trim as _native_ascii_casefold_trim,
+    ascii_lower as _native_ascii_lower,
 )
 
 ASSET_SUFFIXES = {".bmp", ".gif", ".jpg", ".jpeg", ".png", ".tif", ".tiff"}
@@ -66,6 +67,11 @@ STEP_SLOT_MEDIA_RE = re.compile(
 )
 
 
+def _lower_text(value: str) -> str:
+    native = _native_ascii_lower(value)
+    return native if native is not None else value.lower()
+
+
 def _bundle_prompt_media_sources(bundle_dir: Path) -> list[Path]:
     roots: list[Path] = []
     for rel in ("media/processed", "source/media"):
@@ -81,9 +87,9 @@ def _bundle_prompt_media_sources(bundle_dir: Path) -> list[Path]:
 def _is_deployable_prompt_media(path: Path) -> bool:
     if not path.is_file() or path.stat().st_size == 0:
         return False
-    if path.name.lower() in {"readme.md", "media_manifest.json"}:
+    if _lower_text(path.name) in {"readme.md", "media_manifest.json"}:
         return False
-    return path.suffix.lower() in ASSET_SUFFIXES
+    return _lower_text(path.suffix) in ASSET_SUFFIXES
 
 
 def _is_real_visual_media_source(path: Path) -> bool:
@@ -91,7 +97,7 @@ def _is_real_visual_media_source(path: Path) -> bool:
 
     if not path.is_file() or path.stat().st_size == 0:
         return False
-    suffix = path.suffix.lower()
+    suffix = _lower_text(path.suffix)
     if suffix == ".gif":
         return not is_placeholder_video_gif(path)
     if suffix in {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp"}:
@@ -115,9 +121,10 @@ def _should_replace_with_real_media(
         return False
     from .media_convert import is_placeholder_image_slot, is_placeholder_video_gif
 
-    if destination.suffix.lower() == ".gif":
+    destination_suffix = _lower_text(destination.suffix)
+    if destination_suffix == ".gif":
         return is_placeholder_video_gif(destination)
-    if destination.suffix.lower() in {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp"}:
+    if destination_suffix in {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp"}:
         return is_placeholder_image_slot(destination)
     return False
 
@@ -159,7 +166,7 @@ def seed_prompt_media_from_bundle(
                     continue
                 if path.name in slot_sources:
                     continue
-                suffix = path.suffix.lower()
+                suffix = _lower_text(path.suffix)
                 if suffix == ".gif" and is_placeholder_video_gif(path):
                     continue
                 if suffix in {".png", ".jpg", ".jpeg"} and is_placeholder_image_slot(path):
@@ -305,7 +312,7 @@ def seed_prompt_media_from_touchtools(
             path = touchtools_dir / candidate
             if not _is_deployable_prompt_media(path):
                 continue
-            suffix = path.suffix.lower()
+            suffix = _lower_text(path.suffix)
             if suffix == ".gif":
                 from .media_convert import is_placeholder_video_gif
 
