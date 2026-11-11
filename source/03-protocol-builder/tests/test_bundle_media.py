@@ -550,6 +550,47 @@ def test_raw_video_capture_uses_native_lower_with_fallback(tmp_path: Path) -> No
     assert forced_fallback == expected
 
 
+def test_visual_source_kind_uses_native_lower_with_fallback(tmp_path: Path) -> None:
+    source = tmp_path / "step_020_video.MP4"
+    source.write_bytes(b"video")
+    spec = {
+        "filename": "step_020_video.gif",
+        "slot": "step_020_video",
+        "kind": "VIDEO",
+    }
+    inventory = {source.name: source}
+    policy = {
+        "allow_cross_kind_fallback": False,
+        "allow_prompt_number_remap": False,
+        "legacy_aliases": {},
+    }
+
+    def resolve_source() -> tuple[Path | None, str, str]:
+        return bundle_media._resolve_visual_source_for_slot(
+            spec, inventory, policy=policy, ir={"steps": []}
+        )
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = resolve_source()
+    assert expected == (source, "slot_stem", source.name)
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            bundle_media,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            actual = resolve_source()
+        native_call.assert_any_call("VIDEO")
+        native_call.assert_any_call(".MP4")
+    assert actual == expected
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(bundle_media, "_native_ascii_lower", return_value=None):
+            forced_fallback = resolve_source()
+    assert forced_fallback == expected
+
+
 def test_resolve_prompt_media_cross_kind_image_fills_video_slot(tmp_path: Path) -> None:
     source_dir = tmp_path / "sources"
     source_dir.mkdir()

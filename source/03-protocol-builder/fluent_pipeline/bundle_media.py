@@ -749,7 +749,7 @@ def _resolve_visual_source_for_slot(
 ) -> tuple[Path | None, str, str]:
     filename = str(spec.get("filename") or "").strip()
     slot = str(spec.get("slot") or "").strip()
-    kind = str(spec.get("kind") or "").lower()
+    kind = _lower_text(str(spec.get("kind") or ""))
     if not filename or not slot:
         return None, "", ""
 
@@ -763,7 +763,7 @@ def _resolve_visual_source_for_slot(
             continue
         if Path(basename).stem.casefold() != slot.casefold():
             continue
-        suffix = source.suffix.lower()
+        suffix = _lower_text(source.suffix)
         if kind == "image" and suffix in IMAGE_CAPTURE_SUFFIXES:
             return source, "slot_stem", basename
         if kind == "video" and suffix in VIDEO_CAPTURE_SUFFIXES:
