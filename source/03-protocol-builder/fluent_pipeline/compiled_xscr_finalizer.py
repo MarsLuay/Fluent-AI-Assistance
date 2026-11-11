@@ -10,6 +10,11 @@ import re
 from typing import Any, Mapping
 
 from . import xml_compat as ET
+from tecan_common.native_acceleration import (
+    xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
+    xml_first_element_by_name as _native_xml_first_element_by_name,
+)
+
 from .api_v2.command_validate import validate_compiled_xscr_commands
 from .checksums import entry_checksum_state, recompute_checksum_bytes
 from .prompt_media import ensure_compiled_prompt_media_references
@@ -838,6 +843,10 @@ def _first_payload_data_index(payload: Any) -> int:
 
 
 def _first_xml_child(root: Any, name: str) -> Any | None:
+    selection = _native_xml_first_direct_child_by_name(root, name, ET.Element)
+    if selection is not None:
+        _, child = selection
+        return child
     for child in list(root):
         if _local_xml_name(child.tag) == name:
             return child
@@ -845,6 +854,10 @@ def _first_xml_child(root: Any, name: str) -> Any | None:
 
 
 def _first_xml_text(root: Any, name: str) -> str:
+    selection = _native_xml_first_element_by_name(root, name, ET.Element)
+    if selection is not None:
+        _, child = selection
+        return (child.text or "").strip() if child is not None else ""
     for child in root.iter():
         if _local_xml_name(child.tag) == name:
             return (child.text or "").strip()

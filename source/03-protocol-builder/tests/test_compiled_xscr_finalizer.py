@@ -4,9 +4,65 @@ from pathlib import Path
 from unittest import mock
 
 import fluent_pipeline.compiled_xscr_finalizer as finalizer
+from tecan_common import native_acceleration
 
 
 class CompiledXscrFinalizerTests(unittest.TestCase):
+    def test_first_xml_lookups_use_native_selectors_and_fallback(self):
+        root = finalizer.ET.fromstring(
+            '<Root xmlns:x="urn:test"><x:Name> </x:Name><Name>later</Name>'
+            "<x:Direct>first</x:Direct><Direct>second</Direct></Root>"
+        )
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_text = finalizer._first_xml_text(root, "Name")
+            expected_child = finalizer._first_xml_child(root, "Direct")
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                finalizer,
+                "_native_xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
+            ) as first_call, mock.patch.object(
+                finalizer,
+                "_native_xml_first_direct_child_by_name",
+                wraps=native_acceleration.xml_first_direct_child_by_name,
+            ) as direct_call:
+                actual_text = finalizer._first_xml_text(root, "Name")
+                actual_child = finalizer._first_xml_child(root, "Direct")
+                self.assertEqual(first_call.call_count, 1)
+                self.assertEqual(direct_call.call_count, 1)
+        self.assertEqual(actual_text, expected_text)
+        self.assertEqual(actual_text, "")
+        self.assertIs(actual_child, expected_child)
+        self.assertIs(actual_child, root[2])
+
+        class StringTag(str):
+            pass
+
+        custom_root = finalizer.ET.Element("Root")
+        custom_name = finalizer.ET.SubElement(custom_root, StringTag("Name"))
+        custom_name.text = "Custom"
+        custom_child = finalizer.ET.SubElement(custom_root, StringTag("Direct"))
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_text = finalizer._first_xml_text(custom_root, "Name")
+            fallback_child = finalizer._first_xml_child(custom_root, "Direct")
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_first_element_by_name(
+                    custom_root, "Name", finalizer.ET.Element
+                )
+            )
+            self.assertIsNone(
+                native_acceleration.xml_first_direct_child_by_name(
+                    custom_root, "Direct", finalizer.ET.Element
+                )
+            )
+            actual_fallback_text = finalizer._first_xml_text(custom_root, "Name")
+            actual_fallback_child = finalizer._first_xml_child(custom_root, "Direct")
+        self.assertEqual(actual_fallback_text, fallback_text)
+        self.assertEqual(actual_fallback_text, "Custom")
+        self.assertIs(actual_fallback_child, fallback_child)
+        self.assertIs(actual_fallback_child, custom_child)
+
     def test_aligns_workspace_base_name_to_worktable_reference(self):
         xscr = """<VxData><Payload>
 <Reference><Guid>worktable-guid</Guid><TypeId>WorktableWorkspace</TypeId><ObjectName>WT</ObjectName></Reference>
