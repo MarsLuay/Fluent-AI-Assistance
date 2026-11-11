@@ -5433,6 +5433,88 @@ fn project_model_entry_path(py: Python<'_>, record: &Bound<'_, PyAny>) -> PyResu
     Ok(Some(String::new()))
 }
 
+fn project_record_casefold<'py>(
+    py: Python<'py>,
+    record: &Bound<'py, PyDict>,
+    key: &str,
+) -> PyResult<Option<String>> {
+    let Some(value) = record.get_item(key)? else {
+        return Ok(Some(String::new()));
+    };
+    if value.is_none() {
+        return Ok(Some(String::new()));
+    }
+    if !value.get_type().is(py.get_type::<PyString>()) {
+        return Ok(None);
+    }
+    Ok(Some(value.call_method0("casefold")?.extract::<String>()?))
+}
+
+fn project_record_casefold_joined<'py>(
+    py: Python<'py>,
+    record: &Bound<'py, PyDict>,
+    key: &str,
+) -> PyResult<Option<String>> {
+    let Some(value) = record.get_item(key)? else {
+        return Ok(Some(String::new()));
+    };
+    if value.is_none() {
+        return Ok(Some(String::new()));
+    }
+    let values = if value.get_type().is(py.get_type::<PyList>()) {
+        value.cast::<PyList>()?.iter().collect::<Vec<_>>()
+    } else if value.get_type().is(py.get_type::<PyTuple>()) {
+        value.cast::<PyTuple>()?.iter().collect::<Vec<_>>()
+    } else {
+        return Ok(None);
+    };
+    let mut normalized = Vec::with_capacity(values.len());
+    for value in values {
+        if !value.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        normalized.push(value.call_method0("casefold")?.extract::<String>()?);
+    }
+    normalized.sort();
+    Ok(Some(normalized.join(",")))
+}
+
+#[pyfunction]
+fn project_record_fingerprint<'py>(
+    py: Python<'py>,
+    record: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !record.get_type().is(py.get_type::<PyDict>()) {
+        return Ok(None);
+    }
+    let record = record.cast::<PyDict>()?;
+    let Some(kind) = project_record_casefold(py, record, "kind")? else {
+        return Ok(None);
+    };
+    let Some(object_name) = project_record_casefold(py, record, "object_name")? else {
+        return Ok(None);
+    };
+    let Some(type_id) = project_record_casefold(py, record, "type_id")? else {
+        return Ok(None);
+    };
+    let Some(guids) = project_record_casefold_joined(py, record, "guids")? else {
+        return Ok(None);
+    };
+    let Some(names) = project_record_casefold_joined(py, record, "names")? else {
+        return Ok(None);
+    };
+    let Some(functional_group) = project_record_casefold(py, record, "functional_group")? else {
+        return Ok(None);
+    };
+    Ok(Some(
+        PyTuple::new(
+            py,
+            [kind, object_name, type_id, guids, names, functional_group],
+        )?
+        .into_any(),
+    ))
+}
+
 #[pyfunction]
 fn diagnostic_sort_indices(keys_json: &str) -> PyResult<Option<String>> {
     let Ok(keys) = serde_json::from_str::<Vec<Vec<String>>>(keys_json) else {
@@ -6957,6 +7039,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(canonical_json_compact, module)?)?;
     module.add_function(wrap_pyfunction!(project_model_identifiers, module)?)?;
     module.add_function(wrap_pyfunction!(project_model_entry_path, module)?)?;
+    module.add_function(wrap_pyfunction!(project_record_fingerprint, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_sort_indices, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_message, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_redact_text, module)?)?;

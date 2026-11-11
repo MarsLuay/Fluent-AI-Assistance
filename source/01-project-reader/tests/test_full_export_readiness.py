@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from tecan_common import native_acceleration
+import tecan_reader.full_export_readiness as readiness_module
 from tecan_reader.full_export_readiness import (
     ReadinessStatus,
     resolve_full_export_readiness,
@@ -160,6 +161,75 @@ class FullExportReadinessTests(unittest.TestCase):
         )
         self.assertEqual(result.status, ReadinessStatus.COMPLETE)
         self.assertEqual(result.unresolved_references, ())
+
+    def test_native_record_fingerprint_matches_python_casefold_and_sorting(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "project_record_fingerprint"
+        ):
+            self.skipTest("optional Rust readiness fingerprint is not built")
+        records = [
+            {},
+            {
+                "kind": "WorkSpace",
+                "object_name": "Straße",
+                "type_id": "WorkTable",
+                "guids": ["Z", "ä", "A", "ß", "a"],
+                "names": ("Ωmega", "omega", "e\\u0301", "é"),
+                "functional_group": "İstanbul",
+                "provenance": {"source_archive": "ignored"},
+            },
+            {
+                "kind": "",
+                "object_name": None,
+                "type_id": "Typeİ",
+                "guids": [],
+                "names": None,
+                "functional_group": "Σςσ",
+            },
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [readiness_module._record_fingerprint(record) for record in records]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                readiness_module.native_acceleration,
+                "project_record_fingerprint",
+                wraps=native_acceleration.project_record_fingerprint,
+            ) as native_call:
+                actual = [readiness_module._record_fingerprint(record) for record in records]
+                self.assertEqual(native_call.call_count, len(records))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual[1][0:4], ("workspace", "strasse", "worktable", "a,a,ss,z,ä"))
+        self.assertEqual(actual[1][4], "e\\u0301,omega,é,ωmega")
+        self.assertEqual(actual[1][5], "i̇stanbul")
+
+    def test_native_record_fingerprint_falls_back_for_non_string_values(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "project_record_fingerprint"
+        ):
+            self.skipTest("optional Rust readiness fingerprint is not built")
+        class StringSubclass(str):
+            pass
+
+        records = [
+            {"kind": 0, "object_name": "Object"},
+            {"kind": False, "guids": 0},
+            {"guids": ["known", 42]},
+            {"names": [StringSubclass("subclass")]},
+            {"functional_group": {"custom": "value"}},
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [readiness_module._record_fingerprint(record) for record in records]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            for record in records:
+                self.assertIsNone(native_acceleration.project_record_fingerprint(record))
+            with patch.object(
+                readiness_module.native_acceleration,
+                "project_record_fingerprint",
+                wraps=native_acceleration.project_record_fingerprint,
+            ) as native_call:
+                actual = [readiness_module._record_fingerprint(record) for record in records]
+                self.assertEqual(native_call.call_count, len(records))
+        self.assertEqual(actual, expected)
 
     def test_duplicate_identifier_is_ambiguous(self) -> None:
         result = resolve_full_export_readiness(

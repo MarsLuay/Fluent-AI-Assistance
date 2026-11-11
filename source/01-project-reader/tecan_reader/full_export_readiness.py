@@ -498,6 +498,9 @@ def _find_conflicts(records: Sequence[Mapping[str, Any]]) -> list[IdentifierConf
 
 def _record_fingerprint(record: Mapping[str, Any]) -> tuple[str, ...]:
     """Compare definitions, not provenance, when archives repeat shared objects."""
+    native = native_acceleration.project_record_fingerprint(record)
+    if native is not None:
+        return native
     return (
         str(record.get("kind") or "").casefold(),
         str(record.get("object_name") or "").casefold(),

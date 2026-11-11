@@ -2293,6 +2293,23 @@ def project_model_entry_path(record: Any) -> str | None:
         return None
 
 
+def project_record_fingerprint(record: Any) -> tuple[str, ...] | None:
+    """Normalize supported readiness identity fields using Python casefold semantics."""
+    if not enabled() or type(record) is not dict:
+        return None
+    try:
+        result = _native.project_record_fingerprint(record)
+        if (
+            type(result) is tuple
+            and len(result) == 6
+            and all(type(value) is str for value in result)
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def sha256_text(value: Any) -> str | None:
     """Hash exact Unicode text natively, or request the Python hashing fallback."""
     if not enabled() or type(value) is not str:
