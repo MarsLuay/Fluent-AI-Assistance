@@ -2564,6 +2564,37 @@ def zeia_object_kind_from_suffix(suffix: Any) -> str | None:
         return None
 
 
+def count_string_groups(values: Any, groups: Any) -> dict[str, int] | None:
+    """Count string memberships in named groups for exact built-in inputs."""
+    if (
+        not enabled()
+        or type(values) is not list
+        or not all(type(value) is str for value in values)
+        or type(groups) is not dict
+        or not all(
+            type(name) is str
+            and type(members) is list
+            and all(type(member) is str for member in members)
+            for name, members in groups.items()
+        )
+    ):
+        return None
+    try:
+        result = _native.count_string_groups(values, groups)
+        if (
+            type(result) is dict
+            and set(result) == set(groups)
+            and all(
+                type(count) is int and 0 <= count <= len(values)
+                for count in result.values()
+            )
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def pin_reference_candidates(values: Any) -> list[str] | None:
     """Filter exact ASCII pin-reference tokens with Python fallback for Unicode."""
     if (

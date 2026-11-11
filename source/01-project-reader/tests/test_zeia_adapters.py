@@ -95,6 +95,67 @@ class TestObjectKindClassification(unittest.TestCase):
             self.assertEqual(zeia_adapters_module._object_kind(suffix), "component")
 
 
+class TestEligibleMemberCounts(unittest.TestCase):
+    def test_native_suffix_group_counts_match_python(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "count_string_groups"
+        ):
+            self.skipTest("optional Rust suffix counter is not built")
+        entries = [
+            "Scripts/main.XSCR",
+            "scripts/other.xscr",
+            "Objects/worktable.XWSP",
+            "Assets/image.JpG",
+            "lists/transfers.GWL",
+            "inputs/task.TWL",
+            "README.txt",
+            ".hidden",
+            "trailing.",
+            "...",
+            Path("folder/path-object.xscr"),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = zeia_adapters_module._eligible_member_counts(entries)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                zeia_adapters_module,
+                "_native_count_string_groups",
+                wraps=native_acceleration.count_string_groups,
+            ) as native_call:
+                actual = zeia_adapters_module._eligible_member_counts(entries)
+                native_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            {"scripts": 3, "objects": 2, "worklists": 1, "task_inputs": 1},
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                native_acceleration.count_string_groups(
+                    [".xscr", ".jpg", ".xscr"],
+                    {"scripts": [".xscr"], "assets": [".jpg"]},
+                ),
+                {"scripts": 2, "assets": 1},
+            )
+
+    def test_subclass_inputs_keep_python_iteration_behavior(self) -> None:
+        class EntryList(list):
+            pass
+
+        entries = EntryList(["file.xscr", "file.gwl"])
+        expected = {"scripts": 1, "objects": 0, "worklists": 1, "task_inputs": 0}
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                zeia_adapters_module,
+                "_native_count_string_groups",
+                wraps=native_acceleration.count_string_groups,
+            ) as native_call:
+                self.assertEqual(
+                    zeia_adapters_module._eligible_member_counts(entries), expected
+                )
+                native_call.assert_not_called()
+
+
 class ZeiaAdapterTests(unittest.TestCase):
     def _archive(self, root: Path, name: str, entries: dict[str, str]) -> Path:
         path = root / name

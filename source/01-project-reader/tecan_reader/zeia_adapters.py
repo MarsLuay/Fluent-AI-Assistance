@@ -10,6 +10,7 @@ from typing import Any, Protocol
 import zipfile
 
 from tecan_common.native_acceleration import (
+    count_string_groups as _native_count_string_groups,
     count_xscr_object_type_attributes as _native_count_xscr_object_type_attributes,
     extract_data_store_versions as _native_extract_data_store_versions,
     has_gwl_record_prefix as _native_has_gwl_record_prefix,
@@ -208,6 +209,7 @@ class _GenericStructuredAdapter:
 XML_OBJECT_EXTS = {".xcmp", ".xwsp", ".xlqc", ".xlcp", ".xsit", ".xcon", ".xml"}
 ASSET_EXTS = {".bmp", ".gif", ".jpeg", ".jpg", ".png", ".tif", ".tiff"}
 TASK_INPUT_EXTS = {".twl"}
+_PATH_TYPE = type(Path())
 
 
 ADAPTERS: tuple[ZeiaAdapter, ...] = (
@@ -1046,6 +1048,21 @@ def _object_kind(suffix: str) -> str:
 
 
 def _eligible_member_counts(entries: list[str] | tuple[str, ...]) -> dict[str, int]:
+    if type(entries) in (list, tuple) and all(
+        type(entry) is str or type(entry) is _PATH_TYPE for entry in entries
+    ):
+        suffixes = [Path(entry).suffix.casefold() for entry in entries]
+        native = _native_count_string_groups(
+            suffixes,
+            {
+                "scripts": [".xscr"],
+                "objects": sorted(XML_OBJECT_EXTS | ASSET_EXTS),
+                "worklists": [".gwl"],
+                "task_inputs": sorted(TASK_INPUT_EXTS),
+            },
+        )
+        if native is not None:
+            return native
     return {
         "scripts": sum(1 for entry in entries if Path(entry).suffix.casefold() == ".xscr"),
         "objects": sum(

@@ -5904,6 +5904,66 @@ fn zeia_object_kind_from_suffix(suffix: &str) -> String {
 }
 
 #[pyfunction]
+fn count_string_groups<'py>(
+    py: Python<'py>,
+    values: &Bound<'py, PyAny>,
+    groups: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !values.get_type().is(py.get_type::<PyList>())
+        || !groups.get_type().is(py.get_type::<PyDict>())
+    {
+        return Ok(None);
+    }
+    let mut strings = Vec::new();
+    for value in values.try_iter()? {
+        let value = value?;
+        if !value.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let Ok(value) = value.extract::<String>() else {
+            return Ok(None);
+        };
+        strings.push(value);
+    }
+    let mut prepared_groups = Vec::new();
+    for (name, members) in groups.cast::<PyDict>()?.iter() {
+        if !name.get_type().is(py.get_type::<PyString>())
+            || !members.get_type().is(py.get_type::<PyList>())
+        {
+            return Ok(None);
+        }
+        let Ok(name) = name.extract::<String>() else {
+            return Ok(None);
+        };
+        let mut member_set = HashSet::new();
+        for member in members.try_iter()? {
+            let member = member?;
+            if !member.get_type().is(py.get_type::<PyString>()) {
+                return Ok(None);
+            }
+            let Ok(member) = member.extract::<String>() else {
+                return Ok(None);
+            };
+            member_set.insert(member);
+        }
+        prepared_groups.push((name, member_set));
+    }
+    let mut counts = vec![0_usize; prepared_groups.len()];
+    for value in &strings {
+        for (index, (_, members)) in prepared_groups.iter().enumerate() {
+            if members.contains(value) {
+                counts[index] += 1;
+            }
+        }
+    }
+    let result = PyDict::new(py);
+    for ((name, _), count) in prepared_groups.iter().zip(counts) {
+        result.set_item(name, count)?;
+    }
+    Ok(Some(result.into_any()))
+}
+
+#[pyfunction]
 fn command_short_name(type_name: &str) -> Option<String> {
     if !type_name.is_ascii() {
         return None;
@@ -7291,6 +7351,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(diagnostic_redact_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_kind_from_suffix, module)?)?;
     module.add_function(wrap_pyfunction!(zeia_object_kind_from_suffix, module)?)?;
+    module.add_function(wrap_pyfunction!(count_string_groups, module)?)?;
     module.add_function(wrap_pyfunction!(command_short_name, module)?)?;
     module.add_function(wrap_pyfunction!(entry_object_guid, module)?)?;
     module.add_function(wrap_pyfunction!(asset_reference_candidates, module)?)?;
