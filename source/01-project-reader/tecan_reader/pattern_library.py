@@ -9,7 +9,13 @@ from pathlib import Path
 from typing import Any
 
 from .command_registry import registry_manual_step, registry_pattern_type
-from .common import _connect, _connection_arg, fast_json_dumps, to_jsonable
+from .common import (
+    _connect,
+    _connection_arg,
+    _sql_identifier_is_valid,
+    fast_json_dumps,
+    to_jsonable,
+)
 from tecan_common.native_acceleration import (
     append_unique_ascii_string as _native_append_unique_ascii_string,
     pattern_join_summary as _native_pattern_join_summary,
@@ -881,7 +887,7 @@ def _metadata_value(conn: sqlite3.Connection, key: str) -> str:
 
 
 def _count(conn: sqlite3.Connection, table: str) -> int:
-    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", table):
+    if not _sql_identifier_is_valid(table):
         raise ValueError(f"Invalid table name: {table}")
 
     # Securely validate against a schema-derived allowlist

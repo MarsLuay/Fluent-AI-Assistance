@@ -19,9 +19,12 @@ from tecan_common.native_acceleration import (
     compact_list as _native_compact_list,
     extension_counts as _native_extension_counts,
     path_suffixes as _native_path_suffixes,
+    ascii_variable_name_is_valid as _native_ascii_variable_name_is_valid,
 )
 
 from .command_registry import registry_command_family
+
+_SQL_IDENTIFIER_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 TECAN_EXTENSIONS = {
     ".zeia",
@@ -77,6 +80,17 @@ def extension_counts(names: Iterable[str | Path]) -> dict[str, int]:
         suffix = Path(name).suffix.lower() or "<none>"
         counts[suffix] += 1
     return dict(sorted(counts.items()))
+
+
+def _sql_identifier_is_valid(value: Any) -> bool:
+    """Match the existing SQL identifier regex, accelerating ordinary ASCII names."""
+    if type(value) is str and value.endswith("\n"):
+        # Python's ``$`` also matches immediately before one final newline.
+        return _SQL_IDENTIFIER_RE.match(value) is not None
+    native = _native_ascii_variable_name_is_valid(value)
+    if native is not None:
+        return native
+    return _SQL_IDENTIFIER_RE.match(value) is not None
 
 
 def command_short_name(type_name: str) -> str:
