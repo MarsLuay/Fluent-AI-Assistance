@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Protocol, Sequence
 
 from tecan_common.native_acceleration import (
+    ascii_collapse_casefold_whitespace as _native_ascii_collapse_casefold_whitespace,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
     xml_local_name as _native_xml_local_name,
@@ -432,7 +433,9 @@ def _validate_fc_variable_name(field: str, name: str) -> None:
 
 
 def _looks_like_placeholder(value: str) -> bool:
-    normalized = re.sub(r"\s+", " ", str(value or "").strip()).casefold()
+    text = str(value or "")
+    native = _native_ascii_collapse_casefold_whitespace(text)
+    normalized = native if native is not None else re.sub(r"\s+", " ", text.strip()).casefold()
     if not normalized:
         return True
     if normalized in _PLACEHOLDER_TOKENS:

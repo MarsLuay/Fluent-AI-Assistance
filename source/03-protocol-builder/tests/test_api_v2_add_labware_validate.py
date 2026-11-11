@@ -67,6 +67,30 @@ class AddLabwareValidateTests(unittest.TestCase):
         self.assertEqual(fallback_actual, fallback_expected)
         self.assertEqual(fallback_actual, "PythonFallback")
 
+    def test_placeholder_normalization_uses_native_ascii_and_unicode_fallback(self):
+        values = ["TODO", "Fill\tIn", "***", "A-B", "Straße", "東京", " \u001c "]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                add_labware_validate._looks_like_placeholder(value)
+                for value in values
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                add_labware_validate,
+                "_native_ascii_collapse_casefold_whitespace",
+                wraps=native_acceleration.ascii_collapse_casefold_whitespace,
+            ) as native_call:
+                actual = [
+                    add_labware_validate._looks_like_placeholder(value)
+                    for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertIsNone(
+                native_acceleration.ascii_collapse_casefold_whitespace("東京")
+            )
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [True, True, True, False, False, False, True])
+
     def test_add_labware_descendant_lookup_uses_native_selector_and_fallback(self):
         command = _CommandStub(
             payload_xml=(
