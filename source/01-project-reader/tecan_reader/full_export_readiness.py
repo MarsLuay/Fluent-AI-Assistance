@@ -729,10 +729,9 @@ def _compatibility_view(result: FullExportReadiness) -> dict[str, Any]:
 
 
 def _legacy_reference_id(item: UnresolvedReference) -> str:
-    target = item.target_type.casefold()
-    if target == "worktableworkspace":
+    if _casefold_equals(item.target_type, "worktableworkspace"):
         return "missing_referenced_worktables"
-    if target == "liquid_classes":
+    if _casefold_equals(item.target_type, "liquid_classes"):
         return "missing_liquid_class_objects"
     return "unresolved_script_references"
 

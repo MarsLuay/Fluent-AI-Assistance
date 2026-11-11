@@ -9,6 +9,7 @@ from tecan_common import native_acceleration
 import tecan_reader.full_export_readiness as readiness_module
 from tecan_reader.full_export_readiness import (
     ReadinessStatus,
+    UnresolvedReference,
     resolve_full_export_readiness,
 )
 from tecan_reader.diagnostics import DiagnosticCode
@@ -426,6 +427,46 @@ class FullExportReadinessTests(unittest.TestCase):
         self.assertEqual(actual["status"], ReadinessStatus.COMPLETE_WITH_WARNINGS.value)
         self.assertIsNone(
             native_acceleration.ascii_casefold_equals("warníng", "warning")
+        )
+
+    def test_legacy_reference_id_uses_native_ascii_comparison_with_unicode_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "ascii_casefold_equals"
+        ):
+            self.skipTest("optional Rust ASCII comparison is not built")
+        items = [
+            UnresolvedReference("synthetic.zeia", "entry", "entity", "target", target)
+            for target in (
+                "WORKTABLEWORKSPACE",
+                "LIQUID_CLASSES",
+                "WorktableWorkſpace",
+                "other",
+            )
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [readiness_module._legacy_reference_id(item) for item in items]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_casefold_equals",
+                wraps=native_acceleration.ascii_casefold_equals,
+            ) as native_call:
+                actual = [readiness_module._legacy_reference_id(item) for item in items]
+                self.assertEqual(native_call.call_count, 6)
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [
+                "missing_referenced_worktables",
+                "missing_liquid_class_objects",
+                "missing_referenced_worktables",
+                "unresolved_script_references",
+            ],
+        )
+        self.assertIsNone(
+            native_acceleration.ascii_casefold_equals(
+                "WorktableWorkſpace", "worktableworkspace"
+            )
         )
 
     def test_partial_approval_does_not_change_factual_status(self) -> None:
