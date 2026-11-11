@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from tecan_common.native_acceleration import (
+    ascii_casefold_equals as _native_ascii_casefold_equals,
+)
+
 
 def dispose_concrete_runtime_controller(
     controller: Any | None,
@@ -61,7 +65,14 @@ def record_session_identity(
     """api-v2-082: session identity block for runtime-report JSON."""
     configured = str(configured_username or "").strip()
     observed = str(observed_username or "").strip()
-    login_verified = bool(configured and observed and configured.casefold() == observed.casefold())
+    login_verified = False
+    if configured and observed:
+        native_equal = _native_ascii_casefold_equals(configured, observed)
+        login_verified = (
+            native_equal
+            if native_equal is not None
+            else configured.casefold() == observed.casefold()
+        )
     return {
         "configured_username": configured or None,
         "current_username": observed or None,
