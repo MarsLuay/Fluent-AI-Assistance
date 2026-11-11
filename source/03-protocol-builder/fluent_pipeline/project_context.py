@@ -27,7 +27,10 @@ from .progress import ProgressCallback, ProgressEmitter, ProgressStage
 from .project_store import ProjectStore
 from .runner import PipelineError
 from .worktable_geometry import build_worktable_geometry
-from tecan_common.native_acceleration import xml_local_name as _native_xml_local_name
+from tecan_common.native_acceleration import (
+    ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
+    xml_local_name as _native_xml_local_name,
+)
 from tecan_common.zeia_limits import (
     MAX_ZEIA_COMPRESSION_RATIO,
     MAX_ZEIA_MEMBER_UNCOMPRESSED_BYTES,
@@ -2720,7 +2723,9 @@ def _values_for_field_names(fields: dict[str, list[str]], names: set[str]) -> li
 
 
 def _normalize_field_name(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "", value.casefold())
+    folded = value.casefold()
+    native = _native_ascii_lower_alnum_compact(folded)
+    return native if native is not None else re.sub(r"[^a-z0-9]+", "", folded)
 
 
 def _append_snapshot_report(lines: list[str], manifest: dict[str, Any]) -> None:

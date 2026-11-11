@@ -43,6 +43,22 @@ class ProjectContextTests(unittest.TestCase):
         self.assertEqual(fallback_actual, fallback_expected)
         self.assertEqual(fallback_actual, "PythonFallback")
 
+    def test_field_name_normalization_uses_native_compaction_after_casefold(self):
+        values = [" Instrument_Name ", "Straße", "ſcript", "ﬃ", "東京", "Re\u0301"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [pc._normalize_field_name(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                pc,
+                "_native_ascii_lower_alnum_compact",
+                wraps=native_acceleration.ascii_lower_alnum_compact,
+            ) as native_call:
+                actual = [pc._normalize_field_name(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertIsNone(native_acceleration.ascii_lower_alnum_compact("東京"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["instrumentname", "strasse", "script", "ffi", "", "re"])
+
     def test_project_and_collection_roots_use_ready_temp_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
