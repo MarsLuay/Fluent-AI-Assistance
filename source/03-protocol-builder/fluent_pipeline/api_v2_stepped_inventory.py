@@ -21,6 +21,7 @@ from tecan_common.native_acceleration import (
     xml_direct_elements_by_name as _native_xml_direct_elements_by_name,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
+    xml_first_element_by_name as _native_xml_first_element_by_name,
     xml_local_name as _native_xml_local_name,
 )
 
@@ -973,9 +974,10 @@ def _direct_children(parent: ET.Element | None, name: str) -> list[ET.Element]:
 def _first_descendant(parent: ET.Element | None, name: str) -> ET.Element | None:
     if parent is None:
         return None
-    elements = _native_xml_elements_by_name(parent, (name,), ET.Element)
-    if elements is not None:
-        return elements[0] if elements else None
+    selection = _native_xml_first_element_by_name(parent, name, ET.Element)
+    if selection is not None:
+        _, element = selection
+        return element
     for child in parent.iter():
         if _local_name(child.tag) == name:
             return child
