@@ -61,7 +61,11 @@ class GenericCommandValidateTests(unittest.TestCase):
                 generic_validate,
                 "_native_xml_elements_by_name",
                 wraps=native_acceleration.xml_elements_by_name,
-            ) as native_call:
+            ) as native_call, patch.object(
+                generic_validate,
+                "_native_xml_direct_elements_by_name",
+                wraps=native_acceleration.xml_direct_elements_by_name,
+            ) as direct_call:
                 actual_records = generic_validate._elements_by_local_name(root, "Record")
                 actual_line = generic_validate._extract_line_number(actual_records[0])
                 actual_nested = generic_validate._object_has_command_body(
@@ -71,6 +75,7 @@ class GenericCommandValidateTests(unittest.TestCase):
                     actual_records[0], "Missing"
                 )
                 self.assertEqual(native_call.call_count, 4)
+                self.assertEqual(direct_call.call_count, 2)
         self.assertEqual(actual_records, expected_records)
         self.assertEqual(actual_line, expected_line)
         self.assertEqual(actual_line, 9)
@@ -99,6 +104,27 @@ class GenericCommandValidateTests(unittest.TestCase):
             )
         self.assertEqual(actual_custom, expected_custom)
         self.assertEqual(actual_custom, [custom_record])
+
+        custom_body_parent = generic_validate.ET.Element("Record")
+        custom_body = generic_validate.ET.SubElement(
+            custom_body_parent, StringTag("Payload")
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_custom_body = generic_validate._object_has_command_body(
+                custom_body_parent, "Payload"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_direct_elements_by_name(
+                    custom_body_parent, ("Payload",), generic_validate.ET.Element
+                )
+            )
+            actual_custom_body = generic_validate._object_has_command_body(
+                custom_body_parent, "Payload"
+            )
+        self.assertEqual(actual_custom_body, expected_custom_body)
+        self.assertTrue(actual_custom_body)
+        self.assertIsNotNone(custom_body)
 
         invalid_first_line = generic_validate.ET.fromstring(
             "<Record><LineNumber>invalid</LineNumber>"

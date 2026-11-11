@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Mapping, Protocol
 
 from tecan_common.native_acceleration import (
+    xml_direct_elements_by_name as _native_xml_direct_elements_by_name,
     xml_elements_by_name as _native_xml_elements_by_name,
 )
 
@@ -330,9 +331,16 @@ def validate_generic_command_before_execute(
 
 
 def _object_has_command_body(element: ET.Element, command_id: str) -> bool:
-    for child in element:
-        if _local_name(child.tag) == command_id:
+    children = _native_xml_direct_elements_by_name(
+        element, (command_id,), ET.Element
+    )
+    if children is not None:
+        if children:
             return True
+    else:
+        for child in element:
+            if _local_name(child.tag) == command_id:
+                return True
     return bool(_elements_by_local_name(element, command_id))
 
 
