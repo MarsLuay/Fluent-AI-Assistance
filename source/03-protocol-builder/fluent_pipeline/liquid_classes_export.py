@@ -959,9 +959,8 @@ def _micro_command_payload(obj: ET.Element) -> tuple[dict[str, Any], dict[str, A
             name = _local_name(child.tag)
             if name in {"Objects"}:
                 continue
-            if name == "LiquidClassValueVariableNamePair" or any(
-                isinstance(grand.tag, str) and _local_name(grand.tag) == "VariableName"
-                for grand in list(child)
+            if name == "LiquidClassValueVariableNamePair" or (
+                _direct_elements_by_local_name(child, "VariableName")
             ):
                 variable = _child_text(child, "VariableName")
                 value = _child_text(child, "Value")
@@ -973,12 +972,9 @@ def _micro_command_payload(obj: ET.Element) -> tuple[dict[str, Any], dict[str, A
                 fields[variable] = _coerce_scalar(value)
                 continue
             text = _text(child)
-            nested_pairs = [
-                grand
-                for grand in list(child)
-                if isinstance(grand.tag, str)
-                and _local_name(grand.tag) == "LiquidClassValueVariableNamePair"
-            ]
+            nested_pairs = _direct_elements_by_local_name(
+                child, "LiquidClassValueVariableNamePair"
+            )
             if nested_pairs:
                 for pair in nested_pairs:
                     variable = _child_text(pair, "VariableName")

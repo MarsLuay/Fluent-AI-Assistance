@@ -560,6 +560,56 @@ class LiquidClassesExportTests(unittest.TestCase):
             )
         self.assertEqual(native_fallback, fallback)
 
+    def test_micro_payload_variable_scans_use_native_selector_with_fallback(
+        self,
+    ) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_direct_elements_by_name"
+        ):
+            self.skipTest("optional Rust direct-child XML selector is not built")
+        obj = liquid_classes_export.ET.fromstring(
+            '<Object Type="Namespace.Command"><CommandData>'
+            "<DirectValue><VariableName>DirectVariable</VariableName>"
+            "<Value>12</Value></DirectValue><Container>"
+            "<LiquidClassValueVariableNamePair>"
+            "<VariableName>NestedVariable</VariableName><Value>3</Value>"
+            "</LiquidClassValueVariableNamePair></Container>"
+            "</CommandData></Object>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = liquid_classes_export._micro_command_payload(obj)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                liquid_classes_export,
+                "_native_xml_direct_elements_by_name",
+                wraps=native_acceleration.xml_direct_elements_by_name,
+            ) as native_call:
+                actual = liquid_classes_export._micro_command_payload(obj)
+                self.assertGreaterEqual(native_call.call_count, 3)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual[0], {"DirectVariable": 12, "NestedVariable": 3})
+
+        fallback_obj = liquid_classes_export.ET.Element("Object")
+        typed = liquid_classes_export.ET.SubElement(fallback_obj, "CommandData")
+        value_node = liquid_classes_export.ET.SubElement(typed, "DirectValue")
+        value_node.append(liquid_classes_export.ET.Comment("fallback"))
+        liquid_classes_export.ET.SubElement(
+            value_node, "VariableName"
+        ).text = "Fallback"
+        liquid_classes_export.ET.SubElement(value_node, "Value").text = "4"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback = liquid_classes_export._micro_command_payload(fallback_obj)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                liquid_classes_export._native_xml_direct_elements_by_name(
+                    value_node, ("VariableName",), liquid_classes_export.ET.Element
+                )
+            )
+            native_fallback = liquid_classes_export._micro_command_payload(
+                fallback_obj
+            )
+        self.assertEqual(native_fallback, fallback)
+
     def test_parse_xlqc_uses_filename_guid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             guid = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
