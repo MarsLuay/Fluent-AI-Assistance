@@ -89,6 +89,54 @@ class AddLabwareValidateTests(unittest.TestCase):
         self.assertIs(actual_target, expected_target)
         self.assertIs(actual_target, target)
 
+    def test_child_text_uses_native_direct_selector_and_fallback(self):
+        root = add_labware_validate.ET.fromstring(
+            '<Root xmlns:x="urn:test"><x:Name> </x:Name><Name>later</Name></Root>'
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = add_labware_validate._child_text(root, "Name", "default")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                add_labware_validate,
+                "_native_xml_first_direct_child_by_name",
+                wraps=native_acceleration.xml_first_direct_child_by_name,
+            ) as native_call:
+                actual = add_labware_validate._child_text(root, "Name", "default")
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "")
+        self.assertEqual(
+            add_labware_validate._child_text(root, "Missing", "default"), "default"
+        )
+        self.assertEqual(
+            add_labware_validate._child_text(None, "Name", "default"), "default"
+        )
+
+        class StringTag(str):
+            pass
+
+        custom_root = add_labware_validate.ET.Element("Root")
+        custom_child = add_labware_validate.ET.SubElement(
+            custom_root, StringTag("Name")
+        )
+        custom_child.text = "Custom"
+        add_labware_validate.ET.SubElement(custom_root, "Name").text = "Later"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = add_labware_validate._child_text(
+                custom_root, "Name", "default"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_first_direct_child_by_name(
+                    custom_root, "Name", add_labware_validate.ET.Element
+                )
+            )
+            fallback_actual = add_labware_validate._child_text(
+                custom_root, "Name", "default"
+            )
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, "Custom")
+
     def test_slot_key(self):
         fields = AddLabwareFields(
             labware_type="96 Well Flat",

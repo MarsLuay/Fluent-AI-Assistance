@@ -14,6 +14,7 @@ from typing import Any, Callable, Mapping, Protocol, Sequence
 
 from tecan_common.native_acceleration import (
     xml_elements_by_name as _native_xml_elements_by_name,
+    xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
 )
 
 from .api_v2.types import ApiV2ValidationError
@@ -457,6 +458,12 @@ def _find_descendant(element: ET.Element, name: str) -> ET.Element | None:
 def _child_text(element: ET.Element | None, name: str, default: str = "") -> str:
     if element is None:
         return default
+    selection = _native_xml_first_direct_child_by_name(
+        element, name, ET.Element
+    )
+    if selection is not None:
+        _, child = selection
+        return (child.text or "").strip() if child is not None else default
     for child in element:
         if _local_name(child.tag) == name:
             return (child.text or "").strip()
