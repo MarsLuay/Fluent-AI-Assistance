@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -59,6 +60,46 @@ SUBROUTINE_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ApiV2SubroutineIdentityTests(unittest.TestCase):
+    def test_execution_mode_comparison_uses_native_ascii_and_unicode_fallback(self):
+        pairs = [
+            ("JoinSubroutine", "JOINSUBROUTINE", True),
+            ("Straße", "STRAẞE", True),
+            ("ſtart", "START", True),
+            ("Parallel", "JoinSubroutine", False),
+        ]
+        expected = [matched for _, _, matched in pairs]
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [
+                subroutine_identity._execution_modes_equal(left, right)
+                for left, right, _ in pairs
+            ]
+        self.assertEqual(disabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                subroutine_identity,
+                "_native_ascii_casefold_equals",
+                wraps=native_acceleration.ascii_casefold_equals,
+            ) as native_call:
+                enabled = [
+                    subroutine_identity._execution_modes_equal(left, right)
+                    for left, right, _ in pairs
+                ]
+                self.assertEqual(native_call.call_count, len(pairs))
+        self.assertEqual(enabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                subroutine_identity,
+                "_native_ascii_casefold_equals",
+                return_value=None,
+            ):
+                fallback = [
+                    subroutine_identity._execution_modes_equal(left, right)
+                    for left, right, _ in pairs
+                ]
+        self.assertEqual(fallback, expected)
+
     def test_local_name_uses_native_helper_and_custom_string_fallback(self):
         tag = "{urn:example}SubRoutineStatement"
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
@@ -223,7 +264,14 @@ class ApiV2SubroutineIdentityTests(unittest.TestCase):
                 "variable_mappings_start": [{"target": "FingerSelection", "source": "3"}],
             },
         }
-        result = compare_subroutine_step_to_compiled(step, obj)
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                subroutine_identity,
+                "_native_ascii_casefold_equals",
+                wraps=native_acceleration.ascii_casefold_equals,
+            ) as native_call:
+                result = compare_subroutine_step_to_compiled(step, obj)
+                self.assertEqual(native_call.call_count, 1)
         self.assertEqual(result["status"], "matched")
 
     def test_audit_subroutine_identity_passes_with_manifest(self):

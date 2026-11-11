@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from tecan_common.native_acceleration import (
+    ascii_casefold_equals as _native_ascii_casefold_equals,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
@@ -33,6 +34,11 @@ from ..subroutine_variable_mappings import (
 from .commands import Subroutine, command_from_xscr_object, subroutine_from_ir_step
 from .commands import _execution_mode_from_statement, _variable_mappings_from_statement
 from .xml_compare import compare_command_xml, normalize_command_xml
+
+
+def _execution_modes_equal(left: str, right: str) -> bool:
+    native = _native_ascii_casefold_equals(left, right)
+    return native if native is not None else left.casefold() == right.casefold()
 
 
 def _local_name(tag: str) -> str:
@@ -134,9 +140,9 @@ def compare_subroutine_step_to_compiled(
     compiled_xml = ET.tostring(compiled_object, encoding="unicode")
     xml_result = compare_command_xml(compiled_xml, ir_command.to_xml())
     path_mismatch = norm_subroutine_key(ir_command.path) != norm_subroutine_key(compiled_command.path)
-    mode_mismatch = (
-        str(ir_command.execution_mode or "JoinSubroutine").casefold()
-        != str(compiled_command.execution_mode or "JoinSubroutine").casefold()
+    mode_mismatch = not _execution_modes_equal(
+        str(ir_command.execution_mode or "JoinSubroutine"),
+        str(compiled_command.execution_mode or "JoinSubroutine"),
     )
     root_path = Path(str(context_root)).expanduser() if context_root else None
     lookup = build_script_lookup_from_manifest(source_manifest, context_root=root_path)
