@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from tecan_common import native_acceleration
+
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = PACKAGE_DIR.parent
@@ -95,8 +97,10 @@ def workspace_log_path(name: str) -> Path:
 
 
 def _safe_log_label(value: str) -> str:
+    native = native_acceleration.ascii_lower(value)
+    lowered = native if native is not None else value.lower()
     keep = []
-    for char in value.lower().strip():
+    for char in lowered.strip():
         if char.isalnum():
             keep.append(char)
         elif char in {" ", "_", "-"}:
