@@ -396,6 +396,38 @@ class GateEvaluatorNativeNormalizationTests(unittest.TestCase):
                     forced_fallback = evaluate_all()
             self.assertEqual(forced_fallback, expected)
 
+    def test_mca_step_detection_uses_native_lower_with_unicode_fallback(self):
+        steps = [
+            {"operation": "MCA384 Aspirate"},
+            {"command_id": "CustomCommand"},
+            {"source_path": "Straße/MCA.py"},
+            {"parameters": {"device_alias": "Instrument=1/Device=MCA384:1"}},
+            {"operation": "LiHa"},
+        ]
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [gate_evaluators._is_mca_step(step) for step in steps]
+        self.assertEqual(expected, [True, False, True, True, False])
+
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                gate_evaluators,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = [gate_evaluators._is_mca_step(step) for step in steps]
+            self.assertEqual(native_call.call_count, len(steps))
+            native_call.assert_any_call("Straße/MCA.py")
+        self.assertEqual(actual, expected)
+
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                gate_evaluators, "_native_ascii_lower", return_value=None
+            ):
+                forced_fallback = [
+                    gate_evaluators._is_mca_step(step) for step in steps
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_gate_well_row_uses_native_with_python_fallback(self):
         values = ["A1", "aa12", " A2 ", "é1", f"{'A' * 30}3"]
         with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):

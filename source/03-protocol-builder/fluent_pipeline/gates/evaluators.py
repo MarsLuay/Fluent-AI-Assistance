@@ -915,8 +915,8 @@ def _is_mca_step(step: dict[str, Any]) -> bool:
             (step.get("parameters") or {}).get("device_alias") if isinstance(step.get("parameters"), dict) else "",
         )
         if value
-    ).lower()
-    return "mca" in text
+    )
+    return "mca" in _lower_text(text)
 
 def _well_values(step: dict[str, Any]) -> list[tuple[str, Any]]:
     keys = (
