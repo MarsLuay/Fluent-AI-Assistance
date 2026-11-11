@@ -6,6 +6,9 @@ import copy
 import logging
 import math
 import re
+
+from tecan_common import native_acceleration
+
 from .. import xml_compat as ET
 from typing import TYPE_CHECKING, Any, Literal, Mapping, Optional
 
@@ -1350,8 +1353,15 @@ class Simulator:
         return None
 
     def _xml_text(self, root: ET.Element, tag: str) -> str | None:
-        for elem in root.iter():
-            if elem.tag.split("}")[-1] == tag and elem.text is not None:
+        native = native_acceleration.xml_elements_by_name(
+            root, {tag}, ET.Element
+        )
+        elements = native if native is not None else root.iter()
+        for elem in elements:
+            if (
+                (native is not None or elem.tag.split("}")[-1] == tag)
+                and elem.text is not None
+            ):
                 text = elem.text.strip()
                 if text:
                     return text
@@ -1359,7 +1369,16 @@ class Simulator:
 
     def _xml_volume(self, root: ET.Element) -> float | str | None:
         for tag in ("Volume", "Volumes"):
-            holder = next((elem for elem in root.iter() if elem.tag.split("}")[-1] == tag), None)
+            native = native_acceleration.xml_first_element_by_name(
+                root, tag, ET.Element
+            )
+            if native is not None:
+                holder = native[1]
+            else:
+                holder = next(
+                    (elem for elem in root.iter() if elem.tag.split("}")[-1] == tag),
+                    None,
+                )
             if holder is None:
                 continue
             direct = (holder.text or "").strip()

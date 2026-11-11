@@ -557,6 +557,50 @@ class NativeAccelerationTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual.error_source, "example device")
 
+    def test_simulator_xml_text_and_volume_use_native_selectors(self) -> None:
+        from fluentcoder.simulator.walk import Simulator
+
+        if not native_acceleration.available() or not all(
+            hasattr(native_acceleration._native, name)
+            for name in (
+                "xml_elements_by_name",
+                "xml_first_element_by_name",
+            )
+        ):
+            self.skipTest("optional Rust XML selectors are not built")
+        root = ET.fromstring(
+            '<Root xmlns:ns="urn:test"><ns:Name/><Name> example </Name>'
+            "<Volume/><Volumes><Value> 1.25 </Value></Volumes></Root>"
+        )
+        simulator = Simulator.__new__(Simulator)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_text = simulator._xml_text(root, "Name")
+            expected_volume = simulator._xml_volume(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as elements_native_call:
+                actual_text = simulator._xml_text(root, "Name")
+                elements_native_call.assert_called_once_with(
+                    root, {"Name"}, ET.Element
+                )
+            with patch.object(
+                native_acceleration,
+                "xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
+            ) as first_native_call:
+                actual_volume = simulator._xml_volume(root)
+                self.assertEqual(first_native_call.call_count, 2)
+                first_native_call.assert_any_call(root, "Volume", ET.Element)
+                first_native_call.assert_any_call(root, "Volumes", ET.Element)
+
+        self.assertEqual(actual_text, expected_text)
+        self.assertEqual(actual_volume, expected_volume)
+        self.assertEqual(actual_text, "example")
+        self.assertEqual(actual_volume, 1.25)
+
     def test_xcon_orientation_rows_use_native_selector_with_python_parity(self) -> None:
         from fluentcoder.catalog import xcon
 
