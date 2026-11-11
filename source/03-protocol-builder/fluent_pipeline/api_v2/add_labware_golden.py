@@ -12,6 +12,7 @@ from typing import Any, Mapping
 from .. import xml_compat as ET
 from tecan_common.native_acceleration import (
     xml_elements_by_name as _native_xml_elements_by_name,
+    xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
 )
 
 from .commands import AddLabware, command_from_ir_step, command_to_xml
@@ -307,6 +308,10 @@ def _find_descendant(element: ET.Element, name: str) -> ET.Element | None:
 def _child_text(element: ET.Element | None, name: str) -> str:
     if element is None:
         return ""
+    selection = _native_xml_first_direct_child_by_name(element, name, ET.Element)
+    if selection is not None:
+        _, child = selection
+        return (child.text or "").strip() if child is not None else ""
     for child in element:
         if _local_name(child.tag) == name:
             return (child.text or "").strip()
