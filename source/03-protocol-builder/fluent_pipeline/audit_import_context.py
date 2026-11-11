@@ -8,6 +8,10 @@ from pathlib import Path
 import re
 from typing import Iterable
 
+from tecan_common.native_acceleration import (
+    ascii_case_insensitive_substring_match_groups as _native_ascii_substring_match_groups,
+)
+
 
 AUDIT_IMPORT_RE = re.compile(
     r"^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?);.*?"
@@ -73,7 +77,16 @@ def _primary_script(items: Iterable[str]) -> str:
             continue
         lower = item.lower()
         score = 0
-        if any(token in lower for token in ("script", "corpus", "verification", "method")):
+        native_match = _native_ascii_substring_match_groups(
+            [item], [("script", "corpus", "verification", "method")]
+        )
+        if native_match is None:
+            has_script_marker = any(
+                token in lower for token in ("script", "corpus", "verification", "method")
+            )
+        else:
+            has_script_marker = native_match[0]
+        if has_script_marker:
             score += 100
         if lower.startswith("sub_") or lower in {"getfingers"}:
             score -= 100
