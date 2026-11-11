@@ -1187,9 +1187,13 @@ def _opaque_expression_variable_names(expression: dict[str, Any]) -> set[str]:
 
 
 def _bracket_variable_names(value: Any) -> set[str]:
+    text = str(value or "")
+    native = native_acceleration.bracket_variable_names(text)
+    if native is not None:
+        return native
     return {
         match.group(1)
-        for match in re.finditer(r"\[([A-Za-z_][A-Za-z0-9_]*)\]", str(value or ""))
+        for match in re.finditer(r"\[([A-Za-z_][A-Za-z0-9_]*)\]", text)
     }
 
 

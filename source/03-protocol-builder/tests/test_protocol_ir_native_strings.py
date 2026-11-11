@@ -55,6 +55,36 @@ class ProtocolIrNativeStringsTests(unittest.TestCase):
             ],
         )
 
+    def test_bracket_variable_extraction_uses_shared_rust_scanner(self):
+        values = [
+            "[Alpha] [beta_2] [Alpha] [] [_x] [9bad] [with-dash] [[nested]] [é] [Aé]",
+            "before [name9] after",
+            "unicode [é] [Aé] [okay_1]",
+            "",
+            None,
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                protocol_ir_module._bracket_variable_names(value)
+                for value in values
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "bracket_variable_names",
+                wraps=native_acceleration.bracket_variable_names,
+            ) as native_call:
+                actual = [
+                    protocol_ir_module._bracket_variable_names(value)
+                    for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual[0], {"Alpha", "beta_2", "_x", "nested"})
+        self.assertEqual(actual[1], {"name9"})
+        self.assertEqual(actual[2], {"okay_1"})
+        self.assertEqual(actual[3:], [set(), set()])
+
     def test_setup_group_name_whitespace_normalization_uses_native_ascii(self):
         values = [
             "  Operator   Setup  ",
