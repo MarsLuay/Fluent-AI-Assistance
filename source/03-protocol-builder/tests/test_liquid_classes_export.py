@@ -6,7 +6,10 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from tecan_common import native_acceleration
+import fluent_pipeline.liquid_classes_export as liquid_classes_export
 from fluent_pipeline.liquid_classes_export import (
     LIQUID_CLASSES_SCHEMA_VERSION,
     alias_maps_from_liquid_classes_catalog,
@@ -35,6 +38,57 @@ SAMPLE_XLQC = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class LiquidClassesExportTests(unittest.TestCase):
+    def test_scalar_coercion_uses_native_numeric_parsers_with_python_fallback(
+        self,
+    ) -> None:
+        if not native_acceleration.available() or not all(
+            hasattr(native_acceleration._native, name)
+            for name in ("parse_i64_text", "parse_f64_decimal_text")
+        ):
+            self.skipTest("optional Rust scalar parsers are not built")
+        cases = [
+            (" 42 ", 42),
+            ("-7", -7),
+            ("+3", 3),
+            ("1_000", 1000),
+            ("١٢", 12),
+            (
+                "999999999999999999999999999999999",
+                999999999999999999999999999999999,
+            ),
+            ("4.0", 4.0),
+            ("1e2", 100.0),
+            ("true", True),
+            ("NaN", "NaN"),
+            ("not numeric", "not numeric"),
+            ("   ", ""),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                liquid_classes_export._coerce_scalar(value) for value, _ in cases
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                liquid_classes_export,
+                "_native_parse_i64_text",
+                wraps=native_acceleration.parse_i64_text,
+            ) as native_int_call:
+                with patch.object(
+                    liquid_classes_export,
+                    "_native_parse_f64_decimal_text",
+                    wraps=native_acceleration.parse_f64_decimal_text,
+                ) as native_float_call:
+                    actual = [
+                        liquid_classes_export._coerce_scalar(value)
+                        for value, _ in cases
+                    ]
+                    self.assertEqual(native_int_call.call_count, 7)
+                    self.assertEqual(native_float_call.call_count, 3)
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual, [expected_value for _, expected_value in cases]
+        )
+
     def test_parse_xlqc_uses_filename_guid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             guid = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"

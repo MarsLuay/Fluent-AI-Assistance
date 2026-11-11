@@ -13,6 +13,11 @@ import re
 from pathlib import Path
 from typing import Any, Mapping
 
+from tecan_common.native_acceleration import (
+    parse_f64_decimal_text as _native_parse_f64_decimal_text,
+    parse_i64_text as _native_parse_i64_text,
+)
+
 from . import xml_compat as ET
 from .fluent_naming import strip_fluent_instance_suffix
 from .runner import write_json
@@ -1065,9 +1070,18 @@ def _coerce_scalar(text: str) -> Any:
     lowered = raw.casefold()
     if lowered in {"true", "false"}:
         return lowered == "true"
-    try:
-        if "." in raw or "e" in lowered:
+    if "." in raw or "e" in lowered:
+        native_float = _native_parse_f64_decimal_text(raw)
+        if native_float is not None:
+            return native_float
+        try:
             return float(raw)
+        except ValueError:
+            return raw
+    native_integer = _native_parse_i64_text(raw)
+    if native_integer is not None:
+        return native_integer
+    try:
         return int(raw)
     except ValueError:
         return raw
