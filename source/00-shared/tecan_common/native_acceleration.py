@@ -75,6 +75,37 @@ def xml_regex_first_value(text: Any, name: Any) -> str | None:
         return None
 
 
+def xml_unknown_text_fields(
+    text: Any, known_names: Any, limit: Any
+) -> list[tuple[str, list[str]]] | None:
+    """Extract regex-compatible scalar XML fields natively for ASCII input."""
+    if (
+        not enabled()
+        or type(text) is not str
+        or type(known_names) is not list
+        or any(type(name) is not str for name in known_names)
+        or type(limit) is not int
+        or limit < 0
+    ):
+        return None
+    try:
+        result = _native.xml_unknown_text_fields(text, known_names, limit)
+        if type(result) is not list:
+            return None
+        if all(
+            type(item) is tuple
+            and len(item) == 2
+            and type(item[0]) is str
+            and type(item[1]) is list
+            and all(type(value) is str for value in item[1])
+            for item in result
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def extract_data_store_versions(text: Any) -> list[str] | None:
     """Extract ZEIA versions natively for ASCII text; fall back for Unicode."""
     if not enabled() or type(text) is not str:

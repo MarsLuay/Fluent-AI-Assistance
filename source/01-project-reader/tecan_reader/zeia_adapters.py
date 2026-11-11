@@ -15,6 +15,7 @@ from tecan_common.native_acceleration import (
     has_gwl_record_prefix as _native_has_gwl_record_prefix,
     has_visionx_namespace as _native_has_visionx_namespace,
     xml_regex_first_value as _native_xml_regex_first_value,
+    xml_unknown_text_fields as _native_xml_unknown_text_fields,
     zeia_xml_structural_flags as _native_zeia_xml_structural_flags,
 )
 from tecan_common.performance import (
@@ -1009,6 +1010,9 @@ def _unknown_fields_from_text(text: str) -> dict[str, list[str]]:
         "TypeId", "FunctionalGroup", "FootPrint", "Renderer", "Description",
         "BaseWorktableName", "BaseWorktableGuid", "ComponentGuid", "SiteGuid",
     }
+    native = _native_xml_unknown_text_fields(text, sorted(known), 20)
+    if native is not None:
+        return dict(native)
     values: dict[str, list[str]] = {}
     pattern = re.compile(
         r"<(?:(?:[A-Za-z_][\w.-]*):)?([A-Za-z_][\w.-]*)(?:\s[^>]*)?>(.*?)</\1>",

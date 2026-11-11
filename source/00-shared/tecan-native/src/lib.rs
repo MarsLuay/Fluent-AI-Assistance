@@ -1146,6 +1146,102 @@ fn xml_regex_first_value(text: &str, name: &str) -> Option<String> {
     xml_regex_first_value_ascii(text, name)
 }
 
+fn xml_local_tag_name_ascii(text: &[u8], start: usize) -> Option<(String, usize)> {
+    let first_start = start + optional_ascii_xml_prefix_length(&text[start..]);
+    if first_start >= text.len()
+        || !(text[first_start].is_ascii_alphabetic() || text[first_start] == b'_')
+    {
+        return None;
+    }
+    let mut end = first_start + 1;
+    while end < text.len() && (is_ascii_word(text[end]) || matches!(text[end], b'.' | b'-')) {
+        end += 1;
+    }
+    Some((
+        String::from_utf8(text[first_start..end].to_vec()).ok()?,
+        end,
+    ))
+}
+
+fn xml_unknown_text_fields_ascii(
+    text: &str,
+    known_names: &[String],
+    limit: usize,
+) -> Option<Vec<(String, Vec<String>)>> {
+    if !text.is_ascii() || known_names.iter().any(|name| !name.is_ascii()) {
+        return None;
+    }
+    let bytes = text.as_bytes();
+    let known = known_names
+        .iter()
+        .map(String::as_str)
+        .collect::<HashSet<_>>();
+    let mut values = BTreeMap::<String, Vec<String>>::new();
+    let mut search_start = 0;
+    while let Some(relative_open) = bytes[search_start..].iter().position(|byte| *byte == b'<') {
+        let open = search_start + relative_open;
+        let tag_start = open + 1;
+        let Some((name, name_end)) = xml_local_tag_name_ascii(bytes, tag_start) else {
+            search_start = open + 1;
+            continue;
+        };
+        let value_start = match bytes.get(name_end).copied() {
+            Some(b'>') => name_end + 1,
+            Some(byte) if is_python_regex_ascii_whitespace(byte) => bytes[name_end + 1..]
+                .iter()
+                .position(|byte| *byte == b'>')
+                .map(|relative_end| name_end + 1 + relative_end + 1)
+                .unwrap_or_else(|| {
+                    search_start = open + 1;
+                    0
+                }),
+            _ => {
+                search_start = open + 1;
+                continue;
+            }
+        };
+        if value_start == 0 {
+            continue;
+        }
+        let mut close_search = value_start;
+        let mut matched = None;
+        while let Some(relative_close) = bytes[close_search..].iter().position(|byte| *byte == b'<')
+        {
+            let close = close_search + relative_close;
+            if bytes.get(close..close + 2) == Some(b"</")
+                && xml_name_matches_at_ascii(bytes, close + 2, name.as_bytes())
+                && bytes.get(close + 2 + name.len()) == Some(&b'>')
+            {
+                matched = Some((close, close + 3 + name.len()));
+                break;
+            }
+            close_search = close + 1;
+        }
+        let Some((value_end, match_end)) = matched else {
+            search_start = open + 1;
+            continue;
+        };
+        let value = collapse_python_regex_ascii_whitespace(&text[value_start..value_end]);
+        if !value.is_empty() && !value.contains('<') && !known.contains(name.as_str()) {
+            let bucket = values.entry(name.clone()).or_default();
+            if !bucket.contains(&value) && bucket.len() < limit {
+                bucket.push(value);
+            }
+        }
+        search_start = match_end;
+    }
+    Some(values.into_iter().collect())
+}
+
+#[pyfunction]
+fn xml_unknown_text_fields(
+    text: &str,
+    known_names: Vec<String>,
+    limit: usize,
+) -> Option<Vec<(String, Vec<String>)>> {
+    xml_unknown_text_fields_ascii(text, &known_names, limit)
+}
+
 fn extract_data_store_versions_ascii(text: &str) -> Option<Vec<String>> {
     if !text.is_ascii() {
         return None;
@@ -6395,6 +6491,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_tag_local_name, module)?)?;
     module.add_function(wrap_pyfunction!(has_gwl_record_prefix, module)?)?;
     module.add_function(wrap_pyfunction!(xml_regex_first_value, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_unknown_text_fields, module)?)?;
     module.add_function(wrap_pyfunction!(extract_data_store_versions, module)?)?;
     module.add_function(wrap_pyfunction!(count_xscr_object_type_attributes, module)?)?;
     module.add_function(wrap_pyfunction!(has_visionx_namespace, module)?)?;
@@ -7262,6 +7359,42 @@ mod tests {
         }
         assert_eq!(xml_regex_first_value_ascii("<Name>é</Name>", "Name"), None);
         assert_eq!(xml_regex_first_value_ascii("<Name>x</Name>", "é"), None);
+    }
+
+    #[test]
+    fn oversized_xml_unknown_field_scan_preserves_non_overlapping_regex_matches() {
+        let text = concat!(
+            "<Root><Known>skip</Known>",
+            "<Odd>outer <Inner>not independently matched</Inner></Odd>",
+            "<Keep> alpha\t beta </keep><Keep>alpha beta</Keep>",
+            "<keep>lowercase name</keep>",
+            "<Empty> \n </Empty><After>retained</After>",
+            "<x:Prefixed attr='x'>value</Prefixed>",
+            "<Repeated>one</Repeated><Repeated>two</Repeated>",
+        );
+        let known = vec!["Known".to_string()];
+        assert_eq!(
+            xml_unknown_text_fields_ascii(text, &known, 20),
+            Some(vec![
+                ("After".into(), vec!["retained".into()]),
+                ("Keep".into(), vec!["alpha beta".into()]),
+                ("Prefixed".into(), vec!["value".into()]),
+                ("Repeated".into(), vec!["one".into(), "two".into()]),
+                ("keep".into(), vec!["lowercase name".into()]),
+            ])
+        );
+        assert_eq!(
+            xml_unknown_text_fields_ascii(
+                "<Root><Repeated>one</Repeated><Repeated>two</Repeated>",
+                &[],
+                1
+            ),
+            Some(vec![("Repeated".into(), vec!["one".into()])])
+        );
+        assert_eq!(
+            xml_unknown_text_fields_ascii("<Name>café</Name>", &[], 20),
+            None
+        );
     }
 
     #[test]

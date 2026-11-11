@@ -381,6 +381,60 @@ class ZeiaAdapterTests(unittest.TestCase):
                 )
                 self.assertEqual(native_call.call_count, 1)
 
+    def test_unknown_xml_field_scan_matches_regex_order_limits_and_fallback(self) -> None:
+        repeated = "".join(f"<Repeated>value{index}</Repeated>" for index in range(22))
+        text = (
+            "<Root><ObjectName>skip</ObjectName>"
+            "<Odd>outer <Inner>not independently matched</Inner></Odd>"
+            "<Keep> alpha\t beta </keep><Keep>alpha beta</Keep>"
+            "<keep>lowercase name</keep><Empty> \n </Empty>"
+            "<After>retained</After><x:Prefixed attr='x'>value</Prefixed>"
+            + repeated
+        )
+        known = ["ObjectName"]
+        regex = re.compile(
+            r"<(?:(?:[A-Za-z_][\w.-]*):)?([A-Za-z_][\w.-]*)(?:\s[^>]*)?>(.*?)</\1>",
+            re.IGNORECASE | re.DOTALL,
+        )
+        reference: dict[str, list[str]] = {}
+        for match in regex.finditer(text):
+            name, raw_value = match.groups()
+            value = re.sub(r"\s+", " ", raw_value).strip()
+            if not value or "<" in value or name in known:
+                continue
+            bucket = reference.setdefault(name, [])
+            if value not in bucket and len(bucket) < 20:
+                bucket.append(value)
+        expected = list(sorted(reference.items()))
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            native = native_acceleration.xml_unknown_text_fields(text, known, 20)
+            if native_acceleration.available():
+                self.assertEqual(native, expected)
+            else:
+                self.assertIsNone(native)
+            with patch.object(
+                zeia_adapters_module,
+                "_native_xml_unknown_text_fields",
+                wraps=native_acceleration.xml_unknown_text_fields,
+            ) as native_call:
+                accelerated = zeia_adapters_module._unknown_fields_from_text(text)
+                self.assertEqual(native_call.call_count, 1)
+            unicode_text = "<Root><FutureField> café </FutureField>"
+            self.assertIsNone(
+                native_acceleration.xml_unknown_text_fields(unicode_text, known, 20)
+            )
+            self.assertEqual(
+                zeia_adapters_module._unknown_fields_from_text(unicode_text),
+                {"FutureField": ["café"]},
+            )
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                fallback = zeia_adapters_module._unknown_fields_from_text(text)
+
+        self.assertEqual(dict(expected), accelerated)
+        self.assertEqual(accelerated, fallback)
+        self.assertEqual(accelerated["Repeated"], [f"value{index}" for index in range(20)])
+
     def test_worklists_are_canonical_entities(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             archive = self._archive(
