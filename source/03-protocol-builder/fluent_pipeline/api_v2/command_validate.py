@@ -431,14 +431,17 @@ def normalize_configure_data_labware_boolean_casing(text: str) -> tuple[str, lis
         updated = block
         for tag, pattern in _CONFIGURE_DATA_LABWARE_BOOL_PATTERNS.items():
             def replacer(match: re.Match[str], *, tag_name: str = tag) -> str:
+                original = match.group(2)
+                native = _native_ascii_casefold_trim(original)
+                lowered = native if native is not None else original.lower()
                 fixups.append(
                     {
                         "field": tag_name,
-                        "from": match.group(2),
-                        "to": match.group(2).lower(),
+                        "from": original,
+                        "to": lowered,
                     }
                 )
-                return f"{match.group(1)}{match.group(2).lower()}{match.group(3)}"
+                return f"{match.group(1)}{lowered}{match.group(3)}"
 
             updated = pattern.sub(replacer, updated)
         return updated
@@ -844,7 +847,10 @@ def _first_text(root: ET.Element, name: str, default: str = "") -> str:
 
 def _text_is_true(value: str) -> bool:
     native = _native_parse_ascii_bool_text(value)
-    return native if native is not None else value.lower() == "true"
+    if native is not None:
+        return native
+    native_equals = _native_ascii_casefold_equals(value, "true")
+    return native_equals if native_equals is not None else value.lower() == "true"
 
 
 def _contains_casefolded(value: str, needle: str) -> bool:

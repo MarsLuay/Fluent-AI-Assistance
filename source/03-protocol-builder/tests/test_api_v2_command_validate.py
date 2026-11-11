@@ -119,6 +119,46 @@ class ApiV2CommandValidateTests(unittest.TestCase):
                 ]
         self.assertEqual(fallback, expected)
 
+    def test_configure_data_labware_boolean_casing_uses_rust_with_fallback(self):
+        text = (
+            "<ConfigureDataLabwareDataModel>"
+            "<IsLabwareExistenceMandatory>True</IsLabwareExistenceMandatory>"
+            "<IsCustomDetailImageUsed>False</IsCustomDetailImageUsed>"
+            "</ConfigureDataLabwareDataModel>"
+        )
+        expected = (
+            "<ConfigureDataLabwareDataModel>"
+            "<IsLabwareExistenceMandatory>true</IsLabwareExistenceMandatory>"
+            "<IsCustomDetailImageUsed>false</IsCustomDetailImageUsed>"
+            "</ConfigureDataLabwareDataModel>",
+            [
+                {"field": "IsLabwareExistenceMandatory", "from": "True", "to": "true"},
+                {"field": "IsCustomDetailImageUsed", "from": "False", "to": "false"},
+            ],
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = command_validate.normalize_configure_data_labware_boolean_casing(text)
+        self.assertEqual(disabled, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = command_validate.normalize_configure_data_labware_boolean_casing(text)
+                self.assertEqual(native_call.call_count, 2)
+                native_call.assert_any_call("True")
+                native_call.assert_any_call("False")
+        self.assertEqual(enabled, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate, "_native_ascii_casefold_trim", return_value=None
+            ):
+                fallback = command_validate.normalize_configure_data_labware_boolean_casing(text)
+        self.assertEqual(fallback, expected)
+
     def test_text_true_uses_native_ascii_parser_and_python_lower_fallback(self):
         values = ["true", "TRUE", "False", "truſe", " true\u2003", ""]
         expected = [value.lower() == "true" for value in values]
@@ -131,9 +171,15 @@ class ApiV2CommandValidateTests(unittest.TestCase):
                 command_validate,
                 "_native_parse_ascii_bool_text",
                 wraps=native_acceleration.parse_ascii_bool_text,
-            ) as native_call:
+            ) as native_call, patch.object(
+                command_validate,
+                "_native_ascii_casefold_equals",
+                wraps=native_acceleration.ascii_casefold_equals,
+            ) as native_equals:
                 actual = [command_validate._text_is_true(value) for value in values]
                 self.assertEqual(native_call.call_count, len(values))
+                self.assertEqual(native_equals.call_count, 3)
+                native_equals.assert_any_call("truſe", "true")
         self.assertEqual(actual, expected)
 
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
@@ -141,6 +187,8 @@ class ApiV2CommandValidateTests(unittest.TestCase):
                 command_validate,
                 "_native_parse_ascii_bool_text",
                 return_value=None,
+            ), patch.object(
+                command_validate, "_native_ascii_casefold_equals", return_value=None
             ):
                 forced_fallback = [
                     command_validate._text_is_true(value) for value in values
