@@ -144,6 +144,65 @@ class SourceVariableRefNativeTests(unittest.TestCase):
         )
 
 
+class GenerationExternalPathNativeTests(unittest.TestCase):
+    def test_external_path_filters_use_native_helper_and_python_fallback(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source_path = Path(temp_dir) / "source.xscr"
+            source_path.write_text(
+                r"""<Root>
+<FileReference><File>C:\source\tool.dll</File></FileReference>
+<FileReference><File>C:\répertoire\image.png</File></FileReference>
+<FileReference><File>\\server\share\ignored.dll</File></FileReference>
+</Root>""",
+                encoding="utf-8",
+            )
+            compiled_path = Path(temp_dir) / "compiled.xscr"
+            compiled_path.write_text(
+                r"""<Root>
+<Application>"Z:\apps\run.exe"</Application>
+<VbScript>C:/scripts/runner.vb</VbScript>
+<Application>relative.exe</Application>
+</Root>""",
+                encoding="utf-8",
+            )
+            with mock.patch.dict(
+                "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+            ):
+                expected = (
+                    generation_workflow_module._source_file_reference_paths(
+                        [source_path]
+                    ),
+                    generation_workflow_module._compiled_external_command_paths(
+                        compiled_path
+                    ),
+                )
+            with mock.patch.dict(
+                "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+            ):
+                with mock.patch.object(
+                    generation_workflow_module,
+                    "_native_windows_drive_path_prefix",
+                    wraps=native_acceleration.windows_drive_path_prefix,
+                ) as native_call:
+                    actual = (
+                        generation_workflow_module._source_file_reference_paths(
+                            [source_path]
+                        ),
+                        generation_workflow_module._compiled_external_command_paths(
+                            compiled_path
+                        ),
+                    )
+                    self.assertEqual(native_call.call_count, 6)
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            (
+                [r"C:\source\tool.dll", r"C:\répertoire\image.png"],
+                [r"Z:\apps\run.exe", r"C:\scripts\runner.vb"],
+            ),
+        )
+
+
 XSCR = """<?xml version="1.0"?>
 <Root>
   <ObjectName>DemoScript</ObjectName>

@@ -17,6 +17,7 @@ import re
 
 from tecan_common.native_acceleration import (
     ascii_condition_variable_names as _native_ascii_condition_variable_names,
+    windows_drive_path_prefix as _native_windows_drive_path_prefix,
     ascii_variable_name_is_valid as _native_ascii_variable_name_is_valid,
 )
 
@@ -4809,6 +4810,15 @@ def _matching_regeneration_baseline_script(
     return candidates[0][1]
 
 
+def _has_windows_drive_prefix(value: str) -> bool:
+    native = _native_windows_drive_path_prefix(value)
+    return (
+        native
+        if native is not None
+        else re.match(r"^[A-Za-z]:\\", value) is not None
+    )
+
+
 def _source_file_reference_paths(paths: list[Path]) -> list[str]:
     references: list[str] = []
     pattern = re.compile(
@@ -4823,7 +4833,7 @@ def _source_file_reference_paths(paths: list[Path]) -> list[str]:
         except OSError:
             continue
         references.extend(_clean_windows_literal(match) for match in pattern.findall(text))
-    return [value for value in references if re.match(r"^[A-Za-z]:\\", value)]
+    return [value for value in references if _has_windows_drive_prefix(value)]
 
 
 def _compiled_external_command_paths(path: Path) -> list[str]:
@@ -4841,7 +4851,7 @@ def _compiled_external_command_paths(path: Path) -> list[str]:
             flags=re.DOTALL | re.IGNORECASE,
         ):
             value = _clean_windows_literal(raw)
-            if re.match(r"^[A-Za-z]:\\", value):
+            if _has_windows_drive_prefix(value):
                 values.append(value)
     return values
 

@@ -10,6 +10,9 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Mapping
 
 from .checksums import entry_checksum_state, recompute_checksum_bytes
+from tecan_common.native_acceleration import (
+    windows_drive_path_prefix as _native_windows_drive_path_prefix,
+)
 
 _FS_MAPPING_ENTRY = "fs/mapping.xml"
 _CONTENT_XML_ENTRY = "meta/content.xml"
@@ -43,6 +46,15 @@ def _xml_escape_text(value: str) -> str:
 def _normalize_windows_path(value: str) -> str:
     text = str(value or "").strip().replace("/", "\\")
     return text.rstrip("\\")
+
+
+def _has_windows_drive_prefix(value: str) -> bool:
+    native = _native_windows_drive_path_prefix(value)
+    return (
+        native
+        if native is not None
+        else re.match(r"^[A-Za-z]:\\", value) is not None
+    )
 
 
 def _windows_parent(path: str) -> str:
@@ -728,7 +740,7 @@ def collect_file_reference_paths(
 
     def _add(path: str) -> None:
         text = _normalize_windows_path(path)
-        if not text or not re.match(r"^[A-Za-z]:\\", text):
+        if not text or not _has_windows_drive_prefix(text):
             return
         key = text.casefold()
         if key in seen:

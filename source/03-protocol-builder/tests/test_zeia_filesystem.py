@@ -5,6 +5,8 @@ from __future__ import annotations
 import zipfile
 from pathlib import Path
 
+import fluent_pipeline.zeia_filesystem as zeia_filesystem_module
+from tecan_common import native_acceleration
 from fluent_pipeline.checksum import compute_checksum, xml_root_name
 from fluent_pipeline.checksums import entry_checksum_state
 from fluent_pipeline.protocol_ir import build_media_path_map, sound_path_specs_from_ir
@@ -422,6 +424,39 @@ def test_collect_file_reference_paths_includes_attachment_only_generated_media()
     )
 
     assert paths == [display_path, attachment_path]
+
+
+def test_file_reference_path_filter_uses_native_drive_prefix(monkeypatch) -> None:
+    media_path_map = {
+        "entries": [
+            {"absolute_path": "C:/Data/first.bin"},
+            {"absolute_path": r"C:\répertoire\image.png"},
+            {"absolute_path": r"\\server\share\external.png"},
+            {"absolute_path": "relative/path"},
+        ]
+    }
+    monkeypatch.setenv("TECAN_DISABLE_RUST_ACCELERATION", "1")
+    expected = collect_file_reference_paths(media_path_map, None, None)
+
+    calls: list[str] = []
+    native_prefix = native_acceleration.windows_drive_path_prefix
+
+    def track_prefix(value):
+        calls.append(value)
+        return native_prefix(value)
+
+    monkeypatch.setenv("TECAN_DISABLE_RUST_ACCELERATION", "0")
+    monkeypatch.setattr(
+        zeia_filesystem_module,
+        "_native_windows_drive_path_prefix",
+        track_prefix,
+    )
+    actual = collect_file_reference_paths(media_path_map, None, None)
+
+    assert actual == expected == [r"C:\Data\first.bin", r"C:\répertoire\image.png"]
+    assert len(calls) == 4
+    assert native_prefix(r"C:\répertoire") is True
+    assert native_prefix(r"é:\path") is False
 
 
 def test_audio_path_in_media_path_map() -> None:
