@@ -6782,13 +6782,11 @@ def _xscr_readiness_evidence(path: Path, *, role: str) -> dict[str, Any]:
         root, ("RUPScreenTitle",), ET.Element
     )
     if title_elements is None:
-        title_elements = root.iter()
+        title_elements = (
+            el for el in root.iter() if _local_name(el.tag) == "RUPScreenTitle"
+        )
     evidence["touchtools_titles"] = _sorted_strs(
-        [
-            el.text
-            for el in title_elements
-            if _local_name(el.tag) == "RUPScreenTitle" and el.text
-        ]
+        [el.text for el in title_elements if el.text]
     )
     evidence["startup_variables"] = _xscr_startup_variables(root)
     evidence["operator_prompts"] = _xscr_operator_prompts(root)

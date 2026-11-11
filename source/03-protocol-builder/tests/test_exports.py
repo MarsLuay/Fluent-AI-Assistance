@@ -37,6 +37,29 @@ def _ok_finalization_report() -> FinalizationReport:
 
 
 class XscrPromptSelectorTests(unittest.TestCase):
+    def test_readiness_titles_use_native_selector_and_python_fallback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "synthetic.xscr"
+            path.write_text(
+                "<Root><ObjectName>Synthetic</ObjectName>"
+                "<RUPScreenTitle> Beta </RUPScreenTitle>"
+                "<Other>Ignored</Other><RUPScreenTitle>Alpha</RUPScreenTitle>"
+                "<RUPScreenTitle>Beta</RUPScreenTitle></Root>",
+                encoding="utf-8",
+            )
+            with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                expected = exports._xscr_readiness_evidence(path, role="test")
+            with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with mock.patch.object(
+                    exports,
+                    "_native_xml_elements_by_name",
+                    wraps=native_acceleration.xml_elements_by_name,
+                ) as native_call:
+                    actual = exports._xscr_readiness_evidence(path, role="test")
+                    self.assertEqual(native_call.call_count, 2)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["touchtools_titles"], ["Alpha", "Beta"])
+
     def test_prompt_and_variable_item_scans_use_native_selector_and_fallback(self):
         root = exports.ET.fromstring(
             '<Root xmlns:x="urn:test"><x:RUPVariableStatement>'
