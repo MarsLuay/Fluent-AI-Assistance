@@ -39,6 +39,54 @@ class QueryVariableAuditTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [True, True, False, False, False, False, False])
 
+    def test_boolean_coercion_uses_native_ascii_parser_and_fallbacks(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "parse_ascii_bool_text"
+        ):
+            self.skipTest("optional Rust boolean parser is not built")
+        values = ["1", " TRUE ", "false", "yes", "ON", "no", "Straße", None, True]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [query_variable_audit_module._coerce_bool(value) for value in values]
+        self.assertEqual(
+            expected,
+            [True, True, False, True, True, False, False, False, True],
+        )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                query_variable_audit_module,
+                "_native_parse_ascii_bool_text",
+                wraps=native_acceleration.parse_ascii_bool_text,
+            ) as native_parse, patch.object(
+                query_variable_audit_module,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_lower:
+                actual = [
+                    query_variable_audit_module._coerce_bool(value)
+                    for value in values
+                ]
+                self.assertEqual(native_parse.call_count, 7)
+                self.assertEqual(native_lower.call_count, 5)
+            native_parse.assert_any_call("TRUE")
+            native_parse.assert_any_call("Straße")
+            native_lower.assert_any_call("Straße")
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                query_variable_audit_module,
+                "_native_parse_ascii_bool_text",
+                return_value=None,
+            ), patch.object(
+                query_variable_audit_module, "_native_ascii_lower", return_value=None
+            ):
+                forced_fallback = [
+                    query_variable_audit_module._coerce_bool(value)
+                    for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_normalize_query_variable_names_dedupes_and_sorts(self):
         names = normalize_query_variable_names(["TubeCount", "StartupVolume", "TubeCount", ""])
         self.assertEqual(names, ("StartupVolume", "TubeCount"))

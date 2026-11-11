@@ -14,7 +14,9 @@ from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
 from tecan_common.native_acceleration import (
+    ascii_lower as _native_ascii_lower,
     ascii_variable_name_is_valid as _native_ascii_variable_name_is_valid,
+    parse_ascii_bool_text as _native_parse_ascii_bool_text,
 )
 
 
@@ -290,5 +292,11 @@ def _coerce_bool(value: Any) -> bool:
         return value
     if value is None:
         return False
-    text = str(value).strip().lower()
-    return text in {"1", "true", "yes", "on"}
+    text = str(value).strip()
+    native = _native_parse_ascii_bool_text(text)
+    if native is not None:
+        return native
+    lowered = _native_ascii_lower(text)
+    if lowered is None:
+        lowered = text.lower()
+    return lowered in {"1", "true", "yes", "on"}
