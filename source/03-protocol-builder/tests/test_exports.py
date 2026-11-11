@@ -14,6 +14,7 @@ from fluent_pipeline.runner import PipelineError
 from fluent_pipeline.subroutine_dependencies import resolve_subroutine_dependencies
 from fluent_pipeline.validation import scaffold_validation_report
 from fluent_pipeline.zeia_filesystem import build_fs_mapping_xml
+from tecan_common import native_acceleration
 
 
 def _read_archive_text(zf: zipfile.ZipFile, entry: str) -> str:
@@ -33,6 +34,105 @@ def _ok_finalization_report() -> FinalizationReport:
         command_validation={"failure_count": 0},
         generic_command_validation={"failure_count": 0},
     )
+
+
+class XscrPromptSelectorTests(unittest.TestCase):
+    def test_prompt_and_variable_item_scans_use_native_selector_and_fallback(self):
+        root = exports.ET.fromstring(
+            '<Root xmlns:x="urn:test"><x:RUPVariableStatement>'
+            "<x:RUPScreenTitle>Prompt A</x:RUPScreenTitle>"
+            "<x:VariableDatas><x:RupVariableItem>"
+            "<x:VariableName>Mode</x:VariableName>"
+            "<x:DisplayText>Mode label</x:DisplayText>"
+            "</x:RupVariableItem></x:VariableDatas>"
+            "</x:RUPVariableStatement><RUPStandardStatement>"
+            "<Instructions>Continue</Instructions>"
+            "</RUPStandardStatement></Root>"
+        )
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_prompts = exports._xscr_operator_prompts(root)
+            expected_items = exports._xscr_rup_variable_items(root[0])
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual_prompts = exports._xscr_operator_prompts(root)
+                actual_items = exports._xscr_rup_variable_items(root[0])
+                self.assertEqual(native_call.call_count, 4)
+        self.assertEqual(actual_prompts, expected_prompts)
+        self.assertEqual(actual_items, expected_items)
+        self.assertEqual(
+            [prompt["kind"] for prompt in actual_prompts],
+            ["RUPVariableStatement", "RUPStandardStatement"],
+        )
+        self.assertEqual(actual_items[0]["name"], "Mode")
+
+        class StringTag(str):
+            pass
+
+        custom_root = exports.ET.Element("Root")
+        custom_statement = exports.ET.SubElement(
+            custom_root, StringTag("RUPStandardStatement")
+        )
+        exports.ET.SubElement(custom_statement, "Instructions").text = "Fallback"
+        custom_items = exports.ET.SubElement(custom_statement, "Variables")
+        custom_item = exports.ET.SubElement(custom_items, StringTag("RupVariableItem"))
+        exports.ET.SubElement(custom_item, "VariableName").text = "FallbackMode"
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_prompts = exports._xscr_operator_prompts(custom_root)
+            fallback_items = exports._xscr_rup_variable_items(custom_statement)
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_name(
+                    custom_root,
+                    (
+                        "RUPVariableStatement",
+                        "RUPWorktableStatement",
+                        "RUPStandardStatement",
+                    ),
+                    exports.ET.Element,
+                )
+            )
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_name(
+                    custom_statement, ("RupVariableItem",), exports.ET.Element
+                )
+            )
+            actual_fallback_prompts = exports._xscr_operator_prompts(custom_root)
+            actual_fallback_items = exports._xscr_rup_variable_items(custom_statement)
+        self.assertEqual(actual_fallback_prompts, fallback_prompts)
+        self.assertEqual(actual_fallback_items, fallback_items)
+        self.assertEqual(actual_fallback_prompts[0]["instructions"], "Fallback")
+        self.assertEqual(actual_fallback_items[0]["name"], "FallbackMode")
+
+    def test_readiness_title_scan_uses_native_selector(self):
+        xml = (
+            "<Root><ObjectName>Sample</ObjectName>"
+            "<RUPScreenTitle>Second</RUPScreenTitle>"
+            "<RUPScreenTitle> First </RUPScreenTitle></Root>"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "synthetic.xscr"
+            path.write_text(xml, encoding="utf-8")
+            with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                expected = exports._xscr_readiness_evidence(path, role="sample")
+            with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with mock.patch.object(
+                    exports,
+                    "_native_xml_elements_by_name",
+                    wraps=native_acceleration.xml_elements_by_name,
+                ) as native_call:
+                    actual = exports._xscr_readiness_evidence(path, role="sample")
+                    self.assertTrue(
+                        any(
+                            call.args[1] == ("RUPScreenTitle",)
+                            for call in native_call.call_args_list
+                        )
+                    )
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["touchtools_titles"], ["First", "Second"])
 
 
 class ProjectScriptPayloadTests(unittest.TestCase):

@@ -22,6 +22,9 @@ from typing import Any, Iterable, Mapping
 from fluentcoder.expressions import (
     expression_inventory_from_xscr_text,
 )
+from tecan_common.native_acceleration import (
+    xml_elements_by_name as _native_xml_elements_by_name,
+)
 
 from .checksums import (
     audit_archive_checksums,
@@ -6772,8 +6775,17 @@ def _xscr_readiness_evidence(path: Path, *, role: str) -> dict[str, Any]:
     if root is None:
         return evidence
     evidence["object_name"] = _first_text(root, "ObjectName") or path.stem
+    title_elements = _native_xml_elements_by_name(
+        root, ("RUPScreenTitle",), ET.Element
+    )
+    if title_elements is None:
+        title_elements = root.iter()
     evidence["touchtools_titles"] = _sorted_strs(
-        [el.text for el in root.iter() if _local_name(el.tag) == "RUPScreenTitle" and el.text]
+        [
+            el.text
+            for el in title_elements
+            if _local_name(el.tag) == "RUPScreenTitle" and el.text
+        ]
     )
     evidence["startup_variables"] = _xscr_startup_variables(root)
     evidence["operator_prompts"] = _xscr_operator_prompts(root)
@@ -6819,9 +6831,17 @@ def _xscr_startup_variables(root: ET.Element) -> list[dict[str, Any]]:
 
 def _xscr_operator_prompts(root: ET.Element) -> list[dict[str, Any]]:
     prompts = []
-    for el in root.iter():
+    statement_names = (
+        "RUPVariableStatement",
+        "RUPWorktableStatement",
+        "RUPStandardStatement",
+    )
+    elements = _native_xml_elements_by_name(root, statement_names, ET.Element)
+    if elements is None:
+        elements = root.iter()
+    for el in elements:
         statement_name = _local_name(el.tag)
-        if statement_name not in {"RUPVariableStatement", "RUPWorktableStatement", "RUPStandardStatement"}:
+        if statement_name not in statement_names:
             continue
         variables = _xscr_rup_variable_items(el)
         prompt = {
@@ -6841,7 +6861,12 @@ def _xscr_operator_prompts(root: ET.Element) -> list[dict[str, Any]]:
 
 def _xscr_rup_variable_items(statement: ET.Element) -> list[dict[str, str]]:
     items = []
-    for item in statement.iter():
+    elements = _native_xml_elements_by_name(
+        statement, ("RupVariableItem",), ET.Element
+    )
+    if elements is None:
+        elements = statement.iter()
+    for item in elements:
         if _local_name(item.tag) != "RupVariableItem":
             continue
         record = {
