@@ -1,7 +1,10 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import fluent_pipeline.prompt_media as prompt_media_module
+from tecan_common import native_acceleration
 from fluent_pipeline.prompt_media import (
     ensure_compiled_prompt_media_references,
     prompt_media_step_records,
@@ -10,6 +13,32 @@ from fluent_pipeline.validation import _gate_xscr_ir_roundtrip
 
 
 class PromptMediaReferenceTests(unittest.TestCase):
+    def test_prompt_kind_lowering_uses_native_ascii_and_unicode_fallback(self):
+        values = ["STANDARD", "Wörktable", "RUPWorktableStatement"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [prompt_media_module._lower_text(value) for value in values]
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                prompt_media_module,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = [prompt_media_module._lower_text(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+            native_call.assert_any_call("STANDARD")
+            native_call.assert_any_call("Wörktable")
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                prompt_media_module, "_native_ascii_lower", return_value=None
+            ):
+                forced_fallback = [
+                    prompt_media_module._lower_text(value) for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def _ir(self, *, sound_file: str = "media/step022Audio.mp3") -> dict:
         return {
             "protocol": {"name": "Verification_Script2"},
@@ -37,8 +66,10 @@ class PromptMediaReferenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "script.xscr"
             path.write_text(xscr, encoding="utf-8")
+            ir = self._ir()
+            ir["steps"][0]["parameters"]["rup_kind"] = "STANDARD"
 
-            fixups = ensure_compiled_prompt_media_references(path, self._ir())
+            fixups = ensure_compiled_prompt_media_references(path, ir)
             rewritten = path.read_text(encoding="utf-8-sig")
 
         self.assertEqual(len(fixups), 1)

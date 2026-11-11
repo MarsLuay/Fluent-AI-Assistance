@@ -7,8 +7,15 @@ from pathlib import Path, PureWindowsPath
 from typing import Any
 from xml.sax.saxutils import escape as xml_escape
 
+from tecan_common.native_acceleration import ascii_lower as _native_ascii_lower
+
 from .checksums import entry_checksum_state, recompute_checksum_bytes
 from .runner import PipelineError
+
+
+def _lower_text(value: str) -> str:
+    native = _native_ascii_lower(value)
+    return native if native is not None else value.lower()
 
 
 def prompt_media_step_records(ir: dict[str, Any]) -> list[dict[str, str]]:
@@ -95,7 +102,9 @@ def ensure_compiled_prompt_media_references(
         params = step.get("parameters") if isinstance(step.get("parameters"), dict) else {}
         prompt = str(params.get("prompt") or "").strip()
         sound_file = str(params.get("sound_file") or "").strip()
-        prompt_kind = str(params.get("rup_kind") or step.get("command_id") or "").strip().lower()
+        prompt_kind = _lower_text(
+            str(params.get("rup_kind") or step.get("command_id") or "").strip()
+        )
         if prompt_kind in {
             "worktable",
             "rupworktablestatement",
