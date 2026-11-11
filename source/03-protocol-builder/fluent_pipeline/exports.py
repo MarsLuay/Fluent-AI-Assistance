@@ -24,6 +24,7 @@ from fluentcoder.expressions import (
 )
 from tecan_common.native_acceleration import (
     xml_elements_by_name as _native_xml_elements_by_name,
+    xml_first_element_by_name as _native_xml_first_element_by_name,
 )
 
 from .checksums import (
@@ -8234,6 +8235,10 @@ def _text(node: ET.Element | None) -> str | None:
 def _first_descendant(parent: ET.Element | None, name: str) -> ET.Element | None:
     if parent is None:
         return None
+    selection = _native_xml_first_element_by_name(parent, name, ET.Element)
+    if selection is not None:
+        _, child = selection
+        return child
     for child in parent.iter():
         if _local_name(child.tag) == name:
             return child

@@ -107,6 +107,43 @@ class XscrPromptSelectorTests(unittest.TestCase):
         self.assertEqual(actual_fallback_prompts[0]["instructions"], "Fallback")
         self.assertEqual(actual_fallback_items[0]["name"], "FallbackMode")
 
+    def test_first_descendant_uses_native_selector_and_fallback(self):
+        root = exports.ET.fromstring(
+            '<Root xmlns:x="urn:test"><x:Name> </x:Name><Name>later</Name></Root>'
+        )
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = exports._first_descendant(root, "Name")
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
+            ) as native_call:
+                actual = exports._first_descendant(root, "Name")
+                self.assertEqual(native_call.call_count, 1)
+        self.assertIs(actual, expected)
+        self.assertIs(actual, root[0])
+        self.assertIsNone(exports._first_descendant(root, "Missing"))
+        self.assertIsNone(exports._first_descendant(None, "Name"))
+
+        class StringTag(str):
+            pass
+
+        custom_root = exports.ET.Element("Root")
+        custom_name = exports.ET.SubElement(custom_root, StringTag("Name"))
+        exports.ET.SubElement(custom_root, "Name").text = "later"
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = exports._first_descendant(custom_root, "Name")
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_first_element_by_name(
+                    custom_root, "Name", exports.ET.Element
+                )
+            )
+            fallback_actual = exports._first_descendant(custom_root, "Name")
+        self.assertIs(fallback_actual, fallback_expected)
+        self.assertIs(fallback_actual, custom_name)
+
     def test_readiness_title_scan_uses_native_selector(self):
         xml = (
             "<Root><ObjectName>Sample</ObjectName>"
