@@ -94,6 +94,40 @@ def test_deployable_media_name_and_suffix_use_native_lower_fallback(tmp_path: Pa
     assert forced_fallback == expected
 
 
+def test_unresolved_policy_uses_native_lower_with_unicode_fallback(tmp_path: Path) -> None:
+    values = [" Fail_Gate ", "FälL_Gate"]
+
+    def resolved_modes() -> list[str]:
+        return [
+            resolve_prompt_media(
+                {"steps": []},
+                tmp_path / "media",
+                policy={"on_unresolved": value},
+            )["on_unresolved"]
+            for value in values
+        ]
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = resolved_modes()
+    assert expected == ["fail_gate", "fäll_gate"]
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            bundle_media,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            actual = resolved_modes()
+        native_call.assert_any_call("Fail_Gate")
+        native_call.assert_any_call("FälL_Gate")
+    assert actual == expected
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(bundle_media, "_native_ascii_lower", return_value=None):
+            forced_fallback = resolved_modes()
+    assert forced_fallback == expected
+
+
 def test_stage_generation_media_originals_copies_dropped_video(tmp_path: Path) -> None:
     build_dir = tmp_path / "build"
     media_dir = build_dir / "media"

@@ -933,7 +933,8 @@ def resolve_prompt_media(
 
     resolved_policy = _merge_media_resolve_policy(policy)
     prefer_real = bool(resolved_policy.get("prefer_real_over_placeholder", True))
-    on_unresolved = str(resolved_policy.get("on_unresolved") or "warn").strip().lower()
+    on_unresolved_text = str(resolved_policy.get("on_unresolved") or "warn").strip()
+    on_unresolved = _lower_text(on_unresolved_text)
 
     all_specs = media_slot_specs(ir)
     specs = required_media_slot_specs(all_specs)
