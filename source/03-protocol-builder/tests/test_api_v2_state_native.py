@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import unittest
 from unittest.mock import patch
 
@@ -9,6 +10,36 @@ from tecan_common import native_acceleration
 
 
 class ApiV2StateNativeTests(unittest.TestCase):
+    def test_state_label_casefold_uses_native_ascii_with_unicode_fallback(self):
+        values = [" Ready ", "EDITMODE", "ſtartup", "Unrecognized"]
+        expected = [value.strip().casefold() for value in values]
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [state_module._casefold_state_text(value) for value in values]
+        self.assertEqual(disabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                state_module,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = [state_module._casefold_state_text(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(enabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                state_module,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = [state_module._casefold_state_text(value) for value in values]
+        self.assertEqual(fallback, expected)
+        self.assertIs(
+            state_module.parse_state_machine_states("ſtartup"),
+            StateMachineStates.STARTUP,
+        )
+
     def test_compaction_uses_native_ascii_and_preserves_casefold_fallback(self):
         values = ["R U N! 9", "ſcript", "İD", "東京", ""]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):

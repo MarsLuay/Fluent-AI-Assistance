@@ -12,6 +12,7 @@ from enum import Enum
 from typing import Any, Mapping, MutableMapping
 
 from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
 )
 
@@ -48,8 +49,14 @@ _STRING_ALIASES: dict[str, StateMachineStates] = {
 _STATE_PREFIX_RE = re.compile(r"^state\s*=\s*", re.IGNORECASE)
 
 
+def _casefold_state_text(text: str) -> str:
+    stripped = text.strip()
+    native = _native_ascii_casefold_trim(stripped)
+    return native if native is not None else stripped.casefold()
+
+
 def _compact(text: str) -> str:
-    folded = text.casefold()
+    folded = _casefold_state_text(text)
     native = _native_ascii_lower_alnum_compact(folded)
     return native if native is not None else re.sub(r"[^a-z0-9]", "", folded)
 
@@ -105,8 +112,9 @@ def parse_state_machine_states(
     if text.isdigit():
         return _INT_TO_STATE.get(int(text), StateMachineStates.UNKNOWN)
 
+    folded = _casefold_state_text(text)
     for member in StateMachineStates:
-        if text.casefold() == member.value.casefold() or text.casefold() == member.name.casefold():
+        if folded == member.value.casefold() or folded == member.name.casefold():
             return member
 
     compact = _compact(text)
