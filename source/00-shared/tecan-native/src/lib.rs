@@ -2770,6 +2770,15 @@ fn windows_drive_path_prefix_any_separator(value: &str) -> bool {
 }
 
 #[pyfunction]
+fn windows_drive_path_is_qualified(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() >= 2
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && (bytes.len() == 2 || bytes[2] == b'/' || (bytes.len() == 3 && bytes[2] == b'\n'))
+}
+
+#[pyfunction]
 fn ascii_safe_component(value: &str, lowercase: bool) -> Option<String> {
     if !value.is_ascii() {
         return None;
@@ -7893,6 +7902,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         windows_drive_path_prefix_any_separator,
         module
     )?)?;
+    module.add_function(wrap_pyfunction!(windows_drive_path_is_qualified, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_safe_component, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_safe_filesystem_key, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_word_boundary_contains, module)?)?;
@@ -8122,6 +8132,26 @@ mod tests {
         }
         for value in ["", "1:/path", "C:relative", "\\\\server\\share", "é:/path"] {
             assert!(!windows_drive_path_prefix_any_separator(value), "{value:?}");
+        }
+    }
+
+    #[test]
+    fn windows_drive_path_is_qualified_matches_python_regex_edges() {
+        for value in ["C:", "z:", "C:/", "D:/folder", "C:\n"] {
+            assert!(windows_drive_path_is_qualified(value), "{value:?}");
+        }
+        for value in [
+            "",
+            "1:",
+            "é:",
+            "C:relative",
+            r"C:\folder",
+            "C:\r\n",
+            "C:\n\n",
+            ":/",
+            " C:/",
+        ] {
+            assert!(!windows_drive_path_is_qualified(value), "{value:?}");
         }
     }
 

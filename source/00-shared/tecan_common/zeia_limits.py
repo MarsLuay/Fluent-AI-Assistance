@@ -8,6 +8,9 @@ from pathlib import PurePosixPath
 import unicodedata
 import zipfile
 
+from .native_acceleration import (
+    windows_drive_path_is_qualified as _native_windows_drive_path_is_qualified,
+)
 
 MAX_ZEIA_ENTRY_COUNT = 25_000
 MAX_ZEIA_TOTAL_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024
@@ -81,11 +84,15 @@ def normalize_zeia_member_name(value: str) -> str:
         raise ValueError(f"unsafe archive entry path contains NUL: {value!r}")
     normalized = unicodedata.normalize("NFC", raw.replace("\\", "/"))
     pure = PurePosixPath(normalized)
-    if (
-        normalized.startswith("/")
-        or pure.is_absolute()
-        or re.match(r"^[A-Za-z]:($|/)", normalized)
-    ):
+    if normalized.startswith("/") or pure.is_absolute():
+        raise ValueError(f"unsafe archive entry path: {value}")
+    native_drive_qualified = _native_windows_drive_path_is_qualified(normalized)
+    drive_qualified = (
+        native_drive_qualified
+        if native_drive_qualified is not None
+        else re.match(r"^[A-Za-z]:($|/)", normalized) is not None
+    )
+    if drive_qualified:
         raise ValueError(f"unsafe archive entry path: {value}")
     parts = tuple(part for part in pure.parts if part not in {"", "."})
     if any(part == ".." for part in parts):

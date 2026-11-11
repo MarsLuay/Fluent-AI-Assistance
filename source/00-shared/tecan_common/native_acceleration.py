@@ -3150,6 +3150,17 @@ def windows_drive_path_prefix_any_separator(value: Any) -> bool | None:
         return None
 
 
+def windows_drive_path_is_qualified(value: Any) -> bool | None:
+    """Check an already-normalized drive-qualified path prefix, or request fallback."""
+    if not enabled() or type(value) is not str:
+        return None
+    try:
+        result = _native.windows_drive_path_is_qualified(value)
+        return result if type(result) is bool else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def ascii_safe_component(value: Any, lowercase: Any) -> str | None:
     """Sanitize a trimmed ASCII identifier/filename component, or request fallback."""
     if (
