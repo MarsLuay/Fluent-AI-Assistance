@@ -7,6 +7,7 @@ from typing import Any
 
 from tecan_common import xml_compat as ET
 from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     ascii_case_insensitive_substring_match_groups as _native_substring_match_groups,
     collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
     casefold_alias_values as _native_casefold_alias_values,
@@ -69,7 +70,17 @@ def inspect_scheduler_text(text: str, *, source_name: str) -> dict[str, Any]:
     for index, element in candidates:
         if not isinstance(element.tag, str):
             continue
-        kind_name = local_name(element.tag).casefold()
+        raw_kind_name = local_name(element.tag)
+        native_kind_name = (
+            _native_ascii_casefold_trim(raw_kind_name)
+            if raw_kind_name.strip() == raw_kind_name
+            else None
+        )
+        kind_name = (
+            native_kind_name
+            if native_kind_name is not None
+            else raw_kind_name.casefold()
+        )
         if kind_name not in _SCHEDULER_NAMES:
             continue
         if kind_name in {"process", "scheduledprocess", "scheduler"}:

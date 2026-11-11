@@ -91,6 +91,41 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [expected_value for _, _, expected_value in cases])
 
+    def test_scheduler_kind_casefold_uses_native_ascii_and_unicode_fallback(self) -> None:
+        source = (
+            '<Root><PROCESS Name="synthetic process"/>'
+            '<TasK Name="synthetic task"/></Root>'
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = scheduler.inspect_scheduler_text(
+                source, source_name="synthetic.xml"
+            )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                scheduler,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = scheduler.inspect_scheduler_text(
+                    source, source_name="synthetic.xml"
+                )
+                self.assertEqual(native_call.call_count, 2)
+        self.assertEqual(actual, expected)
+        self.assertEqual(len(actual["scheduler_processes"]), 1)
+        self.assertEqual(len(actual["scheduler_tasks"]), 1)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                scheduler,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = scheduler.inspect_scheduler_text(
+                    source, source_name="synthetic.xml"
+                )
+        self.assertEqual(fallback, expected)
+
     def test_scheduler_record_selection_preserves_source_indexes_with_native_scan(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_indexed_elements_by_folded_name"
