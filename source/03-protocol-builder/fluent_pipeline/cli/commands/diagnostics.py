@@ -13,6 +13,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from tecan_common.native_acceleration import ascii_lower as _native_ascii_lower
+
 from ...aliases import alias_records, load_alias_maps, normalize_protocol_ir_aliases, resolve_alias
 from ...bundle_lifecycle import (
     DEFAULT_PROBE_ROOT,
@@ -144,12 +146,20 @@ ANALYSIS_REPORT_VERSION = "tecan.analysis_report.v1"
 from ..runtime import cli_module, _safe_output_label
 
 
+def _lower_text(value: str) -> str:
+    native = _native_ascii_lower(value)
+    return native if native is not None else value.lower()
+
+
 def _cmd_analyze(args: argparse.Namespace) -> int:
     cli = cli_module()
     if args.fluent_script and args.input is not None:
         raise PipelineError("pass either an input path or --fluent-script, not both")
     input_path = resolve_user_path(args.input) if args.input is not None else None
-    input_is_archive = bool(input_path and (input_path.suffix.lower() == ".zeia" or is_context_archive(input_path)))
+    input_is_archive = bool(
+        input_path
+        and (_lower_text(input_path.suffix) == ".zeia" or is_context_archive(input_path))
+    )
     ctx = None if input_is_archive or args.fluent_script else cli._command_context(args.context)
     if input_path is None and ctx is None and not args.fluent_script:
         raise PipelineError("analyze requires an input path, --context, --fluent-script, or an active project")
@@ -394,7 +404,7 @@ def _build_analysis_report(
         "analysis_version": ANALYSIS_REPORT_VERSION,
         "input": {
             "path": str(input_path) if input_path else "",
-            "kind": input_path.suffix.lower() if input_path else "context",
+            "kind": _lower_text(input_path.suffix) if input_path else "context",
         },
         "context": {
             "name": context.name if context else "",
@@ -665,7 +675,7 @@ def _cmd_process_media(args: argparse.Namespace) -> int:
 def _cmd_diagnose(args: argparse.Namespace) -> int:
     cli = cli_module()
     input_path = resolve_user_path(args.input)
-    if args.input.suffix.lower() == ".zeia" or is_context_archive(input_path):
+    if _lower_text(args.input.suffix) == ".zeia" or is_context_archive(input_path):
         ctx = None
     else:
         ctx = cli._command_context(args.context)

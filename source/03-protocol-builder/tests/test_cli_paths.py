@@ -13,6 +13,7 @@ from tecan_common import native_acceleration
 from fluent_pipeline.application_services import GenerationResult
 from fluent_pipeline.cli import _cmd_analyze, _cmd_generate, _cmd_map_media, _resolve_generation_event_log, _resolve_ir_source
 from fluent_pipeline.cli import runtime as cli_runtime
+from fluent_pipeline.cli.commands import diagnostics as diagnostics_commands
 from fluent_pipeline.cli.commands import generation as generation_commands
 from fluent_pipeline.cli.commands import simulator as simulator_commands
 from fluent_pipeline.cli.rendering import generation_exit_code, print_generation_result
@@ -1057,10 +1058,81 @@ class CliPathResolutionTests(unittest.TestCase):
 
 
 class AnalyzeCommandTests(unittest.TestCase):
+    def test_diagnostic_suffix_lowering_uses_native_with_unicode_fallback(self):
+        values = [".ZEIA", ".ZÉIA"]
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [diagnostics_commands._lower_text(value) for value in values]
+        self.assertEqual(expected, [value.lower() for value in values])
+
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                diagnostics_commands,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = [diagnostics_commands._lower_text(value) for value in values]
+            native_call.assert_any_call(".ZEIA")
+            native_call.assert_any_call(".ZÉIA")
+        self.assertEqual(actual, expected)
+
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                diagnostics_commands, "_native_ascii_lower", return_value=None
+            ):
+                forced_fallback = [
+                    diagnostics_commands._lower_text(value) for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
+
+    def test_diagnose_treats_uppercase_zeia_as_archive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            input_path = Path(tmp) / "synthetic.ZEIA"
+            input_path.write_bytes(b"synthetic archive marker")
+            bundle = SimpleNamespace(
+                report={
+                    "summary": {
+                        "status": "ok",
+                        "finding_count": 0,
+                        "top_likely_causes": [],
+                    }
+                }
+            )
+            cli = SimpleNamespace(
+                _command_context=mock.Mock(),
+                diagnose_input=mock.Mock(return_value=bundle),
+            )
+            args = SimpleNamespace(
+                input=input_path,
+                context="unused-context",
+                error_text=None,
+                error_file=None,
+                out_dir=None,
+                script=None,
+                name=None,
+                force_import=False,
+                snapshot=[],
+                as_json=True,
+            )
+
+            with mock.patch.object(diagnostics_commands, "cli_module", return_value=cli), mock.patch.object(
+                diagnostics_commands, "is_context_archive", return_value=False
+            ), mock.patch.object(
+                diagnostics_commands,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call, mock.patch("sys.stdout", new_callable=io.StringIO):
+                rc = diagnostics_commands._cmd_diagnose(args)
+
+            self.assertEqual(rc, 0)
+            cli._command_context.assert_not_called()
+            cli.diagnose_input.assert_called_once()
+            self.assertIsNone(cli.diagnose_input.call_args.kwargs["context"])
+            native_call.assert_any_call(".ZEIA")
+
     def test_analyze_writes_combined_report_from_existing_context(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
-            script_path = tmp_path / "script.xscr"
+            script_path = tmp_path / "script.XSCR"
             script_path.write_text("<Root />", encoding="utf-8")
             out_dir = tmp_path / "analysis"
             ctx = SimpleNamespace(
@@ -1115,8 +1187,13 @@ class AnalyzeCommandTests(unittest.TestCase):
 
             with mock.patch("fluent_pipeline.cli._command_context", return_value=ctx), mock.patch(
                 "fluent_pipeline.cli.diagnose_input", return_value=diagnosis
-            ), mock.patch("fluent_pipeline.cli.analyze_script", return_value=script_report):
+            ), mock.patch("fluent_pipeline.cli.analyze_script", return_value=script_report), mock.patch.object(
+                diagnostics_commands,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
                 rc = _cmd_analyze(args)
+                native_call.assert_any_call(".XSCR")
 
             self.assertEqual(rc, 0)
             analysis_md = out_dir / "analysis.md"
@@ -1131,6 +1208,7 @@ class AnalyzeCommandTests(unittest.TestCase):
             self.assertEqual(data["analysis_version"], "tecan.analysis_report.v1")
             self.assertEqual(data["summary"]["status"], "needs_review")
             self.assertEqual(data["summary"]["improvement_count"], 1)
+            self.assertEqual(data["input"]["kind"], ".xscr")
 
     def test_analyze_reads_saved_fluentcontrol_script_from_database(self):
         with tempfile.TemporaryDirectory() as tmp:
