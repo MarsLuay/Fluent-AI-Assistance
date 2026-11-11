@@ -10,6 +10,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from tecan_common.native_acceleration import (
+    ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
+)
 
 REGISTRY_VERSION = "tecan.command_registry.v2"
 LEGACY_REGISTRY_VERSION = "tecan.command_registry.v1"
@@ -217,4 +220,6 @@ def _first_field(fields: dict[str, Any], names: list[str]) -> Any:
 
 
 def _normalize_key(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "", value.lower())
+    lowered = value.lower()
+    native = _native_ascii_lower_alnum_compact(lowered)
+    return native if native is not None else re.sub(r"[^a-z0-9]+", "", lowered)

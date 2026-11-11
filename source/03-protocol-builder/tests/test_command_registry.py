@@ -1,5 +1,7 @@
 import unittest
+from unittest.mock import patch
 
+from tecan_common import native_acceleration
 from fluent_pipeline.command_registry import (
     command_registry_path,
     command_registry_resource,
@@ -27,6 +29,22 @@ import tecan_common.command_registry as shared_command_registry
 
 
 class CommandRegistryTests(unittest.TestCase):
+    def test_key_normalization_uses_native_ascii_compaction_with_python_lower_fallback(self):
+        values = ["Command Data V2", "A_09", "Straße", "İD", "東京", ""]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [shared_command_registry._normalize_key(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                shared_command_registry,
+                "_native_ascii_lower_alnum_compact",
+                wraps=native_acceleration.ascii_lower_alnum_compact,
+            ) as native_call:
+                actual = [shared_command_registry._normalize_key(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertIsNone(native_acceleration.ascii_lower_alnum_compact("straße"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["commanddatav2", "a09", "strae", "id", "", ""])
+
     def test_common_registry_helpers_are_shared(self):
         helpers = {
             "command_registry_path": command_registry_path,
