@@ -530,7 +530,7 @@ def _visible_prompt_media_by_number(ir: Mapping[str, Any]) -> dict[int, dict[str
         for item in placeholders:
             if not isinstance(item, dict):
                 continue
-            kind = str(item.get("kind") or "").lower()
+            kind = _lower_text(str(item.get("kind") or ""))
             slot = str(item.get("slot") or "").strip()
             if kind and slot:
                 slots[kind] = slot
@@ -945,7 +945,7 @@ def resolve_prompt_media(
     specs = sorted(
         specs,
         key=lambda item: (
-            0 if str(item.get("kind") or "").lower() == "image" else 1,
+            0 if _lower_text(str(item.get("kind") or "")) == "image" else 1,
             str(item.get("filename") or ""),
         ),
     )
@@ -1007,7 +1007,7 @@ def resolve_prompt_media(
         action_kind = _deploy_visual_source_to_slot(
             source,
             destination,
-            slot_kind=str(spec.get("kind") or "").lower(),
+            slot_kind=_lower_text(str(spec.get("kind") or "")),
             worktable_video=str(spec.get("slot") or "").strip() in worktable_slots,
         )
         from .workflow_events import emit_workflow_event
@@ -1420,7 +1420,7 @@ def assign_step_label_media_to_final_prompts(
         params = step.get("parameters") if isinstance(step.get("parameters"), dict) else {}
         media = params.get("media_placeholders") if isinstance(params, dict) else []
         slots = {
-            str(item.get("kind") or "").lower(): str(item.get("slot") or "")
+            _lower_text(str(item.get("kind") or "")): str(item.get("slot") or "")
             for item in media
             if isinstance(item, dict) and str(item.get("slot") or "")
         }
@@ -1433,7 +1433,10 @@ def assign_step_label_media_to_final_prompts(
         )
         if worktable_motion_display:
             for item in media:
-                if isinstance(item, dict) and str(item.get("kind") or "").lower() == "video":
+                if (
+                    isinstance(item, dict)
+                    and _lower_text(str(item.get("kind") or "")) == "video"
+                ):
                     item["worktable_display"] = True
                     item["requires_worktable_gif_normalization"] = True
         assignment = {

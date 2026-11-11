@@ -135,6 +135,89 @@ def test_media_inventory_name_and_suffix_use_native_lower_fallback(
     assert forced_fallback == expected
 
 
+def test_visible_prompt_media_kind_mapping_uses_native_lower_fallback() -> None:
+    ir = {
+        "steps": [
+            {
+                "operation": "prompt_user",
+                "parameters": {
+                    "media_placeholders": [
+                        {"kind": "IMAGE", "slot": "image-slot"},
+                        {"kind": "VIDÉO", "slot": "unicode-slot"},
+                    ]
+                },
+            }
+        ]
+    }
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = bundle_media._visible_prompt_media_by_number(ir)
+    assert expected == {1: {"image": "image-slot", "vidéo": "unicode-slot"}}
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            bundle_media,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            actual = bundle_media._visible_prompt_media_by_number(ir)
+        native_call.assert_any_call("IMAGE")
+        native_call.assert_any_call("VIDÉO")
+    assert actual == expected
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(bundle_media, "_native_ascii_lower", return_value=None):
+            forced_fallback = bundle_media._visible_prompt_media_by_number(ir)
+    assert forced_fallback == expected
+
+
+def test_resolve_prompt_media_sorts_image_kind_with_native_lower(
+    tmp_path: Path,
+) -> None:
+    specs = [
+        {"kind": "VIDEO", "filename": "video.gif", "slot": "video"},
+        {"kind": "IMAGE", "filename": "image.png", "slot": "image"},
+    ]
+
+    def resolve() -> list[str]:
+        with (
+            patch("fluent_pipeline.protocol_ir.media_slot_specs", return_value=specs),
+            patch(
+                "fluent_pipeline.protocol_ir.required_media_slot_specs",
+                side_effect=lambda values: values,
+            ),
+            patch(
+                "fluent_pipeline.media_convert.worktable_fallback_video_slots",
+                return_value=set(),
+            ),
+            patch.object(
+                bundle_media, "_collect_media_inventory_records", return_value={}
+            ),
+        ):
+            report = resolve_prompt_media({"steps": []}, tmp_path / "media")
+        return [item["filename"] for item in report["unresolved"]]
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = resolve()
+    assert expected == ["image.png", "video.gif"]
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            bundle_media,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            actual = resolve()
+        native_call.assert_any_call("IMAGE")
+        native_call.assert_any_call("VIDEO")
+    assert actual == expected
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(bundle_media, "_native_ascii_lower", return_value=None):
+            forced_fallback = resolve()
+    assert forced_fallback == expected
+
+
 def test_unresolved_policy_uses_native_lower_with_unicode_fallback(tmp_path: Path) -> None:
     values = [" Fail_Gate ", "FälL_Gate"]
 
@@ -456,6 +539,7 @@ def test_assign_step_label_media_skips_final_prompt_without_media() -> None:
 
 def test_assign_step_label_media_marks_worktable_motion_display() -> None:
     ir = {"steps": [_prompt("step_001", media=True, rup_kind="worktable")]}
+    ir["steps"][0]["parameters"]["media_placeholders"][0]["kind"] = "VIDEO"
 
     assignments = assign_step_label_media_to_final_prompts(ir, [Path("step1.mov")])
 
