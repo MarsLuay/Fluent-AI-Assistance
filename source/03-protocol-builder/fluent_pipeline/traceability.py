@@ -7,6 +7,7 @@ from typing import Any
 import json
 import re
 from . import xml_compat as ET
+from tecan_common.native_acceleration import xml_local_name as _native_xml_local_name
 
 from .protocol_ir import protocol_ir_from_xscr
 from .request_spec import request_verbatim_prompt
@@ -541,6 +542,9 @@ def _first_text(root: ET.Element, name: str) -> str:
 
 
 def _local_name(tag: str) -> str:
+    native = _native_xml_local_name(tag)
+    if native is not None:
+        return native
     return tag.rsplit("}", 1)[-1] if "}" in tag else tag
 
 
