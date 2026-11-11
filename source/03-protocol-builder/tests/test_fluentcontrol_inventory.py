@@ -298,6 +298,69 @@ class FluentControlInventoryTests(unittest.TestCase):
         self.assertEqual(report["missing_count"], 0)
         self.assertEqual(report["review"][0]["reason"], "target_profile_not_selected")
 
+    def test_system_dependency_matching_uses_native_casefold_indexes(self) -> None:
+        guid = "11111111-1111-4111-8111-111111111111"
+        payload = (
+            b"<Reference><Guid>11111111-1111-4111-8111-111111111111</Guid>"
+            b"<TypeId>WorktableWorkspace</TypeId><ObjectName>STRASSE_WT</ObjectName></Reference>"
+        )
+        target_profile = {
+            "fingerprint": "synthetic-profile",
+            "objects": {
+                "systemspecific": [
+                    {
+                        "guid": guid,
+                        "type_id": "WorktableWorkspace",
+                        "object_name": "Straße_WT",
+                        "relative_path": "Worktable/Workspaces/example.xwsp",
+                    }
+                ]
+            },
+        }
+
+        with tempfile.TemporaryDirectory(prefix="fc_casefold_") as tmp:
+            systemspecific = Path(tmp)
+            (systemspecific / f"{guid}.xwsp").write_text(
+                "<VxData><Payload><ObjectName>Straße_WT</ObjectName></Payload></VxData>",
+                encoding="utf-8",
+            )
+
+            def collect_reports():
+                return [
+                    report_missing_system_dependencies(
+                        payload, systemspecific_dir=systemspecific
+                    ),
+                    report_missing_system_dependencies(
+                        payload, target_profile=target_profile
+                    ),
+                ]
+
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                disabled = collect_reports()
+            self.assertEqual(disabled[0]["present"][0]["resolved_via"], "systemspecific_guid")
+            self.assertEqual(disabled[1]["present"][0]["resolved_via"], "target_profile_guid")
+            self.assertEqual(disabled[0]["missing_count"], 0)
+            self.assertEqual(disabled[1]["missing_count"], 0)
+
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    inventory_module,
+                    "_native_ascii_casefold_trim",
+                    wraps=native_acceleration.ascii_casefold_trim,
+                ) as native_call:
+                    enabled = collect_reports()
+                    self.assertGreater(native_call.call_count, 0)
+            self.assertEqual(enabled, disabled)
+
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    inventory_module,
+                    "_native_ascii_casefold_trim",
+                    return_value=None,
+                ):
+                    fallback = collect_reports()
+            self.assertEqual(fallback, disabled)
+
     def test_missing_system_dependency_report(self) -> None:
         with tempfile.TemporaryDirectory(prefix="fc_sys_") as tmp:
             sys_root = Path(tmp) / "SystemSpecific"

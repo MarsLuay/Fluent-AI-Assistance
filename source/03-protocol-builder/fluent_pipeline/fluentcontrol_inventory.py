@@ -392,7 +392,7 @@ def _index_systemspecific_objects(
         except OSError:
             continue
         name = _first_xml_text(text, "ObjectName") or path.stem
-        index.setdefault(name.casefold(), []).append(
+        index.setdefault(_casefold_key(name), []).append(
             {
                 "guid": path.stem,
                 "object_name": name,
@@ -434,12 +434,12 @@ def _index_systemspecific_profile_objects(
         if not isinstance(item, Mapping):
             continue
         type_id = str(item.get("type_id") or item.get("kind") or "")
-        normalized = type_id.replace(" ", "").replace("_", "").casefold()
+        normalized = _casefold_key(type_id.replace(" ", "").replace("_", ""))
         suffixes = _TYPE_TO_SUFFIX.get(normalized, set())
         name = str(item.get("object_name") or "").strip()
         if not name or not suffixes:
             continue
-        index.setdefault(name.casefold(), []).append(
+        index.setdefault(_casefold_key(name), []).append(
             {
                 "guid": str(item.get("guid") or ""),
                 "object_name": name,
@@ -473,25 +473,33 @@ def report_missing_system_dependencies(
         root = None
         index = {}
         target_binding = "target_unbound"
-    base_guids = {guid.casefold() for guid in (base_archive_guids or set()) if guid}
+    base_guids = {_casefold_key(guid) for guid in (base_archive_guids or set()) if guid}
     missing: list[dict[str, str]] = []
     present: list[dict[str, str]] = []
     review: list[dict[str, Any]] = []
     skipped: list[dict[str, str]] = []
     for ref in extract_typed_references(payload):
         type_id = ref["type_id"]
-        type_key = type_id.replace(" ", "").casefold()
+        type_key = _casefold_key(type_id.replace(" ", ""))
         wanted_suffixes = _TYPE_TO_SUFFIX.get(type_key)
         if not wanted_suffixes:
             skipped.append({**ref, "reason": "type_not_tracked"})
             continue
         guid = ref["guid"]
         name = ref["object_name"]
-        if guid and guid.casefold() in base_guids:
+        if guid and _casefold_key(guid) in base_guids:
             present.append({**ref, "resolved_via": "base_zeia"})
             continue
-        hits = [row for row in index.get(name.casefold(), []) if row["suffix"] in wanted_suffixes]
-        if any(row["guid"].casefold() == guid.casefold() for row in hits if guid):
+        hits = [
+            row
+            for row in index.get(_casefold_key(name), [])
+            if row["suffix"] in wanted_suffixes
+        ]
+        if any(
+            _casefold_key(row["guid"]) == _casefold_key(guid)
+            for row in hits
+            if guid
+        ):
             present.append(
                 {
                     **ref,
