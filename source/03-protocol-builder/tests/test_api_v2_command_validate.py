@@ -141,13 +141,18 @@ class ApiV2CommandValidateTests(unittest.TestCase):
                 command_validate,
                 "_native_xml_elements_by_name",
                 wraps=native_acceleration.xml_elements_by_name,
-            ) as native_call:
+            ) as native_call, patch.object(
+                command_validate,
+                "_native_xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
+            ) as first_call:
                 actual_variables = command_validate._compiled_variable_declarations(
                     root
                 )
                 actual_labware = command_validate._compiled_labware_name_fields(root)
                 actual_first_text = command_validate._first_text(root, "Name")
-                self.assertEqual(native_call.call_count, 5)
+                self.assertEqual(native_call.call_count, 2)
+                self.assertEqual(first_call.call_count, 3)
         self.assertEqual(actual_variables, expected_variables)
         self.assertEqual(actual_variables, {"first", "second"})
         self.assertEqual(actual_labware, expected_labware)
@@ -160,13 +165,24 @@ class ApiV2CommandValidateTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             fallback_text = command_validate._first_text(commented, "Name")
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            self.assertIsNone(
-                native_acceleration.xml_elements_by_name(
-                    commented, ("Name",), command_validate.ET.Element
-                )
+            selection = native_acceleration.xml_first_element_by_name(
+                commented, "Name", command_validate.ET.Element
             )
+            self.assertIsNotNone(selection)
+            assert selection is not None
+            self.assertIs(selection[1], commented[1])
             native_fallback_text = command_validate._first_text(commented, "Name")
         self.assertEqual(native_fallback_text, fallback_text)
+
+        empty_first = command_validate.ET.fromstring(
+            "<Root><Name> </Name><Name>later</Name></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_empty = command_validate._first_text(empty_first, "Name", "default")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            native_empty = command_validate._first_text(empty_first, "Name", "default")
+        self.assertEqual(native_empty, fallback_empty)
+        self.assertEqual(native_empty, "default")
 
     def test_structured_failures_for_bad_xscr(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -17,6 +17,7 @@ from typing import Any, Mapping, Protocol
 
 from tecan_common.native_acceleration import (
     xml_elements_by_name as _native_xml_elements_by_name,
+    xml_first_element_by_name as _native_xml_first_element_by_name,
 )
 
 from .commands import AddLabware, GetFingers, command_from_xscr_object, validate_command
@@ -781,12 +782,17 @@ def _compiled_labware_types_by_label(root: ET.Element) -> dict[str, str]:
 def _compiled_labware_name_fields(root: ET.Element) -> list[str]:
     names: list[str] = []
     seen: set[str] = set()
-    for element in _elements_by_local_names(
-        root, ("LabwareName", "LabwareLable", "LabwareLabel")
-    ):
-        local = _local_name(element.tag)
-        if local not in {"LabwareName", "LabwareLable", "LabwareLabel"}:
-            continue
+    elements = _native_xml_elements_by_name(
+        root, ("LabwareName", "LabwareLable", "LabwareLabel"), ET.Element
+    )
+    if elements is None:
+        elements = (
+            element
+            for element in root.iter()
+            if _local_name(element.tag)
+            in {"LabwareName", "LabwareLable", "LabwareLabel"}
+        )
+    for element in elements:
         value = (element.text or "").strip()
         if value and value not in seen:
             seen.add(value)
@@ -795,10 +801,14 @@ def _compiled_labware_name_fields(root: ET.Element) -> list[str]:
 
 
 def _first_text(root: ET.Element, name: str, default: str = "") -> str:
-    elements = _native_xml_elements_by_name(root, (name,), ET.Element)
-    if elements is None:
-        elements = root.iter()
-    for element in elements:
+    selection = _native_xml_first_element_by_name(root, name, ET.Element)
+    if selection is not None:
+        _, element = selection
+        if element is None:
+            return default
+        text = (element.text or "").strip()
+        return text if text else default
+    for element in root.iter():
         if _local_name(element.tag) == name:
             text = (element.text or "").strip()
             return text if text else default
