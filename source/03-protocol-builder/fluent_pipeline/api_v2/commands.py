@@ -750,8 +750,10 @@ def remove_labware_from_xscr_object(element: Any, *, line_number: int = 0) -> Re
     return RemoveLabware(
         labware_name=_child_text(node, "LabwareName"),
         line_number=line_number or _extract_line_number(element),
-        is_breakpoint=_child_text(statement_data, "IsBreakpoint", "False").lower() == "true",
-        is_disabled_for_execution=_child_text(statement_data, "IsDisabledForExecution", "False").lower() == "true",
+        is_breakpoint=_text_is_true(_child_text(statement_data, "IsBreakpoint", "False")),
+        is_disabled_for_execution=_text_is_true(
+            _child_text(statement_data, "IsDisabledForExecution", "False")
+        ),
     )
 
 
@@ -768,8 +770,10 @@ def get_fingers_from_xscr_element(element: Any, *, line_number: int = 0) -> GetF
         available_id=_descendant_text(element, "AvailableID"),
         line_number=resolved_line,
         group_line_number=int(_descendant_text(element, "GroupLineNumber", "0") or 0),
-        is_breakpoint=_descendant_text(element, "IsBreakpoint", "False").lower() == "true",
-        is_disabled_for_execution=_descendant_text(element, "IsDisabledForExecution", "False").lower() == "true",
+        is_breakpoint=_text_is_true(_descendant_text(element, "IsBreakpoint", "False")),
+        is_disabled_for_execution=_text_is_true(
+            _descendant_text(element, "IsDisabledForExecution", "False")
+        ),
     )
 
 
@@ -873,10 +877,14 @@ def _expression_source_text(expression: Mapping[str, Any]) -> str:
     return render_expression(expression_from_mapping(dict(expression)))
 
 
+def _text_is_true(value: str) -> bool:
+    native = _native_parse_ascii_bool_text(value)
+    return native if native is not None else value.lower() == "true"
+
+
 def _child_bool(element: Any, name: str, default: bool = False) -> bool:
     text = _child_text(element, name, "False" if not default else "True")
-    native = _native_parse_ascii_bool_text(text)
-    return native if native is not None else text.lower() == "true"
+    return _text_is_true(text)
 
 
 def get_fingers_from_ir_step(step: Mapping[str, Any]) -> GetFingers:
@@ -1025,7 +1033,7 @@ def _child_text(element: Any, name: str, default: str = "") -> str:
 
 def _rup_timeout_from_xscr(node: Any) -> int | str:
     """Derive UserPrompt timeout from RUP auto-close flags, not the default RUPTimeOut."""
-    auto_close = _child_text(node, "RUPAutoClose", "False").lower() == "true"
+    auto_close = _text_is_true(_child_text(node, "RUPAutoClose", "False"))
     if not auto_close:
         return 0
     return _child_text(node, "RUPTimeOut", "0") or 0
@@ -1617,11 +1625,15 @@ def command_from_xscr_object(element: Any, *, command_id: str | None = None) -> 
             location=_child_text(node, "Location"),
             site=_child_text(node, "Position", "1") or 1,
             rotation=_child_text(node, "Rotation", "0") or 0,
-            has_lid=_child_text(node, "HasLid", "False").lower() == "true",
+            has_lid=_text_is_true(_child_text(node, "HasLid", "False")),
             line_number=line_number,
             data_style=data_style,
-            is_breakpoint=_child_text(statement_data, "IsBreakpoint", "False").lower() == "true",
-            is_disabled_for_execution=_child_text(statement_data, "IsDisabledForExecution", "False").lower() == "true",
+            is_breakpoint=_text_is_true(
+                _child_text(statement_data, "IsBreakpoint", "False")
+            ),
+            is_disabled_for_execution=_text_is_true(
+                _child_text(statement_data, "IsDisabledForExecution", "False")
+            ),
         )
     if api_type == "UserPrompt" or command_id in {
         "UserPromptStatement",
@@ -1640,21 +1652,20 @@ def command_from_xscr_object(element: Any, *, command_id: str | None = None) -> 
                 timeout=_rup_timeout_from_xscr(node),
                 line_number=line_number,
                 rup_kind="worktable",
-                auto_close=_child_text(node, "RUPAutoClose", "False").lower() == "true",
+                auto_close=_text_is_true(_child_text(node, "RUPAutoClose", "False")),
                 rup_timeout=_rup_raw_timeout_from_xscr(node),
-                is_breakpoint=_child_text(node, "IsBreakpoint", "False").lower() == "true",
-                is_disabled_for_execution=_child_text(node, "IsDisabledForExecution", "False").lower() == "true",
+                is_breakpoint=_text_is_true(_child_text(node, "IsBreakpoint", "False")),
+                is_disabled_for_execution=_text_is_true(
+                    _child_text(node, "IsDisabledForExecution", "False")
+                ),
                 selected_labware_name=_child_text(labware, "LabwareName"),
                 selected_labware_type=_child_text(labware, "LabwareTypeName"),
                 preserve_selected_labware_expression=True,
                 grid=_child_text(labware, "Grid"),
                 site=_child_text(labware, "Site"),
-                is_labware_existence_mandatory=_child_text(
-                    labware,
-                    "IsLabwareExistenceMandatory",
-                    "False",
-                ).lower()
-                == "true",
+                is_labware_existence_mandatory=_text_is_true(
+                    _child_text(labware, "IsLabwareExistenceMandatory", "False")
+                ),
             )
         if command_id == "RUPStandardStatement" or "RUPStandardStatement" in object_type:
             node = _find_descendant(element, "RUPStandardStatement")
@@ -1666,13 +1677,17 @@ def command_from_xscr_object(element: Any, *, command_id: str | None = None) -> 
                 timeout=_rup_timeout_from_xscr(node),
                 line_number=line_number,
                 rup_kind="standard",
-                auto_close=_child_text(node, "RUPAutoClose", "False").lower() == "true",
+                auto_close=_text_is_true(_child_text(node, "RUPAutoClose", "False")),
                 rup_timeout=_rup_raw_timeout_from_xscr(node),
                 variable_scope=_child_text(std, "VariableScope"),
-                is_breakpoint=_child_text(node, "IsBreakpoint", "False").lower() == "true",
-                is_disabled_for_execution=_child_text(node, "IsDisabledForExecution", "False").lower() == "true",
+                is_breakpoint=_text_is_true(_child_text(node, "IsBreakpoint", "False")),
+                is_disabled_for_execution=_text_is_true(
+                    _child_text(node, "IsDisabledForExecution", "False")
+                ),
                 sound_path=_child_text(std, "SelectedSoundPath"),
-                change_status_light_color=_child_text(node, "ChangeStatusLightColor", "False").lower() == "true",
+                change_status_light_color=_text_is_true(
+                    _child_text(node, "ChangeStatusLightColor", "False")
+                ),
                 status_light_color_string=_child_text(node, "StatusLightColorString"),
                 percent_complete_string=_child_text(std, "PercentCompleteString"),
             )
@@ -1681,9 +1696,11 @@ def command_from_xscr_object(element: Any, *, command_id: str | None = None) -> 
             prompt=_child_text(node, "Prompt"),
             timeout=_child_text(node, "Timeout", "0") or 0,
             line_number=line_number,
-            auto_close=_child_text(node, "AutoClose", "False").lower() == "true",
-            is_breakpoint=_child_text(node, "IsBreakpoint", "False").lower() == "true",
-            is_disabled_for_execution=_child_text(node, "IsDisabledForExecution", "False").lower() == "true",
+            auto_close=_text_is_true(_child_text(node, "AutoClose", "False")),
+            is_breakpoint=_text_is_true(_child_text(node, "IsBreakpoint", "False")),
+            is_disabled_for_execution=_text_is_true(
+                _child_text(node, "IsDisabledForExecution", "False")
+            ),
             sound_path=_child_text(node, "SoundFile"),
         )
     if api_type == "Subroutine" or command_id == "SubRoutineStatement":
@@ -1718,11 +1735,19 @@ def command_from_xscr_object(element: Any, *, command_id: str | None = None) -> 
             labware=_parse_transfer_setting(settings, "Labware"),
             location=_parse_transfer_setting(settings, "Location"),
             site=_parse_transfer_setting(settings, "Site", "1") or 1,
-            move_to_base=_parse_transfer_setting(settings, "MoveToBase", "false").lower() == "true",
-            fixed_site=_parse_transfer_setting(settings, "FixedSite", "true").lower() == "true",
+            move_to_base=_text_is_true(_parse_transfer_setting(settings, "MoveToBase", "false")),
+            fixed_site=_text_is_true(_parse_transfer_setting(settings, "FixedSite", "true")),
             module_name=str(macro.attrib.get("ModuleName") or "") if macro is not None else "",
-            is_breakpoint=str(macro.attrib.get("IsBreakpoint") or "false").lower() == "true" if macro is not None else False,
-            is_disabled_for_execution=str(macro.attrib.get("IsDisabledForExecution") or "false").lower() == "true" if macro is not None else False,
+            is_breakpoint=(
+                _text_is_true(str(macro.attrib.get("IsBreakpoint") or "false"))
+                if macro is not None
+                else False
+            ),
+            is_disabled_for_execution=(
+                _text_is_true(str(macro.attrib.get("IsDisabledForExecution") or "false"))
+                if macro is not None
+                else False
+            ),
             execution_settings=settings,
             line_number=line_number,
         )
