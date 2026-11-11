@@ -107,9 +107,15 @@ class UserPromptValidateTests(unittest.TestCase):
                     custom_root, "Prompt", user_prompt_validate.ET.Element
                 )
             )
-            custom_actual = user_prompt_validate._first_descendant_text(
-                custom_root, "Prompt"
-            )
+            with patch.object(
+                user_prompt_validate,
+                "_native_xml_local_name",
+                wraps=native_acceleration.xml_local_name,
+            ) as local_name_call:
+                custom_actual = user_prompt_validate._first_descendant_text(
+                    custom_root, "Prompt"
+                )
+                self.assertEqual(local_name_call.call_count, 2)
         self.assertEqual(custom_actual, custom_expected)
         self.assertEqual(custom_actual, (True, "Fallback"))
 

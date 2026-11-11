@@ -14,6 +14,7 @@ from typing import Any, Callable, Protocol
 
 from tecan_common.native_acceleration import (
     xml_first_element_by_name as _native_xml_first_element_by_name,
+    xml_local_name as _native_xml_local_name,
 )
 
 from .policies.prompt_text import normalize_operator_prompt_text, prompt_text_is_placeholder
@@ -183,4 +184,7 @@ def _first_descendant_text(root: ET.Element, name: str) -> tuple[bool, str]:
 
 
 def _local_name(tag: str) -> str:
+    native = _native_xml_local_name(tag)
+    if native is not None:
+        return native
     return tag.rsplit("}", 1)[-1]
