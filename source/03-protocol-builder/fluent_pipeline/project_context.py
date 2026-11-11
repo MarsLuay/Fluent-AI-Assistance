@@ -27,6 +27,7 @@ from .progress import ProgressCallback, ProgressEmitter, ProgressStage
 from .project_store import ProjectStore
 from .runner import PipelineError
 from .worktable_geometry import build_worktable_geometry
+from tecan_common.native_acceleration import xml_local_name as _native_xml_local_name
 from tecan_common.zeia_limits import (
     MAX_ZEIA_COMPRESSION_RATIO,
     MAX_ZEIA_MEMBER_UNCOMPRESSED_BYTES,
@@ -2234,6 +2235,9 @@ def _read_text(path: Path) -> str:
 
 
 def _local_name(tag: str) -> str:
+    native = _native_xml_local_name(tag)
+    if native is not None:
+        return native
     return tag.rsplit("}", 1)[-1]
 
 

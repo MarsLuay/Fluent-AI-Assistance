@@ -4,8 +4,10 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 import fluent_pipeline.project_context as pc
+from tecan_common import native_acceleration
 from fluent_pipeline.import_identity import build_source_import_identity
 from fluent_pipeline.provenance import policy_profile_sha256s, sha256_path
 from tecan_common.command_registry import command_registry_sha256
@@ -13,6 +15,34 @@ from tecan_reader.zeia_adapters import ingest_zeia
 
 
 class ProjectContextTests(unittest.TestCase):
+    def test_local_name_uses_native_helper_and_custom_tag_fallback(self):
+        tag = "{urn:example}Workspace"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = pc._local_name(tag)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                pc,
+                "_native_xml_local_name",
+                wraps=native_acceleration.xml_local_name,
+            ) as native_call:
+                actual = pc._local_name(tag)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "Workspace")
+
+        class CustomTag(str):
+            def rsplit(self, sep=None, maxsplit=-1):
+                return ["", "PythonFallback"]
+
+        custom_tag = CustomTag("{urn:example}Ignored")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = pc._local_name(custom_tag)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.xml_local_name(custom_tag))
+            fallback_actual = pc._local_name(custom_tag)
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, "PythonFallback")
+
     def test_project_and_collection_roots_use_ready_temp_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
