@@ -245,6 +245,28 @@ class PatternSummaryHelperTests(unittest.TestCase):
         self.assertEqual(actual_summary, expected_summary)
         self.assertEqual(actual_summary, "Aspirate 10")
 
+    def test_pattern_type_normalization_uses_rust_with_python_fallback(self) -> None:
+        values = (" Aspirate-Drop Tips ", "Café-Name", "Aſpirate")
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [pattern_library.normalize_pattern_type(value) for value in values]
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                pattern_library,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = [pattern_library.normalize_pattern_type(value) for value in values]
+                self.assertEqual(native_call.call_count, 3)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["aspirate_drop_tips", "café_name", "aſpirate"])
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                pattern_library, "_native_ascii_casefold_trim", return_value=None
+            ):
+                fallback = [pattern_library.normalize_pattern_type(value) for value in values]
+        self.assertEqual(fallback, expected)
+
     def test_gwl_suffix_check_uses_rust_and_preserves_python_lower(self) -> None:
         steps = [
             {"fields": {"Condition": "café", "FileName": "Orders.GWL"}},

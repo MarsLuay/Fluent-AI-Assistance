@@ -280,7 +280,7 @@ def list_script_pattern_types() -> dict[str, Any]:
 
 
 def normalize_pattern_type(pattern_type: str) -> str:
-    return pattern_type.strip().lower().replace("-", "_").replace(" ", "_")
+    return _lower_text(pattern_type.strip()).replace("-", "_").replace(" ", "_")
 
 
 def classify_command_pattern(command: dict[str, Any]) -> list[str]:
