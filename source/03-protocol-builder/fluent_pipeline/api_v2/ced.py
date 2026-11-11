@@ -13,6 +13,10 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Mapping, MutableSequence, Sequence
 
+from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
+)
+
 from .types import CedButton, CedHandlerResult, ICedInfo
 
 _SAFE_DIALOG_RE = re.compile(
@@ -112,7 +116,7 @@ def handle_common_error_dialog(ced_info: ICedInfo) -> CedHandlerResult:
     preferred_labels = ("OK", "Yes") if _checksum_dialog(combined) else ("OK",)
     for label in preferred_labels:
         for index, button in enumerate(buttons):
-            if button.label.strip().casefold() == label.casefold():
+            if _casefold_text(button.label) == _casefold_text(label):
                 return CedHandlerResult(
                     button_index=index,
                     dismissed=True,
@@ -280,13 +284,19 @@ def subscribe_common_error_dialog(
     return ced_handler, subscription
 
 
+def _casefold_text(value: str) -> str:
+    text = value.strip()
+    native = _native_ascii_casefold_trim(text)
+    return native if native is not None else text.casefold()
+
+
 def _checksum_dialog(text: str) -> bool:
-    lowered = text.casefold()
+    lowered = _casefold_text(text)
     return "checksum" in lowered or "recalculate" in lowered
 
 
 def _is_safe_button_label(label: str) -> bool:
-    normalized = label.strip().casefold()
+    normalized = _casefold_text(label)
     return normalized in {"ok", "yes", "continue", "close"}
 
 

@@ -1,5 +1,9 @@
+import os
 import unittest
+from unittest.mock import patch
 
+import fluent_pipeline.api_v2.ced as ced_module
+from tecan_common import native_acceleration
 from fluent_pipeline.api_v2.ced import (
     CEDNotificationHandler,
     ced_info_from_text,
@@ -12,6 +16,49 @@ from fluent_pipeline.api_v2.types import CedButton, ICedInfo
 
 
 class ApiV2CedHandlerTests(unittest.TestCase):
+    def test_casefold_text_uses_native_ascii_and_python_unicode_fallback(self) -> None:
+        values = ["  OK ", "Straße", "\u2003Café\u00a0", "", "YES"]
+        expected = [value.strip().casefold() for value in values]
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [ced_module._casefold_text(value) for value in values]
+        self.assertEqual(disabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                ced_module,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = [ced_module._casefold_text(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(enabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                ced_module,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = [ced_module._casefold_text(value) for value in values]
+        self.assertEqual(fallback, expected)
+
+    def test_native_ascii_button_matching_preserves_safe_choice(self) -> None:
+        info = ICedInfo(
+            error_id="",
+            message="Import completed successfully.",
+            buttons=(CedButton(label="  oK  "),),
+        )
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                ced_module,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                result = handle_common_error_dialog(info)
+                self.assertGreaterEqual(native_call.call_count, 2)
+        self.assertTrue(result.dismissed)
+        self.assertEqual(result.button_index, 0)
+
     def test_checksum_dialog_selects_yes_button(self) -> None:
         info = ICedInfo(
             error_id="VX_CHECKSUM",
