@@ -10,6 +10,10 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
+from tecan_common.native_acceleration import (
+    ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
+)
+
 from .audit_import_context import import_for_error, read_audit_import_events
 
 
@@ -1485,8 +1489,12 @@ def _command_hint_from_text(text: str) -> str:
 
 
 def _command_ids_match(command_id: str, hint: str) -> bool:
-    left = re.sub(r"[^a-z0-9]", "", command_id.lower())
-    right = re.sub(r"[^a-z0-9]", "", hint.lower())
+    left_lower = command_id.lower()
+    right_lower = hint.lower()
+    native_left = _native_ascii_lower_alnum_compact(left_lower)
+    native_right = _native_ascii_lower_alnum_compact(right_lower)
+    left = native_left if native_left is not None else re.sub(r"[^a-z0-9]", "", left_lower)
+    right = native_right if native_right is not None else re.sub(r"[^a-z0-9]", "", right_lower)
     if not left or not right:
         return False
     if left == right or left in right or right in left:

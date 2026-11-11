@@ -4,7 +4,10 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import fluent_pipeline.fluent_log_parser as fluent_log_parser_module
+from tecan_common import native_acceleration
 from fluent_pipeline.cli import main as cli_main
 from fluent_pipeline.fluent_log_parser import (
     DEFAULT_FLUENT_LOG_LOCATIONS,
@@ -14,6 +17,36 @@ from fluent_pipeline.fluent_log_parser import (
     diagnostics_to_findings,
     parse_fluent_log_text,
 )
+
+
+class FluentLogParserNativeTests(unittest.TestCase):
+    def test_command_identity_matching_uses_native_ascii_compaction_with_fallback(self):
+        pairs = [
+            ("MoveAxisCommandScriptStatement", "MoveAxisCommandDataV1"),
+            ("SetVariableCommand", "Set Variable"),
+            ("ÄBC", "bc"),
+            ("Straße", "strasse"),
+            ("other", "unrelated"),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                fluent_log_parser_module._command_ids_match(command_id, hint)
+                for command_id, hint in pairs
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                fluent_log_parser_module,
+                "_native_ascii_lower_alnum_compact",
+                wraps=native_acceleration.ascii_lower_alnum_compact,
+            ) as native_call:
+                actual = [
+                    fluent_log_parser_module._command_ids_match(command_id, hint)
+                    for command_id, hint in pairs
+                ]
+                self.assertEqual(native_call.call_count, len(pairs) * 2)
+            self.assertIsNone(native_acceleration.ascii_lower_alnum_compact("äbc"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [True, True, True, False, False])
 
 
 class FluentLogParserTests(unittest.TestCase):
