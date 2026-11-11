@@ -435,6 +435,47 @@ class ZeiaAdapterTests(unittest.TestCase):
         self.assertEqual(accelerated, fallback)
         self.assertEqual(accelerated["Repeated"], [f"value{index}" for index in range(20)])
 
+    def test_native_unknown_field_scanner_matches_tag_name_edge_matrix(self) -> None:
+        regex = re.compile(
+            r"<(?:(?:[A-Za-z_][\w.-]*):)?([A-Za-z_][\w.-]*)(?:\s[^>]*)?>(.*?)</\1>",
+            re.IGNORECASE | re.DOTALL,
+        )
+        samples = [
+            f"<{prefix}{name} attr='x'> value\t{index} </{name.lower()}>"
+            for index, name in enumerate(("A", "_Leading", "Name2", "Dotted.Name", "Dash-Name"))
+            for prefix in ("", "ns:", "ns_1:", "ns.part-2:")
+        ]
+        samples.extend(
+            [
+                "<Name data='>'>value</Name>",
+                "<Name/>ignored</Name>",
+                "<Outer>before <Thing>inner</Thing>",
+                "<Outer>before <Thing>inner</Thing></Outer>",
+                "<Repeated>one</Repeated><Repeated>two</Repeated><Repeated>three</Repeated>",
+            ]
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            if not native_acceleration.available():
+                self.skipTest("optional native extension is unavailable")
+            for sample in samples:
+                values: dict[str, list[str]] = {}
+                for match in regex.finditer(sample):
+                    name, raw = match.groups()
+                    value = re.sub(r"\s+", " ", raw).strip()
+                    if not value or "<" in value:
+                        continue
+                    bucket = values.setdefault(name, [])
+                    if value not in bucket and len(bucket) < 2:
+                        bucket.append(value)
+                actual = native_acceleration.xml_unknown_text_fields(sample, [], 2)
+                self.assertEqual(actual, list(sorted(values.items())), repr(sample))
+
+            self.assertIsNone(
+                native_acceleration.xml_unknown_text_fields(
+                    "<Name>café</Name>", [], 2
+                )
+            )
+
     def test_worklists_are_canonical_entities(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             archive = self._archive(
