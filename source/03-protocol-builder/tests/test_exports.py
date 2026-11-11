@@ -108,6 +108,53 @@ class ArchiveEntryNormalizationNativeTests(unittest.TestCase):
         self.assertEqual(fallback, expected)
 
 
+class DatastorePrefixNativeTests(unittest.TestCase):
+    def test_relative_entry_prefix_uses_native_ascii_and_unicode_fallback(self):
+        entries = [
+            "DataStore\\Thing.xscr",
+            "datastore/child/É.xscr",
+            "Dataſtore\\Legacy.xscr",
+            "DataStorе\\NoMatch.xscr",
+            " DataStore\\LeadingSpace.xscr",
+            "DataStore",
+        ]
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [exports._datastore_relative_entry(entry) for entry in entries]
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_casefold_equals",
+                wraps=native_acceleration.ascii_casefold_equals,
+            ) as native_call:
+                actual = [exports._datastore_relative_entry(entry) for entry in entries]
+                self.assertEqual(native_call.call_count, len(entries))
+            self.assertIsNone(
+                native_acceleration.ascii_casefold_equals("DataStorе\\", "DataStore\\")
+            )
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [
+                "Thing.xscr",
+                "child\\É.xscr",
+                "Legacy.xscr",
+                "DataStorе\\NoMatch.xscr",
+                " DataStore\\LeadingSpace.xscr",
+                "DataStore",
+            ],
+        )
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_casefold_equals",
+                return_value=None,
+            ):
+                fallback = [exports._datastore_relative_entry(entry) for entry in entries]
+        self.assertEqual(fallback, expected)
+
+
 class ConnectorPinNormalizationTests(unittest.TestCase):
     def test_pin_normalization_uses_rust_for_ascii_and_python_for_unicode(self):
         values = ["WorktablePin_A-12", "Straße", "ſcript", "東京"]

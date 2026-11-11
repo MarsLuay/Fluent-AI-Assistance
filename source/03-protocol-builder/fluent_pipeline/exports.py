@@ -23,6 +23,7 @@ from fluentcoder.expressions import (
     expression_inventory_from_xscr_text,
 )
 from tecan_common.native_acceleration import (
+    ascii_casefold_equals as _native_ascii_casefold_equals,
     ascii_casefold_trim as _native_ascii_casefold_trim,
     collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
     ascii_case_insensitive_substring_match_groups as _native_ascii_substring_match_groups,
@@ -5056,7 +5057,10 @@ def _archive_has_datastore_metadata(archive_data: dict[str, bytes]) -> bool:
 def _datastore_relative_entry(entry: str) -> str:
     normalized = entry.replace("/", "\\")
     prefix = "DataStore\\"
-    if normalized.casefold().startswith(prefix.casefold()):
+    native_match = _native_ascii_casefold_equals(normalized[: len(prefix)], prefix)
+    if native_match is None:
+        native_match = normalized.casefold().startswith(prefix.casefold())
+    if native_match:
         return normalized[len(prefix) :]
     return normalized
 
