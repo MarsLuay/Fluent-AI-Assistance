@@ -5,7 +5,10 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import fluent_pipeline.delivery_bundle as delivery_bundle_module
+from tecan_common import native_acceleration
 from fluent_pipeline.delivery_bundle import (
     DELIVERY_MANIFEST_SCHEMA_VERSION,
     READY_BUNDLE_SCHEMA_VERSION,
@@ -136,18 +139,47 @@ class DeliveryBundleValidationTests(unittest.TestCase):
             payload.write_bytes(b"exact payload")
             manifest_path = bundle / "source" / "delivery_manifest.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            digest = (
+                "0cfefcacfe03534dd908444efd6e4d0d1075fd8cf59ac79bf956312385679cfe"
+            ).upper()
             manifest["external_file_deployments"] = [
                 {
                     "bundle_path": "source/external-files/16/asset.dat",
                     "target_path": r"C:\TecanInformation\asset.dat",
-                    "sha256": "0cfefcacfe03534dd908444efd6e4d0d1075fd8cf59ac79bf956312385679cfe",
+                    "sha256": f" {digest} ",
                 }
             ]
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
-            result = validate_v2_delivery_bundle(bundle)
+            with patch.dict(
+                "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+            ):
+                fallback_result = validate_v2_delivery_bundle(bundle)
+            with patch.dict(
+                "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+            ):
+                with patch.object(
+                    delivery_bundle_module,
+                    "_native_ascii_lower",
+                    wraps=native_acceleration.ascii_lower,
+                ) as native_call:
+                    accelerated_result = validate_v2_delivery_bundle(bundle)
+                    native_call.assert_any_call(digest)
+            with patch.dict(
+                "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+            ):
+                with patch.object(
+                    delivery_bundle_module,
+                    "_native_ascii_lower",
+                    return_value=None,
+                ):
+                    forced_fallback_result = validate_v2_delivery_bundle(bundle)
 
-        self.assertTrue(result.ok, result.to_dict())
+        self.assertTrue(fallback_result.ok, fallback_result.to_dict())
+        self.assertTrue(accelerated_result.ok, accelerated_result.to_dict())
+        self.assertTrue(
+            forced_fallback_result.ok, forced_fallback_result.to_dict()
+        )
 
     def test_external_deployment_rejects_tampered_payload(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

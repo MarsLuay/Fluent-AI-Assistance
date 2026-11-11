@@ -9,6 +9,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Literal
 
+from tecan_common.native_acceleration import ascii_lower as _native_ascii_lower
+
 
 READY_BUNDLE_SCHEMA_VERSION = "tecan.ready_to_import.bundle.v2"
 DELIVERY_MANIFEST_SCHEMA_VERSION = "tecan.protocol_delivery.v2"
@@ -297,7 +299,11 @@ def _validate_external_file_deployments(
             continue
         bundle_path = str(item.get("bundle_path") or "").strip()
         target_path = str(item.get("target_path") or "").strip()
-        expected_sha256 = str(item.get("sha256") or "").strip().lower()
+        sha256_text = str(item.get("sha256") or "").strip()
+        native_sha256 = _native_ascii_lower(sha256_text)
+        expected_sha256 = (
+            native_sha256 if native_sha256 is not None else sha256_text.lower()
+        )
         if not bundle_path or not target_path or not expected_sha256:
             add_issue(
                 "incomplete_external_deployment",
