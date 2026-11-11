@@ -105,8 +105,8 @@ class TransferLabwareValidateTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 transfer_validate,
-                "_native_xml_elements_by_name",
-                wraps=native_acceleration.xml_elements_by_name,
+                "_native_xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
             ) as native_call:
                 actual = extract_transfer_labware_fields(command)
                 self.assertEqual(native_call.call_count, 1)
@@ -128,8 +128,8 @@ class TransferLabwareValidateTests(unittest.TestCase):
             )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(
-                native_acceleration.xml_elements_by_name(
-                    root, ("ApplicationDriverMacro",), transfer_validate.ET.Element
+                native_acceleration.xml_first_element_by_name(
+                    root, "ApplicationDriverMacro", transfer_validate.ET.Element
                 )
             )
             actual_macro = transfer_validate._find_descendant(

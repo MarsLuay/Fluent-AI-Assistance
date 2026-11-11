@@ -15,8 +15,8 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Protocol
 
 from tecan_common.native_acceleration import (
-    xml_elements_by_name as _native_xml_elements_by_name,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
+    xml_first_element_by_name as _native_xml_first_element_by_name,
 )
 
 from .api_v2.types import ApiV2ValidationError
@@ -495,9 +495,10 @@ def _normalize_base_token(location: str) -> str:
 
 
 def _find_descendant(element: ET.Element, name: str) -> ET.Element | None:
-    nodes = _native_xml_elements_by_name(element, (name,), ET.Element)
-    if nodes is not None:
-        return nodes[0] if nodes else None
+    selection = _native_xml_first_element_by_name(element, name, ET.Element)
+    if selection is not None:
+        _, node = selection
+        return node
     for node in element.iter():
         if _local_name(node.tag) == name:
             return node
