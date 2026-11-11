@@ -32,6 +32,32 @@ class AliasTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, ["mixed alias", "upper", "script", "", ""])
 
+    def test_alias_map_kind_lower_uses_native_ascii_and_python_unicode_fallback(self):
+        values = ["CATALOG", "  Catalog  ", "STRAẞE", "ſCRIPT"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [aliases_module._map_keys(value) for value in values]
+        self.assertEqual(
+            expected,
+            [("catalog_aliases",), ("catalog_aliases",), ("straße",), ("ſcript",)],
+        )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                aliases_module,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = [aliases_module._map_keys(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertIsNone(native_acceleration.ascii_lower("STRAẞE"))
+            self.assertIsNone(native_acceleration.ascii_lower("ſCRIPT"))
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(aliases_module, "_native_ascii_lower", return_value=None):
+                forced_fallback = [aliases_module._map_keys(value) for value in values]
+        self.assertEqual(forced_fallback, expected)
+
     def test_repo_alias_yaml_has_no_falcon_or_capholder_defaults(self):
         aliases = load_alias_maps(DEFAULT_ALIAS_DIR)
         for kind in ("labware_aliases", "catalog_aliases"):

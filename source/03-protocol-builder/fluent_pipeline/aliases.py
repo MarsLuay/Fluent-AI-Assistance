@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from tecan_common.native_acceleration import ascii_casefold_trim as _native_ascii_casefold_trim
+from tecan_common.native_acceleration import ascii_lower as _native_ascii_lower
 
 from .config import PROJECT_DIR
 from .fluent_naming import strip_fluent_instance_suffix
@@ -263,7 +264,9 @@ def _lookup_alias(
 
 
 def _map_keys(kind: str) -> tuple[str, ...]:
-    normalized = str(kind or "").strip().lower()
+    normalized = str(kind or "").strip()
+    native = _native_ascii_lower(normalized)
+    normalized = native if native is not None else normalized.lower()
     return KIND_ALIASES.get(normalized, (normalized,))
 
 
