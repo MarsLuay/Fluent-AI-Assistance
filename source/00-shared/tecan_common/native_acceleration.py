@@ -3053,6 +3053,22 @@ def ascii_safe_variable_base(value: Any) -> str | None:
         return None
 
 
+def ascii_safe_component(value: Any, lowercase: Any) -> str | None:
+    """Sanitize a trimmed ASCII identifier/filename component, or request fallback."""
+    if (
+        not enabled()
+        or type(value) is not str
+        or not value.isascii()
+        or type(lowercase) is not bool
+    ):
+        return None
+    try:
+        result = _native.ascii_safe_component(value, lowercase)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def ascii_word_boundary_contains(value: Any, word: Any) -> bool | None:
     """Match an ASCII word using explicit lowercase-letter/digit boundaries."""
     if (

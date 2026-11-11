@@ -3823,14 +3823,23 @@ def _optional_bool(value: Any) -> bool | None:
 
 
 def _safe_id(value: str) -> str:
-    cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "_", value.strip())
-    cleaned = cleaned.strip("._-").lower()
+    stripped = value.strip()
+    native = native_acceleration.ascii_safe_component(stripped, True)
+    if native is not None:
+        cleaned = native
+    else:
+        cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "_", stripped).strip("._-").lower()
     return cleaned or "protocol"
 
 
 def _safe_filename(value: str) -> str:
-    cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "_", value.strip())
-    return cleaned.strip("._-") or "protocol"
+    stripped = value.strip()
+    native = native_acceleration.ascii_safe_component(stripped, False)
+    if native is not None:
+        cleaned = native
+    else:
+        cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "_", stripped).strip("._-")
+    return cleaned or "protocol"
 
 
 def _safe_var(value: str, *, used: set[str]) -> str:

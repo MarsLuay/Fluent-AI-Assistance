@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable
 
+from tecan_common import native_acceleration
 from fluentcoder.ir.driver_recovery import driver_recovery_from_mapping
 from fluentcoder.expressions import (
     canonical_expression_key,
@@ -2268,8 +2269,12 @@ def _positive_int(value: Any, *, default: int) -> int:
 
 
 def _safe_id(value: str) -> str:
-    cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "_", value.strip())
-    cleaned = cleaned.strip("._-").lower()
+    stripped = value.strip()
+    native = native_acceleration.ascii_safe_component(stripped, True)
+    if native is not None:
+        cleaned = native
+    else:
+        cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "_", stripped).strip("._-").lower()
     return cleaned or "protocol"
 
 

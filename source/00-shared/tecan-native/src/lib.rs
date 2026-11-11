@@ -2672,6 +2672,33 @@ fn ascii_safe_variable_base(value: &str) -> Option<String> {
 }
 
 #[pyfunction]
+fn ascii_safe_component(value: &str, lowercase: bool) -> Option<String> {
+    if !value.is_ascii() {
+        return None;
+    }
+    let mut output = String::new();
+    let mut separator_pending = false;
+    for character in value.chars() {
+        if character.is_ascii_alphanumeric() || matches!(character, '_' | '.' | '-') {
+            output.push(if lowercase {
+                character.to_ascii_lowercase()
+            } else {
+                character
+            });
+            separator_pending = false;
+        } else if !separator_pending {
+            output.push('_');
+            separator_pending = true;
+        }
+    }
+    Some(
+        output
+            .trim_matches(|character| matches!(character, '.' | '_' | '-'))
+            .to_owned(),
+    )
+}
+
+#[pyfunction]
 fn ascii_word_boundary_contains(value: &str, word: &str) -> Option<bool> {
     if !value.is_ascii() || !word.is_ascii() || word.is_empty() {
         return None;
@@ -7689,6 +7716,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(ascii_profile_slug, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_safe_filename, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_safe_variable_base, module)?)?;
+    module.add_function(wrap_pyfunction!(ascii_safe_component, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_word_boundary_contains, module)?)?;
     module.add_function(wrap_pyfunction!(label_base_ascii_text, module)?)?;
     module.add_function(wrap_pyfunction!(is_guid_text, module)?)?;
@@ -7878,6 +7906,24 @@ mod tests {
         assert_eq!(ascii_safe_variable_base("123Flow"), Some("123flow".into()));
         assert_eq!(ascii_safe_variable_base("..."), Some(String::new()));
         assert_eq!(ascii_safe_variable_base("東京"), None);
+    }
+
+    #[test]
+    fn ascii_safe_component_matches_python_allowed_chars_and_optional_lowercase() {
+        assert_eq!(
+            ascii_safe_component("__My-Protocol.Name__", true),
+            Some("my-protocol.name".into())
+        );
+        assert_eq!(
+            ascii_safe_component("__My-File.Name__", false),
+            Some("My-File.Name".into())
+        );
+        assert_eq!(
+            ascii_safe_component("Alpha   Beta", false),
+            Some("Alpha_Beta".into())
+        );
+        assert_eq!(ascii_safe_component("!!!", true), Some(String::new()));
+        assert_eq!(ascii_safe_component("東京", true), None);
     }
 
     #[test]
