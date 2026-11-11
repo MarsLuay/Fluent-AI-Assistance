@@ -9,6 +9,58 @@ from tecan_common import native_acceleration
 
 
 class RuntimeSessionIdentityTests(unittest.TestCase):
+    def test_inventory_lookup_uses_native_ascii_and_unicode_fallback(self) -> None:
+        runnable = ["MethodA", "Straße"]
+        maintenance = ["Maintenance"]
+        methods = ["methoda", "STRAẞE", "maintenance", "Missing"]
+        expected = [[], [], [], [
+            "Method 'Missing' was not reported by GetAllRunnableMethods() or GetAllMaintenanceMethods()."
+        ]]
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [
+                runtime_session.validate_method_in_inventory(
+                    method,
+                    runnable_methods=runnable,
+                    maintenance_methods=maintenance,
+                )
+                for method in methods
+            ]
+        self.assertEqual(disabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                runtime_session,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = [
+                    runtime_session.validate_method_in_inventory(
+                        method,
+                        runnable_methods=runnable,
+                        maintenance_methods=maintenance,
+                    )
+                    for method in methods
+                ]
+                self.assertGreater(native_call.call_count, 0)
+        self.assertEqual(enabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                runtime_session,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = [
+                    runtime_session.validate_method_in_inventory(
+                        method,
+                        runnable_methods=runnable,
+                        maintenance_methods=maintenance,
+                    )
+                    for method in methods
+                ]
+        self.assertEqual(fallback, expected)
+
     def test_method_inventory_uses_native_ascii_and_python_unicode_fallback(self) -> None:
         runnable = [" MethodA ", "Café", "Straße", "Runner", "methoda", ""]
         maintenance = ["methoda", "CAFÉ", "STRASSE", "Maintenance", "Straße", ""]

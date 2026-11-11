@@ -139,13 +139,13 @@ def validate_method_in_inventory(
         return []
     inventory = partition_method_inventory(runnable_methods, maintenance_methods)
     known = {
-        *(name.casefold() for name in inventory["assay_runnable"]),
-        *(name.casefold() for name in inventory["maintenance_methods"]),
-        *(name.casefold() for name in inventory["maintenance_only"]),
+        *(_casefold_key(name) for name in inventory["assay_runnable"]),
+        *(_casefold_key(name) for name in inventory["maintenance_methods"]),
+        *(_casefold_key(name) for name in inventory["maintenance_only"]),
     }
     if not known:
         return []
-    if target.casefold() not in known:
+    if _casefold_key(target) not in known:
         return [
             "Method "
             f"{target!r} was not reported by GetAllRunnableMethods() or GetAllMaintenanceMethods()."
