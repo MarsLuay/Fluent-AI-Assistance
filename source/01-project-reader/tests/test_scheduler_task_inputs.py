@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from tecan_common import native_acceleration
 from tecan_common import xml_compat as ET
+import tecan_reader.scheduler as scheduler
 import tecan_reader.task_input as task_input
 from tecan_reader import inspect_twl_text
 from tecan_reader.zeia_adapters import ingest_zeia
@@ -49,6 +50,46 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
         )
         self.assertEqual(model.objects[0]["base_worktable_name"], "Shared Deck")
         self.assertEqual(model.objects[0]["provenance"]["original_identifiers"]["base_worktable_guid"], "guid-a")
+
+    def test_scheduler_artifact_heuristic_uses_native_ascii_match_with_parity(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native,
+            "ascii_case_insensitive_substring_match_groups",
+        ):
+            self.skipTest("optional Rust substring matcher is not built")
+        cases = (
+            ("archive/scheduler.xml", "<Root/>", True),
+            ("archive/data.xml", "<Root><SCHEDULEDTask/></Root>", True),
+            ("archive/data.xml", "<Root><Other/></Root>", False),
+            ("archive/ſcheduler.xml", "<Root/>", True),
+            ("archive/data.xml", "<Root><Taſk/></Root>", True),
+            ("archive/data.xml", "x" * (256 * 1024) + "<Scheduler/>", False),
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                scheduler.is_scheduler_artifact(entry, text)
+                for entry, text, _ in cases
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration._native,
+                "ascii_case_insensitive_substring_match_groups",
+                wraps=native_acceleration._native.ascii_case_insensitive_substring_match_groups,
+            ) as rust_call:
+                with patch.object(
+                    scheduler,
+                    "_native_substring_match_groups",
+                    wraps=scheduler._native_substring_match_groups,
+                ) as native_call:
+                    actual = [
+                        scheduler.is_scheduler_artifact(entry, text)
+                        for entry, text, _ in cases
+                    ]
+                    self.assertEqual(native_call.call_count, 10)
+                    self.assertEqual(rust_call.call_count, 8)
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [expected_value for _, _, expected_value in cases])
 
     def test_scheduler_processes_tasks_are_distinct_from_gwl(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

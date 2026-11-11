@@ -5,6 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from tecan_common.native_acceleration import (
+    ascii_case_insensitive_substring_match_groups as _native_substring_match_groups,
+)
 from tecan_common.xml_helpers import local_name
 
 from .common import parse_xml_text, read_text
@@ -18,11 +21,32 @@ _KNOWN_FIELDS = {
 
 
 def is_scheduler_artifact(entry: str, text: str) -> bool:
-    path_hint = entry.casefold()
-    if any(token in path_hint for token in ("scheduler", "scheduled", "processes", "tasks")):
-        return True
-    prefix = text[:256 * 1024].casefold()
-    return any(f"<{name}" in prefix or f"/>{name}" in prefix for name in _SCHEDULER_NAMES)
+    native_path_match = _native_substring_match_groups(
+        [entry], [("scheduler", "scheduled", "processes", "tasks")]
+    )
+    if native_path_match is not None:
+        if native_path_match[0]:
+            return True
+    else:
+        path_hint = entry.casefold()
+        if any(
+            token in path_hint
+            for token in ("scheduler", "scheduled", "processes", "tasks")
+        ):
+            return True
+
+    prefix = text[:256 * 1024]
+    markers = tuple(
+        (f"<{name}", f"/>{name}") for name in _SCHEDULER_NAMES
+    )
+    native_text_match = _native_substring_match_groups([prefix], markers)
+    if native_text_match is not None:
+        return any(native_text_match)
+    folded_prefix = prefix.casefold()
+    return any(
+        f"<{name}" in folded_prefix or f"/>{name}" in folded_prefix
+        for name in _SCHEDULER_NAMES
+    )
 
 
 def inspect_scheduler_text(text: str, *, source_name: str) -> dict[str, Any]:
