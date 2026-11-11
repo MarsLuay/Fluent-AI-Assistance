@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import os
-import re
 import time
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
+from .state import _compact as _compact_state_text
 from .state import format_state, parse_state_machine_states
 from .types import StateMachineStates
 
@@ -356,7 +356,7 @@ def _status_indicates_open_method(fluent_status: str) -> bool:
         label = str(parsed)
     else:
         label = format_state(fluent_status)
-    compact = re.sub(r"[^a-z0-9]", "", str(label or "").casefold())
+    compact = _compact_state_text(str(label or ""))
     return compact in _OPEN_METHOD_STATE_KEYS
 
 
