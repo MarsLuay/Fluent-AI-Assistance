@@ -167,6 +167,51 @@ class ApiV2SteppedRunnerTests(unittest.TestCase):
         self.assertEqual(fallback_actual, fallback_expected)
         self.assertEqual(fallback_actual, "Statement")
 
+    def test_command_type_uses_native_child_names_and_fallback(self):
+        command = stepped_inventory.ET.Element(
+            "Object", {"Type": "Tecan.Namespace.Fallback"}
+        )
+        stepped_inventory.ET.SubElement(command, "{urn:example}Command")
+        stepped_inventory.ET.SubElement(command, "Ignored")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = stepped_inventory._command_type_name(command)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                stepped_inventory,
+                "_native_xml_direct_child_local_names",
+                wraps=native_acceleration.xml_direct_child_local_names,
+            ) as native_call:
+                actual = stepped_inventory._command_type_name(command)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "Command")
+
+        class StringTag(str):
+            pass
+
+        custom_command = stepped_inventory.ET.Element("Object")
+        stepped_inventory.ET.SubElement(custom_command, StringTag("CustomCommand"))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = stepped_inventory._command_type_name(custom_command)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_direct_child_local_names(
+                    custom_command, stepped_inventory.ET.Element
+                )
+            )
+            fallback_actual = stepped_inventory._command_type_name(custom_command)
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, "CustomCommand")
+
+        empty_name_command = stepped_inventory.ET.Element(
+            "Object", {"Type": "Tecan.Namespace.Default"}
+        )
+        stepped_inventory.ET.SubElement(empty_name_command, "")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                stepped_inventory._command_type_name(empty_name_command), ""
+            )
+
     def test_extract_commands_from_xscr_maps_statement_objects(self):
         with tempfile.TemporaryDirectory() as tmp:
             xscr = Path(tmp) / "demo.xscr"

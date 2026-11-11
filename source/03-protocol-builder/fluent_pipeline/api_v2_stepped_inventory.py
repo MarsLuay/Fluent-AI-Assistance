@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Mapping, Protocol, Sequence
 
 from tecan_common.native_acceleration import (
+    xml_direct_child_local_names as _native_xml_direct_child_local_names,
     xml_direct_elements_by_name as _native_xml_direct_elements_by_name,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
@@ -936,8 +937,13 @@ class RegistryValidationExecutionChannel:
 
 
 def _command_type_name(command_object: ET.Element) -> str:
-    for child in list(command_object):
-        return _local_name(child.tag)
+    child_names = _native_xml_direct_child_local_names(command_object, ET.Element)
+    if child_names is not None:
+        if child_names:
+            return child_names[0]
+    else:
+        for child in list(command_object):
+            return _local_name(child.tag)
     object_type = str(command_object.attrib.get("Type") or "")
     return object_type.rsplit(".", 1)[-1]
 
