@@ -8,6 +8,10 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
+from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
+)
+
 from .state import _compact as _compact_state_text
 from .state import format_state, parse_state_machine_states
 from .types import StateMachineStates
@@ -33,6 +37,11 @@ _USER_PROMPT_TYPES = frozenset(
     }
 )
 _PAUSED_STATE_LABELS = frozenset({"PauseMode", "Paused", "PAUSED"})
+
+
+def _normalized_ack_text(value: str) -> str:
+    native = _native_ascii_casefold_trim(value)
+    return native if native is not None else value.strip().casefold()
 
 
 @dataclass(frozen=True)
@@ -130,7 +139,7 @@ class FileOperatorAckSource:
         while time.monotonic() < deadline:
             if self.path.is_file():
                 try:
-                    text = self.path.read_text(encoding="utf-8").strip().casefold()
+                    text = _normalized_ack_text(self.path.read_text(encoding="utf-8"))
                 except OSError:
                     text = ""
                 if not text or text in {"1", "true", "yes", "ack", "resume"}:
@@ -146,7 +155,9 @@ def is_user_prompt_type_name(type_name: str) -> bool:
 
 def run_control_options_from_env() -> RunControlOptions:
     """Build run-control flags from optional ``TECAN_*`` environment variables."""
-    resume_enabled = os.environ.get("TECAN_RESUME_RUN_AFTER_PROMPTS", "").strip().casefold() in {
+    resume_enabled = _normalized_ack_text(
+        os.environ.get("TECAN_RESUME_RUN_AFTER_PROMPTS", "")
+    ) in {
         "1",
         "true",
         "yes",
@@ -168,7 +179,8 @@ def operator_ack_source_from_options(options: RunControlOptions) -> OperatorAckS
     if env_path:
         return FileOperatorAckSource(env_path)
     return CallableOperatorAckSource(
-        lambda: os.environ.get("TECAN_OPERATOR_ACK", "").strip().casefold() in {"1", "true", "yes", "ack", "resume"}
+        lambda: _normalized_ack_text(os.environ.get("TECAN_OPERATOR_ACK", ""))
+        in {"1", "true", "yes", "ack", "resume"}
     )
 
 
