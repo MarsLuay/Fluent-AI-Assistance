@@ -705,8 +705,8 @@ def _deploy_visual_source_to_slot(
     slot_kind: str,
     worktable_video: bool = False,
 ) -> str:
-    src_suffix = source.suffix.lower()
-    dest_suffix = destination.suffix.lower()
+    src_suffix = _lower_text(source.suffix)
+    dest_suffix = _lower_text(destination.suffix)
     destination.parent.mkdir(parents=True, exist_ok=True)
     if src_suffix == dest_suffix:
         shutil.copy2(source, destination)

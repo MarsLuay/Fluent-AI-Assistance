@@ -591,6 +591,50 @@ def test_visual_source_kind_uses_native_lower_with_fallback(tmp_path: Path) -> N
     assert forced_fallback == expected
 
 
+def test_visual_deployment_uses_native_suffix_lower_with_fallback(
+    tmp_path: Path, monkeypatch
+) -> None:
+    source = tmp_path / "capture.MOV"
+    destination = tmp_path / "slot.GIF"
+    source.write_bytes(b"video")
+
+    def fake_video_to_gif(
+        source_path: Path, dest_path: Path, *, overwrite: bool = False
+    ) -> dict[str, str]:
+        dest_path.write_bytes(b"GIF89a-test")
+        return {"source": str(source_path), "destination": str(dest_path)}
+
+    monkeypatch.setattr(
+        "fluent_pipeline.media_convert.convert_video_to_gif", fake_video_to_gif
+    )
+
+    def deploy() -> str:
+        return bundle_media._deploy_visual_source_to_slot(
+            source, destination, slot_kind="video"
+        )
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = deploy()
+    assert expected == "converted_video_to_gif"
+    assert destination.read_bytes() == b"GIF89a-test"
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            bundle_media,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            actual = deploy()
+        native_call.assert_any_call(".MOV")
+        native_call.assert_any_call(".GIF")
+    assert actual == expected
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(bundle_media, "_native_ascii_lower", return_value=None):
+            forced_fallback = deploy()
+    assert forced_fallback == expected
+
+
 def test_resolve_prompt_media_cross_kind_image_fills_video_slot(tmp_path: Path) -> None:
     source_dir = tmp_path / "sources"
     source_dir.mkdir()
