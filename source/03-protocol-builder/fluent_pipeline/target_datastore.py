@@ -14,6 +14,10 @@ import re
 from pathlib import Path
 from typing import Any, Mapping
 
+from tecan_common.native_acceleration import (
+    collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
+)
+
 TARGET_DATASTORE_SCHEMA_VERSION = "tecan.target_datastore.v1"
 
 _OBJECT_SUFFIXES = {
@@ -27,7 +31,11 @@ _SENSITIVE_KEY_RE = re.compile(r"(?:password|secret|token|credential|license)", 
 
 def _xml_text(text: str, name: str) -> str:
     match = re.search(rf"<{re.escape(name)}>(.*?)</{re.escape(name)}>", text, flags=re.DOTALL)
-    return re.sub(r"\s+", " ", match.group(1)).strip() if match else ""
+    if match is None:
+        return ""
+    raw = match.group(1)
+    native = _native_collapse_ascii_whitespace(raw)
+    return native if native is not None else re.sub(r"\s+", " ", raw).strip()
 
 
 def _safe_mapping(value: Mapping[str, Any]) -> dict[str, Any]:

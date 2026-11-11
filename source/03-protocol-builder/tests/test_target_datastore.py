@@ -9,6 +9,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from tecan_common import native_acceleration
+import fluent_pipeline.target_datastore as target_datastore_module
 from fluent_pipeline.target_datastore import (
     TARGET_DATASTORE_SCHEMA_VERSION,
     build_target_datastore_profile,
@@ -30,6 +32,43 @@ def _write_object(root: Path, suffix: str, guid: str, name: str, folder: str = "
 
 
 class TargetDatastoreProfileTests(unittest.TestCase):
+    def test_xml_text_uses_native_whitespace_collapse_with_python_fallback(self) -> None:
+        raw = "\x1cAlpha\u2003\t Beta\x1f"
+        xml = f"<VxData><ObjectName>{raw}</ObjectName></VxData>"
+        expected = "Alpha Beta"
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            self.assertEqual(target_datastore_module._xml_text(xml, "ObjectName"), expected)
+            self.assertEqual(target_datastore_module._xml_text(xml, "Missing"), "")
+
+        calls: list[str] = []
+        native_collapse = native_acceleration.collapse_ascii_whitespace
+
+        def track_collapse(value):
+            calls.append(value)
+            return native_collapse(value)
+
+        with (
+            patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}),
+            patch.object(
+                target_datastore_module,
+                "_native_collapse_ascii_whitespace",
+                side_effect=track_collapse,
+            ),
+        ):
+            self.assertEqual(target_datastore_module._xml_text(xml, "ObjectName"), expected)
+
+        self.assertEqual(calls, [raw])
+        with (
+            patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}),
+            patch.object(
+                target_datastore_module,
+                "_native_collapse_ascii_whitespace",
+                return_value=None,
+            ),
+        ):
+            self.assertEqual(target_datastore_module._xml_text(xml, "ObjectName"), expected)
+
     def test_no_target_is_unbound_and_does_not_consult_local_environment(self) -> None:
         with tempfile.TemporaryDirectory() as tmp, patch.dict(
             os.environ,
