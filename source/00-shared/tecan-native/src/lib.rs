@@ -1103,6 +1103,42 @@ fn xml_direct_leaf_name_texts<'py>(
 }
 
 #[pyfunction]
+fn xml_attribute_name_values<'py>(
+    py: Python<'py>,
+    element: &Bound<'py, PyAny>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !element.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let attributes = element.getattr("attrib")?;
+    if !attributes.get_type().is(py.get_type::<PyDict>()) {
+        return Ok(None);
+    }
+    let attributes = attributes.cast::<PyDict>()?;
+    let output = PyList::empty(py);
+    for (name, value) in attributes.iter() {
+        if !name.get_type().is(py.get_type::<PyString>())
+            || !value.get_type().is(py.get_type::<PyString>())
+        {
+            return Ok(None);
+        }
+        let name = name.extract::<String>()?;
+        let local_name = name.rsplit('}').next().unwrap_or(name.as_str());
+        let value = value.extract::<String>()?;
+        let pair = PyTuple::new(
+            py,
+            [
+                PyString::new(py, local_name).into_any(),
+                PyString::new(py, &value).into_any(),
+            ],
+        )?;
+        output.append(pair)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn xml_first_nonempty_texts<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -5702,6 +5738,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_clean_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_child_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_leaf_name_texts, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_attribute_name_values, module)?)?;
     module.add_function(wrap_pyfunction!(xml_first_nonempty_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_container_child_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_unique_texts, module)?)?;

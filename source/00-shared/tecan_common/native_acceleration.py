@@ -115,6 +115,38 @@ def xml_direct_leaf_name_texts(
         return None
 
 
+def xml_attribute_name_values(
+    element: Any, element_type: Any
+) -> list[tuple[str, str]] | None:
+    """Collect standard XML attribute local names and exact string values."""
+    if not enabled() or type(element) is not element_type:
+        return None
+    try:
+        result = _native.xml_attribute_name_values(element, element_type)
+        if type(result) is not list:
+            return None
+        pairs: list[tuple[str, str]] = []
+        for item in result:
+            if (
+                type(item) is not tuple
+                or len(item) != 2
+                or type(item[0]) is not str
+                or type(item[1]) is not str
+            ):
+                return None
+            pairs.append(item)
+        return pairs
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_container_child_texts(
     root: Any, container_name: Any, element_type: Any
 ) -> list[str] | None:

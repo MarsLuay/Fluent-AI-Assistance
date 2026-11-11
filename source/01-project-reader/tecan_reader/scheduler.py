@@ -12,6 +12,7 @@ from tecan_common.native_acceleration import (
     merge_unique_string_groups as _native_merge_unique_string_groups,
     sort_string_keys as _native_sort_string_keys,
     sorted_unique_strings as _native_sorted_unique_strings,
+    xml_attribute_name_values as _native_xml_attribute_name_values,
     xml_direct_leaf_name_texts as _native_xml_direct_leaf_name_texts,
     xml_indexed_elements_by_folded_name as _native_indexed_elements_by_folded_name,
 )
@@ -125,8 +126,13 @@ def inspect_scheduler(path: str | Path, *, source_name: str | None = None) -> di
 def _record(element: Any, *, index: int, kind: str, source_name: str) -> dict[str, Any]:
     fields: dict[str, str] = {}
     unknown: dict[str, list[str]] = {}
-    for name, value in element.attrib.items():
-        _store_field(fields, unknown, local_name(name), str(value))
+    native_attributes = _native_xml_attribute_name_values(element, ET.Element)
+    if native_attributes is None:
+        for name, value in element.attrib.items():
+            _store_field(fields, unknown, local_name(name), str(value))
+    else:
+        for name, value in native_attributes:
+            _store_field(fields, unknown, name, value)
     native_child_fields = _native_xml_direct_leaf_name_texts(element, ET.Element)
     if native_child_fields is None:
         for child in list(element):

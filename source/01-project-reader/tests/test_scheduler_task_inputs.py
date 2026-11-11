@@ -176,13 +176,22 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
             )
 
     def test_scheduler_record_leaf_fields_use_native_scan_with_python_fallback(self) -> None:
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "xml_direct_leaf_name_texts"
+        if not native_acceleration.available() or not all(
+            hasattr(native_acceleration._native, name)
+            for name in (
+                "xml_attribute_name_values",
+                "xml_direct_leaf_name_texts",
+            )
         ):
             self.skipTest("optional Rust XML leaf-field collector is not built")
         root = ET.Element(
             "{urn:test}Process",
-            {"Name": "attribute label", "TaskID": "attribute-id", "VendorAttr": "source"},
+            {
+                "Name": "attribute label",
+                "TaskID": "attribute-id",
+                "VendorAttr": "source",
+                "{urn:test}Étiquette": "café",
+            },
         )
         ET.SubElement(root, "{urn:test}Name").text = " child\u001c label "
         ET.SubElement(root, "TaskID").text = " child-id "
@@ -226,7 +235,7 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
                             )
                             native_call.assert_called_once_with(root, ET.Element)
                             self.assertEqual(sort_call.call_count, 2)
-                            self.assertEqual(sorted_values_call.call_count, 2)
+                            self.assertEqual(sorted_values_call.call_count, 3)
                     self.assertEqual(rust_call.call_count, 1)
 
         self.assertEqual(actual, expected)
@@ -234,8 +243,38 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
         self.assertEqual(actual["fields"]["TaskID"], "child-id")
         self.assertEqual(
             actual["source_metadata"]["unknown_fields"],
-            {"VendorAttr": ["source"], "VendorField": ["one two"]},
+            {
+                "VendorAttr": ["source"],
+                "VendorField": ["one two"],
+                "Étiquette": ["café"],
+            },
         )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            native_attributes = native_acceleration.xml_attribute_name_values(
+                root, ET.Element
+            )
+            with patch.object(
+                scheduler,
+                "_native_xml_attribute_name_values",
+                wraps=scheduler._native_xml_attribute_name_values,
+            ) as attributes_call:
+                actual_with_attribute_spy = scheduler._record(
+                    root,
+                    index=7,
+                    kind="scheduler_task",
+                    source_name="synthetic.xml",
+                )
+                attributes_call.assert_called_once_with(root, ET.Element)
+        self.assertEqual(
+            native_attributes,
+            [
+                ("Name", "attribute label"),
+                ("TaskID", "attribute-id"),
+                ("VendorAttr", "source"),
+                ("Étiquette", "café"),
+            ],
+        )
+        self.assertEqual(actual_with_attribute_spy, actual)
 
         unicode_alias_root = ET.Element("Task", {"TaſkID": "casefolded"})
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
@@ -312,6 +351,29 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
                 source_name="synthetic.xml",
             )
         self.assertEqual(actual_text_fallback, expected_text_fallback)
+
+        unsupported_attribute_root = ET.Element("Task")
+        unsupported_attribute_root.attrib["VendorField"] = StringSubclass(" preserved ")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_attribute_fallback = scheduler._record(
+                unsupported_attribute_root,
+                index=0,
+                kind="scheduler_task",
+                source_name="synthetic.xml",
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                scheduler._native_xml_attribute_name_values(
+                    unsupported_attribute_root, ET.Element
+                )
+            )
+            actual_attribute_fallback = scheduler._record(
+                unsupported_attribute_root,
+                index=0,
+                kind="scheduler_task",
+                source_name="synthetic.xml",
+            )
+        self.assertEqual(actual_attribute_fallback, expected_attribute_fallback)
 
     def test_scheduler_processes_tasks_are_distinct_from_gwl(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
