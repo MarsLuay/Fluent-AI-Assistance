@@ -1596,7 +1596,9 @@ def _subroutine_package_findings(
     return findings
 
 def _norm_subroutine_dependency_key(value: Any) -> str:
-    text = str(value or "").strip().strip('"').casefold()
+    raw = str(value or "").strip().strip('"')
+    folded = _native_ascii_casefold_trim(raw)
+    text = folded if folded is not None else raw.casefold()
     native = _native_ascii_lower_alnum_compact(text)
     return native if native is not None else re.sub(r"[^a-z0-9]+", "", text)
 

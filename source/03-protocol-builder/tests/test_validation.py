@@ -270,8 +270,8 @@ def _gate_record(gate_id: str, status: str, summary: str, details: dict | None =
 
 
 class GateEvaluatorNativeNormalizationTests(unittest.TestCase):
-    def test_subroutine_dependency_key_uses_native_ascii_compaction_with_fallback(self):
-        values = [None, 0, '  "Name-01" ', "Straße", "東京", "A.B_C", "ß"]
+    def test_subroutine_dependency_key_uses_native_casefold_and_compact_fallback(self):
+        values = [None, 0, '  "Name-01" ', "Straße", "İstanbul", "東京", "A.B_C", "ß"]
         with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             expected = [
                 gate_evaluators._norm_subroutine_dependency_key(value)
@@ -282,15 +282,31 @@ class GateEvaluatorNativeNormalizationTests(unittest.TestCase):
                 gate_evaluators,
                 "_native_ascii_lower_alnum_compact",
                 wraps=native_acceleration.ascii_lower_alnum_compact,
-            ) as native_call:
+            ) as compact_call, mock.patch.object(
+                gate_evaluators,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as casefold_call:
                 actual = [
                     gate_evaluators._norm_subroutine_dependency_key(value)
                     for value in values
                 ]
-                self.assertEqual(native_call.call_count, len(values))
-            self.assertIsNone(native_acceleration.ascii_lower_alnum_compact("東京"))
+            self.assertEqual(compact_call.call_count, len(values))
+            self.assertEqual(casefold_call.call_count, len(values))
         self.assertEqual(actual, expected)
-        self.assertEqual(actual, ["", "", "name01", "strasse", "", "abc", "ss"])
+        self.assertEqual(actual, ["", "", "name01", "strasse", "istanbul", "", "abc", "ss"])
+
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                gate_evaluators, "_native_ascii_lower_alnum_compact", return_value=None
+            ), mock.patch.object(
+                gate_evaluators, "_native_ascii_casefold_trim", return_value=None
+            ):
+                forced_fallback = [
+                    gate_evaluators._norm_subroutine_dependency_key(value)
+                    for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
 
     def test_status_lowering_uses_native_without_trimming_or_unicode_changes(self):
         values = ["PASSED", "Straße", " PASSED ", ""]
