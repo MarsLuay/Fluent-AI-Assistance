@@ -321,6 +321,59 @@ RUP_VARIABLE_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ApiV2CommandSerializerTests(unittest.TestCase):
+    def test_subroutine_mapping_scan_uses_native_direct_selector_and_fallback(self):
+        root = ET.fromstring(
+            "<Statement><Mappings>"
+            "<Object><VariableMapping><Target>answer</Target><Source>42</Source>"
+            "</VariableMapping></Object>"
+            "<Wrapper><Object><VariableMapping><Target>ignored</Target>"
+            "<Source>99</Source></VariableMapping></Object></Wrapper>"
+            "<Object><VariableMapping><Target> </Target><Source>empty</Source>"
+            "</VariableMapping></Object>"
+            "</Mappings></Statement>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = commands_module._variable_mappings_from_statement(
+                root, "Mappings"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                commands_module,
+                "_native_xml_direct_elements_by_name",
+                wraps=native_acceleration.xml_direct_elements_by_name,
+            ) as native_call:
+                actual = commands_module._variable_mappings_from_statement(
+                    root, "Mappings"
+                )
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [{"target": "answer", "source": "42"}])
+
+        class StringTag(str):
+            pass
+
+        custom_root = ET.Element("Statement")
+        custom_container = ET.SubElement(custom_root, "Mappings")
+        custom_object = ET.SubElement(custom_container, StringTag("Object"))
+        mapping = ET.SubElement(custom_object, "VariableMapping")
+        ET.SubElement(mapping, "Target").text = "fallback"
+        ET.SubElement(mapping, "Source").text = "7"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = commands_module._variable_mappings_from_statement(
+                custom_root, "Mappings"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_direct_elements_by_name(
+                    custom_container, ("Object",), ET.Element
+                )
+            )
+            fallback_actual = commands_module._variable_mappings_from_statement(
+                custom_root, "Mappings"
+            )
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, [{"target": "fallback", "source": "7"}])
+
     def test_typed_command_child_text_uses_native_selector_and_fallback(self):
         root = ET.fromstring(
             '<Root xmlns:x="urn:test"><x:Name> </x:Name><Name>later</Name>'

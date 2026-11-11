@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol, Sequence
 
 from tecan_common.native_acceleration import (
+    xml_direct_elements_by_name as _native_xml_direct_elements_by_name,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
 )
@@ -1071,9 +1072,14 @@ def _variable_mappings_from_statement(node: Any, container_name: str) -> list[di
     if container is None:
         return []
     mappings: list[dict[str, str]] = []
-    for child in container:
-        if _local_name(child.tag) != "Object":
-            continue
+    objects = _native_xml_direct_elements_by_name(
+        container, ("Object",), ET.Element
+    )
+    if objects is None:
+        objects = (
+            child for child in container if _local_name(child.tag) == "Object"
+        )
+    for child in objects:
         mapping_node = _find_descendant(child, "VariableMapping")
         target = _child_text(mapping_node, "Target")
         source = _child_text(mapping_node, "Source")
