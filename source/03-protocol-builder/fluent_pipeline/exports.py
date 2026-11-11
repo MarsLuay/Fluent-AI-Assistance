@@ -6946,7 +6946,13 @@ def _direct_values(parent: ET.Element, name: str) -> list[str]:
 
 
 def _artifact_type_for_path(path: Path) -> str:
-    suffix = path.suffix.casefold()
+    suffix = path.suffix
+    native = (
+        _native_ascii_casefold_trim(suffix)
+        if type(suffix) is str and suffix.strip() == suffix
+        else None
+    )
+    suffix = native if native is not None else suffix.casefold()
     if suffix == ".xscr":
         return "script"
     if suffix in {".xmet", ".xmth", ".xmethod"}:

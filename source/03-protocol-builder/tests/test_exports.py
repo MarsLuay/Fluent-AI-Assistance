@@ -101,6 +101,44 @@ class ReportKeyNormalizationNativeTests(unittest.TestCase):
         self.assertEqual(forced_fallback, expected)
 
 
+class ArtifactTypeNativeTests(unittest.TestCase):
+    def test_suffix_casefold_uses_rust_with_unicode_and_whitespace_fallback(self):
+        paths = [
+            Path("file.XSCR"),
+            Path("file.xſcr"),
+            Path("file.xscr "),
+            Path("file.XMET"),
+            Path("README"),
+        ]
+        expected = ["script", "script", "xscr ", "method", "unknown"]
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [exports._artifact_type_for_path(path) for path in paths]
+        self.assertEqual(disabled, expected)
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = [exports._artifact_type_for_path(path) for path in paths]
+                self.assertEqual(native_call.call_count, 4)
+                native_call.assert_any_call(".XSCR")
+                native_call.assert_any_call(".xſcr")
+                self.assertNotIn(mock.call(".xscr "), native_call.call_args_list)
+        self.assertEqual(enabled, expected)
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports, "_native_ascii_casefold_trim", return_value=None
+            ):
+                forced_fallback = [
+                    exports._artifact_type_for_path(path) for path in paths
+                ]
+        self.assertEqual(forced_fallback, expected)
+
+
 class DirectBooleanNativeTests(unittest.TestCase):
     def test_xml_boolean_casefold_uses_rust_with_unicode_fallback(self):
         values = ["TRUE", "False", "truſe", " true ", None]
