@@ -7,6 +7,11 @@ import json
 import re
 from pathlib import Path
 from typing import Any, Iterable, Mapping
+
+from tecan_common.native_acceleration import (
+    ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
+)
+
 from . import xml_compat as ET
 from fluentcoder.expressions import expression_inventory_from_xscr_text
 
@@ -944,7 +949,9 @@ def _subroutine_package_findings(
 
 
 def _norm_subroutine_dependency_key(value: Any) -> str:
-    return re.sub(r"[^a-z0-9]+", "", str(value or "").strip().strip('"').casefold())
+    text = str(value or "").strip().strip('"').casefold()
+    native = _native_ascii_lower_alnum_compact(text)
+    return native if native is not None else re.sub(r"[^a-z0-9]+", "", text)
 
 
 def _gate_command_inventory(

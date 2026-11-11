@@ -13,6 +13,7 @@ from fluent_pipeline.expression_provenance import (
     write_expression_provenance_ledger,
 )
 import fluent_pipeline.gates.evaluators as gate_evaluators
+import fluent_pipeline.validation as validation_module
 from fluent_pipeline.gates import ValidationContext, readiness_evaluator
 from tecan_common import native_acceleration
 from fluent_pipeline.protocol_ir import protocol_ir_from_python, write_protocol_ir
@@ -290,6 +291,26 @@ class GateEvaluatorNativeNormalizationTests(unittest.TestCase):
             self.assertIsNone(native_acceleration.ascii_lower_alnum_compact("東京"))
         self.assertEqual(actual, expected)
         self.assertEqual(actual, ["", "", "name01", "strasse", "", "abc", "ss"])
+
+    def test_compatibility_facade_dependency_key_uses_native_compaction(self):
+        values = [None, 0, '  "Name-01" ', "Straße", "東京", "ß"]
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                validation_module._norm_subroutine_dependency_key(value)
+                for value in values
+            ]
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                validation_module,
+                "_native_ascii_lower_alnum_compact",
+                wraps=native_acceleration.ascii_lower_alnum_compact,
+            ) as native_call:
+                actual = [
+                    validation_module._norm_subroutine_dependency_key(value)
+                    for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
 
 
 class ValidationTests(unittest.TestCase):
