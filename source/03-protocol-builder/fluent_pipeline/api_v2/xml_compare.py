@@ -7,6 +7,7 @@ import html
 import re
 from .. import xml_compat as ET
 from tecan_common.native_acceleration import (
+    xml_compare_diff_hint_ascii as _native_xml_compare_diff_hint_ascii,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_local_name as _native_xml_local_name,
     xml_normalize_ascii_tail as _native_xml_normalize_ascii_tail,
@@ -60,18 +61,20 @@ def compare_command_xml(expected: str, actual: str) -> CommandXmlCompareResult:
     equal = norm_expected == norm_actual
     diff_hint = ""
     if not equal:
-        # Short hint for reports: first diverging tag pair.
-        exp_tags = re.findall(r"<([A-Za-z0-9_:.-]+)>", norm_expected)
-        act_tags = re.findall(r"<([A-Za-z0-9_:]+)>", norm_actual)
-        for index, (exp_tag, act_tag) in enumerate(zip(exp_tags, act_tags)):
-            if exp_tag != act_tag:
-                diff_hint = f"tag mismatch at index {index}: {exp_tag!r} vs {act_tag!r}"
-                break
-        else:
-            if len(exp_tags) != len(act_tags):
-                diff_hint = f"tag count mismatch: {len(exp_tags)} vs {len(act_tags)}"
+        diff_hint = _native_xml_compare_diff_hint_ascii(norm_expected, norm_actual) or ""
+        if not diff_hint:
+            # Short hint for reports: first diverging tag pair.
+            exp_tags = re.findall(r"<([A-Za-z0-9_:.-]+)>", norm_expected)
+            act_tags = re.findall(r"<([A-Za-z0-9_:]+)>", norm_actual)
+            for index, (exp_tag, act_tag) in enumerate(zip(exp_tags, act_tags)):
+                if exp_tag != act_tag:
+                    diff_hint = f"tag mismatch at index {index}: {exp_tag!r} vs {act_tag!r}"
+                    break
             else:
-                diff_hint = "payload mismatch after normalization"
+                if len(exp_tags) != len(act_tags):
+                    diff_hint = f"tag count mismatch: {len(exp_tags)} vs {len(act_tags)}"
+                else:
+                    diff_hint = "payload mismatch after normalization"
     return CommandXmlCompareResult(
         equal=equal,
         normalized_expected=norm_expected,

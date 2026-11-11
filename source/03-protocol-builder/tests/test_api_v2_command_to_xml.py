@@ -1027,6 +1027,40 @@ def test_rga_finger_transfer_drop_source_order_is_preserved():
             ],
         )
 
+    def test_xml_diff_hints_use_ascii_rust_tag_scan(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_compare_diff_hint_ascii"
+        ):
+            self.skipTest("optional Rust XML diff-hint scanner is not built")
+        cases = [
+            ("<Root><Alpha>one</Alpha></Root>", "<Root><Beta>one</Beta></Root>"),
+            ("<Root></Root><Tail></Tail>", "<Root></Root>"),
+            ("<Root>one</Root>", "<Root>two</Root>"),
+            ("<Root><a-b></a-b></Root>", "<Root><a-c></a-c></Root>"),
+            ("<Root><café></café></Root>", "<Root><café></root>"),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [compare_command_xml(*case).diff_hint for case in cases]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                xml_compare,
+                "_native_xml_compare_diff_hint_ascii",
+                wraps=native_acceleration.xml_compare_diff_hint_ascii,
+            ) as native_call:
+                actual = [compare_command_xml(*case).diff_hint for case in cases]
+                self.assertEqual(native_call.call_count, len(cases))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [
+                "tag mismatch at index 1: 'alpha' vs 'beta'",
+                "tag count mismatch: 2 vs 1",
+                "payload mismatch after normalization",
+                "tag count mismatch: 2 vs 1",
+                "payload mismatch after normalization",
+            ],
+        )
+
     def test_golden_compare_detects_drift(self):
         golden = command_to_xml(
             AddLabware(

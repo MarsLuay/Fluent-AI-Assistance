@@ -1267,6 +1267,62 @@ fn xml_normalize_ascii_tail(text: &str) -> Option<String> {
     normalize_xml_ascii_tail_value(text)
 }
 
+fn xml_comparison_tag_names_ascii(text: &str, allow_punctuation: bool) -> Vec<&str> {
+    let bytes = text.as_bytes();
+    let mut tags = Vec::new();
+    let mut cursor = 0;
+    while cursor < bytes.len() {
+        if bytes[cursor] != b'<' {
+            cursor += 1;
+            continue;
+        }
+        let start = cursor + 1;
+        let mut end = start;
+        while bytes.get(end).is_some_and(|byte| {
+            byte.is_ascii_alphanumeric()
+                || matches!(*byte, b'_' | b':')
+                || (allow_punctuation && matches!(*byte, b'.' | b'-'))
+        }) {
+            end += 1;
+        }
+        if end > start && bytes.get(end) == Some(&b'>') {
+            tags.push(&text[start..end]);
+            cursor = end + 1;
+        } else {
+            cursor += 1;
+        }
+    }
+    tags
+}
+
+fn xml_compare_diff_hint_ascii_value(expected: &str, actual: &str) -> Option<String> {
+    if !expected.is_ascii() || !actual.is_ascii() {
+        return None;
+    }
+    let expected_tags = xml_comparison_tag_names_ascii(expected, true);
+    let actual_tags = xml_comparison_tag_names_ascii(actual, false);
+    for (index, (expected_tag, actual_tag)) in expected_tags.iter().zip(&actual_tags).enumerate() {
+        if expected_tag != actual_tag {
+            return Some(format!(
+                "tag mismatch at index {index}: '{expected_tag}' vs '{actual_tag}'"
+            ));
+        }
+    }
+    if expected_tags.len() != actual_tags.len() {
+        return Some(format!(
+            "tag count mismatch: {} vs {}",
+            expected_tags.len(),
+            actual_tags.len()
+        ));
+    }
+    Some("payload mismatch after normalization".to_owned())
+}
+
+#[pyfunction]
+fn xml_compare_diff_hint_ascii(expected: &str, actual: &str) -> Option<String> {
+    xml_compare_diff_hint_ascii_value(expected, actual)
+}
+
 fn xml_regex_first_value_ascii(text: &str, name: &str) -> Option<String> {
     if !text.is_ascii() || !name.is_ascii() || name.is_empty() || name.contains(':') {
         return None;
@@ -7451,6 +7507,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(extract_line_number_ascii, module)?)?;
     module.add_function(wrap_pyfunction!(xml_normalize_line_numbers_ascii, module)?)?;
     module.add_function(wrap_pyfunction!(xml_normalize_ascii_tail, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_compare_diff_hint_ascii, module)?)?;
     module.add_function(wrap_pyfunction!(xml_unknown_text_fields, module)?)?;
     module.add_function(wrap_pyfunction!(extract_data_store_versions, module)?)?;
     module.add_function(wrap_pyfunction!(count_xscr_object_type_attributes, module)?)?;
@@ -8354,6 +8411,33 @@ mod tests {
             normalize_line_number_tags_ascii_value("<LineNumber>１２</LineNumber>"),
             None
         );
+    }
+
+    #[test]
+    fn xml_compare_diff_hint_matches_ascii_regex_scans() {
+        assert_eq!(
+            xml_compare_diff_hint_ascii_value(
+                "<root><alpha></alpha></root>",
+                "<root><beta></beta></root>"
+            ),
+            Some("tag mismatch at index 1: 'alpha' vs 'beta'".to_owned())
+        );
+        assert_eq!(
+            xml_compare_diff_hint_ascii_value("<root></root><tail></tail>", "<root></root>"),
+            Some("tag count mismatch: 2 vs 1".to_owned())
+        );
+        assert_eq!(
+            xml_compare_diff_hint_ascii_value("<root>one</root>", "<root>two</root>"),
+            Some("payload mismatch after normalization".to_owned())
+        );
+        assert_eq!(
+            xml_compare_diff_hint_ascii_value(
+                "<root><a-b></a-b></root>",
+                "<root><a-c></a-c></root>"
+            ),
+            Some("tag count mismatch: 2 vs 1".to_owned())
+        );
+        assert_eq!(xml_compare_diff_hint_ascii_value("<café>", "<café>"), None);
     }
 
     #[test]

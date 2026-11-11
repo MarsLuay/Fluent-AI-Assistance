@@ -108,6 +108,23 @@ def xml_normalize_ascii_tail(text: Any) -> str | None:
         return None
 
 
+def xml_compare_diff_hint_ascii(expected: Any, actual: Any) -> str | None:
+    """Build an ASCII XML comparison hint natively, or request Python fallback."""
+    if (
+        not enabled()
+        or type(expected) is not str
+        or type(actual) is not str
+        or not expected.isascii()
+        or not actual.isascii()
+    ):
+        return None
+    try:
+        result = _native.xml_compare_diff_hint_ascii(expected, actual)
+        return result if type(result) is str and result.isascii() else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def xml_unknown_text_fields(
     text: Any, known_names: Any, limit: Any
 ) -> list[tuple[str, list[str]]] | None:
