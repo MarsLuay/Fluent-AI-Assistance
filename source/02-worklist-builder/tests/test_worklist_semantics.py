@@ -744,6 +744,46 @@ class WorklistSemanticsTests(unittest.TestCase):
                     parse_gwl(path)
             self.assertEqual(str(native_error.exception), str(python_error.exception))
 
+    def test_python_gwl_fallback_operation_uppercase_uses_rust_safely(self):
+        for raw_line in ("c;comment;tail", "ſ;DiTiType;42"):
+            with self.subTest(raw_line=raw_line):
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    expected = parse_gwl_line(raw_line)
+
+                operation_text = raw_line.split(";", 1)[0].strip()
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    with patch.object(
+                        native_acceleration,
+                        "worklist_parse_gwl_records",
+                        return_value=None,
+                    ), patch.object(
+                        native_acceleration,
+                        "worklist_ascii_uppercase",
+                        wraps=native_acceleration.worklist_ascii_uppercase,
+                    ) as native_upper:
+                        actual = parse_gwl_line(raw_line)
+                        native_upper.assert_called_once_with(operation_text)
+                self.assertEqual(actual, expected)
+
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    with patch.object(
+                        native_acceleration,
+                        "worklist_parse_gwl_records",
+                        return_value=None,
+                    ), patch.object(
+                        native_acceleration,
+                        "worklist_ascii_uppercase",
+                        return_value=None,
+                    ):
+                        forced_fallback = parse_gwl_line(raw_line)
+                self.assertEqual(forced_fallback, expected)
+
     def test_native_single_gwl_record_parser_matches_python(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "worklist_parse_gwl_records"

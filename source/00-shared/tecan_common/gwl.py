@@ -404,7 +404,9 @@ def parse_gwl_line(raw_line: str, *, line_no: int | None = None, permissive: boo
 
     line = raw_line.rstrip("\r\n")
     parts = line.split(";")
-    op = parts[0].strip().upper()
+    operation_text = parts[0].strip()
+    native_operation = native_acceleration.worklist_ascii_uppercase(operation_text)
+    op = native_operation if native_operation is not None else operation_text.upper()
     prefix = f"Line {line_no}: " if line_no is not None else ""
 
     if op in {"A", "D"}:
