@@ -13,6 +13,11 @@ from . import xml_compat as ET
 from pathlib import Path
 from typing import Any
 
+from tecan_common.native_acceleration import (
+    xml_elements_by_name as _native_xml_elements_by_name,
+    xml_first_element_by_name as _native_xml_first_element_by_name,
+)
+
 
 def clean_subroutine_reference(value: Any) -> str:
     return str(value or "").strip().strip('"').replace("/", "\\")
@@ -413,10 +418,17 @@ def _matching_compiled_reference(dep: dict[str, Any], references: list[dict[str,
 
 
 def _elements_by_local_name(root: ET.Element, name: str) -> list[ET.Element]:
+    elements = _native_xml_elements_by_name(root, (name,), ET.Element)
+    if elements is not None:
+        return elements
     return [element for element in root.iter() if _local_name(element.tag) == name]
 
 
 def _first_text(root: ET.Element, name: str) -> str:
+    selection = _native_xml_first_element_by_name(root, name, ET.Element)
+    if selection is not None:
+        _, element = selection
+        return (element.text or "").strip() if element is not None else ""
     for element in root.iter():
         if _local_name(element.tag) == name:
             return (element.text or "").strip()

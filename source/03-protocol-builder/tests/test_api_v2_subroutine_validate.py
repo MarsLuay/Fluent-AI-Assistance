@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import fluent_pipeline.api_v2_subroutine_validate as subroutine_validate
+import fluent_pipeline.subroutine_dependencies as subroutine_dependencies
 from tecan_common import native_acceleration
 from fluent_pipeline.api_v2_subroutine_validate import (
     extract_subroutine_path,
@@ -35,6 +36,77 @@ _SUBROUTINE_XSCR = """<Object Type="Tecan.Core.Scripting.SubRoutineStatement">
 
 
 class ApiV2SubroutineValidateTests(unittest.TestCase):
+    def test_compiled_reference_scans_use_native_selectors_and_fallback(self):
+        root = subroutine_dependencies.ET.fromstring(
+            '<Root xmlns:x="urn:test"><x:Reference><x:TypeId>Script</x:TypeId>'
+            "<x:ObjectName>First</x:ObjectName></x:Reference>"
+            "<Reference><TypeId>Other</TypeId><ObjectName>Second</ObjectName>"
+            "</Reference></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_refs = subroutine_dependencies._elements_by_local_name(
+                root, "Reference"
+            )
+            expected_text = subroutine_dependencies._first_text(root, "TypeId")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                subroutine_dependencies,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as elements_call, patch.object(
+                subroutine_dependencies,
+                "_native_xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
+            ) as first_call:
+                actual_refs = subroutine_dependencies._elements_by_local_name(
+                    root, "Reference"
+                )
+                actual_text = subroutine_dependencies._first_text(root, "TypeId")
+                self.assertEqual(elements_call.call_count, 1)
+                self.assertEqual(first_call.call_count, 1)
+        self.assertEqual(actual_refs, expected_refs)
+        self.assertEqual(actual_refs, [root[0], root[1]])
+        self.assertEqual(actual_text, expected_text)
+        self.assertEqual(actual_text, "Script")
+
+        class StringTag(str):
+            pass
+
+        custom_root = subroutine_dependencies.ET.Element("Root")
+        custom_ref = subroutine_dependencies.ET.SubElement(
+            custom_root, StringTag("Reference")
+        )
+        type_node = subroutine_dependencies.ET.SubElement(
+            custom_ref, StringTag("TypeId")
+        )
+        type_node.text = "Fallback"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_refs = subroutine_dependencies._elements_by_local_name(
+                custom_root, "Reference"
+            )
+            fallback_text = subroutine_dependencies._first_text(custom_root, "TypeId")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_name(
+                    custom_root, ("Reference",), subroutine_dependencies.ET.Element
+                )
+            )
+            self.assertIsNone(
+                native_acceleration.xml_first_element_by_name(
+                    custom_root, "TypeId", subroutine_dependencies.ET.Element
+                )
+            )
+            actual_fallback_refs = subroutine_dependencies._elements_by_local_name(
+                custom_root, "Reference"
+            )
+            actual_fallback_text = subroutine_dependencies._first_text(
+                custom_root, "TypeId"
+            )
+        self.assertEqual(actual_fallback_refs, fallback_refs)
+        self.assertEqual(actual_fallback_refs, [custom_ref])
+        self.assertEqual(actual_fallback_text, fallback_text)
+        self.assertEqual(actual_fallback_text, "Fallback")
+
     def test_validate_subroutine_fields_requires_folder_prefix(self):
         result = validate_subroutine_fields("BareName")
         self.assertFalse(result.ok)
