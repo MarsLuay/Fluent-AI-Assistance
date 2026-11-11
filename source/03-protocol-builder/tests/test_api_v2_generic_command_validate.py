@@ -5,7 +5,10 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import fluent_pipeline.api_v2.generic_command_validate as generic_validate
+from tecan_common import native_acceleration
 from fluent_pipeline.api_v2.commands import GenericCommand
 from fluent_pipeline.api_v2.generic_command_validate import (
     validate_generic_command_payload,
@@ -39,6 +42,79 @@ BROKEN_PASSTHROUGH_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class GenericCommandValidateTests(unittest.TestCase):
+    def test_generic_xml_candidate_scans_use_native_selector_and_fallback(self):
+        root = generic_validate.ET.fromstring(
+            "<Root><Record><LineNumber>9</LineNumber>"
+            "<Wrapper><Payload /></Wrapper></Record></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_records = generic_validate._elements_by_local_name(root, "Record")
+            expected_line = generic_validate._extract_line_number(expected_records[0])
+            expected_nested = generic_validate._object_has_command_body(
+                expected_records[0], "Payload"
+            )
+            expected_missing = generic_validate._object_has_command_body(
+                expected_records[0], "Missing"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                generic_validate,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual_records = generic_validate._elements_by_local_name(root, "Record")
+                actual_line = generic_validate._extract_line_number(actual_records[0])
+                actual_nested = generic_validate._object_has_command_body(
+                    actual_records[0], "Payload"
+                )
+                actual_missing = generic_validate._object_has_command_body(
+                    actual_records[0], "Missing"
+                )
+                self.assertEqual(native_call.call_count, 4)
+        self.assertEqual(actual_records, expected_records)
+        self.assertEqual(actual_line, expected_line)
+        self.assertEqual(actual_line, 9)
+        self.assertEqual(actual_nested, expected_nested)
+        self.assertTrue(actual_nested)
+        self.assertEqual(actual_missing, expected_missing)
+        self.assertFalse(actual_missing)
+
+        class StringTag(str):
+            pass
+
+        custom_root = generic_validate.ET.Element("Root")
+        custom_record = generic_validate.ET.SubElement(custom_root, StringTag("Record"))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_custom = generic_validate._elements_by_local_name(
+                custom_root, "Record"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_name(
+                    custom_root, ("Record",), generic_validate.ET.Element
+                )
+            )
+            actual_custom = generic_validate._elements_by_local_name(
+                custom_root, "Record"
+            )
+        self.assertEqual(actual_custom, expected_custom)
+        self.assertEqual(actual_custom, [custom_record])
+
+        invalid_first_line = generic_validate.ET.fromstring(
+            "<Record><LineNumber>invalid</LineNumber>"
+            "<LineNumber>9</LineNumber></Record>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_invalid_line = generic_validate._extract_line_number(
+                invalid_first_line
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual_invalid_line = generic_validate._extract_line_number(
+                invalid_first_line
+            )
+        self.assertEqual(actual_invalid_line, expected_invalid_line)
+        self.assertEqual(actual_invalid_line, 0)
+
     def test_valid_passthrough_payload_passes(self):
         command = GenericCommand(
             object_type="Tecan.Core.Instrument.Devices.Rga.Scripting.Data.CgaDropFingersScriptCommandDataV1",

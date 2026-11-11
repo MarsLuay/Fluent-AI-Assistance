@@ -16,6 +16,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 
+from tecan_common.native_acceleration import (
+    xml_elements_by_name as _native_xml_elements_by_name,
+)
+
 from ..command_registry import registry_command_approved_passthrough, registry_command_support_status
 from .commands import GenericCommand
 from .types import ApiV2ValidationError
@@ -221,9 +225,7 @@ def _resolved_passthrough_command_id(element: ET.Element) -> str:
 
 def extract_passthrough_generic_commands(root: ET.Element) -> list[GenericCommand]:
     commands: list[GenericCommand] = []
-    for element in root.iter():
-        if _local_name(element.tag) != "Object":
-            continue
+    for element in _elements_by_local_name(root, "Object"):
         object_type = str(element.attrib.get("Type") or "")
         command_id = _resolved_passthrough_command_id(element)
         if not command_id or not registry_command_approved_passthrough(command_id):
@@ -331,10 +333,7 @@ def _object_has_command_body(element: ET.Element, command_id: str) -> bool:
     for child in element:
         if _local_name(child.tag) == command_id:
             return True
-    for node in element.iter():
-        if _local_name(node.tag) == command_id:
-            return True
-    return False
+    return bool(_elements_by_local_name(element, command_id))
 
 
 def _reason_from_validation_error(exc: ApiV2ValidationError) -> str:
@@ -358,13 +357,20 @@ def _compiled_command_id(element: ET.Element) -> str:
 
 
 def _extract_line_number(element: ET.Element) -> int:
-    for node in element.iter():
-        if _local_name(node.tag) == "LineNumber":
-            try:
-                return int((node.text or "0").strip())
-            except ValueError:
-                return 0
-    return 0
+    nodes = _elements_by_local_name(element, "LineNumber")
+    if not nodes:
+        return 0
+    try:
+        return int((nodes[0].text or "0").strip())
+    except ValueError:
+        return 0
+
+
+def _elements_by_local_name(root: ET.Element, name: str) -> list[ET.Element]:
+    elements = _native_xml_elements_by_name(root, (name,), ET.Element)
+    if elements is not None:
+        return elements
+    return [element for element in root.iter() if _local_name(element.tag) == name]
 
 
 def _local_name(tag: Any) -> str:
