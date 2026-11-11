@@ -588,10 +588,10 @@ def _records_from_root(root: ET.Element) -> list[dict[str, str]]:
     records: list[dict[str, str]] = []
     elements = _native_xml_elements_by_name(root, ("Object",), ET.Element)
     if elements is None:
-        elements = root.iter()
+        elements = (
+            element for element in root.iter() if _local_name(element.tag) == "Object"
+        )
     for element in elements:
-        if _local_name(element.tag) != "Object":
-            continue
         object_type = str(element.attrib.get("Type") or "")
         if object_type.rsplit(".", 1)[-1] in NON_EXECUTABLE_OBJECT_TYPES:
             continue
