@@ -511,7 +511,7 @@ def _audio_slot_filename(slot_base: str, suffix: str) -> str:
     normalized = _workflow_slot_base(slot_base) or str(slot_base or "").strip()
     if not normalized:
         normalized = "step000"
-    return f"{normalized}Audio{suffix.lower()}"
+    return f"{normalized}Audio{_lower_text(suffix)}"
 
 
 def _visible_prompt_media_by_number(ir: Mapping[str, Any]) -> dict[int, dict[str, str]]:
@@ -660,8 +660,12 @@ def _inventory_preferred_source(
     candidate_priority: int = 0,
     incumbent_priority: int = 0,
 ) -> bool:
-    candidate_real = _is_real_visual_media_source(candidate) or candidate.suffix.lower() in AUDIO_SUFFIXES
-    incumbent_real = _is_real_visual_media_source(incumbent) or incumbent.suffix.lower() in AUDIO_SUFFIXES
+    candidate_real = _is_real_visual_media_source(candidate) or (
+        _lower_text(candidate.suffix) in AUDIO_SUFFIXES
+    )
+    incumbent_real = _is_real_visual_media_source(incumbent) or (
+        _lower_text(incumbent.suffix) in AUDIO_SUFFIXES
+    )
     if incumbent_priority > candidate_priority:
         return False
     if candidate_priority >= 90 and candidate_priority > incumbent_priority:
@@ -833,7 +837,7 @@ def _resolve_audio_for_ir(
     prompt_steps = _visible_prompt_steps(ir)
 
     for basename, source in sorted(inventory.items()):
-        if source.suffix.lower() not in AUDIO_SUFFIXES:
+        if _lower_text(source.suffix) not in AUDIO_SUFFIXES:
             continue
         match = STEP_SLOT_MEDIA_RE.match(basename)
         if not match or _media_kind_from_slot_match(match) != "audio":

@@ -786,10 +786,58 @@ def test_resolve_prompt_media_legacy_aliases(tmp_path: Path) -> None:
     assert (media_dir / "step_035_image.png").is_file()
 
 
+def test_audio_suffix_normalization_uses_native_lower_with_fallback(
+    tmp_path: Path,
+) -> None:
+    suffixes = [".MP3", ".WAV", ".İ"]
+    candidate = tmp_path / "candidate.MP3"
+    incumbent = tmp_path / "incumbent.txt"
+    candidate.write_bytes(b"audio")
+    incumbent.write_bytes(b"other")
+
+    def normalize() -> tuple[list[str], bool]:
+        names = [
+            bundle_media._audio_slot_filename("step_049", suffix)
+            for suffix in suffixes
+        ]
+        with patch.object(
+            bundle_media, "_is_real_visual_media_source", return_value=False
+        ):
+            prefers_audio = bundle_media._inventory_preferred_source(
+                candidate, incumbent
+            )
+        return names, prefers_audio
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = normalize()
+    assert expected == (
+        [f"step049Audio{suffix.lower()}" for suffix in suffixes],
+        True,
+    )
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            bundle_media,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            actual = normalize()
+        for suffix in suffixes:
+            native_call.assert_any_call(suffix)
+        native_call.assert_any_call(".MP3")
+        native_call.assert_any_call(".txt")
+    assert actual == expected
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(bundle_media, "_native_ascii_lower", return_value=None):
+            forced_fallback = normalize()
+    assert forced_fallback == expected
+
+
 def test_resolve_prompt_media_attaches_audio(tmp_path: Path) -> None:
     source_dir = tmp_path / "sources"
     source_dir.mkdir()
-    (source_dir / "step049audio.mp3").write_bytes(b"ID3" + b"audio-bytes")
+    (source_dir / "step049audio.MP3").write_bytes(b"ID3" + b"audio-bytes")
 
     ir = {
         "steps": [
