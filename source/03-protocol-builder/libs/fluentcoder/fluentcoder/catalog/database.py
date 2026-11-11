@@ -19,6 +19,10 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 from contextlib import contextmanager
 
+from tecan_common.native_acceleration import (
+    command_short_name as _native_command_short_name,
+)
+
 
 # Database path — bundled inside the catalog package.
 DEFAULT_DB_PATH = Path(__file__).resolve().parent / "tecan.db"
@@ -2333,9 +2337,14 @@ class TecanDatabase:
             full_type = match.group(1)
 
             # Convert to short ID (last part, remove DataV1/DataV2 suffix)
-            short_id = full_type.split(".")[-1]
-            short_id = re.sub(r'ScriptCommandDataV\d+$', '', short_id)
-            short_id = re.sub(r'DataV\d+$', '', short_id)
+            short_type = full_type.split(".")[-1]
+            short_id = _native_command_short_name(full_type)
+            if short_id is None:
+                short_id = re.sub(r'ScriptCommandDataV\d+$', '', short_type)
+                short_id = re.sub(r'DataV\d+$', '', short_id)
+            elif short_id == "ScriptCommand" and short_type != short_id:
+                # Preserve the legacy first-regex behavior for this exact suffix.
+                short_id = ""
 
             # Skip script group containers
             if short_id in ["ScriptGroup", "Script"]:
