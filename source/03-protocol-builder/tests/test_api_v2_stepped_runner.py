@@ -1,7 +1,10 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import fluent_pipeline.api_v2_stepped_inventory as stepped_inventory
+from tecan_common import native_acceleration
 from fluent_pipeline.api_v2_stepped_runner import (
     RecordingExecutionChannel,
     RegistryValidationExecutionChannel,
@@ -46,6 +49,51 @@ _SAMPLE_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ApiV2SteppedRunnerTests(unittest.TestCase):
+    def test_stepped_xml_iterators_use_native_selector_and_fallback(self):
+        root = stepped_inventory.ET.fromstring(
+            '<Root xmlns:x="urn:test"><x:Object><x:Statements />'
+            "<Object><Statements /></Object></x:Object>"
+            "<Object><Statements /></Object></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_objects = list(stepped_inventory._iter_local(root, "Object"))
+            expected_statements = stepped_inventory._first_descendant(
+                expected_objects[0], "Statements"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                stepped_inventory,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual_objects = list(stepped_inventory._iter_local(root, "Object"))
+                actual_statements = stepped_inventory._first_descendant(
+                    actual_objects[0], "Statements"
+                )
+                self.assertEqual(native_call.call_count, 2)
+        self.assertEqual(actual_objects, expected_objects)
+        self.assertEqual(actual_objects, [root[0], root[0][1], root[1]])
+        self.assertIs(actual_statements, expected_statements)
+        self.assertIs(actual_statements, root[0][0])
+        self.assertIsNone(stepped_inventory._first_descendant(None, "Statements"))
+
+        class StringTag(str):
+            pass
+
+        custom_root = stepped_inventory.ET.Element("Root")
+        custom_object = stepped_inventory.ET.SubElement(custom_root, StringTag("Object"))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_custom = list(stepped_inventory._iter_local(custom_root, "Object"))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_name(
+                    custom_root, ("Object",), stepped_inventory.ET.Element
+                )
+            )
+            actual_custom = list(stepped_inventory._iter_local(custom_root, "Object"))
+        self.assertEqual(actual_custom, expected_custom)
+        self.assertEqual(actual_custom, [custom_object])
+
     def test_extract_commands_from_xscr_maps_statement_objects(self):
         with tempfile.TemporaryDirectory() as tmp:
             xscr = Path(tmp) / "demo.xscr"

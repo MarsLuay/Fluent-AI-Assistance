@@ -16,6 +16,10 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Mapping, Protocol, Sequence
 
+from tecan_common.native_acceleration import (
+    xml_elements_by_name as _native_xml_elements_by_name,
+)
+
 from .api_v2_add_labware_validate import (
     extract_add_labware_fields,
     record_successful_add_labware,
@@ -953,6 +957,9 @@ def _direct_children(parent: ET.Element | None, name: str) -> list[ET.Element]:
 def _first_descendant(parent: ET.Element | None, name: str) -> ET.Element | None:
     if parent is None:
         return None
+    elements = _native_xml_elements_by_name(parent, (name,), ET.Element)
+    if elements is not None:
+        return elements[0] if elements else None
     for child in parent.iter():
         if _local_name(child.tag) == name:
             return child
@@ -976,6 +983,10 @@ def _first_text(parent: ET.Element, name: str) -> str | None:
 
 
 def _iter_local(parent: ET.Element, name: str):
+    elements = _native_xml_elements_by_name(parent, (name,), ET.Element)
+    if elements is not None:
+        yield from elements
+        return
     for child in parent.iter():
         if _local_name(child.tag) == name:
             yield child
