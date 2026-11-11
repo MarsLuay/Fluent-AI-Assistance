@@ -512,6 +512,30 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
         self.assertEqual(model.task_inputs[0]["records"][0]["fields"]["TaskName"], "Task A")
         self.assertNotEqual(model.task_inputs[0]["kind"], "worklist")
 
+    def test_twl_unicode_field_casefold_uses_python_fallback(self) -> None:
+        root = ET.Element("Task", {"TasKID": "synthetic-id"})
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = task_input._element_record(root, index=0)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(task_input, "casefold_alias_values", return_value=None):
+                with patch.object(
+                    task_input,
+                    "_native_ascii_casefold_trim",
+                    wraps=native_acceleration.ascii_casefold_trim,
+                ) as native_call:
+                    actual = task_input._element_record(root, index=0)
+                    self.assertGreaterEqual(native_call.call_count, 2)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["task_id"], "synthetic-id")
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(task_input, "casefold_alias_values", return_value=None):
+                with patch.object(
+                    task_input, "_native_ascii_casefold_trim", return_value=None
+                ):
+                    fallback = task_input._element_record(root, index=0)
+        self.assertEqual(fallback, expected)
+
     def test_twl_xml_attribute_fields_use_native_scan_with_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_attribute_name_values"

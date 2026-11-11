@@ -15,6 +15,7 @@ from typing import Any
 from tecan_common import xml_compat as ET
 from tecan_common.native_acceleration import (
     any_ascii_casefold_in,
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     delimited_row_fields,
     delimited_text_rows,
     casefold_alias_values,
@@ -36,6 +37,14 @@ _KNOWN_FIELDS = {
     "processname", "script", "scriptname", "value", "type", "datatype",
     "source", "target", "status", "enabled", "order", "sequence", "parameter",
 }
+
+
+def _casefold_name(value: str) -> str:
+    if type(value) is str and value.strip() == value:
+        native = _native_ascii_casefold_trim(value)
+        if native is not None:
+            return native
+    return value.casefold()
 
 
 def inspect_twl(path: str | Path, *, source_name: str | None = None) -> dict[str, Any]:
@@ -62,7 +71,7 @@ def _inspect_xml(text: str, *, source_name: str) -> dict[str, Any]:
         record_nodes = [
             element for element in root.iter()
             if isinstance(element.tag, str)
-            and local_name(element.tag).casefold() in record_names
+            and _casefold_name(local_name(element.tag)) in record_names
             and list(element)
         ]
     if not record_nodes:
@@ -136,7 +145,7 @@ def _element_record(element: Any, *, index: int) -> dict[str, Any]:
             return
         if not text:
             return
-        if name.casefold() in _KNOWN_FIELDS:
+        if _casefold_name(name) in _KNOWN_FIELDS:
             values[name] = text
         else:
             unknown.setdefault(name, []).append(text)
@@ -161,14 +170,14 @@ def _element_record(element: Any, *, index: int) -> dict[str, Any]:
     if native_attributes is None:
         for name, value in element.attrib.items():
             local = local_name(name)
-            key = local.casefold()
+            key = _casefold_name(local)
             if key in _KNOWN_FIELDS:
                 values[local] = str(value)
             else:
                 unknown.setdefault(local, []).append(str(value))
     else:
         for name, value in native_attributes:
-            if name.casefold() in _KNOWN_FIELDS:
+            if _casefold_name(name) in _KNOWN_FIELDS:
                 values[name] = value
             else:
                 unknown.setdefault(name, []).append(value)
@@ -217,7 +226,7 @@ def _normalized_task_fields(values: dict[str, Any]) -> dict[str, Any]:
             if value not in (None, "")
         }
 
-    folded = {str(key).casefold(): value for key, value in values.items()}
+    folded = {_casefold_name(str(key)): value for key, value in values.items()}
 
     def first(*names: str) -> Any:
         for name in names:
@@ -249,7 +258,7 @@ def _inspect_delimited(text: str, *, source_name: str) -> dict[str, Any]:
     has_header = (
         native_header_match
         if native_header_match is not None
-        else any(cell.casefold() in _KNOWN_FIELDS for cell in header)
+        else any(_casefold_name(cell) in _KNOWN_FIELDS for cell in header)
     )
     data_rows = rows[1:] if has_header else rows
     records: list[dict[str, Any]] = []
