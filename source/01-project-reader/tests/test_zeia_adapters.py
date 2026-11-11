@@ -32,6 +32,67 @@ VISIONX_SCRIPT = """<?xml version="1.0"?>
 """
 
 
+class TestObjectKindClassification(unittest.TestCase):
+    def test_native_classification_matches_python_for_safe_suffixes(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_kind_from_suffix"
+        ):
+            self.skipTest("optional Rust suffix classifier is not built")
+        suffixes = [
+            ".xcmp",
+            ".xwsp",
+            ".xlqc",
+            ".xlcp",
+            ".xsit",
+            ".xcon",
+            ".xml",
+            "..custom",
+            "",
+            "...",
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [zeia_adapters_module._object_kind(suffix) for suffix in suffixes]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                zeia_adapters_module,
+                "_native_xml_kind_from_suffix",
+                wraps=native_acceleration.xml_kind_from_suffix,
+            ) as native_call:
+                actual = [zeia_adapters_module._object_kind(suffix) for suffix in suffixes]
+                self.assertEqual(native_call.call_count, len(suffixes))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [
+                "component",
+                "workspace",
+                "liquid_class",
+                "liquid_class_map",
+                "site",
+                "connector",
+                "xml",
+                "custom",
+                "xml",
+                "xml",
+            ],
+        )
+
+    def test_unknown_case_and_unicode_suffixes_keep_python_semantics(self) -> None:
+        class StringSubclass(str):
+            pass
+
+        suffixes = [".XCMP", ".Custom", ".é", StringSubclass(".xcmp")]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                zeia_adapters_module,
+                "_native_xml_kind_from_suffix",
+                wraps=native_acceleration.xml_kind_from_suffix,
+            ) as native_call:
+                actual = [zeia_adapters_module._object_kind(suffix) for suffix in suffixes]
+                native_call.assert_not_called()
+        self.assertEqual(actual, ["XCMP", "Custom", "é", "component"])
+
+
 class ZeiaAdapterTests(unittest.TestCase):
     def _archive(self, root: Path, name: str, entries: dict[str, str]) -> Path:
         path = root / name

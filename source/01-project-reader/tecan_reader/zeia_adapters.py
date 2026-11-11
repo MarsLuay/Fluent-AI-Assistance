@@ -14,6 +14,7 @@ from tecan_common.native_acceleration import (
     extract_data_store_versions as _native_extract_data_store_versions,
     has_gwl_record_prefix as _native_has_gwl_record_prefix,
     has_visionx_namespace as _native_has_visionx_namespace,
+    xml_kind_from_suffix as _native_xml_kind_from_suffix,
     xml_regex_first_value as _native_xml_regex_first_value,
     xml_unknown_text_fields as _native_xml_unknown_text_fields,
     zeia_xml_structural_flags as _native_zeia_xml_structural_flags,
@@ -1030,6 +1031,10 @@ def _unknown_fields_from_text(text: str) -> dict[str, list[str]]:
 
 
 def _object_kind(suffix: str) -> str:
+    if type(suffix) is str and suffix.isascii() and suffix == suffix.lower():
+        native = _native_xml_kind_from_suffix(suffix)
+        if native is not None:
+            return native
     return {
         ".xcmp": "component",
         ".xwsp": "workspace",
