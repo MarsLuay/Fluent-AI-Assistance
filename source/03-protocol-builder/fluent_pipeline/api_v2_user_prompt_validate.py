@@ -12,6 +12,10 @@ from . import xml_compat as ET
 from dataclasses import dataclass
 from typing import Any, Callable, Protocol
 
+from tecan_common.native_acceleration import (
+    xml_elements_by_name as _native_xml_elements_by_name,
+)
+
 from .policies.prompt_text import normalize_operator_prompt_text, prompt_text_is_placeholder
 from .api_v2.validate_runtime import (
     runtime_error_for_validate_failure as _shared_runtime_error_for_validate_failure,
@@ -77,17 +81,13 @@ def extract_prompt_message(command: UserPromptCommandLike) -> str:
     except ET.ParseError:
         return ""
     if str(command.type_name or "") == "RUPStandardStatement":
-        for node in root.iter():
-            if _local_name(node.tag) == "MessageText":
-                return (node.text or "").strip()
-        for node in root.iter():
-            if _local_name(node.tag) == "CheckMessagePrompt":
-                return (node.text or "").strip()
-        return ""
-    for node in root.iter():
-        if _local_name(node.tag) == "Prompt":
-            return (node.text or "").strip()
-    return ""
+        found, text = _first_descendant_text(root, "MessageText")
+        if found:
+            return text
+        found, text = _first_descendant_text(root, "CheckMessagePrompt")
+        return text if found else ""
+    _, text = _first_descendant_text(root, "Prompt")
+    return text
 
 
 def validate_user_prompt_offline(command: UserPromptCommandLike) -> UserPromptValidateResult:
@@ -167,6 +167,18 @@ def runtime_error_for_validate_failure(
     command: UserPromptCommandLike,
 ) -> str:
     return _shared_runtime_error_for_validate_failure(result, command, kind="UserPrompt")
+
+
+def _first_descendant_text(root: ET.Element, name: str) -> tuple[bool, str]:
+    elements = _native_xml_elements_by_name(root, (name,), ET.Element)
+    if elements is not None:
+        if not elements:
+            return False, ""
+        return True, (elements[0].text or "").strip()
+    for node in root.iter():
+        if _local_name(node.tag) == name:
+            return True, (node.text or "").strip()
+    return False, ""
 
 
 def _local_name(tag: str) -> str:

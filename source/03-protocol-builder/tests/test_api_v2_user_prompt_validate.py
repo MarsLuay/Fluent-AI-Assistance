@@ -1,5 +1,8 @@
 import unittest
+from unittest.mock import patch
 
+from tecan_common import native_acceleration
+import fluent_pipeline.api_v2_user_prompt_validate as user_prompt_validate
 from fluent_pipeline.api_v2_stepped_inventory import (
     ICommand,
     RecordingExecutionChannel,
@@ -21,6 +24,70 @@ class UserPromptValidateTests(unittest.TestCase):
             payload_xml="<UserPromptStatement><Prompt>Confirm deck state.</Prompt></UserPromptStatement>",
         )
         self.assertEqual(extract_prompt_message(command), "Confirm deck state.")
+
+    def test_prompt_descendant_scans_use_native_selector_with_fallback_order(self):
+        command = ICommand(
+            type_name="UserPromptStatement",
+            index=0,
+            group="Checks",
+            payload_xml=(
+                '<Root xmlns:x="urn:test"><x:Prompt> First </x:Prompt>'
+                "<Prompt>Second</Prompt></Root>"
+            ),
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = extract_prompt_message(command)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                user_prompt_validate,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = extract_prompt_message(command)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "First")
+
+        first_empty = ICommand(
+            type_name="RUPStandardStatement",
+            index=0,
+            group="Checks",
+            payload_xml=(
+                "<Root><MessageText> </MessageText>"
+                "<CheckMessagePrompt>fallback</CheckMessagePrompt></Root>"
+            ),
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_empty = extract_prompt_message(first_empty)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                user_prompt_validate,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual_empty = extract_prompt_message(first_empty)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual_empty, expected_empty)
+        self.assertEqual(actual_empty, "")
+
+        fallback_prompt = ICommand(
+            type_name="RUPStandardStatement",
+            index=0,
+            group="Checks",
+            payload_xml="<Root><CheckMessagePrompt>fallback</CheckMessagePrompt></Root>",
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_fallback = extract_prompt_message(fallback_prompt)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                user_prompt_validate,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual_fallback = extract_prompt_message(fallback_prompt)
+                self.assertEqual(native_call.call_count, 2)
+        self.assertEqual(actual_fallback, expected_fallback)
+        self.assertEqual(actual_fallback, "fallback")
 
     def test_offline_validate_passes_real_prompt(self):
         command = ICommand(
