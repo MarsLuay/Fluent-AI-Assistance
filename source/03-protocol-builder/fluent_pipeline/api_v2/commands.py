@@ -7,6 +7,10 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol, Sequence
 
+from tecan_common.native_acceleration import (
+    xml_elements_by_name as _native_xml_elements_by_name,
+)
+
 from fluentcoder.expressions import (
     coerce_literal_expression,
     expression_from_mapping,
@@ -1011,6 +1015,9 @@ def _find_descendant(element: Any, name: str) -> Any:
 
     if not isinstance(element, ET.Element):
         return None
+    nodes = _native_xml_elements_by_name(element, (name,), ET.Element)
+    if nodes is not None:
+        return nodes[0] if nodes else None
     for node in element.iter():
         if _local_name(node.tag) == name:
             return node

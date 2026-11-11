@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import fluent_pipeline.api_v2.commands as commands_module
 import fluent_pipeline.api_v2.xml_compare as xml_compare
 from fluent_pipeline import xml_compat as ET
 from tecan_common import native_acceleration
@@ -320,6 +321,42 @@ RUP_VARIABLE_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ApiV2CommandSerializerTests(unittest.TestCase):
+    def test_typed_command_descendant_lookup_uses_native_selector_and_fallback(self):
+        root = ET.fromstring(
+            '<Root xmlns:x="urn:test"><x:Target>first</x:Target>'
+            "<Target>second</Target></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = commands_module._find_descendant(root, "Target")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                commands_module,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = commands_module._find_descendant(root, "Target")
+                self.assertEqual(native_call.call_count, 1)
+        self.assertIs(actual, expected)
+        self.assertIs(actual, root[0])
+        self.assertIsNone(commands_module._find_descendant(object(), "Target"))
+
+        class StringTag(str):
+            pass
+
+        custom_root = ET.Element("Root")
+        custom_target = ET.SubElement(custom_root, StringTag("Target"))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = commands_module._find_descendant(custom_root, "Target")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_name(
+                    custom_root, ("Target",), ET.Element
+                )
+            )
+            fallback_actual = commands_module._find_descendant(custom_root, "Target")
+        self.assertIs(fallback_actual, fallback_expected)
+        self.assertIs(fallback_actual, custom_target)
+
     def test_compiled_object_scan_uses_native_selector_and_fallback(self):
         xscr = (
             '<Root xmlns:x="urn:test"><x:Object Type="Tecan.Commands.First">'
