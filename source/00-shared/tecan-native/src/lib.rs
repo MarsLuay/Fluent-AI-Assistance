@@ -6404,6 +6404,48 @@ fn bracket_variable_names(value: &str) -> Vec<String> {
 }
 
 #[pyfunction]
+fn ascii_condition_variable_names(value: &str) -> Option<Vec<String>> {
+    if !value.is_ascii() {
+        return None;
+    }
+    let bytes = value.as_bytes();
+    let mut names = Vec::new();
+    let mut seen = HashSet::new();
+    let mut index = 0;
+    while index < bytes.len() {
+        let byte = bytes[index];
+        if byte == b'\'' || byte == b'"' {
+            if let Some(offset) = bytes[index + 1..]
+                .iter()
+                .position(|candidate| *candidate == byte)
+            {
+                index += offset + 2;
+            } else {
+                index += 1;
+            }
+            continue;
+        }
+        if byte.is_ascii_alphanumeric() || byte == b'_' {
+            let start = index;
+            while index < bytes.len()
+                && (bytes[index].is_ascii_alphanumeric() || bytes[index] == b'_')
+            {
+                index += 1;
+            }
+            if bytes[start].is_ascii_alphabetic() || bytes[start] == b'_' {
+                let name = value[start..index].to_owned();
+                if seen.insert(name.clone()) {
+                    names.push(name);
+                }
+            }
+            continue;
+        }
+        index += 1;
+    }
+    Some(names)
+}
+
+#[pyfunction]
 fn count_string_groups<'py>(
     py: Python<'py>,
     values: &Bound<'py, PyAny>,
@@ -7872,6 +7914,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(zeia_object_kind_from_suffix, module)?)?;
     module.add_function(wrap_pyfunction!(count_string_groups, module)?)?;
     module.add_function(wrap_pyfunction!(bracket_variable_names, module)?)?;
+    module.add_function(wrap_pyfunction!(ascii_condition_variable_names, module)?)?;
     module.add_function(wrap_pyfunction!(clean_subroutine_name_ascii, module)?)?;
     module.add_function(wrap_pyfunction!(normalize_ascii_name, module)?)?;
     module.add_function(wrap_pyfunction!(
@@ -8733,6 +8776,28 @@ mod tests {
             ),
             vec!["Foo", "bar_2", "_x", "nested"]
         );
+    }
+
+    #[test]
+    fn ascii_condition_variable_scanner_matches_python_regex_behavior() {
+        let expression = concat!(
+            r#"count + _x + 9bad + 1_name + foo.bar + "doubleName" + 'singleName' + "#,
+            r#"COUNT + "unterminated + inside + 'hidden' + outside + count"#,
+        );
+        assert_eq!(
+            ascii_condition_variable_names(expression),
+            Some(vec![
+                "count".to_owned(),
+                "_x".to_owned(),
+                "foo".to_owned(),
+                "bar".to_owned(),
+                "COUNT".to_owned(),
+                "unterminated".to_owned(),
+                "inside".to_owned(),
+                "outside".to_owned(),
+            ])
+        );
+        assert_eq!(ascii_condition_variable_names("café + count"), None);
     }
 
     #[test]

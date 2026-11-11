@@ -16,6 +16,7 @@ import json
 import re
 
 from tecan_common.native_acceleration import (
+    ascii_condition_variable_names as _native_ascii_condition_variable_names,
     ascii_variable_name_is_valid as _native_ascii_variable_name_is_valid,
 )
 
@@ -6458,8 +6459,12 @@ def _xml_bool_text(value: Any) -> bool:
 
 
 def _source_condition_variable_refs(value: Any) -> set[str]:
-    expression = re.sub(r'"[^"]*"|\'[^\']*\'', " ", str(value or ""))
+    source = str(value or "")
     reserved = {"and", "or", "not", "true", "false", "none"}
+    native = _native_ascii_condition_variable_names(source)
+    if native is not None:
+        return {name for name in native if name.casefold() not in reserved}
+    expression = re.sub(r'"[^"]*"|\'[^\']*\'', " ", source)
     return {
         name
         for name in re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", expression)

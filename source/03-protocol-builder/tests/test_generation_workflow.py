@@ -77,6 +77,57 @@ class SourceVariableRefNativeTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, {"Alpha_2", "_x", "Foo"})
 
+    def test_condition_variable_scanner_parity_and_unicode_fallback(self):
+        values = [
+            r"""count + _x + 9bad + 1_name + foo.bar + "doubleName" + 'singleName' + COUNT +
+            "unterminated + inside + 'hidden' + outside + count""",
+            "and AND or OR not true TRUE false none None user",
+            'unmatched "open + visible + \'hidden\' + after',
+            "évalue + valueé + plain + 'ignored'",
+            None,
+            42,
+        ]
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                generation_workflow_module._source_condition_variable_refs(value)
+                for value in values
+            ]
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                generation_workflow_module,
+                "_native_ascii_condition_variable_names",
+                wraps=native_acceleration.ascii_condition_variable_names,
+            ) as native_call:
+                actual = [
+                    generation_workflow_module._source_condition_variable_refs(value)
+                    for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertIsNone(
+                native_acceleration.ascii_condition_variable_names("évalue")
+            )
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [
+                {
+                    "count",
+                    "_x",
+                    "foo",
+                    "bar",
+                    "COUNT",
+                    "unterminated",
+                    "inside",
+                    "outside",
+                },
+                {"user"},
+                {"unmatched", "open", "visible", "after"},
+                {"plain"},
+                set(),
+                set(),
+            ],
+        )
+
 
 XSCR = """<?xml version="1.0"?>
 <Root>

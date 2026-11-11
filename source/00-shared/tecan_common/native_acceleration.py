@@ -2635,6 +2635,26 @@ def bracket_variable_names(value: Any) -> set[str] | None:
         return None
 
 
+def ascii_condition_variable_names(value: Any) -> set[str] | None:
+    """Extract ASCII identifiers outside quoted text, or request fallback."""
+    if not enabled() or type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.ascii_condition_variable_names(value)
+        if (
+            type(result) is list
+            and all(
+                type(name) is str and name.isascii() and name.isidentifier()
+                for name in result
+            )
+            and len(result) == len(set(result))
+        ):
+            return set(result)
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def subroutine_reference_matches_ascii(
     subroutine: Any, references: Any
 ) -> bool | None:
