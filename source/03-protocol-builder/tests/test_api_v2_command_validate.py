@@ -79,6 +79,46 @@ GOOD_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ApiV2CommandValidateTests(unittest.TestCase):
+    def test_bracket_variable_names_use_rust_with_python_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "bracket_variable_names"
+        ):
+            self.skipTest("optional Rust bracket-variable scanner is not built")
+        values = [
+            "[A] [b_2] [A] [] [_x] [9bad] [with-dash] [[nested]] [é] [Aé]",
+            "before [name9] after",
+            "",
+            None,
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                command_validate._bracket_variable_names(value) for value in values
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_bracket_variable_names",
+                wraps=native_acceleration.bracket_variable_names,
+            ) as native_call:
+                actual = [
+                    command_validate._bracket_variable_names(value) for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual[0], {"A", "b_2", "_x", "nested"})
+        self.assertEqual(actual[1], {"name9"})
+        self.assertEqual(actual[2:], [set(), set()])
+
+        class StringSubclass(str):
+            pass
+
+        unsupported = StringSubclass("[Subclass]")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.bracket_variable_names(unsupported))
+            self.assertEqual(
+                command_validate._bracket_variable_names(unsupported), {"Subclass"}
+            )
+
     def test_root_command_scan_uses_native_selector_and_comment_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_elements_by_name"

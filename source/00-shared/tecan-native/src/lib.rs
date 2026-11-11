@@ -5904,6 +5904,37 @@ fn zeia_object_kind_from_suffix(suffix: &str) -> String {
 }
 
 #[pyfunction]
+fn bracket_variable_names(value: &str) -> Vec<String> {
+    let bytes = value.as_bytes();
+    let mut names = Vec::new();
+    let mut seen = HashSet::new();
+    let mut index = 0;
+    while index + 2 < bytes.len() {
+        if bytes[index] != b'['
+            || !(bytes[index + 1].is_ascii_alphabetic() || bytes[index + 1] == b'_')
+        {
+            index += 1;
+            continue;
+        }
+        let start = index + 1;
+        let mut end = start + 1;
+        while end < bytes.len() && (bytes[end].is_ascii_alphanumeric() || bytes[end] == b'_') {
+            end += 1;
+        }
+        if end < bytes.len() && bytes[end] == b']' {
+            let name = value[start..end].to_owned();
+            if seen.insert(name.clone()) {
+                names.push(name);
+            }
+            index = end + 1;
+        } else {
+            index += 1;
+        }
+    }
+    names
+}
+
+#[pyfunction]
 fn count_string_groups<'py>(
     py: Python<'py>,
     values: &Bound<'py, PyAny>,
@@ -7352,6 +7383,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_kind_from_suffix, module)?)?;
     module.add_function(wrap_pyfunction!(zeia_object_kind_from_suffix, module)?)?;
     module.add_function(wrap_pyfunction!(count_string_groups, module)?)?;
+    module.add_function(wrap_pyfunction!(bracket_variable_names, module)?)?;
     module.add_function(wrap_pyfunction!(command_short_name, module)?)?;
     module.add_function(wrap_pyfunction!(entry_object_guid, module)?)?;
     module.add_function(wrap_pyfunction!(asset_reference_candidates, module)?)?;
@@ -8044,6 +8076,16 @@ mod tests {
         assert_eq!(zeia_object_kind_from_suffix("...Custom"), "Custom");
         assert_eq!(zeia_object_kind_from_suffix(".é"), "é");
         assert_eq!(zeia_object_kind_from_suffix("..."), "xml");
+    }
+
+    #[test]
+    fn bracket_variable_scanner_matches_ascii_regex_boundaries() {
+        assert_eq!(
+            bracket_variable_names(
+                "[Foo] [bar_2] [Foo] [] [_x] [9bad] [with-dash] [[nested]] [é] [Aé]"
+            ),
+            vec!["Foo", "bar_2", "_x", "nested"]
+        );
     }
 
     #[test]

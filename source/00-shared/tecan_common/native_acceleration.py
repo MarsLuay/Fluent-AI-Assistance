@@ -2542,6 +2542,23 @@ def diagnostic_redact_text(value: Any) -> str | None:
         return None
 
 
+def bracket_variable_names(value: Any) -> set[str] | None:
+    """Extract ASCII bracket variable names from exact strings, or fall back."""
+    if not enabled() or (value is not None and type(value) is not str):
+        return None
+    try:
+        result = _native.bracket_variable_names(value or "")
+        if (
+            type(result) is list
+            and all(type(name) is str and name.isascii() for name in result)
+            and len(result) == len(set(result))
+        ):
+            return set(result)
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def xml_kind_from_suffix(suffix: Any) -> str | None:
     """Classify supported ASCII XML suffixes natively, or request Python fallback."""
     if not enabled() or type(suffix) is not str or not suffix.isascii():

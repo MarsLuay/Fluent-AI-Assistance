@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Mapping, Protocol
 
 from tecan_common.native_acceleration import (
+    bracket_variable_names as _native_bracket_variable_names,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
 )
@@ -835,7 +836,13 @@ def _elements_by_local_name(root: ET.Element, name: str) -> list[ET.Element]:
 
 
 def _bracket_variable_names(value: Any) -> set[str]:
-    return {match.group(1) for match in re.finditer(r"\[([A-Za-z_][A-Za-z0-9_]*)\]", str(value or ""))}
+    native = _native_bracket_variable_names(value)
+    if native is not None:
+        return native
+    return {
+        match.group(1)
+        for match in re.finditer(r"\[([A-Za-z_][A-Za-z0-9_]*)\]", str(value or ""))
+    }
 
 
 def _clean_subroutine_name(value: Any) -> str:
