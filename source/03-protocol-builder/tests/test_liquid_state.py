@@ -1,9 +1,39 @@
 import unittest
+from unittest.mock import patch
 
+import fluent_pipeline.liquid_state as liquid_state_module
+from tecan_common import native_acceleration
 from fluent_pipeline.liquid_state import render_liquid_state_markdown, validate_liquid_state
 
 
 class LiquidStateTests(unittest.TestCase):
+    def test_parse_well_row_uses_native_with_python_fallback(self):
+        values = ["A1", "aa12", " A2 ", "é1", f"{'A' * 30}3"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [liquid_state_module._parse_well(value) for value in values]
+        self.assertEqual(expected[:4], [(1, 1), (27, 12), (1, 2), None])
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_row_name_to_index",
+                wraps=native_acceleration.worklist_row_name_to_index,
+            ) as native_call:
+                actual = [liquid_state_module._parse_well(value) for value in values]
+            self.assertEqual(native_call.call_count, 4)
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_row_name_to_index",
+                return_value=None,
+            ):
+                forced_fallback = [
+                    liquid_state_module._parse_well(value) for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_tracks_transfer_before_and_after_volumes(self):
         report = validate_liquid_state(_transfer_ir())
 

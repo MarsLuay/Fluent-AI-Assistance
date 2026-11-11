@@ -12,6 +12,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from tecan_common import native_acceleration
+
 from .protocol_ir_schema import Operation, VOLUME_OPERATIONS
 
 
@@ -772,6 +774,9 @@ def _parse_well(value: str) -> tuple[int, int] | None:
     match = re.fullmatch(r"([A-Za-z]+)(\d+)", value.strip())
     if not match:
         return None
+    native_row = native_acceleration.worklist_row_name_to_index(match.group(1))
+    if native_row is not None:
+        return native_row + 1, int(match.group(2))
     row = 0
     for char in match.group(1).upper():
         row = row * 26 + (ord(char) - ord("A") + 1)
