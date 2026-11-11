@@ -48,6 +48,34 @@ class FluentLogParserNativeTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [True, True, True, False, False])
 
+    def test_script_name_matching_uses_native_trim_and_dot_normalization(self):
+        pairs = [
+            (" Script Name... ", "script name"),
+            ("prefix", " PREFIX.more... "),
+            ("Straße", "strae"),
+            ("\u2003Alpha\u00a0", "alpha..."),
+            ("...", "...."),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                fluent_log_parser_module._script_names_match(left, right)
+                for left, right in pairs
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                fluent_log_parser_module,
+                "_native_ascii_script_name_key",
+                wraps=native_acceleration.ascii_script_name_key,
+            ) as native_call:
+                actual = [
+                    fluent_log_parser_module._script_names_match(left, right)
+                    for left, right in pairs
+                ]
+                self.assertEqual(native_call.call_count, len(pairs) * 2)
+            self.assertIsNone(native_acceleration.ascii_script_name_key("\u2003Alpha\u00a0"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [True, True, False, True, False])
+
 
 class FluentLogParserTests(unittest.TestCase):
     def test_default_locations_include_documented_pegasus_logs(self):

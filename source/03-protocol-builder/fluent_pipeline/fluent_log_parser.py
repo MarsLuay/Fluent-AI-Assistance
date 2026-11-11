@@ -12,6 +12,7 @@ from typing import Any, Iterable, Mapping, Sequence
 
 from tecan_common.native_acceleration import (
     ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
+    ascii_script_name_key as _native_ascii_script_name_key,
 )
 
 from .audit_import_context import import_for_error, read_audit_import_events
@@ -1507,8 +1508,10 @@ def _command_ids_match(command_id: str, hint: str) -> bool:
 
 
 def _script_names_match(left: str, right: str) -> bool:
-    a = left.strip().lower().rstrip(".")
-    b = right.strip().lower().rstrip(".")
+    native_left = _native_ascii_script_name_key(left)
+    native_right = _native_ascii_script_name_key(right)
+    a = native_left if native_left is not None else left.strip().lower().rstrip(".")
+    b = native_right if native_right is not None else right.strip().lower().rstrip(".")
     return bool(a and b and (a == b or a in b or b in a))
 
 

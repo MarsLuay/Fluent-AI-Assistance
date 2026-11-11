@@ -3006,6 +3006,17 @@ def ascii_casefold_trim(value: Any) -> str | None:
         return None
 
 
+def ascii_script_name_key(value: Any) -> str | None:
+    """Trim/lower an ASCII script name and remove trailing periods, or fallback."""
+    if not enabled() or type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.ascii_script_name_key(value)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def ascii_lower_alnum_compact(value: Any) -> str | None:
     """Drop non-lowercase ASCII letters and digits, or request fallback."""
     if not enabled() or type(value) is not str or not value.isascii():

@@ -2599,6 +2599,19 @@ fn ascii_casefold_trim(value: &str) -> Option<String> {
 }
 
 #[pyfunction]
+fn ascii_script_name_key(value: &str) -> Option<String> {
+    if !value.is_ascii() {
+        return None;
+    }
+    Some(
+        trim_python_whitespace(value)
+            .to_ascii_lowercase()
+            .trim_end_matches('.')
+            .to_owned(),
+    )
+}
+
+#[pyfunction]
 fn ascii_lower_alnum_compact(value: &str) -> Option<String> {
     if !value.is_ascii() {
         return None;
@@ -7710,6 +7723,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(sorted_unique_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_trim, module)?)?;
+    module.add_function(wrap_pyfunction!(ascii_script_name_key, module)?)?;
     module.add_function(wrap_pyfunction!(parse_ascii_bool_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_element_is_nil, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_lower_alnum_compact, module)?)?;
@@ -7953,6 +7967,16 @@ mod tests {
         assert_eq!(ascii_casefold_trim("\u{1c}Text\u{1f}"), Some("text".into()));
         assert_eq!(ascii_casefold_trim("  "), Some(String::new()));
         assert_eq!(ascii_casefold_trim("ſcript"), None);
+    }
+
+    #[test]
+    fn ascii_script_name_key_matches_strip_lower_and_trailing_dot_removal() {
+        assert_eq!(
+            ascii_script_name_key(" \tExample Script...\r\n"),
+            Some("example script".into())
+        );
+        assert_eq!(ascii_script_name_key("..."), Some(String::new()));
+        assert_eq!(ascii_script_name_key("Straße"), None);
     }
 
     #[test]
