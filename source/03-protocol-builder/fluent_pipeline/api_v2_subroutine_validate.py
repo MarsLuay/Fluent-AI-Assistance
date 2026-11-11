@@ -21,6 +21,7 @@ from typing import Any, Callable, Mapping, Protocol, Sequence
 
 from tecan_common.native_acceleration import (
     xml_elements_by_name as _native_xml_elements_by_name,
+    xml_first_element_by_name as _native_xml_first_element_by_name,
     xml_local_name as _native_xml_local_name,
 )
 
@@ -460,9 +461,10 @@ def _local_name(tag: str) -> str:
 
 
 def _find_descendant(root: ET.Element, name: str) -> ET.Element | None:
-    elements = _native_xml_elements_by_name(root, (name,), ET.Element)
-    if elements is not None:
-        return elements[0] if elements else None
+    selection = _native_xml_first_element_by_name(root, name, ET.Element)
+    if selection is not None:
+        _, element = selection
+        return element
     for node in root.iter():
         if _local_name(node.tag) == name:
             return node

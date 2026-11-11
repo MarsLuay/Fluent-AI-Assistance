@@ -180,8 +180,8 @@ class ApiV2SubroutineValidateTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 subroutine_validate,
-                "_native_xml_elements_by_name",
-                wraps=native_acceleration.xml_elements_by_name,
+                "_native_xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
             ) as native_call:
                 actual = extract_subroutine_path(command)
                 self.assertEqual(native_call.call_count, 1)
@@ -198,8 +198,8 @@ class ApiV2SubroutineValidateTests(unittest.TestCase):
             expected_element = subroutine_validate._find_descendant(root, "SubRoutine")
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(
-                native_acceleration.xml_elements_by_name(
-                    root, ("SubRoutine",), subroutine_validate.ET.Element
+                native_acceleration.xml_first_element_by_name(
+                    root, "SubRoutine", subroutine_validate.ET.Element
                 )
             )
             actual_element = subroutine_validate._find_descendant(root, "SubRoutine")
