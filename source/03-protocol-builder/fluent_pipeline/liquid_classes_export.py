@@ -17,6 +17,8 @@ from tecan_common.native_acceleration import (
     parse_f64_decimal_text as _native_parse_f64_decimal_text,
     parse_i64_text as _native_parse_i64_text,
     xml_clean_text as _native_xml_clean_text,
+    xml_elements_by_ascii_casefolded_name
+    as _native_xml_elements_by_ascii_casefolded_name,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
@@ -1037,6 +1039,21 @@ def _snake_case(value: str) -> str:
     return text.strip("_").casefold()
 
 
+def _section_source_elements(root: ET.Element) -> list[ET.Element]:
+    names = tuple(_SECTION_KINDS)
+    elements = _native_xml_elements_by_ascii_casefolded_name(
+        root, names, ET.Element
+    )
+    if elements is not None:
+        return elements
+    return [
+        elem
+        for elem in root.iter()
+        if isinstance(elem.tag, str)
+        and _local_name(elem.tag).casefold() in _SECTION_KINDS
+    ]
+
+
 def _pipetting_sections(root: ET.Element | None) -> dict[str, dict[str, Any]]:
     """Legacy fallback: aspirate/dispense/mix scalars under matching ancestors."""
     if root is None:
@@ -1047,11 +1064,8 @@ def _pipetting_sections(root: ET.Element | None) -> dict[str, dict[str, Any]]:
         "mix": {},
         "empty_tips": {},
     }
-    for elem in root.iter():
-        if not isinstance(elem.tag, str):
-            continue
-        local = _local_name(elem.tag)
-        kind = _SECTION_KINDS.get(local.casefold())
+    for elem in _section_source_elements(root):
+        kind = _SECTION_KINDS.get(_local_name(elem.tag).casefold())
         if kind is None:
             continue
         fields = _section_fields(elem)

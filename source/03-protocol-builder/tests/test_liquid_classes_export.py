@@ -320,6 +320,55 @@ class LiquidClassesExportTests(unittest.TestCase):
         self.assertEqual(fallback, [candidate])
         self.assertEqual(native_fallback, fallback)
 
+    def test_legacy_section_scan_uses_native_casefolded_selector(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native,
+            "xml_elements_by_ascii_casefolded_name",
+        ):
+            self.skipTest("optional Rust case-folded XML selector is not built")
+        root = liquid_classes_export.ET.fromstring(
+            "<Root><Other /><ASPIRATE /><Mixing /><EMPTY_TIPS /></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = liquid_classes_export._section_source_elements(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                liquid_classes_export,
+                "_native_xml_elements_by_ascii_casefolded_name",
+                wraps=native_acceleration.xml_elements_by_ascii_casefolded_name,
+            ) as native_call:
+                actual = liquid_classes_export._section_source_elements(root)
+                native_call.assert_called_once_with(
+                    root,
+                    tuple(liquid_classes_export._SECTION_KINDS),
+                    liquid_classes_export.ET.Element,
+                )
+        self.assertTrue(all(a is e for a, e in zip(actual, expected)))
+        self.assertEqual([e.tag for e in actual], ["ASPIRATE", "Mixing", "EMPTY_TIPS"])
+
+        unicode_root = liquid_classes_export.ET.Element("Root")
+        unicode_root.append(liquid_classes_export.ET.Comment("preserved fallback"))
+        unusual_section = liquid_classes_export.ET.SubElement(unicode_root, "Section")
+        unusual_section.tag = "aſpirate"
+        liquid_classes_export.ET.SubElement(unicode_root, "Dispense")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback = liquid_classes_export._section_source_elements(unicode_root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                liquid_classes_export._native_xml_elements_by_ascii_casefolded_name(
+                    unicode_root,
+                    tuple(liquid_classes_export._SECTION_KINDS),
+                    liquid_classes_export.ET.Element,
+                )
+            )
+            native_fallback = liquid_classes_export._section_source_elements(
+                unicode_root
+            )
+        self.assertEqual(
+            [element.tag for element in fallback], ["aſpirate", "Dispense"]
+        )
+        self.assertEqual(native_fallback, fallback)
+
     def test_parse_xlqc_uses_filename_guid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             guid = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
