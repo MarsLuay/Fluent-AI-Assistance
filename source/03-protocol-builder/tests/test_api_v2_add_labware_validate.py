@@ -91,15 +91,25 @@ class AddLabwareValidateTests(unittest.TestCase):
                         add_labware_validate,
                         "_native_parse_ascii_bool_text",
                         wraps=native_acceleration.parse_ascii_bool_text,
-                    ) as native_call:
+                    ) as native_call, patch.object(
+                        add_labware_validate,
+                        "_native_ascii_casefold_equals",
+                        wraps=native_acceleration.ascii_casefold_equals,
+                    ) as native_equals:
                         actual = add_labware_validate.extract_add_labware_fields(command)
                         self.assertEqual(native_call.call_count, 1)
+                        expects_fallback = raw in {" truſe ", ""}
+                        self.assertEqual(native_equals.call_count, int(expects_fallback))
                 self.assertEqual(actual, fallback)
 
                 with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
                     with patch.object(
                         add_labware_validate,
                         "_native_parse_ascii_bool_text",
+                        return_value=None,
+                    ), patch.object(
+                        add_labware_validate,
+                        "_native_ascii_casefold_equals",
                         return_value=None,
                     ):
                         unsupported_fallback = add_labware_validate.extract_add_labware_fields(

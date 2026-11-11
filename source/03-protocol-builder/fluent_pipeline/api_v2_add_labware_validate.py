@@ -15,6 +15,7 @@ from typing import Any, Callable, Mapping, Protocol, Sequence
 from tecan_common.native_acceleration import (
     ascii_casefold_trim as _native_ascii_casefold_trim,
     ascii_collapse_casefold_whitespace as _native_ascii_collapse_casefold_whitespace,
+    ascii_casefold_equals as _native_ascii_casefold_equals,
     parse_ascii_bool_text as _native_parse_ascii_bool_text,
     ascii_variable_name_is_valid as _native_ascii_variable_name_is_valid,
     bracket_variable_names as _native_bracket_variable_names,
@@ -134,11 +135,15 @@ def extract_add_labware_fields(command: AddLabwareCommandLike) -> AddLabwareFiel
         return None
     has_lid_text = _child_text(node, "HasLid", "False")
     native_has_lid = _native_parse_ascii_bool_text(has_lid_text)
-    has_lid = (
-        native_has_lid
-        if native_has_lid is not None
-        else has_lid_text.lower() == "true"
-    )
+    if native_has_lid is not None:
+        has_lid = native_has_lid
+    else:
+        native_equals = _native_ascii_casefold_equals(has_lid_text, "true")
+        has_lid = (
+            native_equals
+            if native_equals is not None
+            else has_lid_text.lower() == "true"
+        )
     return AddLabwareFields(
         labware_type=_child_text(node, "LabwareType"),
         labware_label=_child_text(node, "LabwareLable") or _child_text(node, "LabwareLabel"),

@@ -16,6 +16,7 @@ from typing import Any, Callable, Mapping, Protocol
 
 from tecan_common.native_acceleration import (
     ascii_casefold_trim as _native_ascii_casefold_trim,
+    ascii_casefold_equals as _native_ascii_casefold_equals,
     parse_ascii_bool_text as _native_parse_ascii_bool_text,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
@@ -476,7 +477,10 @@ def _validate_fields_core(fields: TransferLabwareFields) -> None:
 
 def _text_is_true(value: str) -> bool:
     native = _native_parse_ascii_bool_text(value)
-    return native if native is not None else value.lower() == "true"
+    if native is not None:
+        return native
+    native_equals = _native_ascii_casefold_equals(value, "true")
+    return native_equals if native_equals is not None else value.lower() == "true"
 
 
 def _parse_transfer_setting(settings: str, tag: str, default: str = "") -> str:
