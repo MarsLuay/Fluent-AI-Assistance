@@ -6,6 +6,8 @@ import json
 from collections.abc import Iterable, Sequence
 from typing import Any, Mapping
 
+from tecan_common import native_acceleration
+
 
 def collect_variable_seeds(
     *,
@@ -151,5 +153,11 @@ def _coerce_bool(value: Any) -> bool:
         return value
     if value is None:
         return False
-    text = str(value).strip().lower()
-    return text in {"1", "true", "yes", "on"}
+    text = str(value).strip()
+    native = native_acceleration.parse_ascii_bool_text(text)
+    if native is not None:
+        return native
+    lowered = native_acceleration.ascii_lower(text)
+    if lowered is None:
+        lowered = text.lower()
+    return lowered in {"1", "true", "yes", "on"}

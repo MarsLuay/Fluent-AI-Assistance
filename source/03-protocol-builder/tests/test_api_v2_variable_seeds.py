@@ -1,5 +1,8 @@
 import unittest
+from unittest.mock import patch
 
+from tecan_common import native_acceleration
+import fluent_pipeline.variable_seeds as variable_seeds_module
 from fluent_pipeline.api_v2.runtime import MockRuntimeController, seed_simulation_values
 from fluent_pipeline.api_v2.types import VariableSeed
 from fluent_pipeline.variable_seeds import (
@@ -39,6 +42,59 @@ class VariableSeedCollectionTests(unittest.TestCase):
         seeds = dict(collect_variable_seeds(protocol_ir=ir, request_spec=spec))
 
         self.assertEqual(seeds["PlateCount"], "4")
+
+    def test_coerce_bool_uses_native_ascii_parser_and_fallbacks(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "parse_ascii_bool_text"
+        ):
+            self.skipTest("optional Rust boolean parser is not built")
+        values = [
+            "1",
+            " TRUE ",
+            "false",
+            "yes",
+            "ON",
+            "no",
+            "Straße",
+            None,
+            True,
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [variable_seeds_module._coerce_bool(value) for value in values]
+        self.assertEqual(
+            expected,
+            [True, True, False, True, True, False, False, False, True],
+        )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "parse_ascii_bool_text",
+                wraps=native_acceleration.parse_ascii_bool_text,
+            ) as native_parse, patch.object(
+                native_acceleration,
+                "ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_lower:
+                actual = [variable_seeds_module._coerce_bool(value) for value in values]
+                self.assertEqual(native_parse.call_count, 7)
+                self.assertEqual(native_lower.call_count, 5)
+            native_parse.assert_any_call("TRUE")
+            native_parse.assert_any_call("Straße")
+            native_lower.assert_any_call("Straße")
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration, "parse_ascii_bool_text", return_value=None
+            ):
+                with patch.object(
+                    native_acceleration, "ascii_lower", return_value=None
+                ):
+                    forced_fallback = [
+                        variable_seeds_module._coerce_bool(value) for value in values
+                    ]
+        self.assertEqual(forced_fallback, expected)
 
 
 class VariableSeedOfflineTests(unittest.TestCase):
