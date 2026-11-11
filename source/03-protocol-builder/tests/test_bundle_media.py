@@ -324,6 +324,63 @@ def test_organize_bundle_touchtools_media_splits_layout(tmp_path: Path) -> None:
     assert (media_dir / "media_manifest.json").is_file()
 
 
+def test_bundle_media_organizing_uses_native_suffix_lower_fallback(
+    tmp_path: Path,
+) -> None:
+    def organize(run_name: str) -> tuple[dict[str, object], list[str], list[str]]:
+        run_dir = tmp_path / run_name
+        media_dir = run_dir / "media"
+        source_dir = run_dir / "source"
+        media_dir.mkdir(parents=True)
+        source_dir.mkdir()
+        (media_dir / "step_001_video.GIF").write_bytes(b"video")
+        originals = source_dir / bundle_media.SOURCE_MEDIA_ORIGINALS_DIR
+        originals.mkdir()
+        (originals / "capture.MOV").write_bytes(b"raw-video")
+        (source_dir / "protocol.ir.json").write_text(
+            json.dumps(
+                {
+                    "steps": [
+                        {"parameters": {"video_path": "media/step_001_video.GIF"}},
+                        {"parameters": {"video_path": "media/missing.GIF"}},
+                        {"parameters": {"image_path": "media/missing.PNG"}},
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        manifest = organize_bundle_touchtools_media(media_dir, source_dir)
+        processed = sorted(path.name for path in (media_dir / "processed").iterdir())
+        unprocessed = sorted(path.name for path in (media_dir / "unprocessed").iterdir())
+        return manifest, processed, unprocessed
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = organize("python")
+    assert expected[0]["processed_count"] == 3
+    assert expected[0]["unprocessed_count"] == 1
+    assert expected[1] == ["missing.GIF", "missing.PNG", "step_001_video.GIF"]
+    assert expected[2] == ["capture.MOV"]
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            bundle_media,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            actual = organize("native")
+        native_call.assert_any_call(".GIF")
+        native_call.assert_any_call(".PNG")
+        native_call.assert_any_call(".MOV")
+        native_call.assert_any_call("step_001_video.GIF")
+        native_call.assert_any_call("missing.GIF")
+    assert actual == expected
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(bundle_media, "_native_ascii_lower", return_value=None):
+            forced_fallback = organize("fallback")
+    assert forced_fallback == expected
+
+
 def test_organize_bundle_touchtools_media_processes_only_ir_references(tmp_path: Path) -> None:
     bundle = tmp_path / "bundle"
     media_dir = bundle / "media"

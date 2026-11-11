@@ -1203,14 +1203,14 @@ def organize_bundle_touchtools_media(
     for path in list(bundle_media_dir.iterdir()):
         if not path.is_file():
             continue
-        if path.name.lower() in {"readme.md", "media_manifest.json"}:
+        if _lower_text(path.name) in {"readme.md", "media_manifest.json"}:
             continue
-        if path.suffix.lower() not in media_like_suffixes:
+        if _lower_text(path.suffix) not in media_like_suffixes:
             continue
         if required_names and path.name not in required_names:
             path.unlink()
             continue
-        if path.suffix.lower() not in asset_suffixes:
+        if _lower_text(path.suffix) not in asset_suffixes:
             path.unlink()
             continue
         destination = processed_dir / path.name
@@ -1229,7 +1229,8 @@ def organize_bundle_touchtools_media(
         processed_names = sorted(
             path.name
             for path in processed_dir.iterdir()
-            if path.is_file() and path.name.lower() not in {"readme.md", "media_manifest.json"}
+            if path.is_file()
+            and _lower_text(path.name) not in {"readme.md", "media_manifest.json"}
         )
     missing_required = sorted(
         name
@@ -1241,7 +1242,7 @@ def organize_bundle_touchtools_media(
         from .protocol_ir import write_placeholder_image_slot
 
         for name in missing_required:
-            suffix = Path(name).suffix.lower()
+            suffix = _lower_text(Path(name).suffix)
             destination = processed_dir / name
             if suffix == ".gif":
                 write_placeholder_video_slot(destination)
@@ -1254,7 +1255,8 @@ def organize_bundle_touchtools_media(
     processed_names = sorted(
         path.name
         for path in processed_dir.iterdir()
-        if path.is_file() and path.name.lower() not in {"readme.md", "media_manifest.json"}
+        if path.is_file()
+        and _lower_text(path.name) not in {"readme.md", "media_manifest.json"}
     )
 
     copied_unprocessed: set[str] = set()
@@ -1270,7 +1272,7 @@ def organize_bundle_touchtools_media(
                 continue
             if path.name.startswith("before_normalize__"):
                 continue
-            if path.suffix.lower() not in (
+            if _lower_text(path.suffix) not in (
                 set(IMAGE_CAPTURE_SUFFIXES)
                 | set(VIDEO_CAPTURE_SUFFIXES)
                 | set(AUDIO_SUFFIXES)
