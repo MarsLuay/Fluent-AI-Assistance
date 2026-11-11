@@ -4,7 +4,10 @@ import tempfile
 import unittest
 from dataclasses import dataclass
 from pathlib import Path
+from unittest.mock import patch
 
+import fluent_pipeline.api_v2_subroutine_validate as subroutine_validate
+from tecan_common import native_acceleration
 from fluent_pipeline.api_v2_subroutine_validate import (
     extract_subroutine_path,
     load_runtime_script_inventory,
@@ -45,6 +48,47 @@ class ApiV2SubroutineValidateTests(unittest.TestCase):
             payload_xml=_SUBROUTINE_XSCR,
         )
         self.assertEqual(extract_subroutine_path(command), "Demo\\SUB_Get_Fingers_v1.0")
+
+    def test_extract_subroutine_path_uses_native_selector_and_fallback(self):
+        command = _FakeCommand(
+            type_name="SubRoutineStatement",
+            index=0,
+            group="Checks",
+            payload_xml=(
+                '<Root xmlns:x="urn:test"><x:SubRoutine>Folder\\First</x:SubRoutine>'
+                "<SubRoutine>Folder\\Second</SubRoutine></Root>"
+            ),
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = extract_subroutine_path(command)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                subroutine_validate,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = extract_subroutine_path(command)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "Folder\\First")
+
+        class StringTag(str):
+            pass
+
+        root = subroutine_validate.ET.Element("Root")
+        tagged = subroutine_validate.ET.SubElement(root, StringTag("SubRoutine"))
+        tagged.text = "Folder\\Fallback"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_element = subroutine_validate._find_descendant(root, "SubRoutine")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_name(
+                    root, ("SubRoutine",), subroutine_validate.ET.Element
+                )
+            )
+            actual_element = subroutine_validate._find_descendant(root, "SubRoutine")
+        self.assertIs(actual_element, expected_element)
+        self.assertIs(actual_element, tagged)
 
     def test_resolve_missing_on_worktable_inventory(self):
         result = resolve_subroutine_against_inventory(

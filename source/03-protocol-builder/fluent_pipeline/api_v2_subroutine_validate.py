@@ -19,6 +19,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Mapping, Protocol, Sequence
 
+from tecan_common.native_acceleration import (
+    xml_elements_by_name as _native_xml_elements_by_name,
+)
+
 from .subroutine_dependencies import (
     clean_subroutine_reference,
     find_subroutine_record,
@@ -113,10 +117,8 @@ def extract_subroutine_path(command: SubroutineCommandLike) -> str:
         root = ET.fromstring(payload)
     except ET.ParseError:
         return ""
-    for node in root.iter():
-        if _local_name(node.tag) == "SubRoutine":
-            return clean_subroutine_reference(node.text)
-    return ""
+    node = _find_descendant(root, "SubRoutine")
+    return clean_subroutine_reference(node.text) if node is not None else ""
 
 
 def subroutine_model_from_command(command: SubroutineCommandLike) -> tuple[str, str]:
@@ -454,6 +456,9 @@ def _local_name(tag: str) -> str:
 
 
 def _find_descendant(root: ET.Element, name: str) -> ET.Element | None:
+    elements = _native_xml_elements_by_name(root, (name,), ET.Element)
+    if elements is not None:
+        return elements[0] if elements else None
     for node in root.iter():
         if _local_name(node.tag) == name:
             return node
