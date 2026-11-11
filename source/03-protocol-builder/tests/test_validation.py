@@ -428,6 +428,41 @@ class GateEvaluatorNativeNormalizationTests(unittest.TestCase):
                 ]
         self.assertEqual(forced_fallback, expected)
 
+    def test_media_step_label_uses_native_lower_with_unicode_casefold_fallback(self):
+        values = [
+            "media/Step_001_image.png",
+            "STEP-02.wav",
+            "ſtep_03.jpg",
+            "image_step_04.jpg",
+            None,
+        ]
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [gate_evaluators._media_step_label(value) for value in values]
+        self.assertEqual(expected, ["step001", "step02", "step03", "", ""])
+
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                gate_evaluators,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = [gate_evaluators._media_step_label(value) for value in values]
+            self.assertEqual(native_call.call_count, 3)
+            native_call.assert_any_call("Step_001")
+            native_call.assert_any_call("ſtep_03")
+        self.assertEqual(actual, expected)
+
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                gate_evaluators,
+                "_native_ascii_lower",
+                return_value=None,
+            ):
+                forced_fallback = [
+                    gate_evaluators._media_step_label(value) for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_gate_well_row_uses_native_with_python_fallback(self):
         values = ["A1", "aa12", " A2 ", "é1", f"{'A' * 30}3"]
         with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):

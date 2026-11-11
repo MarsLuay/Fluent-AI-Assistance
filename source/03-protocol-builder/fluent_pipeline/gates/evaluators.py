@@ -859,7 +859,13 @@ def _media_basename(value: Any) -> str:
 def _media_step_label(value: Any) -> str:
     basename = _media_basename(value)
     match = re.match(r"(step[_-]?\d+)", basename, flags=re.IGNORECASE)
-    return match.group(1).replace("_", "").replace("-", "").casefold() if match else ""
+    if not match:
+        return ""
+    token = match.group(1)
+    native = _native_ascii_lower(token)
+    if native is not None:
+        return native.replace("_", "").replace("-", "")
+    return token.replace("_", "").replace("-", "").casefold()
 
 def _clean_subroutine_name(value: Any) -> str:
     return str(value or "").strip().strip('"').replace("/", "\\")
