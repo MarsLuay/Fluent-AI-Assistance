@@ -8,6 +8,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from tecan_common.native_acceleration import (
+    ascii_profile_slug as _native_ascii_profile_slug,
+)
+
 from .generation_options import (
     GenerationOptions,
     generation_options_from_request_spec,
@@ -548,7 +552,12 @@ def extract_intent_checks(verbatim_prompt: str | None) -> list[str]:
         has_signal = any(signal in low for signal in _INTENT_CHECK_SIGNALS)
         if not is_question and not has_signal and len(words) < 5:
             continue
-        key = re.sub(r"[^a-z0-9]+", " ", low).strip()
+        native_key = _native_ascii_profile_slug(low)
+        key = (
+            native_key.replace("_", " ")
+            if native_key is not None
+            else re.sub(r"[^a-z0-9]+", " ", low).strip()
+        )
         if not key or key in seen:
             continue
         seen.add(key)

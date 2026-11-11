@@ -1,7 +1,9 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from tecan_common import native_acceleration
 from fluent_pipeline.protocol_ir import RUP_VARIABLE_SELECTOR_INSTRUCTIONS
 from fluent_pipeline.generation_options import GenerationOptions
 from fluent_pipeline.generation_options import normalize_generation_options
@@ -376,6 +378,30 @@ class IntentCheckExtractionTests(unittest.TestCase):
         self.assertEqual(extract_intent_checks(None), [])
         dupes = extract_intent_checks("Make sure the cap closes\nMake sure the cap closes\n")
         self.assertEqual(dupes, ["Make sure the cap closes"])
+
+    def test_native_ascii_key_matches_python_unicode_and_punctuation_behavior(self):
+        prompt = (
+            "Check output status?\n"
+            "Check-output status?\n"
+            "Straße status?\n"
+            "東京 status?\n"
+            "Status?\n"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = extract_intent_checks(prompt)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch(
+                "fluent_pipeline.request_spec._native_ascii_profile_slug",
+                wraps=native_acceleration.ascii_profile_slug,
+            ) as native_call:
+                actual = extract_intent_checks(prompt)
+                self.assertEqual(native_call.call_count, 5)
+            self.assertIsNone(native_acceleration.ascii_profile_slug("東京 status?"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            ["Check output status?", "Straße status?", "東京 status?"],
+        )
 
     def test_normalize_defaults_required_checks_empty(self):
         spec = normalize_request_spec({"request": {"intent": "x"}})
