@@ -38,6 +38,34 @@ SAMPLE_XLQC = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class LiquidClassesExportTests(unittest.TestCase):
+    def test_identity_key_normalization_uses_native_ascii_with_unicode_fallback(
+        self,
+    ) -> None:
+        values = [" LiquidClass ", "Straße", "İmage", None, 0, ""]
+        expected = [str(value or "").strip().casefold() for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [liquid_classes_export._norm(value) for value in values]
+        self.assertEqual(disabled, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                liquid_classes_export,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = [liquid_classes_export._norm(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(enabled, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                liquid_classes_export,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = [liquid_classes_export._norm(value) for value in values]
+        self.assertEqual(fallback, expected)
+
     def test_local_name_uses_native_helper_and_custom_tag_fallback(self) -> None:
         tag = "{urn:example}LiquidClass"
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
@@ -714,8 +742,17 @@ class LiquidClassesExportTests(unittest.TestCase):
             self.assertEqual(entry["guid"], guid)
             self.assertEqual(entry["name"], "Water Free Single")
             self.assertEqual(entry["supported_heads"], ["Fca", "Mca96"])
-            self.assertEqual(resolve_liquid_class_guid("Water Free Single", catalog), guid)
-            self.assertIsNone(resolve_liquid_class_guid("Missing LC", catalog))
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    liquid_classes_export,
+                    "_native_ascii_casefold_trim",
+                    wraps=native_acceleration.ascii_casefold_trim,
+                ) as native_call:
+                    resolved = resolve_liquid_class_guid("Water Free Single", catalog)
+                    missing = resolve_liquid_class_guid("Missing LC", catalog)
+                    self.assertGreater(native_call.call_count, 0)
+            self.assertEqual(resolved, guid)
+            self.assertIsNone(missing)
 
     def test_manifest_objects_and_write(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

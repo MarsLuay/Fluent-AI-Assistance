@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     parse_f64_decimal_text as _native_parse_f64_decimal_text,
     parse_i64_text as _native_parse_i64_text,
     xml_clean_text as _native_xml_clean_text,
@@ -1204,7 +1205,9 @@ def _child_text(elem: ET.Element | None, local_name: str) -> str:
 
 
 def _norm(value: Any) -> str:
-    return str(value or "").strip().casefold()
+    text = str(value or "")
+    native = _native_ascii_casefold_trim(text)
+    return native if native is not None else text.strip().casefold()
 
 
 def _clean(payload: dict[str, Any]) -> dict[str, Any]:
