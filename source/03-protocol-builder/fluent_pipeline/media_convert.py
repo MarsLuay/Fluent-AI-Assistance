@@ -393,13 +393,13 @@ def convert_image_to_png(
     dest = Path(dest)
     if not source.is_file():
         raise PipelineError(f"Image source not found: {source}")
-    if dest.suffix.lower() != ".png":
+    if _lower_text(dest.suffix) != ".png":
         raise PipelineError(f"Image slot destination must be a .png path, got: {dest.name}")
     if dest.exists() and not overwrite:
         raise PipelineError(f"Refusing to overwrite existing PNG: {dest} (pass overwrite=True)")
 
     dest.parent.mkdir(parents=True, exist_ok=True)
-    suffix = source.suffix.lower()
+    suffix = _lower_text(source.suffix)
     ffmpeg = resolve_ffmpeg()
     if suffix in {".heic", ".heif", ".avif"} and ffmpeg:
         cmd = [
@@ -470,7 +470,7 @@ def convert_video_to_gif(
         raise PipelineError(f"Video source not found: {source}")
     if dest.exists() and not overwrite:
         raise PipelineError(f"Refusing to overwrite existing GIF: {dest} (pass overwrite=True)")
-    if dest.suffix.lower() != ".gif":
+    if _lower_text(dest.suffix) != ".gif":
         raise PipelineError(f"Video slot destination must be a .gif path, got: {dest.name}")
 
     ffmpeg = resolve_ffmpeg()
@@ -603,7 +603,7 @@ def normalize_worktable_gif(
         raise PipelineError(f"GIF source not found: {source}")
     if dest.exists() and not overwrite:
         raise PipelineError(f"Refusing to overwrite existing GIF: {dest} (pass overwrite=True)")
-    if source.suffix.lower() != ".gif" or dest.suffix.lower() != ".gif":
+    if _lower_text(source.suffix) != ".gif" or _lower_text(dest.suffix) != ".gif":
         raise PipelineError("Worktable GIF normalization requires .gif source and destination paths")
 
     try:

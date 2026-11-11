@@ -61,14 +61,21 @@ class MediaConvertTests(unittest.TestCase):
         from fluent_pipeline.media_convert import convert_image_to_png
 
         with tempfile.TemporaryDirectory() as tmp:
-            source = Path(tmp) / "capture.jpg"
-            dest = Path(tmp) / "slot.png"
+            source = Path(tmp) / "capture.JPG"
+            dest = Path(tmp) / "slot.PNG"
             image = Image.new("RGB", (4, 2), "red")
             exif = Image.Exif()
             exif[274] = 6
             image.save(source, format="JPEG", exif=exif)
 
-            convert_image_to_png(source, dest, overwrite=True)
+            with unittest.mock.patch.object(
+                media_convert,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                convert_image_to_png(source, dest, overwrite=True)
+            native_call.assert_any_call(".PNG")
+            native_call.assert_any_call(".JPG")
 
             with Image.open(dest) as converted:
                 self.assertEqual(converted.size, (2, 4))
@@ -124,7 +131,7 @@ class MediaConvertTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "clip.mp4"
             source.write_bytes(b"video")
-            dest = Path(tmp) / "out.gif"
+            dest = Path(tmp) / "out.GIF"
             captured: dict[str, list[str]] = {}
 
             def fake_run(cmd, **_kwargs):
@@ -138,8 +145,13 @@ class MediaConvertTests(unittest.TestCase):
             ), unittest.mock.patch(
                 "fluent_pipeline.media_convert.subprocess.run",
                 side_effect=fake_run,
-            ):
+            ), unittest.mock.patch.object(
+                media_convert,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
                 result = convert_video_to_gif(source, dest, overwrite=True, max_seconds=5)
+                native_call.assert_any_call(".GIF")
 
             self.assertEqual(result["max_seconds"], 5)
             cmd = captured["cmd"]
@@ -192,8 +204,8 @@ class MediaConvertTests(unittest.TestCase):
             self.skipTest("Pillow not available")
 
         with tempfile.TemporaryDirectory() as tmp:
-            source = Path(tmp) / "portrait.gif"
-            dest = Path(tmp) / "worktable.gif"
+            source = Path(tmp) / "portrait.GIF"
+            dest = Path(tmp) / "worktable.GIF"
             frames = []
             for color in ("red", "blue", "green"):
                 image = Image.new("RGB", (120, 220), color)
@@ -206,7 +218,14 @@ class MediaConvertTests(unittest.TestCase):
                 loop=0,
             )
 
-            result = normalize_worktable_gif(source, dest, fps=5, overwrite=True)
+            with unittest.mock.patch.object(
+                media_convert,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                result = normalize_worktable_gif(source, dest, fps=5, overwrite=True)
+                self.assertEqual(native_call.call_count, 2)
+                native_call.assert_any_call(".GIF")
 
             self.assertEqual(result["source_width"], 120)
             self.assertEqual(result["source_height"], 220)
