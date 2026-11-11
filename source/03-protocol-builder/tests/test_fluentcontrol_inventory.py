@@ -36,6 +36,49 @@ def _write_xscr(root: Path, guid: str, name: str, folder: str) -> None:
 
 
 class FluentControlInventoryTests(unittest.TestCase):
+    def test_systemspecific_sibling_detection_uses_casefold_key(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            for user_dir_name in ("uSeRsPeCiFiC", "uSerſpecific"):
+                root = Path(tmp) / user_dir_name
+                database = root / "DataBase"
+                user_dir = database / user_dir_name
+                legacy_system_dir = database / "DataBase_SystemSpecific"
+                system_dir = database / "SystemSpecific"
+                program_data = root / "program-data"
+                for directory in (user_dir, legacy_system_dir, system_dir):
+                    directory.mkdir(parents=True, exist_ok=True)
+
+                env = {
+                    "TECAN_VISIONX_USERSPECIFIC": str(user_dir),
+                    "TECAN_VISIONX_SYSTEMSPECIFIC": "",
+                    "ProgramData": str(program_data),
+                }
+                expected = [
+                    legacy_system_dir,
+                    system_dir,
+                    program_data
+                    / "Tecan"
+                    / "VisionX"
+                    / "DataBase"
+                    / "SystemSpecific",
+                ]
+                with patch.dict(
+                    "os.environ", {**env, "TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    disabled = inventory_module.fluentcontrol_systemspecific_dirs()
+                with patch.dict(
+                    "os.environ", {**env, "TECAN_DISABLE_RUST_ACCELERATION": "0"}
+                ):
+                    with patch.object(
+                        inventory_module,
+                        "_native_ascii_casefold_trim",
+                        wraps=native_acceleration.ascii_casefold_trim,
+                    ) as native_call:
+                        enabled = inventory_module.fluentcontrol_systemspecific_dirs()
+                        self.assertEqual(native_call.call_count, 1)
+                self.assertEqual(disabled, expected)
+                self.assertEqual(enabled, expected)
+
     def test_script_name_index_uses_native_ascii_and_unicode_fallback(self) -> None:
         class CustomName(str):
             def casefold(self):

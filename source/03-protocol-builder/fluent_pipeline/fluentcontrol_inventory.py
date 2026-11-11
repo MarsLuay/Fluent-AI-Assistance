@@ -73,7 +73,7 @@ def fluentcontrol_systemspecific_dirs() -> list[Path]:
         if sibling.is_dir():
             candidates.append(sibling)
         # live layout: .../DataBase/UserSpecific -> .../DataBase/SystemSpecific
-        if Path(user_override).name.casefold() == "userspecific":
+        if _casefold_key(Path(user_override).name) == "userspecific":
             candidates.append(Path(user_override).parent / "SystemSpecific")
     program_data = str(os.environ.get("ProgramData") or r"C:\ProgramData").strip()
     candidates.append(Path(program_data) / "Tecan" / "VisionX" / "DataBase" / "SystemSpecific")
