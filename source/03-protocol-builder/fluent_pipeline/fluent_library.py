@@ -8,6 +8,10 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from tecan_common.native_acceleration import (
+    ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
+)
+
 from .runner import PipelineError, ensure_parent
 
 
@@ -167,7 +171,9 @@ def _first_xml_text(text: str, tag: str) -> str:
 
 
 def _name_key(value: Any) -> str:
-    return re.sub(r"[^a-z0-9]+", "", str(value or "").casefold())
+    text = str(value or "").casefold()
+    native = _native_ascii_lower_alnum_compact(text)
+    return native if native is not None else re.sub(r"[^a-z0-9]+", "", text)
 
 
 def _safe_filename(value: str) -> str:
