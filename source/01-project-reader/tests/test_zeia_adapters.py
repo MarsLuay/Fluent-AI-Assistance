@@ -709,6 +709,45 @@ class ZeiaAdapterTests(unittest.TestCase):
         self.assertIn("visionx-datastore-v2", str(error.exception))
         self.assertIn("visionx-datastore-v3", str(error.exception))
 
+    def test_parse_error_name_uses_native_lower_with_unicode_fallback(self) -> None:
+        exceptions = [
+            type("ExampleParseError", (Exception,), {})("synthetic"),
+            type("PärseError", (Exception,), {})("synthetic"),
+        ]
+
+        def classifications() -> list[str]:
+            return [
+                zeia_adapters_module._parse_error(
+                    "DataStore/UserSpecific/item.xscr",
+                    exc,
+                    suffix=".xscr",
+                    parser="xscr",
+                )["classification"]
+                for exc in exceptions
+            ]
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = classifications()
+        self.assertEqual(expected, ["malformed", "parser_failure"])
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                zeia_adapters_module,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = classifications()
+            native_call.assert_any_call("ExampleParseError")
+            native_call.assert_any_call("PärseError")
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                zeia_adapters_module, "_native_ascii_lower", return_value=None
+            ):
+                forced_fallback = classifications()
+        self.assertEqual(forced_fallback, expected)
+
     def test_known_malformed_export_is_reported_not_silently_dropped(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             archive = self._archive(

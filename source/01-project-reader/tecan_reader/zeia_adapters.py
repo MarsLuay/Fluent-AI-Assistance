@@ -11,6 +11,7 @@ import zipfile
 
 from tecan_common.native_acceleration import (
     ascii_casefold_trim as _native_ascii_casefold_trim,
+    ascii_lower as _native_ascii_lower,
     collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
     count_string_groups as _native_count_string_groups,
     count_xscr_object_type_attributes as _native_count_xscr_object_type_attributes,
@@ -1099,6 +1100,11 @@ def _eligible_member_counts(entries: list[str] | tuple[str, ...]) -> dict[str, i
     }
 
 
+def _lower_text(value: str) -> str:
+    native = _native_ascii_lower(value)
+    return native if native is not None else value.lower()
+
+
 def _parse_error(
     entry: str,
     exc: Exception,
@@ -1119,7 +1125,7 @@ def _parse_error(
         classification = "unreadable_or_encoding_failure"
         severity = "error"
         code = DiagnosticCode.ENCODING_DECODE_FAILED
-    elif type(exc).__name__.lower().endswith("parseerror"):
+    elif _lower_text(type(exc).__name__).endswith("parseerror"):
         classification = "malformed"
         severity = "error"
         code = DiagnosticCode.ZEIA_SCHEMA_MALFORMED
