@@ -11,6 +11,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol, Sequence
 
+from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
+)
+
 from .query_variable_audit import _coerce_bool, _is_variable_name
 
 
@@ -184,9 +188,11 @@ def normalize_variable_value(value: Any) -> str:
     if isinstance(value, bool):
         return "True" if value else "False"
     text = str(value).strip()
-    if text.casefold() in {"true", "yes", "on"}:
+    native = _native_ascii_casefold_trim(text)
+    normalized = native if native is not None else text.casefold()
+    if normalized in {"true", "yes", "on"}:
         return "True"
-    if text.casefold() in {"false", "no", "off"}:
+    if normalized in {"false", "no", "off"}:
         return "False"
     return text
 
