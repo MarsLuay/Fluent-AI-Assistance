@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from tecan_common.native_acceleration import (
+    ascii_lower as _native_ascii_lower,
     ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
     worklist_row_name_to_index as _native_worklist_row_name_to_index,
 )
@@ -59,6 +60,11 @@ from ..subroutine_dependencies import (
     validate_compiled_subroutine_references,
 )
 from .models import GateFactory, GateRecord, ValidationContext
+
+
+def _lower_text(value: str) -> str:
+    native = _native_ascii_lower(value)
+    return native if native is not None else value.lower()
 
 
 # Artifact and workflow gates (Gates 3-10, 18, and 27).
@@ -112,7 +118,12 @@ def evaluate_simulation(context: ValidationContext) -> GateRecord:
             "Simulation passed." if options.get("simulation_passed") else "Simulation did not pass.",
         )
     data = options.get("simulation")
-    if isinstance(data, dict) and str(data.get("status") or "").lower() in {"ok", "passed", "pass", "success"} and not data.get("failure"):
+    if (
+        isinstance(data, dict)
+        and _lower_text(str(data.get("status") or ""))
+        in {"ok", "passed", "pass", "success"}
+        and not data.get("failure")
+    ):
         return context.make_gate("simulation_passes", "passed", "Simulation JSON reports a passing status.")
     return context.make_gate("simulation_passes", "failed", "No passing simulation result was provided.")
 
@@ -226,7 +237,7 @@ def evaluate_fluent_context_check(context: ValidationContext) -> GateRecord | No
             {"required": required},
         )
 
-    status = str(report.get("status") or "").lower()
+    status = _lower_text(str(report.get("status") or ""))
     ok = bool(report.get("ok")) and status not in {"failed", "unavailable"}
     errors = [
         *[str(value) for value in (report.get("errors") or []) if str(value).strip()],

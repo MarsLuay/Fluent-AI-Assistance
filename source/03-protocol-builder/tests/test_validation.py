@@ -292,6 +292,58 @@ class GateEvaluatorNativeNormalizationTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, ["", "", "name01", "strasse", "", "abc", "ss"])
 
+    def test_status_lowering_uses_native_without_trimming_or_unicode_changes(self):
+        values = ["PASSED", "Straße", " PASSED ", ""]
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [gate_evaluators._lower_text(value) for value in values]
+        self.assertEqual(expected, [value.lower() for value in values])
+
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                gate_evaluators,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = [gate_evaluators._lower_text(value) for value in values]
+            self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                gate_evaluators, "_native_ascii_lower", return_value=None
+            ):
+                forced_fallback = [
+                    gate_evaluators._lower_text(value) for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
+
+        for status, expected_status in (("PASSED", "passed"), (" PASSED ", "failed")):
+            context = ValidationContext(
+                make_gate=_gate_record,
+                validation_options={"simulation": {"status": status}},
+            )
+            self.assertEqual(
+                gate_evaluators.evaluate_simulation(context)["status"],
+                expected_status,
+            )
+
+        for status, expected_status in (
+            ("PASSED", "passed"),
+            ("UNAVAILABLE", "failed"),
+            (" UNAVAILABLE ", "passed"),
+        ):
+            context = ValidationContext(
+                make_gate=_gate_record,
+                validation_options={
+                    "fluent_context_check_required": True,
+                    "fluent_context_check": {"ok": True, "status": status},
+                },
+            )
+            self.assertEqual(
+                gate_evaluators.evaluate_fluent_context_check(context)["status"],
+                expected_status,
+            )
+
     def test_gate_well_row_uses_native_with_python_fallback(self):
         values = ["A1", "aa12", " A2 ", "é1", f"{'A' * 30}3"]
         with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
