@@ -13,7 +13,10 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Mapping
 
-from tecan_common.native_acceleration import ascii_casefold_trim as _native_ascii_casefold_trim
+from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
+    ascii_profile_slug as _native_ascii_profile_slug,
+)
 
 from .runner import write_json
 
@@ -172,7 +175,9 @@ def write_connector_coverage_for_context(
 
 
 def _profile_id_for(name: str, guid: str) -> str:
-    slug = _PROFILE_ID_RE.sub("_", (name or "").casefold()).strip("_")
+    text = (name or "").casefold()
+    native = _native_ascii_profile_slug(text)
+    slug = native if native is not None else _PROFILE_ID_RE.sub("_", text).strip("_")
     if slug:
         return slug[:80]
     short = (guid or "").replace("-", "")[:12]

@@ -36,6 +36,37 @@ class ConnectorCoverageExportTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, ["abcd-1234", "", "script", "", ""])
 
+    def test_profile_slugging_uses_native_ascii_regex_parity_and_unicode_fallback(self):
+        cases = [
+            ("Demo Group 42", "unused", "demo_group_42"),
+            ("  __Mixed--Name__ ", "unused", "mixed_name"),
+            ("alpha///beta", "unused", "alpha_beta"),
+            ("Straße", "unused", "strasse"),
+            ("ſcript", "unused", "script"),
+            ("東京", "aa-bb", "component_aabb"),
+            ("!!!", "", "component_unknown"),
+            ("A" * 90, "unused", "a" * 80),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                connector_coverage_export_module._profile_id_for(name, guid)
+                for name, guid, _ in cases
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                connector_coverage_export_module,
+                "_native_ascii_profile_slug",
+                wraps=native_acceleration.ascii_profile_slug,
+            ) as native_call:
+                actual = [
+                    connector_coverage_export_module._profile_id_for(name, guid)
+                    for name, guid, _ in cases
+                ]
+                self.assertEqual(native_call.call_count, len(cases))
+            self.assertIsNone(native_acceleration.ascii_profile_slug("東京"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [expected for _, _, expected in cases])
+
     def test_profiles_mined_from_geometry_components_only(self):
         demo_device = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
         demo_nest = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
