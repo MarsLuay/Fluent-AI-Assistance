@@ -563,6 +563,45 @@ def test_assign_step_label_media_marks_worktable_motion_display() -> None:
     assert video["requires_worktable_gif_normalization"] is True
 
 
+def test_assignment_suffix_and_worktable_kind_use_native_lower_fallback() -> None:
+    def assign() -> tuple[list[dict[str, object]], bool, bool]:
+        ir = {"steps": [_prompt("step_001", media=True, rup_kind="worktable")]}
+        params = ir["steps"][0]["parameters"]
+        params["rup_kind"] = " WORKTABLE "
+        params["media_placeholders"][0]["kind"] = "VIDEO"
+        assignments = assign_step_label_media_to_final_prompts(
+            ir, [Path("step1.MOV")]
+        )
+        video = params["media_placeholders"][0]
+        return (
+            assignments,
+            video.get("worktable_display") is True,
+            video.get("requires_worktable_gif_normalization") is True,
+        )
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = assign()
+    assert expected[0][0]["worktable_display_video"] is True
+    assert expected[1:] == (True, True)
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            bundle_media,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            actual = assign()
+        native_call.assert_any_call("VIDEO")
+        native_call.assert_any_call("WORKTABLE")
+        native_call.assert_any_call(".MOV")
+    assert actual == expected
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(bundle_media, "_native_ascii_lower", return_value=None):
+            forced_fallback = assign()
+    assert forced_fallback == expected
+
+
 def _write_test_png(path: Path) -> None:
     from PIL import Image
 

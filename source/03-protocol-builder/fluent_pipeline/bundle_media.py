@@ -1424,10 +1424,10 @@ def assign_step_label_media_to_final_prompts(
             for item in media
             if isinstance(item, dict) and str(item.get("slot") or "")
         }
-        rup_kind = str(params.get("rup_kind") or "").strip().lower()
+        rup_kind = _lower_text(str(params.get("rup_kind") or "").strip())
         command_id = str(step.get("command_id") or "").strip()
         worktable_motion_display = (
-            path.suffix.lower() in VIDEO_CAPTURE_SUFFIXES | {".gif"}
+            _lower_text(path.suffix) in VIDEO_CAPTURE_SUFFIXES | {".gif"}
             and slots.get("video")
             and (rup_kind == "worktable" or command_id == "RUPWorktableStatement")
         )
