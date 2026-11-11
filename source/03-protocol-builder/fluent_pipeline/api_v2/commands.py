@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol, Sequence
 
 from tecan_common.native_acceleration import (
+    ascii_casefold_equals as _native_ascii_casefold_equals,
     ascii_casefold_trim as _native_ascii_casefold_trim,
     ascii_worktable_int_text as _native_ascii_worktable_int_text,
     parse_ascii_bool_text as _native_parse_ascii_bool_text,
@@ -73,6 +74,17 @@ def _worktable_selected_labware_text(value: Any) -> str:
 
 def _normalize_prompt_text(prompt: str) -> str:
     return normalize_operator_prompt_text(prompt)
+
+
+def _casefolded_contains(value: str, needle: str) -> bool:
+    native = _native_ascii_casefold_trim(value)
+    haystack = native if native is not None else value.casefold()
+    return needle.casefold() in haystack
+
+
+def _casefold_equal(left: str, right: str) -> bool:
+    native = _native_ascii_casefold_equals(left, right)
+    return native if native is not None else left.casefold() == right.casefold()
 
 
 def _require_non_empty(label: str, value: Any, *, command: str) -> str:
@@ -519,7 +531,7 @@ class GetFingers:
 
     def validate(self) -> None:
         labware = _require_non_empty("labware_name", self.labware_name, command="GetFingers")
-        if "adapter" in labware.casefold():
+        if _casefolded_contains(labware, "adapter"):
             raise ApiV2ValidationError(
                 "GetFingers cannot target adapter labware.",
                 field="labware_name",
@@ -555,7 +567,7 @@ class GetFingers:
             )
         alias_device = alias.rsplit("=", 1)[-1]
         id_device = available_id.rsplit("/", 1)[-1]
-        if alias_device.casefold() != id_device.casefold():
+        if not _casefold_equal(alias_device, id_device):
             raise ApiV2ValidationError(
                 f"device_alias device {alias_device!r} does not match available_id device {id_device!r}.",
                 field="available_id",
@@ -619,7 +631,7 @@ class DropFingers:
         if not str(self.labware_name or "").strip() and backs == "BackToSource":
             return
         labware = _require_non_empty("labware_name", self.labware_name, command="DropFingers")
-        if "adapter" in labware.casefold():
+        if _casefolded_contains(labware, "adapter"):
             raise ApiV2ValidationError(
                 "DropFingers cannot target adapter labware.",
                 field="labware_name",
@@ -648,7 +660,7 @@ class DropFingers:
             )
         alias_device = alias.rsplit("=", 1)[-1]
         id_device = available_id.rsplit("/", 1)[-1]
-        if alias_device.casefold() != id_device.casefold():
+        if not _casefold_equal(alias_device, id_device):
             raise ApiV2ValidationError(
                 f"device_alias device {alias_device!r} does not match available_id device {id_device!r}.",
                 field="available_id",
