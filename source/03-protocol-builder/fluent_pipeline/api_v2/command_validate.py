@@ -264,7 +264,7 @@ def validate_typed_commands(
         xml_text = record.get("xml") or ""
         command_id = record.get("command_id") or ""
         object_type = record.get("object_type") or ""
-        if not xml_text.strip():
+        if not _clean_text(xml_text):
             continue
         try:
             element = ET.fromstring(xml_text)
@@ -287,7 +287,7 @@ def validate_typed_commands(
             continue
         try:
             if isinstance(command, AddLabware):
-                if not str(command.location or "").strip():
+                if not _clean_text(str(command.location or "")):
                     continue
                 from ..api_v2_add_labware_validate import AddLabwareFields, validate_add_labware_fields
 
@@ -804,17 +804,18 @@ def _compiled_labware_name_fields(root: ET.Element) -> list[str]:
             in {"LabwareName", "LabwareLable", "LabwareLabel"}
         )
     for element in elements:
-        raw_text = element.text
-        native_text = _native_xml_clean_text(raw_text)
-        value = (
-            native_text
-            if native_text is not None
-            else (raw_text or "").strip()
-        )
+        value = _clean_text(element.text)
         if value and value not in seen:
             seen.add(value)
             names.append(value)
     return names
+
+
+def _clean_text(value: Any) -> str:
+    native = _native_xml_clean_text(value)
+    if native is not None:
+        return native
+    return (value or "").strip()
 
 
 def _first_text(root: ET.Element, name: str, default: str = "") -> str:
@@ -823,23 +824,11 @@ def _first_text(root: ET.Element, name: str, default: str = "") -> str:
         _, element = selection
         if element is None:
             return default
-        raw_text = element.text
-        native_text = _native_xml_clean_text(raw_text)
-        text = (
-            native_text
-            if native_text is not None
-            else (raw_text or "").strip()
-        )
+        text = _clean_text(element.text)
         return text if text else default
     for element in root.iter():
         if _local_name(element.tag) == name:
-            raw_text = element.text
-            native_text = _native_xml_clean_text(raw_text)
-            text = (
-                native_text
-                if native_text is not None
-                else (raw_text or "").strip()
-            )
+            text = _clean_text(element.text)
             return text if text else default
     return default
 

@@ -527,6 +527,48 @@ class ApiV2CommandValidateTests(unittest.TestCase):
         self.assertEqual(native_empty, fallback_empty)
         self.assertEqual(native_empty, "default")
 
+    def test_typed_validation_blank_text_checks_use_rust_cleaner(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_clean_text"
+        ):
+            self.skipTest("optional Rust XML text cleaner is not built")
+        blank_records = [{"xml": "\u2007", "command_id": "ignored"}]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_blank = command_validate.validate_typed_commands(blank_records)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_xml_clean_text",
+                wraps=native_acceleration.xml_clean_text,
+            ) as native_clean:
+                actual_blank = command_validate.validate_typed_commands(blank_records)
+                native_clean.assert_called_once_with("\u2007")
+        self.assertEqual(actual_blank, expected_blank)
+        self.assertEqual(actual_blank, [])
+
+        command = command_validate.AddLabware(
+            labware_type="plate", labware_label="plate", location="\u2007"
+        )
+        records = [{"xml": "<Root />", "command_id": "unused"}]
+        with patch.object(
+            command_validate, "command_from_xscr_object", return_value=command
+        ):
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                expected_location = command_validate.validate_typed_commands(records)
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    command_validate,
+                    "_native_xml_clean_text",
+                    wraps=native_acceleration.xml_clean_text,
+                ) as native_clean:
+                    actual_location = command_validate.validate_typed_commands(records)
+                    self.assertEqual(
+                        [call.args for call in native_clean.call_args_list],
+                        [("<Root />",), ("\u2007",)],
+                    )
+        self.assertEqual(actual_location, expected_location)
+        self.assertEqual(actual_location, [])
+
     def test_labware_name_fields_use_rust_text_cleaner(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_clean_text"
