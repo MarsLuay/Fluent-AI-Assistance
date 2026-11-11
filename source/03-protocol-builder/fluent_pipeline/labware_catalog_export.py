@@ -11,6 +11,10 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
+)
+
 from .fluent_naming import strip_fluent_instance_suffix
 from .runner import write_json
 from .worktable_datastore import (
@@ -443,7 +447,9 @@ def _sort_index(value: Any) -> tuple[int, str]:
 
 
 def _norm(value: Any) -> str:
-    return str(value or "").strip().casefold()
+    text = str(value or "")
+    native = _native_ascii_casefold_trim(text)
+    return native if native is not None else text.strip().casefold()
 
 
 def _string_list(value: Any) -> list[str]:

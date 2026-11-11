@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import os
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import fluent_pipeline.labware_catalog_export as labware_catalog_export
+from tecan_common import native_acceleration
 from fluent_pipeline.aliases import resolve_alias
 from fluent_pipeline.labware_catalog_export import (
     alias_maps_from_labware_catalog,
@@ -15,6 +19,32 @@ from fluent_pipeline.labware_catalog_export import (
 
 
 class LabwareCatalogExportTests(unittest.TestCase):
+    def test_label_key_normalization_uses_native_ascii_and_unicode_fallback(self):
+        values = [" Custom Runner ", "Straße", "İmage", None, 0, ""]
+        expected = [str(value or "").strip().casefold() for value in values]
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [labware_catalog_export._norm(value) for value in values]
+        self.assertEqual(disabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                labware_catalog_export,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = [labware_catalog_export._norm(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(enabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                labware_catalog_export,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = [labware_catalog_export._norm(value) for value in values]
+        self.assertEqual(fallback, expected)
+
     def test_strip_instance_suffix(self):
         self.assertEqual(strip_fluent_instance_suffix("Runner[001]"), "Runner")
         self.assertEqual(strip_fluent_instance_suffix("FilterDWP[platecount]"), "FilterDWP")
@@ -108,7 +138,14 @@ class LabwareCatalogExportTests(unittest.TestCase):
             self.assertIsNotNone(path)
             assert path is not None
             self.assertTrue(path.is_file())
-            catalog = build_labware_catalog_from_geometry(geometry)
+            with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    labware_catalog_export,
+                    "_native_ascii_casefold_trim",
+                    wraps=native_acceleration.ascii_casefold_trim,
+                ) as native_call:
+                    catalog = build_labware_catalog_from_geometry(geometry)
+                    self.assertGreater(native_call.call_count, 0)
             maps = alias_maps_from_labware_catalog(catalog)
             self.assertEqual(maps["labware_aliases"]["SitePlate[002]"], "SitePlate")
             resolved = resolve_alias("SitePlate[002]", "labware", maps)
