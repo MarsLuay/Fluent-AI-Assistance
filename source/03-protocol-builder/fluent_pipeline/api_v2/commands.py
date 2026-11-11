@@ -1429,10 +1429,12 @@ def _parse_rup_variable_items(node: Any) -> list[dict[str, Any]]:
         node, ("RupVariableItem",), ET.Element
     )
     if elements is None:
-        elements = node.iter()
+        elements = (
+            element
+            for element in node.iter()
+            if _local_name(element.tag) == "RupVariableItem"
+        )
     for element in elements:
-        if _local_name(element.tag) != "RupVariableItem":
-            continue
         allowed_raw = _child_text(element, "AllowedValues")
         field: dict[str, Any] = {
             "name": _child_text(element, "VariableName"),
