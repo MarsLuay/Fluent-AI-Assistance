@@ -2636,6 +2636,36 @@ fn xml_first_element_by_name<'py>(
 }
 
 #[pyfunction]
+fn xml_first_direct_child_by_name<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    name: &str,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<(bool, Option<Bound<'py, PyAny>>)> {
+    if !root.get_type().is(element_type) {
+        return Ok((false, None));
+    }
+    for child in root.try_iter()? {
+        let child = child?;
+        if !child.get_type().is(element_type) {
+            return Ok((false, None));
+        }
+        let tag = child.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok((false, None));
+        }
+        let tag = tag.extract::<String>()?;
+        if xml_tag_local_name(&tag) == name {
+            return Ok((true, Some(child)));
+        }
+    }
+    Ok((true, None))
+}
+
+#[pyfunction]
 fn xml_elements_by_name<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -5801,6 +5831,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_elements_by_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_has_unmodeled_local_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_first_element_by_name, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_first_direct_child_by_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_reference_guids, module)?)?;
     module.add_function(wrap_pyfunction!(xml_mesh_reference_lists, module)?)?;
     module.add_function(wrap_pyfunction!(xml_sub_component_names, module)?)?;

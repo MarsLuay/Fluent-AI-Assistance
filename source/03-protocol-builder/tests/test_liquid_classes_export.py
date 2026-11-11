@@ -152,6 +152,57 @@ class LiquidClassesExportTests(unittest.TestCase):
         self.assertIs(native_fallback_element, fallback_element)
         self.assertEqual(native_fallback_text, fallback_text)
 
+    def test_direct_xml_child_text_uses_native_selector_with_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_first_direct_child_by_name"
+        ):
+            self.skipTest("optional Rust direct-child XML selector is not built")
+        root = liquid_classes_export.ET.fromstring(
+            '<Root xmlns:x="urn:test"><Nested><Target>nested</Target></Nested>'
+            "<x:Target> first </x:Target><Target>later</Target></Root>"
+        )
+        empty_first = liquid_classes_export.ET.fromstring(
+            "<Root><Target>   </Target><Target>later</Target></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = liquid_classes_export._child_text(root, "Target")
+            expected_empty = liquid_classes_export._child_text(empty_first, "Target")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                liquid_classes_export,
+                "_native_xml_first_direct_child_by_name",
+                wraps=native_acceleration.xml_first_direct_child_by_name,
+            ) as native_call:
+                actual = liquid_classes_export._child_text(root, "Target")
+                actual_empty = liquid_classes_export._child_text(
+                    empty_first, "Target"
+                )
+                self.assertEqual(native_call.call_count, 2)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "first")
+        self.assertEqual(actual_empty, expected_empty)
+        self.assertEqual(actual_empty, "")
+
+        class StringSubclass(str):
+            pass
+
+        unsupported = liquid_classes_export.ET.Element("Root")
+        child = liquid_classes_export.ET.SubElement(unsupported, "Target")
+        child.tag = StringSubclass("Target")
+        child.text = StringSubclass(" fallback ")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback = liquid_classes_export._child_text(unsupported, "Target")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                liquid_classes_export._native_xml_first_direct_child_by_name(
+                    unsupported, "Target", liquid_classes_export.ET.Element
+                )
+            )
+            actual_fallback = liquid_classes_export._child_text(
+                unsupported, "Target"
+            )
+        self.assertEqual(actual_fallback, fallback)
+
     def test_parse_xlqc_uses_filename_guid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             guid = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"

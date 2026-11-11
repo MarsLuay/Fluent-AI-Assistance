@@ -17,6 +17,7 @@ from tecan_common.native_acceleration import (
     parse_f64_decimal_text as _native_parse_f64_decimal_text,
     parse_i64_text as _native_parse_i64_text,
     xml_clean_text as _native_xml_clean_text,
+    xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
 )
 
@@ -1125,6 +1126,13 @@ def _text(elem: ET.Element | None) -> str:
 def _child_text(elem: ET.Element | None, local_name: str) -> str:
     if elem is None:
         return ""
+    native = _native_xml_first_direct_child_by_name(
+        elem, local_name, ET.Element
+    )
+    if native is not None:
+        supported, child = native
+        if supported:
+            return _text(child) if child is not None else ""
     for child in list(elem):
         if isinstance(child.tag, str) and _local_name(child.tag) == local_name:
             return _text(child)
