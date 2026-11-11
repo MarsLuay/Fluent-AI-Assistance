@@ -3938,6 +3938,22 @@ def worklist_window_properties(
         return None
 
 
+def worklist_barrier_reason(kind: Any) -> str | None:
+    """Classify a supported worklist barrier kind in Rust."""
+    if not enabled() or type(kind) is not str or kind not in {
+        "break",
+        "state",
+        "comment",
+        "other",
+    }:
+        return None
+    try:
+        result = _native.worklist_barrier_reason(kind)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def worklist_analyze_lines(
     lines: Any,
     enabled_tip_mask: str | None,

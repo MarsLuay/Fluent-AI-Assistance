@@ -40,6 +40,7 @@ from tecan_worklist.optimizer import (
     optimize_worklist,
     parse_enabled_tip_mask,
     semantic_equivalent,
+    _barrier_reason,
     _window_properties,
 )
 from tecan_worklist.transfer import (
@@ -1669,6 +1670,32 @@ class WorklistSemanticsTests(unittest.TestCase):
                         "independent explicit-tip units may be interleaved deterministically",
                     ),
                 )
+
+    def test_native_barrier_reasons_match_python_classification(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_barrier_reason"
+        ):
+            self.skipTest("optional Rust barrier classifier is not built")
+        records = [
+            Break(),
+            Wash(2),
+            Flush(("x",)),
+            SetDiTiType(("x",)),
+            Comment("synthetic marker"),
+            RawRecord("Q", "Q;opaque"),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [_barrier_reason(record) for record in records]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_barrier_reason",
+                wraps=native_acceleration.worklist_barrier_reason,
+            ) as native_call:
+                actual = [_barrier_reason(record) for record in records]
+                self.assertEqual(native_call.call_count, len(records))
+            self.assertIsNone(native_acceleration.worklist_barrier_reason("unexpected"))
+        self.assertEqual(actual, expected)
 
     def test_optimizer_interleaves_only_independent_explicit_units(self):
         records = []

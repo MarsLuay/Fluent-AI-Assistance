@@ -486,12 +486,22 @@ def _window_properties(units: list[TransferUnit]) -> tuple[bool, bool, tuple[int
 
 def _barrier_reason(record: Record) -> str:
     if isinstance(record, Break):
-        return "explicit execution barrier"
-    if isinstance(record, (Wash, Flush, SetDiTiType)):
-        return "typed worklist state transition"
-    if isinstance(record, Comment):
-        return "comment association"
-    return "unsupported or state-changing record"
+        kind = "break"
+    elif isinstance(record, (Wash, Flush, SetDiTiType)):
+        kind = "state"
+    elif isinstance(record, Comment):
+        kind = "comment"
+    else:
+        kind = "other"
+    native = native_acceleration.worklist_barrier_reason(kind)
+    if native is not None:
+        return native
+    return {
+        "break": "explicit execution barrier",
+        "state": "typed worklist state transition",
+        "comment": "comment association",
+        "other": "unsupported or state-changing record",
+    }[kind]
 
 
 __all__ = [

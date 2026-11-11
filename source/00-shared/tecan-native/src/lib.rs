@@ -6265,6 +6265,17 @@ fn worklist_window_properties(
 }
 
 #[pyfunction]
+fn worklist_barrier_reason(kind: &str) -> Option<String> {
+    match kind {
+        "break" => Some("explicit execution barrier".to_owned()),
+        "state" => Some("typed worklist state transition".to_owned()),
+        "comment" => Some("comment association".to_owned()),
+        "other" => Some("unsupported or state-changing record".to_owned()),
+        _ => None,
+    }
+}
+
+#[pyfunction]
 fn worklist_analyze_lines(
     lines_json: &str,
     enabled_tip_mask: Option<&str>,
@@ -6725,6 +6736,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_serialize_gwl_lines, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_count_record_types, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_window_properties, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_barrier_reason, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_analyze_lines, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_optimize_lines, module)?)?;
     module.add_function(wrap_pyfunction!(clean_empty_containers, module)?)?;
