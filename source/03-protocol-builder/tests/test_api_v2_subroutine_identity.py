@@ -108,6 +108,53 @@ class ApiV2SubroutineIdentityTests(unittest.TestCase):
         self.assertIs(actual_custom, expected_custom)
         self.assertIs(actual_custom, custom_element)
 
+    def test_subroutine_child_text_uses_native_selector_and_fallback(self):
+        root = ET.fromstring(
+            '<Root xmlns:x="urn:test"><x:Name> </x:Name><Name>later</Name>'
+            "<Nested><Name>nested</Name></Nested></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = subroutine_identity._child_text(root, "Name", "default")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                subroutine_identity,
+                "_native_xml_first_direct_child_by_name",
+                wraps=native_acceleration.xml_first_direct_child_by_name,
+            ) as native_call:
+                actual = subroutine_identity._child_text(root, "Name", "default")
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "")
+        self.assertEqual(
+            subroutine_identity._child_text(root, "Missing", "default"), "default"
+        )
+        self.assertEqual(
+            subroutine_identity._child_text(None, "Name", "default"), "default"
+        )
+
+        class StringTag(str):
+            pass
+
+        custom_root = ET.Element("Root")
+        custom_child = ET.SubElement(custom_root, StringTag("Name"))
+        custom_child.text = "Custom"
+        ET.SubElement(custom_root, "Name").text = "later"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = subroutine_identity._child_text(
+                custom_root, "Name", "default"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_first_direct_child_by_name(
+                    custom_root, "Name", ET.Element
+                )
+            )
+            fallback_actual = subroutine_identity._child_text(
+                custom_root, "Name", "default"
+            )
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, "Custom")
+
     def test_subroutine_from_ir_step_maps_fields(self):
         command = subroutine_from_ir_step(
             {
