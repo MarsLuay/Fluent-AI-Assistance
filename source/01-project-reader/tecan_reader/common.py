@@ -19,6 +19,7 @@ from tecan_common.native_acceleration import (
     compact_list as _native_compact_list,
     extension_counts as _native_extension_counts,
     path_suffixes as _native_path_suffixes,
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     ascii_variable_name_is_valid as _native_ascii_variable_name_is_valid,
 )
 
@@ -108,7 +109,11 @@ def command_family(type_name: str) -> str:
     registry_family = registry_command_family(type_name)
     if registry_family:
         return registry_family
-    t = type_name.lower()
+    if type(type_name) is str and type_name.strip() == type_name:
+        native = _native_ascii_casefold_trim(type_name)
+        t = native if native is not None else type_name.lower()
+    else:
+        t = type_name.lower()
     if "touchtools" in t or ".rup." in t:
         return "TouchTools/RUP"
     if "liha" in t or "fca" in t:
