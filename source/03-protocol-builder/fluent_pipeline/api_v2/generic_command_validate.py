@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Mapping, Protocol
 
 from tecan_common.native_acceleration import (
+    xml_direct_child_local_names as _native_xml_direct_child_local_names,
     xml_direct_elements_by_name as _native_xml_direct_elements_by_name,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_local_name as _native_xml_local_name,
@@ -357,8 +358,10 @@ def _reason_from_validation_error(exc: ApiV2ValidationError) -> str:
 
 
 def _compiled_command_id(element: ET.Element) -> str:
-    for child in list(element):
-        tag = _local_name(child.tag)
+    child_names = _native_xml_direct_child_local_names(element, ET.Element)
+    if child_names is None:
+        child_names = (_local_name(child.tag) for child in list(element))
+    for tag in child_names:
         if tag and tag != "Object":
             return tag
     object_type = str(element.attrib.get("Type") or "")

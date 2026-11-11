@@ -70,6 +70,51 @@ class GenericCommandValidateTests(unittest.TestCase):
         self.assertEqual(fallback_actual, fallback_expected)
         self.assertEqual(fallback_actual, "Fallback")
 
+    def test_compiled_command_id_uses_ordered_native_child_names(self):
+        element = generic_validate.ET.Element(
+            "Object", {"Type": "Tecan.Namespace.Fallback"}
+        )
+        generic_validate.ET.SubElement(element, "Object")
+        generic_validate.ET.SubElement(element, "Payload")
+        generic_validate.ET.SubElement(element, "Ignored")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = generic_validate._compiled_command_id(element)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                generic_validate,
+                "_native_xml_direct_child_local_names",
+                wraps=native_acceleration.xml_direct_child_local_names,
+            ) as native_call:
+                actual = generic_validate._compiled_command_id(element)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "Payload")
+
+        class StringTag(str):
+            pass
+
+        custom_element = generic_validate.ET.Element("Object")
+        generic_validate.ET.SubElement(custom_element, StringTag("CustomCommand"))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = generic_validate._compiled_command_id(custom_element)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_direct_child_local_names(
+                    custom_element, generic_validate.ET.Element
+                )
+            )
+            fallback_actual = generic_validate._compiled_command_id(custom_element)
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, "CustomCommand")
+
+        type_fallback = generic_validate.ET.Element(
+            "Object", {"Type": "Tecan.Namespace.Default"}
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertEqual(
+                generic_validate._compiled_command_id(type_fallback), "Default"
+            )
+
     def test_generic_xml_candidate_scans_use_native_selector_and_fallback(self):
         root = generic_validate.ET.fromstring(
             "<Root><Record><LineNumber>9</LineNumber>"

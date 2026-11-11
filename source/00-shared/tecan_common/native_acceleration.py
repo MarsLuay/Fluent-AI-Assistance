@@ -1090,6 +1090,26 @@ def xml_variable_definition_elements(root: Any, element_type: Any) -> list[Any] 
         return None
 
 
+def xml_direct_child_local_names(root: Any, element_type: Any) -> list[str] | None:
+    """Return supported direct-child local names in their original order."""
+    if not enabled() or type(root) is not element_type:
+        return None
+    try:
+        result = _native.xml_direct_child_local_names(root, element_type)
+        if type(result) is list and all(type(name) is str for name in result):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_runtime_variable_definition_candidates(
     root: Any, element_type: Any
 ) -> list[Any] | None:

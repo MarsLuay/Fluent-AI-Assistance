@@ -2525,6 +2525,32 @@ fn xml_variable_definition_elements<'py>(
 }
 
 #[pyfunction]
+fn xml_direct_child_local_names<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let output = PyList::empty(py);
+    for child in root.try_iter()? {
+        let child = child?;
+        if !child.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = child.getattr("tag")?;
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        output.append(local)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn xml_runtime_variable_definition_candidates<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -5955,6 +5981,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     module.add_function(wrap_pyfunction!(xml_variable_definition_elements, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_direct_child_local_names, module)?)?;
     module.add_function(wrap_pyfunction!(
         xml_runtime_variable_definition_candidates,
         module
