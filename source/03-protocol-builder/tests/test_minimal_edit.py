@@ -3,8 +3,11 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import fluent_pipeline.minimal_edit as minimal_edit_module
 from fluent_pipeline.minimal_edit import compare_xscr_minimal_edit, extract_xscr_command_records
+from tecan_common import native_acceleration
 
 
 XSCR = """<?xml version="1.0" encoding="utf-8"?>
@@ -55,6 +58,25 @@ XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class MinimalEditTests(unittest.TestCase):
+    def test_local_name_uses_native_helper_after_string_conversion(self):
+        class CustomTag:
+            def __str__(self):
+                return "{urn:example}Command"
+
+        value = CustomTag()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = minimal_edit_module._local_name(value)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                minimal_edit_module,
+                "_native_xml_local_name",
+                wraps=native_acceleration.xml_local_name,
+            ) as native_call:
+                actual = minimal_edit_module._local_name(value)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "Command")
+
     def test_extracts_statement_records_without_group_wrapper(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "script.xscr"

@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from tecan_common.native_acceleration import xml_local_name as _native_xml_local_name
+
 
 MINIMAL_EDIT_REPORT_VERSION = "tecan.minimal_edit_diff.v1"
 _IGNORED_METADATA_TAGS = {
@@ -443,7 +445,9 @@ def _normalize_text(value: Any) -> str:
 
 
 def _local_name(tag: Any) -> str:
-    return str(tag).rsplit("}", 1)[-1]
+    text = str(tag)
+    native = _native_xml_local_name(text)
+    return native if native is not None else text.rsplit("}", 1)[-1]
 
 
 def write_minimal_edit_reports(report: dict[str, Any], json_path: Path | None, markdown_path: Path | None) -> None:
