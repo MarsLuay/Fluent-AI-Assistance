@@ -19,6 +19,43 @@ from fluent_pipeline.runtime_variable_audit import (
 
 
 class RuntimeVariableAuditTests(unittest.TestCase):
+    def test_variable_name_validation_uses_native_ascii_with_python_fallback(self):
+        values = [
+            "Name_2",
+            "_x",
+            "2name",
+            "Name with space",
+            "é",
+            "ſcript",
+            "",
+            "  Alpha  ",
+            None,
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                runtime_variable_audit_module._is_variable_name(value)
+                for value in values
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                runtime_variable_audit_module,
+                "_native_ascii_variable_name_is_valid",
+                wraps=native_acceleration.ascii_variable_name_is_valid,
+            ) as native_call:
+                actual = [
+                    runtime_variable_audit_module._is_variable_name(value)
+                    for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values) - 2)
+            self.assertIsNone(
+                native_acceleration.ascii_variable_name_is_valid("ſcript")
+            )
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [True, True, False, False, False, False, False, True, False],
+        )
+
     def test_local_name_uses_native_helper_and_custom_python_fallback(self):
         tag = "{urn:example}VariableDefinitionHelper"
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):

@@ -17,6 +17,7 @@ from typing import Any, Iterable, Mapping, Sequence
 
 from .query_variable_audit import normalize_query_variable_names
 from tecan_common.native_acceleration import (
+    ascii_variable_name_is_valid as _native_ascii_variable_name_is_valid,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_local_name as _native_xml_local_name,
     xml_runtime_variable_definition_candidates as _native_runtime_candidates,
@@ -356,4 +357,7 @@ def _first_text(element: ET.Element, local_name: str) -> str:
 
 def _is_variable_name(value: str) -> bool:
     text = str(value or "").strip()
-    return bool(text) and VARIABLE_NAME_RE.fullmatch(text) is not None
+    if not text:
+        return False
+    native = _native_ascii_variable_name_is_valid(text)
+    return native if native is not None else VARIABLE_NAME_RE.fullmatch(text) is not None

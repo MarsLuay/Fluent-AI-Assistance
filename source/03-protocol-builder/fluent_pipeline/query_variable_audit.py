@@ -13,6 +13,10 @@ import re
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
+from tecan_common.native_acceleration import (
+    ascii_variable_name_is_valid as _native_ascii_variable_name_is_valid,
+)
+
 
 QUERY_VARIABLE_AUDIT_VERSION = "tecan.query_variable_audit.v1"
 VARIABLE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -275,7 +279,10 @@ def _collect_spec_variable_name(names: set[str], record: Any) -> None:
 
 
 def _is_variable_name(value: str) -> bool:
-    return bool(value) and VARIABLE_NAME_RE.fullmatch(value) is not None
+    if not value:
+        return False
+    native = _native_ascii_variable_name_is_valid(value)
+    return native if native is not None else VARIABLE_NAME_RE.fullmatch(value) is not None
 
 
 def _coerce_bool(value: Any) -> bool:

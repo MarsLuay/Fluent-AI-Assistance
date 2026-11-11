@@ -1,5 +1,8 @@
 import unittest
+from unittest.mock import patch
 
+import fluent_pipeline.query_variable_audit as query_variable_audit_module
+from tecan_common import native_acceleration
 from fluent_pipeline.query_variable_audit import (
     audit_query_variables_for_workflow,
     build_query_variable_audit,
@@ -12,6 +15,30 @@ from fluent_pipeline.request_spec import build_request_validation_diff, render_r
 
 
 class QueryVariableAuditTests(unittest.TestCase):
+    def test_variable_name_validation_uses_native_ascii_with_python_fallback(self):
+        values = ["Alpha_2", "_x", "2name", "Name\n", "é", "ſcript", ""]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                query_variable_audit_module._is_variable_name(value)
+                for value in values
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                query_variable_audit_module,
+                "_native_ascii_variable_name_is_valid",
+                wraps=native_acceleration.ascii_variable_name_is_valid,
+            ) as native_call:
+                actual = [
+                    query_variable_audit_module._is_variable_name(value)
+                    for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values) - 1)
+            self.assertIsNone(
+                native_acceleration.ascii_variable_name_is_valid("ſcript")
+            )
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [True, True, False, False, False, False, False])
+
     def test_normalize_query_variable_names_dedupes_and_sorts(self):
         names = normalize_query_variable_names(["TubeCount", "StartupVolume", "TubeCount", ""])
         self.assertEqual(names, ("StartupVolume", "TubeCount"))
