@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import copy
+from unittest import mock
 
+from tecan_common import native_acceleration
+
+from fluent_pipeline import pattern_index
 from fluent_pipeline.pattern_index import (
     PATTERN_SELECTION_SCHEMA_VERSION,
     rank_pattern_windows,
@@ -119,6 +123,41 @@ def test_ambiguous_candidates_remain_visible_and_explicit_selection_wins() -> No
     assert explicit["status"] == "ready"
     assert [item["pattern"]["id"] for item in explicit["selected"]] == [2]
     assert explicit["selection_mode"] == "explicit"
+
+
+def test_explicit_query_and_script_casefold_uses_native_with_unicode_fallback() -> None:
+    windows = [
+        _window(
+            1,
+            "aspirate",
+            source_script="Straße",
+            retrieval={"method": "pattern_query", "query": "aspirate"},
+        )
+    ]
+    arguments = {
+        "explicit_pattern_queries": [" ASPIRATE "],
+        "explicit_source_scripts": ["STRASSE"],
+    }
+    with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = rank_pattern_windows(windows, **arguments)
+
+    with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with mock.patch.object(
+            pattern_index,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            actual = rank_pattern_windows(windows, **arguments)
+        assert native_call.call_count == 4
+        native_call.assert_any_call("STRASSE")
+        native_call.assert_any_call("Straße")
+    assert actual == expected
+    assert actual["selected"][0]["pattern"]["id"] == 1
+
+    with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with mock.patch.object(pattern_index, "_native_ascii_lower", return_value=None):
+            forced_fallback = rank_pattern_windows(windows, **arguments)
+    assert forced_fallback == expected
 
 
 def test_ranking_is_repeatable_and_preserves_explicit_query_and_script_overrides() -> None:

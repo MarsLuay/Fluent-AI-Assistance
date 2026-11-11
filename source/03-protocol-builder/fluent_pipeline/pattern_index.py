@@ -9,11 +9,18 @@ import json
 import re
 import sqlite3
 
+from tecan_common.native_acceleration import ascii_lower as _native_ascii_lower
+
 from .runner import PipelineError
 
 
 PATTERN_SELECTION_SCHEMA_VERSION = "tecan.generation_pattern_selection.v1"
 DEFAULT_PATTERN_CONFIDENCE = 0.5
+
+
+def _casefold_text(value: str) -> str:
+    native = _native_ascii_lower(value)
+    return native if native is not None else value.casefold()
 
 
 def load_pattern_windows(
@@ -149,8 +156,16 @@ def rank_pattern_windows(
     facets = _selection_facets(task_facets or {})
     target = dict(target_evidence or {})
     ids = {str(value) for value in explicit_pattern_ids}
-    queries = {str(value).strip().casefold() for value in explicit_pattern_queries if str(value).strip()}
-    scripts = {str(value).strip().casefold() for value in explicit_source_scripts if str(value).strip()}
+    queries = {
+        _casefold_text(str(value).strip())
+        for value in explicit_pattern_queries
+        if str(value).strip()
+    }
+    scripts = {
+        _casefold_text(str(value).strip())
+        for value in explicit_source_scripts
+        if str(value).strip()
+    }
     explicit_requested = bool(ids or queries or scripts)
 
     candidates: list[dict[str, Any]] = []
@@ -165,18 +180,19 @@ def rank_pattern_windows(
         retrieval = window.get("retrieval") if isinstance(window.get("retrieval"), Mapping) else {}
         source_script = str(window.get("source_script") or "")
         pattern_id = str(window.get("id") or "")
-        retrieval_query = str(retrieval.get("query") or "").strip().casefold()
+        retrieval_query = _casefold_text(str(retrieval.get("query") or "").strip())
+        source_script_key = _casefold_text(source_script)
         is_explicit = (
             pattern_id in ids
             or (retrieval_query and retrieval_query in queries)
-            or source_script.casefold() in scripts
+            or source_script_key in scripts
         )
         if pattern_id in ids:
             matched_ids.add(pattern_id)
         if retrieval_query in queries:
             matched_queries.add(retrieval_query)
-        if source_script.casefold() in scripts:
-            matched_scripts.add(source_script.casefold())
+        if source_script_key in scripts:
+            matched_scripts.add(source_script_key)
         score, breakdown, matches = _pattern_score(source_window, facets, target)
         confidence = _confidence(source_window)
         incompatible, incompatibility_reason = _target_incompatibility(source_window, target)
