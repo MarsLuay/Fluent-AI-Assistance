@@ -511,6 +511,18 @@ def _catalog_entry(item: Mapping[str, Any]) -> dict[str, Any]:
     )
 
 
+def _profile_source_elements(root: ET.Element) -> list[ET.Element]:
+    names = (_EQ_SET_LOCAL, _DPS_SET_LOCAL, _SUBCLASS_LOCAL)
+    elements = _native_xml_elements_by_name(root, names, ET.Element)
+    if elements is not None:
+        return elements
+    return [
+        elem
+        for elem in root.iter()
+        if isinstance(elem.tag, str) and _local_name(elem.tag) in names
+    ]
+
+
 def _mine_profiles(root: ET.Element | None) -> list[dict[str, Any]]:
     """Mine head×tip profiles from typed Fluent liquid-class sets."""
     if root is None:
@@ -519,9 +531,7 @@ def _mine_profiles(root: ET.Element | None) -> list[dict[str, Any]]:
     # EquationSets often omit DeviceType; stash tip-keyed params and fan out later.
     tip_eq: dict[str, dict[str, dict[str, Any]]] = {}
 
-    for elem in root.iter():
-        if not isinstance(elem.tag, str):
-            continue
+    for elem in _profile_source_elements(root):
         local = _local_name(elem.tag)
         if local == _EQ_SET_LOCAL:
             head, tip, section = _set_context(elem)
