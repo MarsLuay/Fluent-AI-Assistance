@@ -12,6 +12,10 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Mapping
 
+from tecan_common.native_acceleration import (
+    normalize_script_folder_path as _native_normalize_script_folder_path,
+)
+
 from .runner import write_json
 
 SCRIPT_FOLDER_BINDINGS_SCHEMA_VERSION = "tecan.script_folder_bindings.v1"
@@ -178,8 +182,11 @@ def _worktable_binding(script: Mapping[str, Any]) -> dict[str, str]:
 
 
 def _normalize_folder(value: Any) -> str:
-    text = str(value or "").strip().replace("/", "\\").strip("\\")
-    return text
+    text = str(value or "")
+    native = _native_normalize_script_folder_path(text)
+    if native is not None:
+        return native
+    return text.strip().replace("/", "\\").strip("\\")
 
 
 def _display_name(folder: str, object_name: str) -> str:

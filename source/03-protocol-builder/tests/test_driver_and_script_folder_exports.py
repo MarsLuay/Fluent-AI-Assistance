@@ -15,6 +15,7 @@ from fluent_pipeline.driver_macros_export import (
     build_driver_command_contracts,
     build_driver_macros_catalog,
 )
+import fluent_pipeline.script_folder_bindings_export as script_folder_bindings_export_module
 from fluent_pipeline.script_folder_bindings_export import build_script_folder_bindings
 
 
@@ -289,6 +290,52 @@ class DriverMacrosExportTests(unittest.TestCase):
 
 
 class ScriptFolderBindingsExportTests(unittest.TestCase):
+    def test_folder_path_normalization_uses_native_and_python_fallback(self) -> None:
+        class CustomFolder:
+            def __str__(self):
+                return "\u2003/custom//path\\\u00a0"
+
+        values = [
+            None,
+            False,
+            0,
+            " /folder//child\\ \t",
+            "///",
+            "\u2003/é/路径/\u00a0",
+            "left/right",
+            CustomFolder(),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                script_folder_bindings_export_module._normalize_folder(value)
+                for value in values
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                script_folder_bindings_export_module,
+                "_native_normalize_script_folder_path",
+                wraps=native_acceleration.normalize_script_folder_path,
+            ) as native_call:
+                actual = [
+                    script_folder_bindings_export_module._normalize_folder(value)
+                    for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [
+                "",
+                "",
+                "",
+                "folder\\\\child",
+                "",
+                "é\\路径",
+                "left\\right",
+                "custom\\\\path",
+            ],
+        )
+
     def test_builds_folder_tree_and_worktable_bindings(self) -> None:
         manifest = {
             "scripts": [

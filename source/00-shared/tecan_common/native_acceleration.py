@@ -225,6 +225,17 @@ def xml_clean_text(value: Any) -> str | None:
         return None
 
 
+def normalize_script_folder_path(value: Any) -> str | None:
+    """Normalize a script-folder path natively, or request Python fallback."""
+    if not enabled() or type(value) is not str:
+        return None
+    try:
+        result = _native.normalize_script_folder_path(value)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def xml_direct_child_texts(root: Any, element_type: Any) -> list[str] | None:
     """Collect non-empty, trimmed texts from direct standard XML children."""
     if not enabled():

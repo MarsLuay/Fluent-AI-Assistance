@@ -1788,6 +1788,18 @@ fn xml_clean_text(text: &str) -> String {
     trim_python_whitespace(text).to_owned()
 }
 
+fn normalize_script_folder_path_value(text: &str) -> String {
+    trim_python_whitespace(text)
+        .replace('/', "\\")
+        .trim_matches('\\')
+        .to_owned()
+}
+
+#[pyfunction]
+fn normalize_script_folder_path(text: &str) -> String {
+    normalize_script_folder_path_value(text)
+}
+
 #[pyfunction]
 fn xml_direct_child_texts<'py>(
     py: Python<'py>,
@@ -7514,6 +7526,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(has_visionx_namespace, module)?)?;
     module.add_function(wrap_pyfunction!(zeia_xml_structural_flags, module)?)?;
     module.add_function(wrap_pyfunction!(xml_clean_text, module)?)?;
+    module.add_function(wrap_pyfunction!(normalize_script_folder_path, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_child_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_leaf_name_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_record_children, module)?)?;
@@ -8410,6 +8423,23 @@ mod tests {
         assert_eq!(
             normalize_line_number_tags_ascii_value("<LineNumber>１２</LineNumber>"),
             None
+        );
+    }
+
+    #[test]
+    fn script_folder_normalization_matches_python_strip_replace_strip() {
+        assert_eq!(
+            normalize_script_folder_path_value(" \u{2003}/folder//child\\\u{00a0} "),
+            "folder\\\\child"
+        );
+        assert_eq!(normalize_script_folder_path_value("///"), "");
+        assert_eq!(
+            normalize_script_folder_path_value("left/right"),
+            "left\\right"
+        );
+        assert_eq!(
+            normalize_script_folder_path_value("\u{00a0}é/路径/\u{2003}"),
+            "é\\路径"
         );
     }
 
