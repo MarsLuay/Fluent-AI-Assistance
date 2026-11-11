@@ -527,6 +527,48 @@ class ApiV2CommandValidateTests(unittest.TestCase):
         self.assertEqual(native_empty, fallback_empty)
         self.assertEqual(native_empty, "default")
 
+    def test_labware_name_fields_use_rust_text_cleaner(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_clean_text"
+        ):
+            self.skipTest("optional Rust XML text cleaner is not built")
+
+        class StringSubclass(str):
+            def strip(self) -> str:
+                return "custom"
+
+        root = command_validate.ET.Element("Root")
+        fields = [
+            ("LabwareName", "PlateA"),
+            ("LabwareLable", " PlateA "),
+            ("LabwareLabel", "\x1c PlateB \x1f"),
+            ("LabwareName", StringSubclass("ignored")),
+            ("LabwareName", None),
+        ]
+        for tag, value in fields:
+            command_validate.ET.SubElement(root, tag).text = value
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = command_validate._compiled_labware_name_fields(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_xml_clean_text",
+                wraps=native_acceleration.xml_clean_text,
+            ) as native_clean:
+                actual = command_validate._compiled_labware_name_fields(root)
+                self.assertEqual(native_clean.call_count, len(fields))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["PlateA", "PlateB", "custom"])
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate, "_native_xml_elements_by_name", return_value=None
+            ):
+                fallback_selection = command_validate._compiled_labware_name_fields(
+                    root
+                )
+        self.assertEqual(fallback_selection, expected)
+
     def test_structured_failures_for_bad_xscr(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "bad.xscr"

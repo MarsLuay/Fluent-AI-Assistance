@@ -804,7 +804,13 @@ def _compiled_labware_name_fields(root: ET.Element) -> list[str]:
             in {"LabwareName", "LabwareLable", "LabwareLabel"}
         )
     for element in elements:
-        value = (element.text or "").strip()
+        raw_text = element.text
+        native_text = _native_xml_clean_text(raw_text)
+        value = (
+            native_text
+            if native_text is not None
+            else (raw_text or "").strip()
+        )
         if value and value not in seen:
             seen.add(value)
             names.append(value)
