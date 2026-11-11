@@ -37,6 +37,39 @@ def _ok_finalization_report() -> FinalizationReport:
     )
 
 
+class ConnectorPinNormalizationTests(unittest.TestCase):
+    def test_pin_normalization_uses_rust_for_ascii_and_python_for_unicode(self):
+        values = ["WorktablePin_A-12", "Straße", "ſcript", "東京"]
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [exports._pin_norm(value) for value in values]
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_lower_alnum_compact",
+                wraps=native_acceleration.ascii_lower_alnum_compact,
+            ) as native_call:
+                actual = [exports._pin_norm(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertIsNone(native_acceleration.ascii_lower_alnum_compact("東京"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["worktablepina12", "strasse", "script", ""])
+
+    def test_pin_suffix_extraction_stays_python_and_compacts_matches_natively(self):
+        values = ["WorktablePin_A_12", "PinFoo-Bar", "NoPin"]
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [exports._pin_suffix(value) for value in values]
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_lower_alnum_compact",
+                wraps=native_acceleration.ascii_lower_alnum_compact,
+            ) as native_call:
+                actual = [exports._pin_suffix(value) for value in values]
+                self.assertEqual(native_call.call_count, 2)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["a12", "foo", ""])
+
+
 class TouchToolsRequestTests(unittest.TestCase):
     def test_ascii_request_matching_uses_native_and_unicode_uses_casefold_fallback(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -24,6 +24,7 @@ from fluentcoder.expressions import (
 )
 from tecan_common.native_acceleration import (
     ascii_case_insensitive_substring_match_groups as _native_ascii_substring_match_groups,
+    ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
     xml_clean_text as _native_xml_clean_text,
     xml_direct_elements_by_name as _native_xml_direct_elements_by_name,
     xml_elements_by_name as _native_xml_elements_by_name,
@@ -6380,14 +6381,18 @@ def _pin_refs_match(required: str, candidate: str) -> bool:
 
 
 def _pin_norm(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "", value.casefold())
+    folded = value.casefold()
+    native = _native_ascii_lower_alnum_compact(folded)
+    return native if native is not None else re.sub(r"[^a-z0-9]+", "", folded)
 
 
 def _pin_suffix(value: str) -> str:
     match = re.search(r"(?:WorktablePin_|Pin)([A-Za-z0-9_]+)", value)
     if not match:
         return ""
-    return re.sub(r"[^a-z0-9]+", "", match.group(1).casefold())
+    folded = match.group(1).casefold()
+    native = _native_ascii_lower_alnum_compact(folded)
+    return native if native is not None else re.sub(r"[^a-z0-9]+", "", folded)
 
 
 def _pin_status(pin: str, connector_refs: list[dict[str, str]]) -> str:
