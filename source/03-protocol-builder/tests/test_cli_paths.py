@@ -7,6 +7,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
+import fluent_pipeline.cli.rendering as rendering_module
+from tecan_common import native_acceleration
 from fluent_pipeline.application_services import GenerationResult
 from fluent_pipeline.cli import _cmd_analyze, _cmd_generate, _cmd_map_media, _resolve_generation_event_log, _resolve_ir_source
 from fluent_pipeline.cli import runtime as cli_runtime
@@ -1139,6 +1141,63 @@ class AnalyzeCommandTests(unittest.TestCase):
             data = json.loads((out_dir / "analysis.json").read_text(encoding="utf-8"))
             self.assertEqual(data["local_fluent_script"]["guid"], guid)
             self.assertEqual(data["input"]["path"], str(staged))
+
+
+class GenerationProtocolFolderTests(unittest.TestCase):
+    def test_protocol_folder_suffixes_use_native_lower_with_unicode_fallback(self):
+        manifests = [
+            {
+                "published_protocol_folder": None,
+                "published_zeia_path": "delivery/Prötokol.ZEIA",
+                "ready_to_import_artifacts": [],
+            },
+            {
+                "published_protocol_folder": None,
+                "published_zeia_path": None,
+                "ready_to_import_artifacts": ["package/MORE.ZEIA"],
+            },
+            {
+                "published_protocol_folder": None,
+                "published_zeia_path": None,
+                "ready_to_import_artifacts": ["package/PROTO.İ"],
+            },
+        ]
+        with mock.patch.dict(
+            "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+        ):
+            expected = [
+                rendering_module._generation_protocol_folder(manifest)
+                for manifest in manifests
+            ]
+        self.assertEqual(expected, [Path("delivery"), Path("package"), None])
+
+        with mock.patch.dict(
+            "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+        ):
+            with mock.patch.object(
+                rendering_module,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = [
+                    rendering_module._generation_protocol_folder(manifest)
+                    for manifest in manifests
+                ]
+            native_call.assert_any_call(".ZEIA")
+            native_call.assert_any_call(".İ")
+        self.assertEqual(actual, expected)
+
+        with mock.patch.dict(
+            "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+        ):
+            with mock.patch.object(
+                rendering_module, "_native_ascii_lower", return_value=None
+            ):
+                forced_fallback = [
+                    rendering_module._generation_protocol_folder(manifest)
+                    for manifest in manifests
+                ]
+        self.assertEqual(forced_fallback, expected)
 
 
 class WorkspaceLogPathTests(unittest.TestCase):

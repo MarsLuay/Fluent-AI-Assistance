@@ -32,6 +32,12 @@ from ..spec_lint import render_lint_report
 ProgressMode = str
 
 
+def _lower_path_suffix(path: Path) -> str:
+    suffix = path.suffix
+    native = _native_ascii_lower(suffix)
+    return native if native is not None else suffix.lower()
+
+
 def normalize_progress_mode(value: Any) -> ProgressMode:
     if value is True:
         return "plain"
@@ -108,10 +114,12 @@ def _generation_protocol_folder(manifest: dict[str, Any]) -> Path | None:
     if manifest.get("published_protocol_folder"):
         return Path(str(manifest["published_protocol_folder"]))
     published = Path(str(manifest.get("published_zeia_path") or ""))
-    if published.suffix.lower() == ".zeia":
+    if _lower_path_suffix(published) == ".zeia":
         return published.parent
     artifacts = [Path(str(path)) for path in (manifest.get("ready_to_import_artifacts") or []) if str(path).strip()]
-    zeia_artifacts = [path for path in artifacts if path.suffix.lower() == ".zeia"]
+    zeia_artifacts = [
+        path for path in artifacts if _lower_path_suffix(path) == ".zeia"
+    ]
     if len(zeia_artifacts) == 1:
         return zeia_artifacts[0].parent
     return None
