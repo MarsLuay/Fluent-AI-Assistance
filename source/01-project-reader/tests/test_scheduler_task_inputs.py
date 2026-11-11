@@ -164,6 +164,105 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
                 )
             )
 
+    def test_scheduler_record_leaf_fields_use_native_scan_with_python_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_direct_leaf_name_texts"
+        ):
+            self.skipTest("optional Rust XML leaf-field collector is not built")
+        root = ET.Element(
+            "{urn:test}Process",
+            {"Name": "attribute label", "TaskID": "attribute-id", "VendorAttr": "source"},
+        )
+        ET.SubElement(root, "{urn:test}Name").text = " child\u001c label "
+        ET.SubElement(root, "TaskID").text = " child-id "
+        ET.SubElement(root, "VendorField").text = " one\n two "
+        ET.SubElement(root, "VendorField").text = "one two"
+        nested = ET.SubElement(root, "Nested")
+        ET.SubElement(nested, "Script").text = "not a direct leaf"
+        ET.SubElement(root, "Description").text = " \t "
+        root.append(ET.Comment("ignored child"))
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = scheduler._record(
+                root, index=7, kind="scheduler_task", source_name="synthetic.xml"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration._native,
+                "xml_direct_leaf_name_texts",
+                wraps=native_acceleration._native.xml_direct_leaf_name_texts,
+            ) as rust_call:
+                with patch.object(
+                    scheduler,
+                    "_native_xml_direct_leaf_name_texts",
+                    wraps=scheduler._native_xml_direct_leaf_name_texts,
+                ) as native_call:
+                    actual = scheduler._record(
+                        root, index=7, kind="scheduler_task", source_name="synthetic.xml"
+                    )
+                    native_call.assert_called_once_with(root, ET.Element)
+                    self.assertEqual(rust_call.call_count, 1)
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["fields"]["Name"], "child label")
+        self.assertEqual(actual["fields"]["TaskID"], "child-id")
+        self.assertEqual(
+            actual["source_metadata"]["unknown_fields"],
+            {"VendorAttr": ["source"], "VendorField": ["one two"]},
+        )
+
+        class StringSubclass(str):
+            pass
+
+        unsupported_root = ET.Element("Task")
+        unsupported_child = ET.SubElement(unsupported_root, "VendorField")
+        unsupported_child.tag = StringSubclass("VendorField")
+        unsupported_child.text = StringSubclass(" preserved ")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_fallback = scheduler._record(
+                unsupported_root,
+                index=0,
+                kind="scheduler_task",
+                source_name="synthetic.xml",
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                scheduler._native_xml_direct_leaf_name_texts(
+                    unsupported_root, ET.Element
+                )
+            )
+            actual_fallback = scheduler._record(
+                unsupported_root,
+                index=0,
+                kind="scheduler_task",
+                source_name="synthetic.xml",
+            )
+        self.assertEqual(actual_fallback, expected_fallback)
+
+        unsupported_text_root = ET.Element("Task")
+        unsupported_text_child = ET.SubElement(unsupported_text_root, "VendorField")
+        unsupported_text_child.text = StringSubclass(" preserved ")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_text_fallback = scheduler._record(
+                unsupported_text_root,
+                index=0,
+                kind="scheduler_task",
+                source_name="synthetic.xml",
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                scheduler._native_xml_direct_leaf_name_texts(
+                    unsupported_text_root, ET.Element
+                )
+            )
+            actual_text_fallback = scheduler._record(
+                unsupported_text_root,
+                index=0,
+                kind="scheduler_task",
+                source_name="synthetic.xml",
+            )
+        self.assertEqual(actual_text_fallback, expected_text_fallback)
+
     def test_scheduler_processes_tasks_are_distinct_from_gwl(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             archive = self._archive(

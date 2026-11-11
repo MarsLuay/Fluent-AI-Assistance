@@ -8,6 +8,7 @@ from typing import Any
 from tecan_common import xml_compat as ET
 from tecan_common.native_acceleration import (
     ascii_case_insensitive_substring_match_groups as _native_substring_match_groups,
+    xml_direct_leaf_name_texts as _native_xml_direct_leaf_name_texts,
     xml_indexed_elements_by_folded_name as _native_indexed_elements_by_folded_name,
 )
 from tecan_common.xml_helpers import local_name
@@ -104,12 +105,17 @@ def _record(element: Any, *, index: int, kind: str, source_name: str) -> dict[st
     unknown: dict[str, list[str]] = {}
     for name, value in element.attrib.items():
         _store_field(fields, unknown, local_name(name), str(value))
-    for child in list(element):
-        if not isinstance(child.tag, str):
-            continue
-        name = local_name(child.tag)
-        value = " ".join((child.text or "").split())
-        if value and not list(child):
+    native_child_fields = _native_xml_direct_leaf_name_texts(element, ET.Element)
+    if native_child_fields is None:
+        for child in list(element):
+            if not isinstance(child.tag, str):
+                continue
+            name = local_name(child.tag)
+            value = " ".join((child.text or "").split())
+            if value and not list(child):
+                _store_field(fields, unknown, name, value)
+    else:
+        for name, value in native_child_fields:
             _store_field(fields, unknown, name, value)
     if not fields and not unknown:
         return {}

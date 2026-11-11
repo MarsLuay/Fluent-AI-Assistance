@@ -1040,6 +1040,68 @@ fn xml_direct_child_texts<'py>(
     Ok(Some(output.into_any()))
 }
 
+fn collapse_python_whitespace(value: &str) -> String {
+    let mut output = String::with_capacity(value.len());
+    for part in value
+        .split(is_python_whitespace)
+        .filter(|part| !part.is_empty())
+    {
+        if !output.is_empty() {
+            output.push(' ');
+        }
+        output.push_str(part);
+    }
+    output
+}
+
+#[pyfunction]
+fn xml_direct_leaf_name_texts<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let output = PyList::empty(py);
+    for child in root.try_iter()? {
+        let child = child?;
+        if !child.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = child.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local_name = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        let text = child.getattr("text")?;
+        let text = if text.is_none() {
+            String::new()
+        } else {
+            if !text.get_type().is(py.get_type::<PyString>()) {
+                return Ok(None);
+            }
+            let text = text.extract::<String>()?;
+            collapse_python_whitespace(&text)
+        };
+        if !text.is_empty() && child.call_method0("__len__")?.extract::<usize>()? == 0 {
+            let pair = PyTuple::new(
+                py,
+                [
+                    PyString::new(py, local_name).into_any(),
+                    PyString::new(py, &text).into_any(),
+                ],
+            )?;
+            output.append(pair)?;
+        }
+    }
+    Ok(Some(output.into_any()))
+}
+
 #[pyfunction]
 fn xml_first_nonempty_texts<'py>(
     py: Python<'py>,
@@ -5639,6 +5701,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_tag_local_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_clean_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_child_texts, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_direct_leaf_name_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_first_nonempty_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_container_child_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_unique_texts, module)?)?;
