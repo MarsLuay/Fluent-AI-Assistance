@@ -426,6 +426,38 @@ def test_collect_file_reference_paths_includes_attachment_only_generated_media()
     assert paths == [display_path, attachment_path]
 
 
+def test_file_reference_text_whitespace_uses_native_helper(monkeypatch) -> None:
+    text = (
+        "<Root>"
+        "<FileReference><File>\tC:\\Data\\   file\x1c\u2003name.bin \r\n"
+        "</File></FileReference>"
+        "<FileReference><File>C:\\répertoire\u2003image.png</File>"
+        "</FileReference>"
+        "<FileReference><File> \t\x1c </File></FileReference>"
+        "</Root>"
+    )
+    monkeypatch.setenv("TECAN_DISABLE_RUST_ACCELERATION", "1")
+    expected = zeia_filesystem_module._extract_file_reference_paths(text)
+
+    calls: list[str] = []
+    native_collapse = native_acceleration.collapse_ascii_whitespace
+
+    def track_collapse(value):
+        calls.append(value)
+        return native_collapse(value)
+
+    monkeypatch.setenv("TECAN_DISABLE_RUST_ACCELERATION", "0")
+    monkeypatch.setattr(
+        zeia_filesystem_module,
+        "_native_collapse_ascii_whitespace",
+        track_collapse,
+    )
+    actual = zeia_filesystem_module._extract_file_reference_paths(text)
+
+    assert actual == expected == [r"C:\Data\ file name.bin", "C:\\répertoire image.png"]
+    assert len(calls) == 3
+
+
 def test_file_reference_path_filter_uses_native_drive_prefix(monkeypatch) -> None:
     media_path_map = {
         "entries": [

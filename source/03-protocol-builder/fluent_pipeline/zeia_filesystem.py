@@ -11,6 +11,7 @@ from typing import Any, Mapping
 
 from .checksums import entry_checksum_state, recompute_checksum_bytes
 from tecan_common.native_acceleration import (
+    collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
     windows_drive_path_prefix as _native_windows_drive_path_prefix,
 )
 
@@ -723,7 +724,13 @@ def _extract_file_reference_paths(text: str) -> list[str]:
         match = _FILE_REFERENCE_FILE_RE.search(block)
         if not match:
             continue
-        value = re.sub(r"\s+", " ", match.group(1)).strip()
+        raw_value = match.group(1)
+        native = _native_collapse_ascii_whitespace(raw_value)
+        value = (
+            native
+            if native is not None
+            else re.sub(r"\s+", " ", raw_value).strip()
+        )
         if value and value not in paths:
             paths.append(value)
     return paths
