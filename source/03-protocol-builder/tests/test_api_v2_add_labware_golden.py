@@ -105,9 +105,15 @@ class ApiV2AddLabwareGoldenTests(unittest.TestCase):
                     custom_root, "AddLabwareDataV1", ET.Element
                 )
             )
-            fallback_actual = add_labware_golden._find_descendant(
-                custom_root, "AddLabwareDataV1"
-            )
+            with patch.object(
+                add_labware_golden,
+                "_native_xml_local_name",
+                wraps=native_acceleration.xml_local_name,
+            ) as local_name_call:
+                fallback_actual = add_labware_golden._find_descendant(
+                    custom_root, "AddLabwareDataV1"
+                )
+                self.assertEqual(local_name_call.call_count, 2)
         self.assertIs(fallback_actual, fallback_expected)
         self.assertIs(fallback_actual, custom_element)
 

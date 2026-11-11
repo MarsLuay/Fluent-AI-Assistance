@@ -13,6 +13,7 @@ from .. import xml_compat as ET
 from tecan_common.native_acceleration import (
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
+    xml_local_name as _native_xml_local_name,
 )
 
 from .commands import AddLabware, command_from_ir_step, command_to_xml
@@ -290,6 +291,9 @@ def _norm_label(value: Any) -> str:
 
 
 def _local_name(tag: str) -> str:
+    native = _native_xml_local_name(tag)
+    if native is not None:
+        return native
     if "}" in tag:
         return tag.rsplit("}", 1)[-1]
     return tag
