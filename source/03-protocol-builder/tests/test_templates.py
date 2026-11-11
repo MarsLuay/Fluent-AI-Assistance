@@ -1,7 +1,10 @@
 import unittest
 from copy import deepcopy
 from pathlib import Path
+from unittest.mock import patch
 
+import fluent_pipeline.template_library as template_library_module
+from tecan_common import native_acceleration
 from fluent_pipeline.protocol_ir import CANONICAL_IR_VERSION, render_python_draft, render_recreate_markdown
 from fluent_pipeline.protocol_ir_schema import validate_protocol_ir_document
 from fluent_pipeline.request_spec import load_request_spec
@@ -179,6 +182,34 @@ def _inventory_template_requests() -> dict[str, dict]:
 
 
 class TemplateLibraryTests(unittest.TestCase):
+    def test_worktable_candidate_guid_lookup_uses_native_ascii_with_unicode_fallback(self):
+        workspaces = [
+            {"guid": "  ABCD  ", "name": "ASCII workspace"},
+            {"guid": "ſcript", "name": "Unicode workspace"},
+        ]
+        selected_scripts = [
+            {
+                "qualified_name": "synthetic_source",
+                "references": [
+                    {"type_id": "WorktableWorkspace", "guid": "abcd"},
+                    {"type_id": "WorktableWorkspace", "guid": "SCRIPT"},
+                ],
+            }
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = template_library_module._worktable_candidates(workspaces, selected_scripts)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                template_library_module,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = template_library_module._worktable_candidates(workspaces, selected_scripts)
+                self.assertEqual(native_call.call_count, 4)
+            self.assertIsNone(native_acceleration.ascii_casefold_trim("ſcript"))
+        self.assertEqual(actual, expected)
+        self.assertEqual([candidate.value for candidate in actual], ["ASCII workspace", "Unicode workspace"])
+
     def test_template_inventory_contains_expected_shapes(self):
         templates = list_templates()
         names = {item["name"] for item in templates}

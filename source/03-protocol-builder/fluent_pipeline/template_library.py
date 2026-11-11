@@ -8,6 +8,8 @@ from pathlib import Path
 import re
 from typing import Any, Mapping
 
+from tecan_common.native_acceleration import ascii_casefold_trim as _native_ascii_casefold_trim
+
 from .config import PROJECT_DIR
 from .inference import (
     InferenceCandidate,
@@ -937,6 +939,11 @@ def _context_workspaces(manifest: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     return [item for item in (raw or []) if isinstance(item, Mapping)]
 
 
+def _casefold_trimmed_text(value: str) -> str:
+    native = _native_ascii_casefold_trim(value)
+    return native if native is not None else value.strip().casefold()
+
+
 def _selected_script_records(
     manifest: Mapping[str, Any],
     request_spec: Mapping[str, Any],
@@ -968,7 +975,7 @@ def _worktable_candidates(
     selected_scripts: list[Mapping[str, Any]],
 ) -> tuple[InferenceCandidate, ...]:
     by_guid = {
-        str(item.get("guid") or "").strip().casefold(): item
+        _casefold_trimmed_text(str(item.get("guid") or "")): item
         for item in workspaces
         if str(item.get("guid") or "").strip()
     }
@@ -981,7 +988,7 @@ def _worktable_candidates(
                 continue
             name = str(ref.get("object_name") or ref.get("name") or "").strip()
             guid = str(ref.get("guid") or "").strip()
-            workspace = by_guid.get(guid.casefold()) if guid else None
+            workspace = by_guid.get(_casefold_trimmed_text(guid)) if guid else None
             value = name or str((workspace or {}).get("name") or (workspace or {}).get("object_name") or guid).strip()
             if value:
                 candidates.append(
@@ -999,7 +1006,7 @@ def _worktable_candidates(
             continue
         for raw_guid in dependencies.get("workspace_guids") or []:
             guid = str(raw_guid or "").strip()
-            workspace = by_guid.get(guid.casefold())
+            workspace = by_guid.get(_casefold_trimmed_text(guid))
             value = str((workspace or {}).get("name") or (workspace or {}).get("object_name") or guid).strip()
             if value:
                 candidates.append(
