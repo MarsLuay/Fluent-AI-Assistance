@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     ascii_lower as _native_ascii_lower,
     ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
     worklist_row_name_to_index as _native_worklist_row_name_to_index,
@@ -1674,4 +1675,6 @@ def _command_name_record(
     return record
 
 def _norm_name(value: Any) -> str:
-    return str(value or "").strip().casefold()
+    text = str(value or "").strip()
+    native = _native_ascii_casefold_trim(text)
+    return native if native is not None else text.casefold()

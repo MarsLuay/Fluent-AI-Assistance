@@ -428,6 +428,38 @@ class GateEvaluatorNativeNormalizationTests(unittest.TestCase):
                 ]
         self.assertEqual(forced_fallback, expected)
 
+    def test_name_normalization_uses_native_casefold_with_unicode_fallback(self):
+        values = [None, 0, " Name ", "Straße", "İstanbul", "東京", "\u2003Name\u2003"]
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [gate_evaluators._norm_name(value) for value in values]
+        self.assertEqual(
+            expected,
+            [str(value or "").strip().casefold() for value in values],
+        )
+
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                gate_evaluators,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = [gate_evaluators._norm_name(value) for value in values]
+            self.assertEqual(native_call.call_count, len(values))
+            native_call.assert_any_call("Straße")
+            native_call.assert_any_call("Name")
+        self.assertEqual(actual, expected)
+
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                gate_evaluators,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                forced_fallback = [
+                    gate_evaluators._norm_name(value) for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_media_step_label_uses_native_lower_with_unicode_casefold_fallback(self):
         values = [
             "media/Step_001_image.png",
