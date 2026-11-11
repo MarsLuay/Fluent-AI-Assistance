@@ -168,6 +168,50 @@ class ApiV2CommandValidateTests(unittest.TestCase):
                 command_validate._clean_subroutine_name(unicode_value), "Ä\\Sub"
             )
 
+    def test_local_name_uses_native_text_kernel(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_tag_local_name"
+        ):
+            self.skipTest("optional Rust XML local-name helper is not built")
+
+        class CustomTag:
+            def __init__(self, text: str) -> None:
+                self.text = text
+                self.string_calls = 0
+
+            def __str__(self) -> str:
+                self.string_calls += 1
+                return self.text
+
+        custom = CustomTag("{urn:test}Custom")
+        values = [
+            "{urn:test}Object",
+            "{outer}{inner}Name",
+            "Object",
+            42,
+            "\ud800",
+            custom,
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                command_validate._local_name(value) for value in values
+            ]
+        self.assertEqual(custom.string_calls, 1)
+        custom.string_calls = 0
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_xml_local_name",
+                wraps=native_acceleration.xml_local_name,
+            ) as native_call:
+                actual = [command_validate._local_name(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual, ["Object", "Name", "Object", "42", "\ud800", "Custom"]
+        )
+        self.assertEqual(custom.string_calls, 1)
+
     def test_root_command_scan_uses_native_selector_and_comment_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_elements_by_name"

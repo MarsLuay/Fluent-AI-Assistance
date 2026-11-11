@@ -19,6 +19,7 @@ from tecan_common.native_acceleration import (
     bracket_variable_names as _native_bracket_variable_names,
     clean_subroutine_name_ascii as _native_clean_subroutine_name_ascii,
     xml_elements_by_name as _native_xml_elements_by_name,
+    xml_local_name as _native_xml_local_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
 )
 
@@ -877,6 +878,9 @@ def _number(value: Any) -> float | None:
 
 def _local_name(tag: Any) -> str:
     text = str(tag)
+    native = _native_xml_local_name(text)
+    if native is not None:
+        return native
     if "}" in text:
         return text.rsplit("}", 1)[-1]
     return text
