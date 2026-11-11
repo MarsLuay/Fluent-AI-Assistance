@@ -23,6 +23,7 @@ from fluentcoder.expressions import (
     expression_inventory_from_xscr_text,
 )
 from tecan_common.native_acceleration import (
+    ascii_case_insensitive_substring_match_groups as _native_ascii_substring_match_groups,
     xml_clean_text as _native_xml_clean_text,
     xml_direct_elements_by_name as _native_xml_direct_elements_by_name,
     xml_elements_by_name as _native_xml_elements_by_name,
@@ -6914,7 +6915,7 @@ def _request_mentions_touchtools(request_spec: Path | None) -> bool:
     if request_spec is None or not request_spec.exists():
         return False
     try:
-        text = request_spec.read_text(encoding="utf-8").casefold()
+        text = request_spec.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return False
     needles = [
@@ -6927,7 +6928,11 @@ def _request_mentions_touchtools(request_spec: Path | None) -> bool:
         "system care",
         "maintenance method",
     ]
-    return any(needle in text for needle in needles)
+    native = _native_ascii_substring_match_groups([text], [needles])
+    if native is not None:
+        return native[0]
+    folded = text.casefold()
+    return any(needle in folded for needle in needles)
 
 
 def _method_touchtools_reason(

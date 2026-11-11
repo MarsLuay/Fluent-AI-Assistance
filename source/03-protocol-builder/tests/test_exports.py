@@ -36,6 +36,51 @@ def _ok_finalization_report() -> FinalizationReport:
     )
 
 
+class TouchToolsRequestTests(unittest.TestCase):
+    def test_ascii_request_matching_uses_native_and_unicode_uses_casefold_fallback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            request = Path(tmp) / "request.txt"
+            cases = [
+                ("Enable TOUCH TOOLS for the operator.", True),
+                ("An ordinary request.", False),
+                ("ſystem care", True),
+            ]
+            with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                expected = []
+                for text, _ in cases:
+                    request.write_text(text, encoding="utf-8")
+                    expected.append(exports._request_mentions_touchtools(request))
+            self.assertEqual(expected, [expected_value for _, expected_value in cases])
+
+            with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with mock.patch.object(
+                    exports,
+                    "_native_ascii_substring_match_groups",
+                    wraps=native_acceleration.ascii_case_insensitive_substring_match_groups,
+                ) as native_call:
+                    actual = []
+                    for text, _ in cases:
+                        request.write_text(text, encoding="utf-8")
+                        actual.append(exports._request_mentions_touchtools(request))
+                    self.assertEqual(native_call.call_count, len(cases))
+                self.assertIsNone(
+                    native_acceleration.ascii_case_insensitive_substring_match_groups(
+                        ["ſystem care"],
+                        [[
+                            "touchtools",
+                            "touch tools",
+                            "touchscreen",
+                            "touch screen",
+                            "touch monitor",
+                            "method starter",
+                            "system care",
+                            "maintenance method",
+                        ]],
+                    )
+                )
+            self.assertEqual(actual, expected)
+
+
 class XscrPromptSelectorTests(unittest.TestCase):
     def test_local_name_uses_native_helper_and_custom_python_fallback(self):
         tag = "{urn:example}RUPScreenTitle"
