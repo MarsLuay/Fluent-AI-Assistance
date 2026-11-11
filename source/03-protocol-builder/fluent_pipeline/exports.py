@@ -8140,7 +8140,13 @@ def _friendly_device_name(value: str) -> str:
         "liha": "LiHa arm",
         "fca": "FCA arm",
     }
-    return names.get(value.lower(), value)
+    native = (
+        _native_ascii_casefold_trim(value)
+        if type(value) is str and value.strip() == value
+        else None
+    )
+    key = native if native is not None else value.lower()
+    return names.get(key, value)
 
 
 def _xscr_command_details(command_object: ET.Element, group_name: str) -> dict[str, object] | None:

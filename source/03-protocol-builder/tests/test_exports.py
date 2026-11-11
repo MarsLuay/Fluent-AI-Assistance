@@ -101,6 +101,36 @@ class ReportKeyNormalizationNativeTests(unittest.TestCase):
         self.assertEqual(forced_fallback, expected)
 
 
+class FriendlyDeviceNameNativeTests(unittest.TestCase):
+    def test_device_name_lowercase_uses_rust_with_safe_fallbacks(self):
+        values = ["MCA96", " LIHA ", "LIHſA", "fca"]
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [exports._friendly_device_name(value) for value in values]
+        self.assertEqual(expected, ["MCA96 head", " LIHA ", "LIHſA", "FCA arm"])
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = [exports._friendly_device_name(value) for value in values]
+                self.assertEqual(native_call.call_count, 3)
+                native_call.assert_any_call("MCA96")
+                native_call.assert_any_call("LIHſA")
+                self.assertNotIn(mock.call(" LIHA "), native_call.call_args_list)
+        self.assertEqual(enabled, expected)
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports, "_native_ascii_casefold_trim", return_value=None
+            ):
+                forced_fallback = [
+                    exports._friendly_device_name(value) for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
+
+
 class SourceTreeCopyNormalizationNativeTests(unittest.TestCase):
     def test_excluded_paths_use_native_casefold_with_unicode_fallback(self):
         with tempfile.TemporaryDirectory() as tmp:
