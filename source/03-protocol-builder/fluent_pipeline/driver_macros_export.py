@@ -16,6 +16,7 @@ from typing import Any, Mapping
 from . import xml_compat as ET
 from tecan_common.native_acceleration import (
     ascii_case_insensitive_substring_match_groups as _native_ascii_substring_match_groups,
+    xml_clean_text as _native_xml_clean_text,
     xml_local_name as _native_xml_local_name,
 )
 from fluentcoder.ir.driver_recovery import parse_driver_recovery_policy
@@ -421,7 +422,8 @@ def _local_name(tag: str) -> str:
 def _text(elem: ET.Element | None) -> str:
     if elem is None or elem.text is None:
         return ""
-    return elem.text.strip()
+    value = _native_xml_clean_text(elem.text)
+    return value if value is not None else elem.text.strip()
 
 
 def _child_text(elem: ET.Element | None, local_name: str) -> str:

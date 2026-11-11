@@ -47,6 +47,46 @@ class DriverMacrosExportTests(unittest.TestCase):
         self.assertEqual(fallback_actual, fallback_expected)
         self.assertEqual(fallback_actual, "PythonFallback")
 
+    def test_xml_text_trimming_uses_native_unicode_and_custom_fallback(self) -> None:
+        class TextNode:
+            def __init__(self, text):
+                self.text = text
+
+        nodes = [
+            TextNode("  value \t"),
+            TextNode("\u2003value\u00a0"),
+            TextNode("\u2003"),
+            TextNode(None),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [driver_macros_export_module._text(node) for node in nodes]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                driver_macros_export_module,
+                "_native_xml_clean_text",
+                wraps=native_acceleration.xml_clean_text,
+            ) as native_call:
+                actual = [driver_macros_export_module._text(node) for node in nodes]
+                self.assertEqual(native_call.call_count, 3)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["value", "value", "", ""])
+
+        class CustomText(str):
+            def strip(self, *args, **kwargs):
+                return "python-custom-strip"
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                driver_macros_export_module,
+                "_native_xml_clean_text",
+                wraps=native_acceleration.xml_clean_text,
+            ) as native_call:
+                self.assertEqual(
+                    driver_macros_export_module._text(TextNode(CustomText(" raw "))),
+                    "python-custom-strip",
+                )
+                self.assertEqual(native_call.call_count, 1)
+
     def test_driver_object_path_hint_scan_uses_ascii_native_and_unicode_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
