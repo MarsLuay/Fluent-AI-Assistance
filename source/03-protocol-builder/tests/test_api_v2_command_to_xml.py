@@ -321,6 +321,42 @@ RUP_VARIABLE_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ApiV2CommandSerializerTests(unittest.TestCase):
+    def test_child_bool_uses_native_ascii_parser_and_python_lower_fallback(self):
+        cases = [
+            (ET.fromstring("<Root><Flag>True</Flag></Root>"), False, True),
+            (ET.fromstring("<Root><Flag>FALSE</Flag></Root>"), True, False),
+            (ET.fromstring("<Root><Flag> truſe </Flag></Root>"), False, False),
+            (ET.fromstring("<Root><Flag>unknown</Flag></Root>"), False, False),
+            (ET.fromstring("<Root />"), True, True),
+            (ET.fromstring("<Root />"), False, False),
+        ]
+        for element, default, expected in cases:
+            with self.subTest(default=default, expected=expected):
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                    fallback = commands_module._child_bool(element, "Flag", default)
+                self.assertEqual(fallback, expected)
+
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                    with patch.object(
+                        commands_module,
+                        "_native_parse_ascii_bool_text",
+                        wraps=native_acceleration.parse_ascii_bool_text,
+                    ) as native_call:
+                        actual = commands_module._child_bool(element, "Flag", default)
+                        self.assertEqual(native_call.call_count, 1)
+                self.assertEqual(actual, fallback)
+
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                    with patch.object(
+                        commands_module,
+                        "_native_parse_ascii_bool_text",
+                        return_value=None,
+                    ):
+                        unsupported_fallback = commands_module._child_bool(
+                            element, "Flag", default
+                        )
+                self.assertEqual(unsupported_fallback, fallback)
+
     def test_xml_compare_local_name_uses_native_helper_and_custom_fallback(self):
         tag = "{urn:example}Object"
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):

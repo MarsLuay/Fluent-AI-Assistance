@@ -9,6 +9,7 @@ from typing import Any, Mapping, Protocol, Sequence
 
 from tecan_common.native_acceleration import (
     ascii_worktable_int_text as _native_ascii_worktable_int_text,
+    parse_ascii_bool_text as _native_parse_ascii_bool_text,
     ascii_worktable_selection_text as _native_ascii_worktable_selection_text,
     xml_direct_elements_by_name as _native_xml_direct_elements_by_name,
     xml_elements_by_name as _native_xml_elements_by_name,
@@ -874,7 +875,8 @@ def _expression_source_text(expression: Mapping[str, Any]) -> str:
 
 def _child_bool(element: Any, name: str, default: bool = False) -> bool:
     text = _child_text(element, name, "False" if not default else "True")
-    return text.lower() == "true"
+    native = _native_parse_ascii_bool_text(text)
+    return native if native is not None else text.lower() == "true"
 
 
 def get_fingers_from_ir_step(step: Mapping[str, Any]) -> GetFingers:
