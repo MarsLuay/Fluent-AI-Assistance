@@ -23,6 +23,7 @@ from fluentcoder.expressions import (
     expression_inventory_from_xscr_text,
 )
 from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
     ascii_case_insensitive_substring_match_groups as _native_ascii_substring_match_groups,
     ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
@@ -5146,7 +5147,12 @@ def _guid_from_archive_entry(entry: str) -> str:
 
 
 def _normalize_archive_entry(entry: str) -> str:
-    return entry.replace("\\", "/").casefold().strip("/")
+    normalized = entry.replace("\\", "/")
+    if normalized.strip() == normalized:
+        native = _native_ascii_casefold_trim(normalized)
+        if native is not None:
+            return native.strip("/")
+    return normalized.casefold().strip("/")
 
 
 def _script_object_name_from_path(path: Path) -> str:

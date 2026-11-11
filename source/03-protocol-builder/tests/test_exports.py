@@ -71,6 +71,43 @@ class SourcePathWhitespaceNativeTests(unittest.TestCase):
         self.assertEqual(unsupported_fallback, expected_path)
 
 
+class ArchiveEntryNormalizationNativeTests(unittest.TestCase):
+    def test_archive_paths_use_native_ascii_casefold_with_exact_python_fallback(self):
+        entries = [
+            "DataStore\\A.XSCR",
+            "//Meta//Text//",
+            " Straße\\X ",
+            "DataStore/İtem",
+            "/DataStore/Folder/",
+            "\u2003DataStore\u2003",
+        ]
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [exports._normalize_archive_entry(entry) for entry in entries]
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = [exports._normalize_archive_entry(entry) for entry in entries]
+                self.assertEqual(native_call.call_count, 4)
+            self.assertIsNone(native_acceleration.ascii_casefold_trim("DataStore/İtem"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual[:2], ["datastore/a.xscr", "meta//text"])
+        self.assertEqual(actual[2], " strasse/x ")
+        self.assertEqual(actual[4], "datastore/folder")
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = [exports._normalize_archive_entry(entry) for entry in entries]
+        self.assertEqual(fallback, expected)
+
+
 class ConnectorPinNormalizationTests(unittest.TestCase):
     def test_pin_normalization_uses_rust_for_ascii_and_python_for_unicode(self):
         values = ["WorktablePin_A-12", "Straße", "ſcript", "東京"]
