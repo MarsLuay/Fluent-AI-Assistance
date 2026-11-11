@@ -115,6 +115,40 @@ def xml_direct_leaf_name_texts(
         return None
 
 
+def xml_direct_record_children(
+    root: Any, element_type: Any
+) -> list[tuple[str, str, bool, Any]] | None:
+    """Collect direct XML child records in order for recursive readers."""
+    if not enabled() or type(root) is not element_type:
+        return None
+    try:
+        result = _native.xml_direct_record_children(root, element_type)
+        if type(result) is not list:
+            return None
+        records: list[tuple[str, str, bool, Any]] = []
+        for item in result:
+            if (
+                type(item) is not tuple
+                or len(item) != 4
+                or type(item[0]) is not str
+                or type(item[1]) is not str
+                or type(item[2]) is not bool
+                or type(item[3]) is not element_type
+            ):
+                return None
+            records.append(item)
+        return records
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_attribute_name_values(
     element: Any, element_type: Any
 ) -> list[tuple[str, str]] | None:

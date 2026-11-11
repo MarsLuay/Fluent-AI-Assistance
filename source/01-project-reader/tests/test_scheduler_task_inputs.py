@@ -476,6 +476,30 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
             native_fallback = task_input._element_record(unsupported, index=0)
         self.assertEqual(native_fallback, python_fallback)
 
+    def test_twl_xml_child_collector_falls_back_for_string_subclasses(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_direct_record_children"
+        ):
+            self.skipTest("optional Rust XML child collector is not built")
+
+        class StringSubclass(str):
+            pass
+
+        root = ET.Element("Task")
+        child = ET.SubElement(root, "Field")
+        child.tag = StringSubclass("Field")
+        child.text = StringSubclass("  preserved\u00a0 text ")
+        root.append(ET.Comment("ignored"))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = task_input._element_record(root, index=0)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                task_input._native_xml_direct_record_children(root, ET.Element)
+            )
+            actual = task_input._element_record(root, index=0)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["unknown_fields"], {"Field": ["preserved text"]})
+
     def test_twl_record_selection_matches_python_casefold_for_unicode_tags(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_elements_by_folded_name_with_children"
@@ -541,9 +565,9 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
 
     def test_twl_xml_whitespace_normalization_uses_native_unicode(self) -> None:
         if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "collapse_ascii_whitespace"
+            native_acceleration._native, "xml_direct_record_children"
         ):
-            self.skipTest("optional Rust whitespace normalizer is not built")
+            self.skipTest("optional Rust XML child collector is not built")
         source = (
             "<TaskInput><Task><Name>  first\t\t task </Name>"
             "<Value>\n  1 \t 2 \r\n</Value><Future> alpha \t beta </Future>"
@@ -554,8 +578,8 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 task_input,
-                "collapse_ascii_whitespace",
-                wraps=native_acceleration.collapse_ascii_whitespace,
+                "_native_xml_direct_record_children",
+                wraps=task_input._native_xml_direct_record_children,
             ) as native_call:
                 actual = inspect_twl_text(source, source_name="Inputs/spacing.twl")
                 self.assertGreater(native_call.call_count, 0)
@@ -577,8 +601,8 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
             )
             with patch.object(
                 task_input,
-                "collapse_ascii_whitespace",
-                wraps=native_acceleration.collapse_ascii_whitespace,
+                "_native_xml_direct_record_children",
+                wraps=task_input._native_xml_direct_record_children,
             ) as native_call:
                 unicode_actual = inspect_twl_text(
                     unicode_source, source_name="Inputs/unicode.twl"

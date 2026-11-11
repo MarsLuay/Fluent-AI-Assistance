@@ -23,6 +23,7 @@ from tecan_common.native_acceleration import (
     sort_string_keys,
     sorted_unique_strings,
     xml_attribute_name_values as _native_xml_attribute_name_values,
+    xml_direct_record_children as _native_xml_direct_record_children,
     xml_elements_by_folded_name_with_children,
 )
 from tecan_common.xml_helpers import local_name
@@ -125,28 +126,37 @@ def _sorted_fields(values: dict[str, Any]) -> dict[str, Any]:
 def _element_record(element: Any, *, index: int) -> dict[str, Any]:
     values: dict[str, str] = {}
     unknown: dict[str, list[str]] = {}
-    for child in list(element):
-        if not isinstance(child.tag, str):
-            continue
-        name = local_name(child.tag)
-        native_text = collapse_ascii_whitespace(child.text)
-        text = (
-            native_text
-            if native_text is not None
-            else " ".join((child.text or "").split())
-        )
-        if list(child):
+    def process_child(
+        name: str, text: str, has_children: bool, child: Any
+    ) -> None:
+        if has_children:
             nested = _element_record(child, index=index)
             if nested:
                 values[name] = nested
-            continue
+            return
         if not text:
-            continue
-        key = name.casefold()
-        if key in _KNOWN_FIELDS:
+            return
+        if name.casefold() in _KNOWN_FIELDS:
             values[name] = text
         else:
             unknown.setdefault(name, []).append(text)
+
+    native_children = _native_xml_direct_record_children(element, ET.Element)
+    if native_children is None:
+        for child in list(element):
+            if not isinstance(child.tag, str):
+                continue
+            name = local_name(child.tag)
+            native_text = collapse_ascii_whitespace(child.text)
+            text = (
+                native_text
+                if native_text is not None
+                else " ".join((child.text or "").split())
+            )
+            process_child(name, text, bool(list(child)), child)
+    else:
+        for name, text, has_children, child in native_children:
+            process_child(name, text, has_children, child)
     native_attributes = _native_xml_attribute_name_values(element, ET.Element)
     if native_attributes is None:
         for name, value in element.attrib.items():

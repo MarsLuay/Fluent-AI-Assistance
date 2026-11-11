@@ -1103,6 +1103,55 @@ fn xml_direct_leaf_name_texts<'py>(
 }
 
 #[pyfunction]
+fn xml_direct_record_children<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let output = PyList::empty(py);
+    for child in root.try_iter()? {
+        let child = child?;
+        if !child.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = child.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local_name = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        let text = child.getattr("text")?;
+        let text = if text.is_none() {
+            String::new()
+        } else {
+            if !text.get_type().is(py.get_type::<PyString>()) {
+                return Ok(None);
+            }
+            let text = text.extract::<String>()?;
+            collapse_python_whitespace(&text)
+        };
+        let has_children = child.call_method0("__len__")?.extract::<usize>()? > 0;
+        let record = PyTuple::new(
+            py,
+            [
+                PyString::new(py, local_name).into_any(),
+                PyString::new(py, &text).into_any(),
+                PyBool::new(py, has_children).as_any().clone(),
+                child.clone(),
+            ],
+        )?;
+        output.append(record)?;
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn xml_attribute_name_values<'py>(
     py: Python<'py>,
     element: &Bound<'py, PyAny>,
@@ -5738,6 +5787,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_clean_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_child_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_leaf_name_texts, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_direct_record_children, module)?)?;
     module.add_function(wrap_pyfunction!(xml_attribute_name_values, module)?)?;
     module.add_function(wrap_pyfunction!(xml_first_nonempty_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_container_child_texts, module)?)?;
