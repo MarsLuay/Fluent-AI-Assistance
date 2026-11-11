@@ -14,7 +14,10 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from . import xml_compat as ET
-from tecan_common.native_acceleration import xml_local_name as _native_xml_local_name
+from tecan_common.native_acceleration import (
+    ascii_case_insensitive_substring_match_groups as _native_ascii_substring_match_groups,
+    xml_local_name as _native_xml_local_name,
+)
 from fluentcoder.ir.driver_recovery import parse_driver_recovery_policy
 
 from .external_commands import (
@@ -347,8 +350,17 @@ def _driver_object_paths(
             continue
         kind = str(item.get("kind") or "").casefold()
         entry = str(item.get("entry") or item.get("extracted_path") or "")
-        haystack = f"{kind} {entry}".casefold()
-        if not any(hint in haystack for hint in _DRIVER_OBJECT_HINTS):
+        haystack_source = f"{kind} {entry}"
+        native_match = _native_ascii_substring_match_groups(
+            [haystack_source], [tuple(_DRIVER_OBJECT_HINTS)]
+        )
+        if native_match is None:
+            has_driver_hint = any(
+                hint in haystack_source.casefold() for hint in _DRIVER_OBJECT_HINTS
+            )
+        else:
+            has_driver_hint = native_match[0]
+        if not has_driver_hint:
             continue
         path = _resolve_manifest_path(manifest, item)
         if path is None or not path.is_file():

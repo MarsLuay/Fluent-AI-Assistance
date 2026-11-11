@@ -47,6 +47,44 @@ class DriverMacrosExportTests(unittest.TestCase):
         self.assertEqual(fallback_actual, fallback_expected)
         self.assertEqual(fallback_actual, "PythonFallback")
 
+    def test_driver_object_path_hint_scan_uses_ascii_native_and_unicode_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            entries = (
+                "bundle/applicationdriver.xml",
+                "bundle/applicationdriverſ.xml",
+                "bundle/ordinary.xml",
+            )
+            for entry in entries:
+                path = root / entry
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("", encoding="utf-8")
+            manifest = {
+                "extracted_dir": str(root),
+                "objects": [{"kind": "misc", "entry": entry} for entry in entries],
+            }
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                expected = driver_macros_export_module._driver_object_paths(manifest, None)
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    driver_macros_export_module,
+                    "_native_ascii_substring_match_groups",
+                    wraps=native_acceleration.ascii_case_insensitive_substring_match_groups,
+                ) as native_call:
+                    actual = driver_macros_export_module._driver_object_paths(manifest, None)
+                    self.assertEqual(native_call.call_count, len(entries))
+                self.assertIsNone(
+                    native_acceleration.ascii_case_insensitive_substring_match_groups(
+                        ["misc applicationdriverſ.xml"],
+                        [tuple(driver_macros_export_module._DRIVER_OBJECT_HINTS)],
+                    )
+                )
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            [path.name for path in actual],
+            ["applicationdriver.xml", "applicationdriverſ.xml"],
+        )
+
     def test_mines_legacy_driver_macro_from_xscr(self) -> None:
         xml = """<?xml version="1.0"?>
 <root>
