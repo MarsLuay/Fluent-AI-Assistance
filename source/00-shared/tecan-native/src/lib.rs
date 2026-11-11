@@ -1208,6 +1208,173 @@ fn has_visionx_namespace(text: &str) -> Option<bool> {
     has_visionx_namespace_ascii(text)
 }
 
+fn object_name_opening_tag_matches_ascii(tag_body: &[u8]) -> bool {
+    let marker = b"objectname";
+    let mut search_start = 0;
+    while search_start + marker.len() <= tag_body.len() {
+        let Some(relative_start) = tag_body[search_start..]
+            .windows(marker.len())
+            .position(|candidate| candidate.eq_ignore_ascii_case(marker))
+        else {
+            break;
+        };
+        let end = search_start + relative_start + marker.len();
+        if end == tag_body.len() || !is_ascii_word(tag_body[end]) {
+            return true;
+        }
+        search_start = end;
+    }
+    false
+}
+
+fn object_name_closing_tag_matches_ascii(tag_body: &[u8]) -> bool {
+    let marker = b"objectname";
+    tag_body.len() > marker.len()
+        && tag_body.first() == Some(&b'/')
+        && tag_body[tag_body.len() - marker.len()..].eq_ignore_ascii_case(marker)
+}
+
+fn has_ascii_object_name_tag(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    let mut search_start = 0;
+    while let Some(relative_open) = bytes[search_start..].iter().position(|byte| *byte == b'<') {
+        let body_start = search_start + relative_open + 1;
+        let Some(relative_end) = bytes[body_start..].iter().position(|byte| *byte == b'>') else {
+            return false;
+        };
+        let tag_end = body_start + relative_end;
+        if object_name_opening_tag_matches_ascii(&bytes[body_start..tag_end]) {
+            return true;
+        }
+        search_start = tag_end + 1;
+    }
+    false
+}
+
+fn has_ascii_object_name_structure(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    let mut search_start = 0;
+    while let Some(relative_open) = bytes[search_start..].iter().position(|byte| *byte == b'<') {
+        let open = search_start + relative_open;
+        let body_start = open + 1;
+        let Some(relative_end) = bytes[body_start..].iter().position(|byte| *byte == b'>') else {
+            return false;
+        };
+        let close = body_start + relative_end;
+        if object_name_opening_tag_matches_ascii(&bytes[body_start..close]) {
+            let content_start = close + 1;
+            if let Some(relative_content_end) =
+                bytes[content_start..].iter().position(|byte| *byte == b'<')
+            {
+                let content_end = content_start + relative_content_end;
+                if content_end > content_start {
+                    let closing_body_start = content_end + 1;
+                    if closing_body_start < bytes.len() && bytes[content_end] == b'<' {
+                        if let Some(relative_closing_end) = bytes[closing_body_start..]
+                            .iter()
+                            .position(|byte| *byte == b'>')
+                        {
+                            let closing_end = closing_body_start + relative_closing_end;
+                            if object_name_closing_tag_matches_ascii(
+                                &bytes[closing_body_start..closing_end],
+                            ) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        search_start = close + 1;
+    }
+    false
+}
+
+fn has_ascii_script_tag(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    let marker = b"script";
+    let mut search_start = 0;
+    while let Some(relative_open) = bytes[search_start..].iter().position(|byte| *byte == b'<') {
+        let body_start = search_start + relative_open + 1;
+        let tag_end = bytes[body_start..]
+            .iter()
+            .position(|byte| *byte == b'>')
+            .map_or(bytes.len(), |relative_end| body_start + relative_end);
+        let mut candidate_start = body_start;
+        while candidate_start + marker.len() <= tag_end {
+            let marker_end = candidate_start + marker.len();
+            if bytes[candidate_start..marker_end].eq_ignore_ascii_case(marker)
+                && marker_end < bytes.len()
+                && (bytes[marker_end] == b'>' || is_python_ascii_whitespace(bytes[marker_end]))
+            {
+                return true;
+            }
+            candidate_start += 1;
+        }
+        if tag_end == bytes.len() {
+            break;
+        }
+        search_start = tag_end + 1;
+    }
+    false
+}
+
+fn has_ascii_object_structure(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    let mut search_start = 0;
+    while let Some(relative_open) = bytes[search_start..].iter().position(|byte| *byte == b'<') {
+        let body_start = search_start + relative_open + 1;
+        let tag_end = bytes[body_start..]
+            .iter()
+            .position(|byte| *byte == b'>')
+            .map_or(bytes.len(), |relative_end| body_start + relative_end);
+        let body = &bytes[body_start..tag_end];
+        let object = b"object";
+        let type_attribute = b"type=";
+        let mut object_search = 0;
+        while object_search + object.len() <= body.len() {
+            let Some(relative_object) = body[object_search..]
+                .windows(object.len())
+                .position(|candidate| candidate.eq_ignore_ascii_case(object))
+            else {
+                break;
+            };
+            let after_object = object_search + relative_object + object.len();
+            if after_object < body.len() && is_python_ascii_whitespace(body[after_object]) {
+                let tail = &body[after_object..];
+                if tail
+                    .windows(type_attribute.len())
+                    .any(|candidate| candidate.eq_ignore_ascii_case(type_attribute))
+                {
+                    return true;
+                }
+            }
+            object_search = after_object;
+        }
+        if tag_end == bytes.len() {
+            break;
+        }
+        search_start = tag_end + 1;
+    }
+    false
+}
+
+fn zeia_xml_structural_flags_ascii(text: &str) -> Option<(bool, bool)> {
+    if !text.is_ascii() {
+        return None;
+    }
+    let has_object_name = has_ascii_object_name_structure(text);
+    Some((
+        has_object_name && has_ascii_script_tag(text),
+        has_ascii_object_name_tag(text) || has_ascii_object_structure(text),
+    ))
+}
+
+#[pyfunction]
+fn zeia_xml_structural_flags(text: &str) -> Option<(bool, bool)> {
+    zeia_xml_structural_flags_ascii(text)
+}
+
 #[pyfunction]
 fn xml_clean_text(text: &str) -> String {
     trim_python_whitespace(text).to_owned()
@@ -6128,6 +6295,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(extract_data_store_versions, module)?)?;
     module.add_function(wrap_pyfunction!(count_xscr_object_type_attributes, module)?)?;
     module.add_function(wrap_pyfunction!(has_visionx_namespace, module)?)?;
+    module.add_function(wrap_pyfunction!(zeia_xml_structural_flags, module)?)?;
     module.add_function(wrap_pyfunction!(xml_clean_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_child_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_leaf_name_texts, module)?)?;
@@ -7018,5 +7186,35 @@ mod tests {
             assert_eq!(has_visionx_namespace_ascii(text), Some(false), "{text:?}");
         }
         assert_eq!(has_visionx_namespace_ascii("<VxData> café"), None);
+    }
+
+    #[test]
+    fn zeia_structural_flags_cover_ascii_pattern_edges() {
+        for (text, expected) in [
+            ("<ObjectName>foo</ObjectName><Script />", (true, true)),
+            (
+                "<ObjectName/>foo</FakeObjectName><x:Script\n>",
+                (true, true),
+            ),
+            ("<ObjectNameX>foo</ObjectName><Script>", (false, true)),
+            ("<ObjectName>foo<Other></ObjectName><Script>", (false, true)),
+            ("<Thing><Object Type='A'/></Thing>", (false, true)),
+            ("<Object\tType=foo", (false, true)),
+            ("<Object Type = 'x'>", (false, false)),
+            ("<ObjectX Type=foo>", (false, false)),
+            ("<Object Value='Script'>", (false, false)),
+            ("<Script\tSomething>", (false, false)),
+            ("<ScriptX>", (false, false)),
+        ] {
+            assert_eq!(
+                zeia_xml_structural_flags_ascii(text),
+                Some(expected),
+                "{text:?}"
+            );
+        }
+        assert_eq!(
+            zeia_xml_structural_flags_ascii("<ObjectName>café</ObjectName>"),
+            None
+        );
     }
 }

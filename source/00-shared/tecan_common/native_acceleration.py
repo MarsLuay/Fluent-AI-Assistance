@@ -99,6 +99,23 @@ def has_visionx_namespace(text: Any) -> bool | None:
         return None
 
 
+def zeia_xml_structural_flags(text: Any) -> tuple[bool, bool] | None:
+    """Detect ZEIA XML structural markers natively for ASCII text only."""
+    if not enabled() or type(text) is not str:
+        return None
+    try:
+        result = _native.zeia_xml_structural_flags(text)
+        if (
+            type(result) is tuple
+            and len(result) == 2
+            and all(type(value) is bool for value in result)
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def xml_clean_text(value: Any) -> str | None:
     """Trim exact Unicode XML text natively, preserving Python fallback cases."""
     if not enabled():

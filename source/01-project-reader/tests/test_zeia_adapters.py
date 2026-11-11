@@ -225,6 +225,65 @@ class ZeiaAdapterTests(unittest.TestCase):
         self.assertEqual(accelerated.status, fallback.status)
         self.assertEqual(accelerated.selected.adapter_id, fallback.selected.adapter_id)
 
+    def test_structural_probe_flags_match_python_regex_and_fallback(self) -> None:
+        object_name = r"<[^>]*:?ObjectName\b[^>]*>"
+        object_name_with_text = r"<[^>]*:?ObjectName\b[^>]*>[^<]+</[^>]*:?ObjectName>"
+        script_tag = r"<[^>]*:?Script(?:\s|>)"
+        object_type = r"<[^>]*:?Object\s+[^>]*Type="
+        samples = (
+            "<ObjectName>foo</ObjectName><Script />",
+            "<ObjectName/>foo</FakeObjectName><x:Script\n>",
+            "<ObjectNameX>foo</ObjectName><Script>",
+            "<ObjectName>foo<Other></ObjectName><Script>",
+            "<Thing><Object Type='A'/></Thing>",
+            "<Object\tType=foo",
+            "<Object Type = 'x'>",
+            "<ObjectX Type=foo>",
+            "<Object Value='Script'>",
+            "<Script\tSomething>",
+            "<ScriptX>",
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            for sample in samples:
+                expected = (
+                    bool(
+                        re.search(object_name_with_text, sample, re.IGNORECASE)
+                        and re.search(script_tag, sample, re.IGNORECASE)
+                    ),
+                    bool(
+                        re.search(object_name, sample, re.IGNORECASE)
+                        or re.search(object_type, sample, re.IGNORECASE)
+                    ),
+                )
+                native = native_acceleration.zeia_xml_structural_flags(sample)
+                if native_acceleration.available():
+                    self.assertEqual(native, expected, repr(sample))
+                else:
+                    self.assertIsNone(native, repr(sample))
+
+            self.assertIsNone(
+                native_acceleration.zeia_xml_structural_flags(
+                    "<ObjectName>café</ObjectName><Script>"
+                )
+            )
+            with tempfile.TemporaryDirectory() as tmp:
+                archive = self._archive(
+                    Path(tmp),
+                    "structure-probe.zeia",
+                    {"Scripts/main.xscr": LEGACY_SCRIPT},
+                )
+                with patch.object(
+                    zeia_adapters_module,
+                    "_native_zeia_xml_structural_flags",
+                    wraps=native_acceleration.zeia_xml_structural_flags,
+                ) as native_call:
+                    accelerated = probe_zeia(archive)
+                    self.assertEqual(native_call.call_count, 1)
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                    fallback = probe_zeia(archive)
+        self.assertEqual(accelerated.status, fallback.status)
+        self.assertEqual(accelerated.selected.adapter_id, fallback.selected.adapter_id)
+
     def test_oversized_xscr_object_type_count_matches_python_regex(self) -> None:
         pattern = r"<Object\b[^>]*\bType=['\"]([^'\"]+)"
         samples = (

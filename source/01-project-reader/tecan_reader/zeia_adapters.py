@@ -14,6 +14,7 @@ from tecan_common.native_acceleration import (
     extract_data_store_versions as _native_extract_data_store_versions,
     has_gwl_record_prefix as _native_has_gwl_record_prefix,
     has_visionx_namespace as _native_has_visionx_namespace,
+    zeia_xml_structural_flags as _native_zeia_xml_structural_flags,
 )
 from tecan_common.performance import (
     finish_performance_marker,
@@ -749,14 +750,22 @@ def _build_probe(
             )
         )
     has_visionx_namespace = has_visionx
-    has_script_structure = bool(
-        re.search(r"<[^>]*:?ObjectName\b[^>]*>[^<]+</[^>]*:?ObjectName>", combined, re.IGNORECASE)
-        and re.search(r"<[^>]*:?Script(?:\s|>)", combined, re.IGNORECASE)
-    )
-    has_object_structure = bool(
-        re.search(r"<[^>]*:?ObjectName\b[^>]*>", combined, re.IGNORECASE)
-        or re.search(r"<[^>]*:?Object\s+[^>]*Type=", combined, re.IGNORECASE)
-    )
+    structural_flags = _native_zeia_xml_structural_flags(combined)
+    if structural_flags is None:
+        has_script_structure = bool(
+            re.search(
+                r"<[^>]*:?ObjectName\b[^>]*>[^<]+</[^>]*:?ObjectName>",
+                combined,
+                re.IGNORECASE,
+            )
+            and re.search(r"<[^>]*:?Script(?:\s|>)", combined, re.IGNORECASE)
+        )
+        has_object_structure = bool(
+            re.search(r"<[^>]*:?ObjectName\b[^>]*>", combined, re.IGNORECASE)
+            or re.search(r"<[^>]*:?Object\s+[^>]*Type=", combined, re.IGNORECASE)
+        )
+    else:
+        has_script_structure, has_object_structure = structural_flags
     has_script_container_evidence = any(
         Path(name).suffix.casefold() == ".xscr"
         and any(
