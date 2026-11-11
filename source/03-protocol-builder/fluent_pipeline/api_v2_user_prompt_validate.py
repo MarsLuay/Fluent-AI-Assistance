@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Protocol
 
 from tecan_common.native_acceleration import (
-    xml_elements_by_name as _native_xml_elements_by_name,
+    xml_first_element_by_name as _native_xml_first_element_by_name,
 )
 
 from .policies.prompt_text import normalize_operator_prompt_text, prompt_text_is_placeholder
@@ -170,11 +170,12 @@ def runtime_error_for_validate_failure(
 
 
 def _first_descendant_text(root: ET.Element, name: str) -> tuple[bool, str]:
-    elements = _native_xml_elements_by_name(root, (name,), ET.Element)
-    if elements is not None:
-        if not elements:
+    selection = _native_xml_first_element_by_name(root, name, ET.Element)
+    if selection is not None:
+        _, element = selection
+        if element is None:
             return False, ""
-        return True, (elements[0].text or "").strip()
+        return True, (element.text or "").strip()
     for node in root.iter():
         if _local_name(node.tag) == name:
             return True, (node.text or "").strip()

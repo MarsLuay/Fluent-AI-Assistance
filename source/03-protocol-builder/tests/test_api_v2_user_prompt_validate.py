@@ -40,8 +40,8 @@ class UserPromptValidateTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 user_prompt_validate,
-                "_native_xml_elements_by_name",
-                wraps=native_acceleration.xml_elements_by_name,
+                "_native_xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
             ) as native_call:
                 actual = extract_prompt_message(command)
                 self.assertEqual(native_call.call_count, 1)
@@ -62,8 +62,8 @@ class UserPromptValidateTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 user_prompt_validate,
-                "_native_xml_elements_by_name",
-                wraps=native_acceleration.xml_elements_by_name,
+                "_native_xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
             ) as native_call:
                 actual_empty = extract_prompt_message(first_empty)
                 self.assertEqual(native_call.call_count, 1)
@@ -81,13 +81,37 @@ class UserPromptValidateTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 user_prompt_validate,
-                "_native_xml_elements_by_name",
-                wraps=native_acceleration.xml_elements_by_name,
+                "_native_xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
             ) as native_call:
                 actual_fallback = extract_prompt_message(fallback_prompt)
                 self.assertEqual(native_call.call_count, 2)
         self.assertEqual(actual_fallback, expected_fallback)
         self.assertEqual(actual_fallback, "fallback")
+
+        class StringTag(str):
+            pass
+
+        custom_root = user_prompt_validate.ET.Element("Root")
+        custom_prompt = user_prompt_validate.ET.SubElement(
+            custom_root, StringTag("Prompt")
+        )
+        custom_prompt.text = "Fallback"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            custom_expected = user_prompt_validate._first_descendant_text(
+                custom_root, "Prompt"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_first_element_by_name(
+                    custom_root, "Prompt", user_prompt_validate.ET.Element
+                )
+            )
+            custom_actual = user_prompt_validate._first_descendant_text(
+                custom_root, "Prompt"
+            )
+        self.assertEqual(custom_actual, custom_expected)
+        self.assertEqual(custom_actual, (True, "Fallback"))
 
     def test_offline_validate_passes_real_prompt(self):
         command = ICommand(
