@@ -9,6 +9,7 @@ from .command_tracing import append_command_trace, trace_execution_command
 from .commands import set_location_from_ir_step
 from .legacy_sila import resolve_legacy_service_endpoint
 from .progress_policy import ProgressSyncPolicy, progress_wait_guidance
+from .run_control import run_control_options_from_env
 from .runtime_session import (
     partition_method_inventory,
     record_session_identity,
@@ -83,11 +84,9 @@ def merge_api_v2_context_into_report(
     merged = dict(report)
     details = dict(merged.get("details") or {})
     if resume_run_after_prompts is None:
-        resume_run_after_prompts = os.environ.get("TECAN_RESUME_RUN_AFTER_PROMPTS", "").strip().casefold() in {
-            "1",
-            "true",
-            "yes",
-        }
+        resume_run_after_prompts = (
+            run_control_options_from_env().resume_run_after_prompts
+        )
     if interior_light_before_prompts is None:
         interior_light_before_prompts = interior_light_options_from_env().interior_light_before_prompts
     if operator_ack_path is None:

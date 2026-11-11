@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import fluent_pipeline.api_v2.context_enrichment as context_enrichment
 import fluent_pipeline.api_v2.run_control as run_control
 from tecan_common import native_acceleration
 from fluent_pipeline.api_v2.run_control import (
@@ -17,6 +18,21 @@ from fluent_pipeline.api_v2.run_control import (
 
 
 class RunControlNormalizationTests(unittest.TestCase):
+    def test_context_enrichment_reuses_run_control_environment_normalization(self) -> None:
+        for disabled, expected in (("0", True), ("1", True), ("0", False)):
+            raw = "Yeſ" if expected else "enabled"
+            with self.subTest(disabled=disabled, raw=raw):
+                env = {
+                    "TECAN_RESUME_RUN_AFTER_PROMPTS": raw,
+                    "TECAN_DISABLE_RUST_ACCELERATION": disabled,
+                }
+                with patch.dict(os.environ, env, clear=True):
+                    report = context_enrichment.merge_api_v2_context_into_report(
+                        {}, host="localhost", port=1
+                    )
+                resume = report["details"]["api_v2"]["resume_run"]
+                self.assertEqual(resume["resume_run_after_prompts"], expected)
+
     def test_resume_environment_flag_native_and_fallback_parity(self) -> None:
         cases = [
             ("yes", True),
