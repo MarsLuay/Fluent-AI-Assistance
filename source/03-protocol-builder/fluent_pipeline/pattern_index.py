@@ -420,12 +420,20 @@ def _target_incompatibility(window: Mapping[str, Any], target: Mapping[str, Any]
     incompatible_ids = {str(value) for value in _facet_strings(target.get("incompatible_pattern_ids"))}
     if pattern_id in incompatible_ids:
         return True, "incompatible_target_evidence"
-    scripts = {str(value).casefold() for value in _facet_strings(target.get("incompatible_source_scripts"))}
-    if str(window.get("source_script") or "").casefold() in scripts:
+    scripts = {
+        _casefold_text(str(value))
+        for value in _facet_strings(target.get("incompatible_source_scripts"))
+    }
+    if _casefold_text(str(window.get("source_script") or "")) in scripts:
         return True, "incompatible_source_script"
     metadata = window.get("metadata") if isinstance(window.get("metadata"), Mapping) else {}
-    target_version = str(target.get("target_fluentcontrol_version") or "").strip().casefold()
-    supported_versions = {str(value).casefold() for value in _facet_strings(metadata.get("supported_target_versions"))}
+    target_version = _casefold_text(
+        str(target.get("target_fluentcontrol_version") or "").strip()
+    )
+    supported_versions = {
+        _casefold_text(str(value))
+        for value in _facet_strings(metadata.get("supported_target_versions"))
+    }
     if target_version and supported_versions and target_version not in supported_versions:
         return True, "incompatible_target_version"
     return False, ""

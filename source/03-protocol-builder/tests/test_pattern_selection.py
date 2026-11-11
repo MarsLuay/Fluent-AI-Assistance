@@ -219,6 +219,51 @@ def test_pattern_scoring_uses_native_lower_with_unicode_fallback() -> None:
     assert forced_fallback == expected
 
 
+def test_target_incompatibility_uses_native_casefold_with_unicode_fallback() -> None:
+    window = _window(
+        1,
+        "aspirate",
+        source_script="Straße",
+        metadata={"supported_target_versions": ["3.7"]},
+    )
+    targets = [
+        {"incompatible_source_scripts": ["STRASSE"]},
+        {"target_fluentcontrol_version": "3.8"},
+    ]
+    with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = [
+            pattern_index._target_incompatibility(window, target) for target in targets
+        ]
+    assert expected == [
+        (True, "incompatible_source_script"),
+        (True, "incompatible_target_version"),
+    ]
+
+    with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with mock.patch.object(
+            pattern_index,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            actual = [
+                pattern_index._target_incompatibility(window, target)
+                for target in targets
+            ]
+        native_call.assert_any_call("STRASSE")
+        native_call.assert_any_call("Straße")
+        native_call.assert_any_call("3.8")
+        native_call.assert_any_call("3.7")
+    assert actual == expected
+
+    with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with mock.patch.object(pattern_index, "_native_ascii_lower", return_value=None):
+            forced_fallback = [
+                pattern_index._target_incompatibility(window, target)
+                for target in targets
+            ]
+    assert forced_fallback == expected
+
+
 def test_ranking_is_repeatable_and_preserves_explicit_query_and_script_overrides() -> None:
     windows = [
         _window(1, "aspirate", source_script="A", retrieval={"method": "pattern_query", "query": "aspirate"}),
