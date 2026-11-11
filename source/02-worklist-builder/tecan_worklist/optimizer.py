@@ -587,6 +587,158 @@ def analyze_worklist(
     )
 
 
+def _native_optimization_result(
+    worklist: Worklist,
+    records: list[Record],
+    lines: list[str],
+    analysis: WorklistAnalysis,
+    enabled_tip_mask: object,
+    supported_channels: int,
+) -> OptimizationResult | None:
+    payload = native_acceleration.worklist_optimize_lines(
+        lines,
+        worklist.name,
+        enabled_tip_mask if type(enabled_tip_mask) is str else None,
+        supported_channels,
+    )
+    if payload is None or payload.get("ok") is not True:
+        return None
+
+    expected_payload = analysis.to_dict()
+    native_explicit = payload.get("explicit_tip_assignments")
+    if not isinstance(native_explicit, dict) or any(
+        type(key) is not str
+        or not key.isascii()
+        or not key.isdecimal()
+        or type(value) is not int
+        for key, value in native_explicit.items()
+    ):
+        return None
+    normalized_explicit = {int(key): value for key, value in native_explicit.items()}
+    if normalized_explicit != expected_payload["explicit_tip_assignments"] or any(
+        payload.get(key) != expected_payload.get(key)
+        for key in (
+            "schema_version",
+            "record_count",
+            "unit_count",
+            "automatic_tip_units",
+            "enabled_tip_mask",
+            "barriers",
+            "parallel_windows",
+            "diagnostics",
+            "runtime_parallelism",
+        )
+    ):
+        return None
+
+    raw_orders = payload.get("reordered_units")
+    raw_reasons = payload.get("reasons")
+    if (
+        type(raw_orders) is not list
+        or any(
+            type(order) is not list or any(type(index) is not int for index in order)
+            for order in raw_orders
+        )
+        or type(raw_reasons) is not list
+        or any(type(reason) is not str for reason in raw_reasons)
+    ):
+        return None
+
+    units_by_index = {unit.unit_index: unit for unit in analysis.units}
+    windows_by_unit = {
+        unit.unit_index: window for window in analysis.windows for unit in window.units
+    }
+    replacements: dict[int, list[Record]] = {}
+    removed: set[int] = set()
+    reordered: list[tuple[int, ...]] = []
+    previous_window = -1
+    for raw_order in raw_orders:
+        order = tuple(raw_order)
+        if len(order) < 2 or len(set(order)) != len(order):
+            return None
+        window = windows_by_unit.get(order[0])
+        if (
+            window is None
+            or window.index <= previous_window
+            or any(windows_by_unit.get(index) is not window for index in order)
+            or not window.independent
+            or not window.explicit_tips
+        ):
+            return None
+        previous_window = window.index
+        original_order = [unit.unit_index for unit in window.units]
+        if len(order) != len(original_order) or set(order) != set(original_order):
+            return None
+
+        grouped: dict[int, list[int]] = defaultdict(list)
+        for unit in window.units:
+            if unit.tip_channel is None:
+                return None
+            grouped[unit.tip_channel].append(unit.unit_index)
+        channels = sorted(grouped)
+        if len(channels) < 2:
+            return None
+        expected_order: list[int] = []
+        offset = 0
+        while True:
+            added = False
+            for channel in channels:
+                if offset < len(grouped[channel]):
+                    expected_order.append(grouped[channel][offset])
+                    added = True
+            if not added:
+                break
+            offset += 1
+        if order != tuple(expected_order) or order == tuple(original_order):
+            return None
+
+        group_indices: set[int] = set()
+        for unit_index in original_order:
+            unit = units_by_index.get(unit_index)
+            if unit is None:
+                return None
+            for record_index in unit.record_indices:
+                if (
+                    type(record_index) is not int
+                    or record_index < 0
+                    or record_index >= len(records)
+                    or record_index in group_indices
+                    or record_index in removed
+                ):
+                    return None
+                group_indices.add(record_index)
+        first = min(group_indices)
+        blocks = {
+            unit_index: [records[index] for index in units_by_index[unit_index].record_indices]
+            for unit_index in original_order
+        }
+        replacements[first] = [record for unit_index in order for record in blocks[unit_index]]
+        removed.update(index for index in group_indices if index != first)
+        reordered.append(order)
+
+    changed = bool(replacements)
+    if payload.get("changed") is not changed:
+        return None
+    output: list[Record] = []
+    for index, record in enumerate(records):
+        if index in replacements:
+            output.extend(replacements[index])
+        elif index not in removed:
+            output.append(record)
+    optimized = Worklist(name=worklist.name, records=output)
+    if optimized.to_text() != payload.get("text"):
+        return None
+    if Counter(record.to_line() for record in optimized.records) != Counter(lines):
+        return None
+    return OptimizationResult(
+        optimized,
+        analysis,
+        changed,
+        tuple(reordered),
+        tuple(raw_reasons),
+    )
+
+
 def optimize_worklist(
     worklist: Worklist,
     *,
@@ -602,6 +754,20 @@ def optimize_worklist(
             reasons=("optimization refused because the worklist has semantic errors",),
         )
     records = list(worklist.records)
+    native_lines = _native_worklist_analysis_lines(
+        records, enabled_tip_mask, analysis.enabled_tip_mask, supported_channels
+    )
+    if native_lines is not None:
+        native_result = _native_optimization_result(
+            worklist,
+            records,
+            native_lines,
+            analysis,
+            enabled_tip_mask,
+            supported_channels,
+        )
+        if native_result is not None:
+            return native_result
     replacements: dict[int, list[Record]] = {}
     reordered: list[tuple[int, ...]] = []
     reasons: list[str] = []

@@ -35,6 +35,7 @@ from tecan_worklist.gwl import (
     parse_tip_selection,
     serialize_gwl,
 )
+import tecan_worklist.optimizer as optimizer_module
 from tecan_worklist.optimizer import (
     analyze_worklist,
     optimize_worklist,
@@ -1879,6 +1880,123 @@ class WorklistSemanticsTests(unittest.TestCase):
                 actual = semantic_equivalent(unsupported, unsupported)
                 self.assertEqual(native_call.call_count, 0)
         self.assertEqual(actual, expected)
+
+    def test_native_optimizer_api_matches_fallback_and_guards_raw_records(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_optimize_lines"
+        ):
+            self.skipTest("optional Rust worklist optimizer is not built")
+
+        units = [_transfer(index, tip=tip) for index, tip in enumerate(("1", "1", "2", "2"), 1)]
+        original = Worklist(
+            records=[
+                Comment("first unit"),
+                *units[0],
+                *units[1],
+                *units[2],
+                *units[3],
+                Break(),
+            ]
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = optimize_worklist(original, enabled_tip_mask="3")
+
+        native_builder = optimizer_module._native_optimization_result
+        native_results = []
+
+        def capture_native_result(*args, **kwargs):
+            result = native_builder(*args, **kwargs)
+            native_results.append(result)
+            return result
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                optimizer_module,
+                "_native_optimization_result",
+                side_effect=capture_native_result,
+            ):
+                with patch.object(
+                    native_acceleration,
+                    "worklist_optimize_lines",
+                    wraps=native_acceleration.worklist_optimize_lines,
+                ) as native_call:
+                    actual = optimize_worklist(original, enabled_tip_mask="3")
+            native_call.assert_called_once()
+        self.assertEqual(len(native_results), 1)
+        self.assertIsNotNone(native_results[0])
+        self.assertEqual(actual.worklist.to_text(), expected.worklist.to_text())
+        self.assertEqual(actual.analysis.to_dict(), expected.analysis.to_dict())
+        self.assertEqual(actual.changed, expected.changed)
+        self.assertEqual(actual.reordered_units, expected.reordered_units)
+        self.assertEqual(actual.reasons, expected.reasons)
+        self.assertTrue(
+            all(
+                actual_record is expected_record
+                for actual_record, expected_record in zip(
+                    actual.worklist.records, expected.worklist.records
+                )
+            )
+        )
+
+        automatic_units = [_transfer(index, tip="") for index in (1, 2)]
+        shared_units = [
+            *_transfer(1, tip="1"),
+            *_transfer(2, tip="2", source=1),
+        ]
+        one_channel_units = [
+            *_transfer(1, tip="1"),
+            *_transfer(2, tip="1"),
+        ]
+        interleaved_units = [
+            *_transfer(1, tip="1"),
+            *_transfer(2, tip="2"),
+        ]
+        no_change_worklists = [
+            Worklist(records=[record for unit in automatic_units for record in unit]),
+            Worklist(records=shared_units),
+            Worklist(records=one_channel_units),
+            Worklist(records=interleaved_units),
+        ]
+        for candidate in no_change_worklists:
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                expected = optimize_worklist(candidate, enabled_tip_mask="3")
+            native_results.clear()
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    optimizer_module,
+                    "_native_optimization_result",
+                    side_effect=capture_native_result,
+                ):
+                    with patch.object(
+                        native_acceleration,
+                        "worklist_optimize_lines",
+                        wraps=native_acceleration.worklist_optimize_lines,
+                    ) as native_call:
+                        actual = optimize_worklist(candidate, enabled_tip_mask="3")
+                native_call.assert_called_once()
+            self.assertEqual(len(native_results), 1)
+            self.assertIsNotNone(native_results[0])
+            self.assertEqual(actual.worklist.to_text(), expected.worklist.to_text())
+            self.assertEqual(actual.analysis.to_dict(), expected.analysis.to_dict())
+            self.assertEqual(actual.changed, expected.changed)
+            self.assertEqual(actual.reordered_units, expected.reordered_units)
+            self.assertEqual(actual.reasons, expected.reasons)
+
+        unsupported = Worklist(records=[RawRecord("Z", "Z;opaque")])
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = optimize_worklist(unsupported)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_optimize_lines",
+                wraps=native_acceleration.worklist_optimize_lines,
+            ) as native_call:
+                actual = optimize_worklist(unsupported)
+                native_call.assert_not_called()
+        self.assertEqual(actual.worklist.to_text(), expected.worklist.to_text())
+        self.assertEqual(actual.analysis.to_dict(), expected.analysis.to_dict())
+        self.assertEqual(actual.changed, expected.changed)
+        self.assertEqual(actual.reasons, expected.reasons)
 
     def test_optimizer_interleaves_only_independent_explicit_units(self):
         records = []
