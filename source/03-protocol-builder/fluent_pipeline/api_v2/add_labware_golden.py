@@ -10,6 +10,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping
 from .. import xml_compat as ET
+from tecan_common.native_acceleration import (
+    xml_elements_by_name as _native_xml_elements_by_name,
+)
 
 from .commands import AddLabware, command_from_ir_step, command_to_xml
 from .golden_compare import compare_xscr_commands_to_native_xml, golden_compare_summary
@@ -292,6 +295,9 @@ def _local_name(tag: str) -> str:
 
 
 def _find_descendant(element: ET.Element, name: str) -> ET.Element | None:
+    nodes = _native_xml_elements_by_name(element, (name,), ET.Element)
+    if nodes is not None:
+        return nodes[0] if nodes else None
     for node in element.iter():
         if _local_name(node.tag) == name:
             return node

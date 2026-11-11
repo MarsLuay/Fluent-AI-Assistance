@@ -5,7 +5,11 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import fluent_pipeline.api_v2.add_labware_golden as add_labware_golden
+from fluent_pipeline import xml_compat as ET
+from tecan_common import native_acceleration
 from fluent_pipeline.api_v2.add_labware_golden import (
     compare_add_labware_payloads,
     compare_verification_recipe_add_labware_golden,
@@ -64,6 +68,49 @@ def _recipe_ir():
 
 
 class ApiV2AddLabwareGoldenTests(unittest.TestCase):
+    def test_golden_payload_lookup_uses_native_selector_and_fallback(self):
+        root = ET.fromstring(
+            '<Root xmlns:x="urn:test"><x:AddLabwareDataV1><x:LabwareType>first</x:LabwareType>'
+            "</x:AddLabwareDataV1><AddLabwareDataV1><LabwareType>second</LabwareType>"
+            "</AddLabwareDataV1></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = add_labware_golden._find_descendant(root, "AddLabwareDataV1")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                add_labware_golden,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = add_labware_golden._find_descendant(root, "AddLabwareDataV1")
+                self.assertEqual(native_call.call_count, 1)
+        self.assertIs(actual, expected)
+        self.assertIs(actual, root[0])
+        assert actual is not None
+        payload = add_labware_golden.add_labware_payload_from_element(root)
+        self.assertEqual(payload["LabwareType"], "first")
+
+        class StringTag(str):
+            pass
+
+        custom_root = ET.Element("Root")
+        custom_element = ET.SubElement(custom_root, StringTag("AddLabwareDataV1"))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = add_labware_golden._find_descendant(
+                custom_root, "AddLabwareDataV1"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_name(
+                    custom_root, ("AddLabwareDataV1",), ET.Element
+                )
+            )
+            fallback_actual = add_labware_golden._find_descendant(
+                custom_root, "AddLabwareDataV1"
+            )
+        self.assertIs(fallback_actual, fallback_expected)
+        self.assertIs(fallback_actual, custom_element)
+
     def test_is_verification_recipe_ir(self):
         ir = _recipe_ir()
         self.assertTrue(is_verification_recipe_ir(ir))
