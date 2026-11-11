@@ -1146,6 +1146,44 @@ class ReaderTests(unittest.TestCase):
                 reader_script._variable_declarations(root), fallback_declarations
             )
 
+    def test_xml_custom_part_detection_uses_native_ascii_with_unicode_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native,
+            "ascii_case_insensitive_substring_match_values",
+        ):
+            self.skipTest("optional Rust substring matcher is not built")
+        names = ("PREFIX-CUSTOM-ASSET", "cuſtom Asset", "ordinary object", "CUSTOMARY")
+
+        def detect() -> list[bool]:
+            return [
+                reader_xmlobj.inspect_xml_object_text(
+                    f"<Root><ObjectName>{name}</ObjectName></Root>",
+                    source_name="synthetic.xcmp",
+                    suffix=".xcmp",
+                )["custom_part"]
+                for name in names
+            ]
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = detect()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                reader_xmlobj,
+                "_native_custom_marker_match",
+                wraps=native_acceleration.ascii_case_insensitive_substring_match_values,
+            ) as native_call:
+                actual = detect()
+                self.assertEqual(native_call.call_count, len(names))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [True, True, False, True])
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                reader_xmlobj, "_native_custom_marker_match", return_value=None
+            ):
+                fallback = detect()
+        self.assertEqual(fallback, expected)
+
     def test_xml_object_fields_reuse_grouped_xml_scan(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_texts_by_name"

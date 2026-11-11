@@ -7,6 +7,7 @@ from typing import Any
 import re
 
 from tecan_common.native_acceleration import (
+    ascii_case_insensitive_substring_match_values as _native_custom_marker_match,
     pin_reference_candidates as _native_pin_reference_candidates,
     xml_asset_reference_names as _native_xml_asset_reference_names,
     xml_kind_from_suffix as _native_xml_kind_from_suffix,
@@ -79,10 +80,17 @@ def inspect_xml_object_text(
         "pin_refs": pin_refs,
         "asset_refs": asset_refs,
         "custom_part": bool(
-            pin_refs or asset_refs or "custom" in object_name.casefold()
+            pin_refs or asset_refs or _has_custom_marker(object_name)
         ),
         "source_metadata": {"unknown_fields": _unknown_fields(root)},
     }
+
+
+def _has_custom_marker(value: str) -> bool:
+    native = _native_custom_marker_match([value], "custom")
+    if native is not None:
+        return native[0]
+    return "custom" in value.casefold()
 
 
 def _unknown_fields(root: Any) -> dict[str, list[str]]:
