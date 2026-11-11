@@ -242,9 +242,13 @@ def _simulator_app_dir() -> Path:
             return candidate.resolve()
     return candidates[0].resolve()
 
-def _safe_output_label(value: str) -> str:
+def _lower_text(value: str) -> str:
     native = _native_ascii_lower(value)
-    lowered = native if native is not None else value.lower()
+    return native if native is not None else value.lower()
+
+
+def _safe_output_label(value: str) -> str:
+    lowered = _lower_text(value)
     keep = []
     for char in lowered.strip():
         if char.isalnum():
@@ -261,7 +265,7 @@ def _generation_return_code(manifest: dict[str, Any]) -> int:
     source_dir = published.parent / "source"
     if (
         manifest.get("ready_to_import")
-        and published.suffix.lower() == ".zeia"
+        and _lower_text(published.suffix) == ".zeia"
         and published.parent.name == published.stem
         and published.exists()
         and (published.parent / "RECREATE_SCRIPT.md").exists()

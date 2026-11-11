@@ -1440,6 +1440,56 @@ class WorkspaceLogPathTests(unittest.TestCase):
                 ]
         self.assertEqual(forced_fallback, expected)
 
+    def test_generation_return_code_accepts_uppercase_zeia_with_fallback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            protocol_dir = root / "synthetic"
+            source_dir = protocol_dir / "source"
+            generated_dir = source_dir / "generated"
+            reports_dir = source_dir / "reports"
+            generated_dir.mkdir(parents=True)
+            reports_dir.mkdir()
+            published = protocol_dir / "synthetic.ZEIA"
+            published.write_bytes(b"synthetic archive marker")
+            (protocol_dir / "RECREATE_SCRIPT.md").write_text("synthetic", encoding="utf-8")
+            for name in (
+                "generation_manifest.json",
+                "GENERATION_WORKFLOW.md",
+                "request.spec.yaml",
+                "protocol.ir.json",
+            ):
+                (source_dir / name).write_text("synthetic", encoding="utf-8")
+            (generated_dir / "protocol.py").write_text("synthetic", encoding="utf-8")
+            manifest = {"ready_to_import": True, "published_zeia_path": str(published)}
+
+            with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                expected = cli_runtime._generation_return_code(manifest)
+            self.assertEqual(expected, 0)
+
+            with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with mock.patch.object(
+                    cli_runtime,
+                    "_native_ascii_lower",
+                    wraps=native_acceleration.ascii_lower,
+                ) as native_call:
+                    actual = cli_runtime._generation_return_code(manifest)
+                native_call.assert_any_call(".ZEIA")
+            self.assertEqual(actual, expected)
+
+            with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with mock.patch.object(cli_runtime, "_native_ascii_lower", return_value=None):
+                    forced_fallback = cli_runtime._generation_return_code(manifest)
+            self.assertEqual(forced_fallback, expected)
+
+            non_archive = protocol_dir / "synthetic.zip"
+            non_archive.write_bytes(b"synthetic archive marker")
+            self.assertEqual(
+                cli_runtime._generation_return_code(
+                    {**manifest, "published_zeia_path": str(non_archive)}
+                ),
+                1,
+            )
+
     def test_workflow_event_log_path_uses_logs_dir_and_out_dir_label(self):
         path = workflow_event_log_path("generated_script_final")
         self.assertEqual(path.name, "generated-script-final.events.jsonl")
