@@ -191,6 +191,7 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
                 "TaskID": "attribute-id",
                 "VendorAttr": "source",
                 "{urn:test}Étiquette": "café",
+                "{urn:other}VendorAttr": "qualified-source",
             },
         )
         ET.SubElement(root, "{urn:test}Name").text = " child\u001c label "
@@ -244,7 +245,7 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
         self.assertEqual(
             actual["source_metadata"]["unknown_fields"],
             {
-                "VendorAttr": ["source"],
+                "VendorAttr": ["qualified-source", "source"],
                 "VendorField": ["one two"],
                 "Étiquette": ["café"],
             },
@@ -272,6 +273,7 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
                 ("TaskID", "attribute-id"),
                 ("VendorAttr", "source"),
                 ("Étiquette", "café"),
+                ("VendorAttr", "qualified-source"),
             ],
         )
         self.assertEqual(actual_with_attribute_spy, actual)
