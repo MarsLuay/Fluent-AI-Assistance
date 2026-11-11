@@ -39,6 +39,34 @@ _GOOD_PAYLOAD = """<Object Type="Tecan.Core.Scripting.Worktable.Data.AddLabwareD
 
 
 class AddLabwareValidateTests(unittest.TestCase):
+    def test_normalized_keys_use_native_ascii_and_python_unicode_fallback(self):
+        values = [" Label ", "NEST", "Straße", "  Straße  ", "", None, 0]
+        expected = [str(value or "").strip().casefold() for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [add_labware_validate._norm(value) for value in values]
+        self.assertEqual(disabled, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                add_labware_validate,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = [add_labware_validate._norm(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                add_labware_validate,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                forced_fallback = [
+                    add_labware_validate._norm(value) for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_has_lid_boolean_uses_native_ascii_parser_and_python_lower_fallback(self):
         values = ["true", "TRUE", "tRuE", "False", " truſe ", ""]
         for raw in values:

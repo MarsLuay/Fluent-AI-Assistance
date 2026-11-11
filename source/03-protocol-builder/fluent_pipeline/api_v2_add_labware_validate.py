@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Protocol, Sequence
 
 from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     ascii_collapse_casefold_whitespace as _native_ascii_collapse_casefold_whitespace,
     parse_ascii_bool_text as _native_parse_ascii_bool_text,
     ascii_variable_name_is_valid as _native_ascii_variable_name_is_valid,
@@ -506,4 +507,6 @@ def _local_name(tag: str) -> str:
 
 
 def _norm(value: str) -> str:
-    return str(value or "").strip().casefold()
+    text = str(value or "")
+    native = _native_ascii_casefold_trim(text)
+    return native if native is not None else text.strip().casefold()
