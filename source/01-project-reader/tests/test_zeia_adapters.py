@@ -486,9 +486,22 @@ class ZeiaAdapterTests(unittest.TestCase):
 
             unicode_text = "<Name> café </Name>"
             self.assertIsNone(native_acceleration.xml_regex_first_value(unicode_text, name))
-            self.assertEqual(zeia_adapters_module._xml_value(unicode_text, name), "café")
+            with patch.object(
+                zeia_adapters_module,
+                "_native_collapse_ascii_whitespace",
+                wraps=native_acceleration.collapse_ascii_whitespace,
+            ) as collapse_call:
+                self.assertEqual(zeia_adapters_module._xml_value(unicode_text, name), "café")
+                self.assertEqual(collapse_call.call_count, 1)
 
             with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                with patch.object(
+                    zeia_adapters_module,
+                    "_native_collapse_ascii_whitespace",
+                    wraps=native_acceleration.collapse_ascii_whitespace,
+                ) as collapse_call:
+                    self.assertEqual(zeia_adapters_module._xml_value(unicode_text, name), "café")
+                    self.assertEqual(collapse_call.call_count, 1)
                 for sample in samples:
                     match = re.search(pattern, sample, re.IGNORECASE | re.DOTALL)
                     expected = re.sub(r"\s+", " ", match.group(1)).strip() if match else ""
@@ -548,10 +561,16 @@ class ZeiaAdapterTests(unittest.TestCase):
             self.assertIsNone(
                 native_acceleration.xml_unknown_text_fields(unicode_text, known, 20)
             )
-            self.assertEqual(
-                zeia_adapters_module._unknown_fields_from_text(unicode_text),
-                {"FutureField": ["café"]},
-            )
+            with patch.object(
+                zeia_adapters_module,
+                "_native_collapse_ascii_whitespace",
+                wraps=native_acceleration.collapse_ascii_whitespace,
+            ) as collapse_call:
+                self.assertEqual(
+                    zeia_adapters_module._unknown_fields_from_text(unicode_text),
+                    {"FutureField": ["café"]},
+                )
+                self.assertEqual(collapse_call.call_count, 1)
             with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
                 fallback = zeia_adapters_module._unknown_fields_from_text(text)
 

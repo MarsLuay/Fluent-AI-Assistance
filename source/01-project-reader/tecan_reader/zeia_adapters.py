@@ -10,6 +10,7 @@ from typing import Any, Protocol
 import zipfile
 
 from tecan_common.native_acceleration import (
+    collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
     count_string_groups as _native_count_string_groups,
     count_xscr_object_type_attributes as _native_count_xscr_object_type_attributes,
     extract_data_store_versions as _native_extract_data_store_versions,
@@ -984,12 +985,17 @@ def _inspect_object_member(
     }
 
 
+def _collapse_xml_whitespace(value: str) -> str:
+    native = _native_collapse_ascii_whitespace(value)
+    return native if native is not None else re.sub(r"\s+", " ", value).strip()
+
+
 def _xml_value(text: str, name: str) -> str:
     native = _native_xml_regex_first_value(text, name)
     if native is not None:
         return native
     match = re.search(rf"<(?:[A-Za-z_][\w.-]*:)?{re.escape(name)}(?:\s[^>]*)?>(.*?)</(?:[A-Za-z_][\w.-]*:)?{re.escape(name)}>", text, re.IGNORECASE | re.DOTALL)
-    return re.sub(r"\s+", " ", match.group(1)).strip() if match else ""
+    return _collapse_xml_whitespace(match.group(1)) if match else ""
 
 
 def _unknown_fields_from_text(text: str) -> dict[str, list[str]]:
@@ -1023,7 +1029,7 @@ def _unknown_fields_from_text(text: str) -> dict[str, list[str]]:
     )
     for match in pattern.finditer(text):
         name = match.group(1)
-        value = re.sub(r"\s+", " ", match.group(2)).strip()
+        value = _collapse_xml_whitespace(match.group(2))
         if not value or "<" in value or name in known:
             continue
         bucket = values.setdefault(name, [])
