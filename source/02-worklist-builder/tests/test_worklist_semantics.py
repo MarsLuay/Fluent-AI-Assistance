@@ -40,6 +40,7 @@ from tecan_worklist.optimizer import (
     optimize_worklist,
     parse_enabled_tip_mask,
     semantic_equivalent,
+    _window_properties,
 )
 from tecan_worklist.transfer import (
     Transfer,
@@ -1593,6 +1594,45 @@ class WorklistSemanticsTests(unittest.TestCase):
         self.assertEqual(analysis.units[1].tip_selection.mode, "automatic")
         self.assertEqual(analysis.barriers[0]["type"], "B")
         self.assertEqual(analysis.enabled_tip_mask, 3)
+
+    def test_native_window_properties_match_python_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_window_properties"
+        ):
+            self.skipTest("optional Rust window classifier is not built")
+
+        independent = []
+        for index, tip in ((1, "1"), (2, "2")):
+            independent.extend(_transfer(index, tip=tip))
+        shared = []
+        shared.extend(_transfer(1, tip="1"))
+        shared.extend(_transfer(2, tip="2", source=1, destination=2))
+        automatic = []
+        automatic.extend(_transfer(1, tip=""))
+        invalid = list(_transfer(1, tip="3"))
+        worklists = [
+            Worklist(records=independent),
+            Worklist(records=shared),
+            Worklist(records=automatic),
+            Worklist(records=invalid),
+        ]
+        units_by_case = []
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            for worklist in worklists:
+                units_by_case.append(list(analyze_worklist(worklist).units))
+
+        for units in units_by_case:
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                expected = _window_properties(units)
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    native_acceleration,
+                    "worklist_window_properties",
+                    wraps=native_acceleration.worklist_window_properties,
+                ) as native_call:
+                    actual = _window_properties(units)
+                    self.assertEqual(native_call.call_count, 1)
+            self.assertEqual(actual, expected)
 
     def test_optimizer_interleaves_only_independent_explicit_units(self):
         records = []

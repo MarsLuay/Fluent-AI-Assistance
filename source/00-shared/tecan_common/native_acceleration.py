@@ -3885,6 +3885,59 @@ def worklist_count_record_types(types: Any) -> dict[str, int] | None:
         return None
 
 
+def worklist_window_properties(
+    source_keys: Any,
+    destination_keys: Any,
+    tip_valid: Any,
+    tip_modes: Any,
+    tip_channels: Any,
+) -> tuple[bool, bool, tuple[int, ...], str] | None:
+    """Classify a transfer window natively for exact primitive inputs."""
+    sequences = (source_keys, destination_keys, tip_valid, tip_modes, tip_channels)
+    if not enabled() or any(type(value) is not list for value in sequences):
+        return None
+    count = len(source_keys)
+    if any(len(value) != count for value in sequences[1:]):
+        return None
+    if any(
+        type(key) is not list or any(type(part) is not str for part in key)
+        for keys in (source_keys, destination_keys)
+        for key in keys
+    ):
+        return None
+    if any(type(value) is not bool for value in tip_valid):
+        return None
+    if any(type(value) is not str for value in tip_modes):
+        return None
+    if any(
+        value is not None and (type(value) is not int or value < 0)
+        for value in tip_channels
+    ):
+        return None
+    try:
+        result = _native.worklist_window_properties(*sequences)
+        if (
+            type(result) is tuple
+            and len(result) == 4
+            and type(result[0]) is bool
+            and type(result[1]) is bool
+            and type(result[2]) is list
+            and all(type(channel) is int for channel in result[2])
+            and type(result[3]) is str
+        ):
+            return result[0], result[1], tuple(result[2]), result[3]
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def worklist_analyze_lines(
     lines: Any,
     enabled_tip_mask: str | None,

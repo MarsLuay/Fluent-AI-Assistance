@@ -444,6 +444,31 @@ def _location_key(record: Pipette) -> tuple[str, ...]:
 
 
 def _window_properties(units: list[TransferUnit]) -> tuple[bool, bool, tuple[int, ...], str]:
+    if type(units) is list and all(
+        type(unit) is TransferUnit
+        and type(unit.source_key) is tuple
+        and all(type(part) is str for part in unit.source_key)
+        and type(unit.destination_key) is tuple
+        and all(type(part) is str for part in unit.destination_key)
+        and type(unit.tip_selection) is TipSelection
+        and type(unit.tip_selection.valid) is bool
+        and type(unit.tip_selection.mode) is str
+        and (
+            unit.tip_selection.channel is None
+            or type(unit.tip_selection.channel) is int
+            and unit.tip_selection.channel >= 0
+        )
+        for unit in units
+    ):
+        native = native_acceleration.worklist_window_properties(
+            [list(unit.source_key) for unit in units],
+            [list(unit.destination_key) for unit in units],
+            [unit.tip_selection.valid for unit in units],
+            [unit.tip_selection.mode for unit in units],
+            [unit.tip_selection.channel for unit in units],
+        )
+        if native is not None:
+            return native
     if any(not unit.tip_selection.valid for unit in units):
         return False, False, tuple(sorted({item.tip_channel for item in units if item.tip_channel is not None})), "invalid tip selection prevents reordering"
     seen: set[tuple[str, ...]] = set()

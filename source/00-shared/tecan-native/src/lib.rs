@@ -6203,6 +6203,68 @@ fn worklist_build_schedule(
 }
 
 #[pyfunction]
+fn worklist_window_properties(
+    source_keys: Vec<Vec<String>>,
+    destination_keys: Vec<Vec<String>>,
+    tip_valid: Vec<bool>,
+    tip_modes: Vec<String>,
+    tip_channels: Vec<Option<usize>>,
+) -> Option<(bool, bool, Vec<usize>, String)> {
+    let count = source_keys.len();
+    if destination_keys.len() != count
+        || tip_valid.len() != count
+        || tip_modes.len() != count
+        || tip_channels.len() != count
+    {
+        return None;
+    }
+    let channels = tip_channels
+        .iter()
+        .flatten()
+        .copied()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    if tip_valid.iter().any(|valid| !valid) {
+        return Some((
+            false,
+            false,
+            channels,
+            "invalid tip selection prevents reordering".to_owned(),
+        ));
+    }
+    let mut seen = HashSet::<Vec<String>>::new();
+    for (source, destination) in source_keys.iter().zip(&destination_keys) {
+        if seen.contains(source) || seen.contains(destination) {
+            let explicit = tip_modes.iter().all(|mode| mode == "explicit");
+            return Some((
+                false,
+                explicit,
+                channels,
+                "shared source/destination state is order-sensitive".to_owned(),
+            ));
+        }
+        seen.insert(source.clone());
+        seen.insert(destination.clone());
+    }
+    let explicit = tip_modes.iter().all(|mode| mode == "explicit");
+    if !explicit {
+        return Some((
+            true,
+            false,
+            channels,
+            "independent units may be analyzed, but automatic tips are not rewritten".to_owned(),
+        ));
+    }
+    Some((
+        true,
+        true,
+        channels,
+        "independent explicit-tip units may be interleaved deterministically".to_owned(),
+    ))
+}
+
+#[pyfunction]
 fn worklist_analyze_lines(
     lines_json: &str,
     enabled_tip_mask: Option<&str>,
@@ -6662,6 +6724,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_join_gwl_fields, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_serialize_gwl_lines, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_count_record_types, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_window_properties, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_analyze_lines, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_optimize_lines, module)?)?;
     module.add_function(wrap_pyfunction!(clean_empty_containers, module)?)?;
