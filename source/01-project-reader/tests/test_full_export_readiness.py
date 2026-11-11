@@ -311,6 +311,91 @@ class FullExportReadinessTests(unittest.TestCase):
         self.assertEqual(actual_fallback[:4], ["strasse", "é", "i", "中"])
         self.assertEqual(actual_fallback[4:], ["", "", "ab"])
 
+    def test_native_readiness_candidate_projection_matches_python_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "readiness_candidate"
+        ):
+            self.skipTest("optional Rust readiness candidate projector is not built")
+        records = [
+            {},
+            {
+                "provenance": {
+                    "source_archive": "source.zeia",
+                    "entry_path": "Objects/Worktable.xml",
+                },
+                "entry": "ignored.xml",
+                "kind": "workspace",
+                "object_name": "Worktable",
+            },
+            {
+                "provenance": {"source_archive": "", "entry_path": ""},
+                "entry": "Objects/fallback.xml",
+                "kind": "",
+                "object_name": "",
+            },
+            {
+                "provenance": None,
+                "entry": "Scripts/β.xscr",
+                "kind": None,
+                "object_name": "Straße",
+            },
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [readiness_module._candidate(record) for record in records]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                readiness_module.native_acceleration,
+                "readiness_candidate",
+                wraps=native_acceleration.readiness_candidate,
+            ) as native_call:
+                actual = [readiness_module._candidate(record) for record in records]
+                self.assertEqual(native_call.call_count, len(records))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            list(actual[0]),
+            ["source_archive", "source_entry", "kind", "object_name"],
+        )
+        self.assertEqual(
+            actual[0],
+            {
+                "source_archive": "",
+                "source_entry": "",
+                "kind": "object",
+                "object_name": "",
+            },
+        )
+        self.assertEqual(actual[1]["source_entry"], "Objects/Worktable.xml")
+        self.assertEqual(actual[2]["source_entry"], "Objects/fallback.xml")
+        self.assertEqual(actual[3]["source_entry"], "Scripts/β.xscr")
+
+        class DictSubclass(dict):
+            pass
+
+        unsupported = [
+            {"kind": 42, "object_name": "Object"},
+            {"provenance": {"source_archive": 42}},
+            {"entry": ["preserve", "list"]},
+            DictSubclass({"kind": "subclass"}),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_fallback = [
+                readiness_module._candidate(record) for record in unsupported
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertTrue(
+                all(
+                    native_acceleration.readiness_candidate(record) is None
+                    for record in unsupported
+                )
+            )
+            actual_fallback = [
+                readiness_module._candidate(record) for record in unsupported
+            ]
+        self.assertEqual(actual_fallback, expected_fallback)
+        self.assertEqual(actual_fallback[0]["kind"], 42)
+        self.assertEqual(actual_fallback[1]["source_archive"], 42)
+        self.assertEqual(actual_fallback[2]["source_entry"], ["preserve", "list"])
+
     def test_readiness_label_casefolding_uses_rust_with_unicode_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "ascii_casefold_equals"

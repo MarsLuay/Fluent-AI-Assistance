@@ -5515,6 +5515,88 @@ fn project_record_fingerprint<'py>(
     ))
 }
 
+fn readiness_candidate_field<'py>(
+    py: Python<'py>,
+    record: &Bound<'py, PyDict>,
+    key: &str,
+    default: &str,
+) -> PyResult<Option<String>> {
+    let Some(value) = record.get_item(key)? else {
+        return Ok(Some(default.to_owned()));
+    };
+    if value.is_none() {
+        return Ok(Some(default.to_owned()));
+    }
+    if !value.get_type().is(py.get_type::<PyString>()) {
+        return Ok(None);
+    }
+    let value = value.extract::<String>()?;
+    Ok(Some(if value.is_empty() {
+        default.to_owned()
+    } else {
+        value
+    }))
+}
+
+#[pyfunction]
+fn readiness_candidate<'py>(
+    py: Python<'py>,
+    record: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !record.get_type().is(py.get_type::<PyDict>()) {
+        return Ok(None);
+    }
+    let record = record.cast::<PyDict>()?;
+    let provenance_value = record.get_item("provenance")?;
+    let provenance = if let Some(value) = provenance_value {
+        if value.is_none() {
+            None
+        } else if value.get_type().is(py.get_type::<PyDict>()) {
+            Some(value.cast_into::<PyDict>()?)
+        } else {
+            return Ok(None);
+        }
+    } else {
+        None
+    };
+    let result = PyDict::new(py);
+    let source_archive = match provenance.as_ref() {
+        Some(value) => readiness_candidate_field(py, value, "source_archive", "")?,
+        None => Some(String::new()),
+    };
+    let Some(source_archive) = source_archive else {
+        return Ok(None);
+    };
+    let source_entry = match provenance.as_ref() {
+        Some(value) => readiness_candidate_field(py, value, "entry_path", "")?,
+        None => Some(String::new()),
+    };
+    let Some(source_entry) = source_entry else {
+        return Ok(None);
+    };
+    let Some(record_entry) = readiness_candidate_field(py, record, "entry", "")? else {
+        return Ok(None);
+    };
+    let Some(kind) = readiness_candidate_field(py, record, "kind", "object")? else {
+        return Ok(None);
+    };
+    let Some(object_name) = readiness_candidate_field(py, record, "object_name", "")? else {
+        return Ok(None);
+    };
+    result.set_item("source_archive", source_archive)?;
+    result.set_item(
+        "source_entry",
+        if source_entry.is_empty() {
+            record_entry
+        } else {
+            source_entry
+        },
+    )?;
+    result.set_item("kind", kind)?;
+    result.set_item("object_name", object_name)?;
+    Ok(Some(result.into_any()))
+}
+
 #[pyfunction]
 fn readiness_kind_token(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
     if value.is_none() {
@@ -7061,6 +7143,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(project_model_identifiers, module)?)?;
     module.add_function(wrap_pyfunction!(project_model_entry_path, module)?)?;
     module.add_function(wrap_pyfunction!(project_record_fingerprint, module)?)?;
+    module.add_function(wrap_pyfunction!(readiness_candidate, module)?)?;
     module.add_function(wrap_pyfunction!(readiness_kind_token, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_sort_indices, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_message, module)?)?;

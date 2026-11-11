@@ -2323,6 +2323,24 @@ def readiness_kind_token(value: Any) -> str | None:
         return None
 
 
+def readiness_candidate(record: Any) -> dict[str, str] | None:
+    """Project supported exact-string readiness records to candidate summaries."""
+    if not enabled() or type(record) is not dict:
+        return None
+    try:
+        result = _native.readiness_candidate(record)
+        expected_keys = {"source_archive", "source_entry", "kind", "object_name"}
+        if (
+            type(result) is dict
+            and set(result) == expected_keys
+            and all(type(value) is str for value in result.values())
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def sha256_text(value: Any) -> str | None:
     """Hash exact Unicode text natively, or request the Python hashing fallback."""
     if not enabled() or type(value) is not str:

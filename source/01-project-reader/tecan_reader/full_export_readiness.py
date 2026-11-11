@@ -609,6 +609,9 @@ def _kind_token(value: Any) -> str:
 
 
 def _candidate(record: Mapping[str, Any]) -> dict[str, Any]:
+    native = native_acceleration.readiness_candidate(record)
+    if native is not None:
+        return native
     provenance = record.get("provenance") or {}
     return {
         "source_archive": provenance.get("source_archive") or "",
