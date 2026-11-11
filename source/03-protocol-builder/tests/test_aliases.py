@@ -2,7 +2,10 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import fluent_pipeline.aliases as aliases_module
+from tecan_common import native_acceleration
 from fluent_pipeline.aliases import (
     DEFAULT_ALIAS_DIR,
     load_alias_maps,
@@ -13,6 +16,22 @@ from fluent_pipeline.aliases import (
 
 
 class AliasTests(unittest.TestCase):
+    def test_alias_key_normalization_uses_native_ascii_and_unicode_fallback(self):
+        values = ["  Mixed Alias  ", "\u001cUPPER\u001f", "ſCRIPT", None, 0]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [aliases_module._norm(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                aliases_module,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = [aliases_module._norm(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertIsNone(native_acceleration.ascii_casefold_trim("ſCRIPT"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["mixed alias", "upper", "script", "", ""])
+
     def test_repo_alias_yaml_has_no_falcon_or_capholder_defaults(self):
         aliases = load_alias_maps(DEFAULT_ALIAS_DIR)
         for kind in ("labware_aliases", "catalog_aliases"):
