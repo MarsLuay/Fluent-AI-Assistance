@@ -2310,6 +2310,19 @@ def project_record_fingerprint(record: Any) -> tuple[str, ...] | None:
         return None
 
 
+def readiness_kind_token(value: Any) -> str | None:
+    """Normalize ASCII readiness kind tokens, or request Python Unicode fallback."""
+    if not enabled() or (value is not None and type(value) is not str):
+        return None
+    if type(value) is str and not value.isascii():
+        return None
+    try:
+        result = _native.readiness_kind_token(value)
+        return result if type(result) is str and result.isascii() else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def sha256_text(value: Any) -> str | None:
     """Hash exact Unicode text natively, or request the Python hashing fallback."""
     if not enabled() or type(value) is not str:

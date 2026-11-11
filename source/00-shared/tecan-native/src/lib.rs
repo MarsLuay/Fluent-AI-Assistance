@@ -5516,6 +5516,27 @@ fn project_record_fingerprint<'py>(
 }
 
 #[pyfunction]
+fn readiness_kind_token(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+    if value.is_none() {
+        return Ok(Some(String::new()));
+    }
+    if !value.get_type().is(py.get_type::<PyString>()) {
+        return Ok(None);
+    }
+    let value = value.extract::<String>()?;
+    if !value.is_ascii() {
+        return Ok(None);
+    }
+    Ok(Some(
+        value
+            .bytes()
+            .filter(u8::is_ascii_alphanumeric)
+            .map(|byte| byte.to_ascii_lowercase() as char)
+            .collect(),
+    ))
+}
+
+#[pyfunction]
 fn diagnostic_sort_indices(keys_json: &str) -> PyResult<Option<String>> {
     let Ok(keys) = serde_json::from_str::<Vec<Vec<String>>>(keys_json) else {
         return Ok(None);
@@ -7040,6 +7061,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(project_model_identifiers, module)?)?;
     module.add_function(wrap_pyfunction!(project_model_entry_path, module)?)?;
     module.add_function(wrap_pyfunction!(project_record_fingerprint, module)?)?;
+    module.add_function(wrap_pyfunction!(readiness_kind_token, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_sort_indices, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_message, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_redact_text, module)?)?;

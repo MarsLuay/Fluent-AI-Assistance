@@ -602,6 +602,9 @@ def _kind_matches(candidates: Sequence[Mapping[str, Any]], target_type: str) -> 
 
 def _kind_token(value: Any) -> str:
     """Compare adapter type IDs and canonical kinds independent of separators."""
+    native = native_acceleration.readiness_kind_token(value)
+    if native is not None:
+        return native
     return "".join(character for character in str(value or "").casefold() if character.isalnum())
 
 

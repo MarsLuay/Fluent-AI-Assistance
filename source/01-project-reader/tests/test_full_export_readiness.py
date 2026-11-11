@@ -255,6 +255,62 @@ class FullExportReadinessTests(unittest.TestCase):
         )
         self.assertEqual(result.status, ReadinessStatus.COMPLETE_WITH_WARNINGS)
 
+    def test_native_readiness_kind_token_matches_ascii_with_unicode_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "readiness_kind_token"
+        ):
+            self.skipTest("optional Rust readiness token normalizer is not built")
+        ascii_values = [
+            None,
+            "",
+            "WorktableWorkspace",
+            "Worktable_Workspace",
+            "A-1._x",
+            "  spaces / and punctuation!",
+            "".join(chr(value) for value in range(128)),
+            *(chr(value) for value in range(128)),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [readiness_module._kind_token(value) for value in ascii_values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                readiness_module.native_acceleration,
+                "readiness_kind_token",
+                wraps=native_acceleration.readiness_kind_token,
+            ) as native_call:
+                actual = [readiness_module._kind_token(value) for value in ascii_values]
+                self.assertEqual(native_call.call_count, len(ascii_values))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual[2], "worktableworkspace")
+        self.assertEqual(actual[3], "worktableworkspace")
+        self.assertEqual(actual[4], "a1x")
+        self.assertEqual(
+            actual[6],
+            "0123456789abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz",
+        )
+
+        class StringSubclass(str):
+            pass
+
+        fallback_values = ["Straße", "é", "İ", "中", 0, False, StringSubclass("A-B")]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_fallback = [
+                readiness_module._kind_token(value) for value in fallback_values
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertTrue(
+                all(
+                    native_acceleration.readiness_kind_token(value) is None
+                    for value in fallback_values
+                )
+            )
+            actual_fallback = [
+                readiness_module._kind_token(value) for value in fallback_values
+            ]
+        self.assertEqual(actual_fallback, expected_fallback)
+        self.assertEqual(actual_fallback[:4], ["strasse", "é", "i", "中"])
+        self.assertEqual(actual_fallback[4:], ["", "", "ab"])
+
     def test_readiness_label_casefolding_uses_rust_with_unicode_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "ascii_casefold_equals"
