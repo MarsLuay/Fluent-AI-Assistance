@@ -33,11 +33,11 @@ VISIONX_SCRIPT = """<?xml version="1.0"?>
 
 
 class TestObjectKindClassification(unittest.TestCase):
-    def test_native_classification_matches_python_for_safe_suffixes(self) -> None:
+    def test_native_classification_matches_python_for_exact_strings(self) -> None:
         if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "xml_kind_from_suffix"
+            native_acceleration._native, "zeia_object_kind_from_suffix"
         ):
-            self.skipTest("optional Rust suffix classifier is not built")
+            self.skipTest("optional Rust ZEIA suffix classifier is not built")
         suffixes = [
             ".xcmp",
             ".xwsp",
@@ -49,14 +49,18 @@ class TestObjectKindClassification(unittest.TestCase):
             "..custom",
             "",
             "...",
+            ".XCMP",
+            ".Custom",
+            ".é",
+            "\ud800",
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             expected = [zeia_adapters_module._object_kind(suffix) for suffix in suffixes]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 zeia_adapters_module,
-                "_native_xml_kind_from_suffix",
-                wraps=native_acceleration.xml_kind_from_suffix,
+                "_native_zeia_object_kind_from_suffix",
+                wraps=native_acceleration.zeia_object_kind_from_suffix,
             ) as native_call:
                 actual = [zeia_adapters_module._object_kind(suffix) for suffix in suffixes]
                 self.assertEqual(native_call.call_count, len(suffixes))
@@ -74,23 +78,21 @@ class TestObjectKindClassification(unittest.TestCase):
                 "custom",
                 "xml",
                 "xml",
+                "XCMP",
+                "Custom",
+                "é",
+                "\ud800",
             ],
         )
 
-    def test_unknown_case_and_unicode_suffixes_keep_python_semantics(self) -> None:
+    def test_string_subclass_uses_python_fallback(self) -> None:
         class StringSubclass(str):
             pass
 
-        suffixes = [".XCMP", ".Custom", ".é", StringSubclass(".xcmp")]
+        suffix = StringSubclass(".xcmp")
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            with patch.object(
-                zeia_adapters_module,
-                "_native_xml_kind_from_suffix",
-                wraps=native_acceleration.xml_kind_from_suffix,
-            ) as native_call:
-                actual = [zeia_adapters_module._object_kind(suffix) for suffix in suffixes]
-                native_call.assert_not_called()
-        self.assertEqual(actual, ["XCMP", "Custom", "é", "component"])
+            self.assertIsNone(native_acceleration.zeia_object_kind_from_suffix(suffix))
+            self.assertEqual(zeia_adapters_module._object_kind(suffix), "component")
 
 
 class ZeiaAdapterTests(unittest.TestCase):

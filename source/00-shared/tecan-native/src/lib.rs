@@ -5883,6 +5883,27 @@ fn xml_kind_from_suffix(suffix: &str) -> Option<String> {
 }
 
 #[pyfunction]
+fn zeia_object_kind_from_suffix(suffix: &str) -> String {
+    match suffix {
+        ".xcmp" => "component".to_owned(),
+        ".xwsp" => "workspace".to_owned(),
+        ".xlqc" => "liquid_class".to_owned(),
+        ".xlcp" => "liquid_class_map".to_owned(),
+        ".xsit" => "site".to_owned(),
+        ".xcon" => "connector".to_owned(),
+        ".xml" => "xml".to_owned(),
+        _ => {
+            let value = suffix.trim_start_matches('.');
+            if value.is_empty() {
+                "xml".to_owned()
+            } else {
+                value.to_owned()
+            }
+        }
+    }
+}
+
+#[pyfunction]
 fn command_short_name(type_name: &str) -> Option<String> {
     if !type_name.is_ascii() {
         return None;
@@ -7269,6 +7290,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(diagnostic_message, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_redact_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_kind_from_suffix, module)?)?;
+    module.add_function(wrap_pyfunction!(zeia_object_kind_from_suffix, module)?)?;
     module.add_function(wrap_pyfunction!(command_short_name, module)?)?;
     module.add_function(wrap_pyfunction!(entry_object_guid, module)?)?;
     module.add_function(wrap_pyfunction!(asset_reference_candidates, module)?)?;
@@ -7956,6 +7978,11 @@ mod tests {
         assert_eq!(xml_clean_text(" \tvalue\r\n"), "value");
         assert_eq!(xml_kind_from_suffix(".XWSP"), Some("workspace".into()));
         assert_eq!(xml_kind_from_suffix("...Custom"), Some("custom".into()));
+        assert_eq!(zeia_object_kind_from_suffix(".xcmp"), "component");
+        assert_eq!(zeia_object_kind_from_suffix(".XCMP"), "XCMP");
+        assert_eq!(zeia_object_kind_from_suffix("...Custom"), "Custom");
+        assert_eq!(zeia_object_kind_from_suffix(".é"), "é");
+        assert_eq!(zeia_object_kind_from_suffix("..."), "xml");
     }
 
     #[test]

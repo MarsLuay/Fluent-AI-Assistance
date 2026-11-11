@@ -2553,6 +2553,17 @@ def xml_kind_from_suffix(suffix: Any) -> str | None:
         return None
 
 
+def zeia_object_kind_from_suffix(suffix: Any) -> str | None:
+    """Match ZEIA object suffix classification for exact strings natively."""
+    if not enabled() or type(suffix) is not str:
+        return None
+    try:
+        result = _native.zeia_object_kind_from_suffix(suffix)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def pin_reference_candidates(values: Any) -> list[str] | None:
     """Filter exact ASCII pin-reference tokens with Python fallback for Unicode."""
     if (
