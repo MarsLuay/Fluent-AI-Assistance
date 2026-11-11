@@ -1,9 +1,42 @@
 import unittest
+from unittest.mock import patch
 
+from tecan_common import native_acceleration
+import fluent_pipeline.ir_planner as ir_planner
 from fluent_pipeline.ir_planner import synthesize_seed_ir
 
 
 class IrPlannerTests(unittest.TestCase):
+    def test_first_field_uses_native_ascii_lower_with_unicode_fallback(self):
+        fields = {
+            "LabwareName": "first",
+            "LABWAREname": "last",
+            "Straße": "unicode",
+        }
+        names = ("labwarename", "STRAẞE", "STRASSE")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [ir_planner._first_field(fields, (name,)) for name in names]
+        self.assertEqual(expected, ["last", "unicode", None])
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                ir_planner,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = [ir_planner._first_field(fields, (name,)) for name in names]
+                self.assertEqual(native_call.call_count, 12)
+            native_call.assert_any_call("Straße")
+            native_call.assert_any_call("STRAẞE")
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(ir_planner, "_native_ascii_lower", return_value=None):
+                forced_fallback = [
+                    ir_planner._first_field(fields, (name,)) for name in names
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_script_rack_types_are_dependencies_not_labware_labels(self):
         ir = {
             "protocol": {"name": "Rack type dependency test"},

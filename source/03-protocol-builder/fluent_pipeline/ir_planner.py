@@ -12,6 +12,8 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from tecan_common.native_acceleration import ascii_lower as _native_ascii_lower
+
 from .command_registry import registry_command_operation, registry_field_value, registry_requires
 from .inference import (
     InferenceCandidate,
@@ -836,9 +838,14 @@ def _scalar_or_copy(value: Any) -> Any:
 
 
 def _first_field(fields: dict[str, Any], names: tuple[str, ...]) -> Any:
-    by_lower = {key.lower(): value for key, value in fields.items()}
+    by_lower = {}
+    for key, value in fields.items():
+        native = _native_ascii_lower(key)
+        by_lower[native if native is not None else key.lower()] = value
     for name in names:
-        value = by_lower.get(name.lower())
+        native = _native_ascii_lower(name)
+        lowered_name = native if native is not None else name.lower()
+        value = by_lower.get(lowered_name)
         if value not in (None, "", []):
             if isinstance(value, list):
                 return next((item for item in value if item not in (None, "", [])), None)
