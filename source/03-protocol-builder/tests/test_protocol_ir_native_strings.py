@@ -304,6 +304,50 @@ class ProtocolIrNativeStringsTests(unittest.TestCase):
                 ]
         self.assertEqual(forced_fallback, expected)
 
+    def test_media_slot_rows_use_native_lower_and_preserve_unicode_fallback(self):
+        rows = [
+            {
+                "step_id": "step",
+                "media": [
+                    {"slot": "video-slot", "kind": "VIDEO"},
+                    {"slot": "unicode-slot", "kind": "VÍDEO"},
+                    {"slot": "default-slot"},
+                ],
+            }
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = protocol_ir_compat_module._media_slot_specs_from_rows(rows)
+        summary = [
+            (spec["kind"], spec["filename"], spec["path"]) for spec in expected
+        ]
+        self.assertEqual(
+            summary,
+            [
+                ("video", "video-slot.gif", "media/video-slot.gif"),
+                ("vídeo", "unicode-slot.bin", "media/unicode-slot.bin"),
+                ("media", "default-slot.bin", "media/default-slot.bin"),
+            ],
+        )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                protocol_ir_compat_module,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = protocol_ir_compat_module._media_slot_specs_from_rows(rows)
+                self.assertGreaterEqual(native_call.call_count, len(rows[0]["media"]))
+            native_call.assert_any_call("VIDEO")
+            native_call.assert_any_call("VÍDEO")
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                protocol_ir_compat_module, "_native_ascii_lower", return_value=None
+            ):
+                forced_fallback = protocol_ir_compat_module._media_slot_specs_from_rows(rows)
+        self.assertEqual(forced_fallback, expected)
+
     def test_rup_display_type_alias_normalization_uses_native_compaction(self):
         cases = [
             ("Combo Box", False),

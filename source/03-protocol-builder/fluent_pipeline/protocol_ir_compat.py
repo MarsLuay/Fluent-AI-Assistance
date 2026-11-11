@@ -811,7 +811,7 @@ def _media_slot_specs_from_rows(rows: list[dict[str, Any]]) -> list[dict[str, An
             slot = str(media.get("slot") or "").strip()
             if not slot:
                 continue
-            kind = str(media.get("kind") or "media").lower()
+            kind = _lower_text(str(media.get("kind") or "media"))
             specs.append(
                 {
                     "filename": media_slot_filename(slot, kind),
