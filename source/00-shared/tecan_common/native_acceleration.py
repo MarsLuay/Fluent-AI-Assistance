@@ -4046,6 +4046,71 @@ def worklist_analyze_lines(
         return None
 
 
+def worklist_analyze_detail_lines(
+    lines: Any,
+    enabled_tip_mask: str | None,
+    supported_channels: int,
+) -> dict[str, Any] | None:
+    """Analyze records and return unit record indices for Python model assembly."""
+    if not enabled():
+        return None
+    try:
+        encoded = _native.worklist_analyze_detail_lines(
+            _encode_json(lines), enabled_tip_mask, supported_channels
+        )
+        if encoded is None:
+            return None
+        result = json.loads(encoded)
+        if not isinstance(result, dict) or type(result.get("ok")) is not bool:
+            return None
+        if not all(
+            isinstance(result.get(key), str)
+            for key in ("schema_version", "runtime_parallelism")
+        ):
+            return None
+        if not all(
+            type(result.get(key)) is int
+            for key in ("record_count", "unit_count", "automatic_tip_units")
+        ):
+            return None
+        explicit = result.get("explicit_tip_assignments")
+        if not isinstance(explicit, dict) or not all(
+            isinstance(key, str) and type(value) is int
+            for key, value in explicit.items()
+        ):
+            return None
+        if not all(
+            isinstance(result.get(key), list)
+            for key in ("barriers", "parallel_windows", "diagnostics")
+        ):
+            return None
+        if result.get("enabled_tip_mask") is not None and type(
+            result["enabled_tip_mask"]
+        ) is not int:
+            return None
+        unit_records = result.get("unit_record_indices")
+        if (
+            type(unit_records) is not list
+            or len(unit_records) != result["unit_count"]
+            or any(
+                type(indices) is not list
+                or any(type(index) is not int or index < 0 for index in indices)
+                for indices in unit_records
+            )
+        ):
+            return None
+        return result
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def worklist_optimize_lines(
     lines: Any,
     name: str,

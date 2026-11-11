@@ -176,6 +176,262 @@ def parse_enabled_tip_mask(value: object, *, supported_channels: int = 8) -> int
     return mask
 
 
+def _native_worklist_analysis_lines(
+    records: list[Record],
+    enabled_tip_mask: object,
+    enabled_mask: int | None,
+    supported_channels: int,
+) -> list[str] | None:
+    if type(supported_channels) is not int or supported_channels < 0:
+        return None
+    if enabled_tip_mask is not None and (
+        type(enabled_tip_mask) is not str or not enabled_tip_mask.isascii()
+    ):
+        return None
+    if enabled_tip_mask is not None and native_acceleration.worklist_parse_enabled_tip_mask(
+        enabled_tip_mask, supported_channels
+    ) != enabled_mask:
+        return None
+
+    lines: list[str] = []
+    for record in records:
+        if type(record) is Pipette:
+            if record.operation not in {"A", "D"} or type(record.volume) is not int:
+                return None
+            string_fields = (
+                record.rack_label,
+                record.rack_id,
+                record.rack_type,
+                record.tube_id,
+                record.liquid_class,
+                record.forced_rack_type,
+            )
+            if any(
+                type(value) is not str
+                or not value.isascii()
+                or value.strip() != value
+                or any(character in value for character in ";\r\n")
+                for value in string_fields
+            ):
+                return None
+            if type(record.position) is str:
+                if (
+                    not record.position.isascii()
+                    or record.position.strip() != record.position
+                    or any(character in record.position for character in ";\r\n")
+                ):
+                    return None
+            elif type(record.position) is not int:
+                return None
+            if (
+                type(record.tip_mask) is not str
+                or not record.tip_mask.isascii()
+                or any(character in record.tip_mask for character in ";\r\n")
+            ):
+                return None
+            python_selection = parse_tip_selection(
+                record.tip_mask, supported_channels=supported_channels
+            )
+            native_selection = native_acceleration.worklist_parse_tip_selection(
+                record.tip_mask, supported_channels
+            )
+            if native_selection != python_selection.to_dict():
+                return None
+        elif type(record) is Comment:
+            if type(record.text) is not str or not record.text.isascii():
+                return None
+        elif type(record) is Break:
+            pass
+        elif type(record) is Wash:
+            if record.scheme is not None and (
+                type(record.scheme) is not int or record.scheme not in {1, 2, 3, 4}
+            ):
+                return None
+        elif type(record) in {Flush, SetDiTiType}:
+            if type(record.parameters) is not tuple or any(
+                type(value) is not str
+                or not value.isascii()
+                or any(character in value for character in "\r\n")
+                for value in record.parameters
+            ):
+                return None
+        else:
+            return None
+        try:
+            line = record.to_line()
+        except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+            return None
+        if type(line) is not str or not line.isascii() or "\n" in line or "\r" in line:
+            return None
+        lines.append(line)
+    return lines
+
+
+def _worklist_analysis_from_native(
+    records: list[Record],
+    payload: dict[str, object],
+    enabled_mask: int | None,
+    supported_channels: int,
+) -> WorklistAnalysis | None:
+    try:
+        if payload.get("record_count") != len(records):
+            return None
+        unit_record_indices = payload["unit_record_indices"]
+        if type(unit_record_indices) is not list:
+            return None
+        units: list[TransferUnit] = []
+        for unit_index, indices in enumerate(unit_record_indices):
+            if (
+                type(indices) is not list
+                or len(indices) < 2
+                or any(type(index) is not int for index in indices)
+                or indices != list(range(indices[0], indices[-1] + 1))
+                or indices[0] < 0
+                or indices[-1] >= len(records)
+            ):
+                return None
+            comment_indices, pair_indices = indices[:-2], indices[-2:]
+            if any(type(records[index]) is not Comment for index in comment_indices):
+                return None
+            if pair_indices[1] != pair_indices[0] + 1:
+                return None
+            aspirate, dispense = (records[index] for index in pair_indices)
+            if (
+                type(aspirate) is not Pipette
+                or type(dispense) is not Pipette
+                or aspirate.operation != "A"
+                or dispense.operation != "D"
+            ):
+                return None
+            selection_a = parse_tip_selection(
+                aspirate.tip_mask, supported_channels=supported_channels
+            )
+            selection_d = parse_tip_selection(
+                dispense.tip_mask, supported_channels=supported_channels
+            )
+            selection = selection_a if selection_a.mode == "explicit" else selection_d
+            units.append(
+                TransferUnit(
+                    unit_index=unit_index,
+                    record_indices=tuple(indices),
+                    line_numbers=tuple(index + 1 for index in indices),
+                    aspirate=aspirate,
+                    dispense=dispense,
+                    tip_selection=selection,
+                    source_key=_location_key(aspirate),
+                    destination_key=_location_key(dispense),
+                )
+            )
+        raw_windows = payload["parallel_windows"]
+        if type(raw_windows) is not list:
+            return None
+        windows: list[ParallelWindow] = []
+        for expected_index, item in enumerate(raw_windows):
+            if type(item) is not dict:
+                return None
+            index = item.get("index")
+            unit_indices = item.get("unit_indices")
+            channels = item.get("candidate_channels")
+            independent = item.get("independent")
+            explicit = item.get("explicit_tips")
+            reason = item.get("reason")
+            if (
+                type(index) is not int
+                or index != expected_index
+                or type(unit_indices) is not list
+                or any(
+                    type(value) is not int or value < 0 or value >= len(units)
+                    for value in unit_indices
+                )
+                or type(channels) is not list
+                or any(type(value) is not int for value in channels)
+                or type(independent) is not bool
+                or type(explicit) is not bool
+                or type(reason) is not str
+            ):
+                return None
+            windows.append(
+                ParallelWindow(
+                    index=index,
+                    units=tuple(units[value] for value in unit_indices),
+                    independent=independent,
+                    explicit_tips=explicit,
+                    candidate_channels=tuple(channels),
+                    reason=reason,
+                )
+            )
+        raw_barriers = payload["barriers"]
+        if type(raw_barriers) is not list or any(type(item) is not dict for item in raw_barriers):
+            return None
+        raw_diagnostics = payload["diagnostics"]
+        if type(raw_diagnostics) is not list:
+            return None
+        diagnostics: list[WorklistDiagnostic] = []
+        for item in raw_diagnostics:
+            if type(item) is not dict:
+                return None
+            code, message = item.get("code"), item.get("message")
+            line_numbers, severity = item.get("line_numbers"), item.get("severity")
+            if (
+                type(code) is not str
+                or type(message) is not str
+                or type(line_numbers) is not list
+                or any(type(line) is not int for line in line_numbers)
+                or type(severity) is not str
+            ):
+                return None
+            diagnostics.append(
+                WorklistDiagnostic(code, message, tuple(line_numbers), severity)
+            )
+        schema_version = payload.get("schema_version")
+        if (
+            type(schema_version) is not str
+            or len(units) != payload.get("unit_count")
+            or payload.get("enabled_tip_mask") != enabled_mask
+        ):
+            return None
+        analysis = WorklistAnalysis(
+            schema_version=schema_version,
+            record_count=len(records),
+            units=tuple(units),
+            windows=tuple(windows),
+            barriers=tuple(raw_barriers),
+            diagnostics=tuple(diagnostics),
+            enabled_tip_mask=enabled_mask,
+        )
+        analysis_payload = analysis.to_dict()
+        native_explicit = payload.get("explicit_tip_assignments")
+        if not isinstance(native_explicit, dict) or any(
+            type(key) is not str
+            or not key.isascii()
+            or not key.isdecimal()
+            or type(value) is not int
+            for key, value in native_explicit.items()
+        ):
+            return None
+        normalized_explicit = {int(key): value for key, value in native_explicit.items()}
+        if any(
+            analysis_payload.get(key) != payload.get(key)
+            for key in (
+                "schema_version",
+                "record_count",
+                "unit_count",
+                "automatic_tip_units",
+                "enabled_tip_mask",
+                "barriers",
+                "parallel_windows",
+                "diagnostics",
+                "runtime_parallelism",
+            )
+        ) or analysis_payload["explicit_tip_assignments"] != normalized_explicit or (
+            payload.get("ok") != (not analysis.has_errors)
+        ):
+            return None
+        return analysis
+    except (IndexError, KeyError, TypeError, ValueError):
+        return None
+
+
 def analyze_worklist(
     worklist: Worklist | Iterable[Record],
     *,
@@ -184,6 +440,21 @@ def analyze_worklist(
 ) -> WorklistAnalysis:
     records = list(worklist.records if isinstance(worklist, Worklist) else worklist)
     enabled = parse_enabled_tip_mask(enabled_tip_mask, supported_channels=supported_channels)
+    native_lines = _native_worklist_analysis_lines(
+        records, enabled_tip_mask, enabled, supported_channels
+    )
+    if native_lines is not None:
+        native = native_acceleration.worklist_analyze_detail_lines(
+            native_lines,
+            enabled_tip_mask if type(enabled_tip_mask) is str else None,
+            supported_channels,
+        )
+        if native is not None:
+            analysis = _worklist_analysis_from_native(
+                records, native, enabled, supported_channels
+            )
+            if analysis is not None:
+                return analysis
     diagnostics: list[WorklistDiagnostic] = []
     barriers: list[dict[str, object]] = []
     units: list[TransferUnit] = []

@@ -1597,6 +1597,95 @@ class WorklistSemanticsTests(unittest.TestCase):
         self.assertEqual(analysis.barriers[0]["type"], "B")
         self.assertEqual(analysis.enabled_tip_mask, 3)
 
+    def test_native_python_analyzer_preserves_model_and_fallback_semantics(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_analyze_detail_lines"
+        ):
+            self.skipTest("optional detailed Rust worklist analyzer is not built")
+
+        first_a, first_d = _transfer(1, tip="1")
+        second_a, second_d = _transfer(2, tip="2")
+        automatic_a, automatic_d = _transfer(3, tip="")
+        mismatch_a = Pipette("A", "Source", "Plate", 4, 10, tip_mask="1")
+        mismatch_d = Pipette("D", "Destination", "Plate", 4, 10, tip_mask="2")
+        cases = [
+            (
+                Worklist(
+                    records=[
+                        Comment("preceding\ncomment"),
+                        first_a,
+                        first_d,
+                        second_a,
+                        second_d,
+                        Wash(2),
+                        automatic_a,
+                        automatic_d,
+                        Flush(("synthetic",)),
+                        SetDiTiType(("synthetic",)),
+                        Break(),
+                        Comment("trailing comment"),
+                    ]
+                ),
+                "3",
+                8,
+            ),
+            (Worklist(records=[mismatch_a, mismatch_d, Break(), automatic_d]), "3", 8),
+        ]
+
+        for worklist, mask, channels in cases:
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                expected = analyze_worklist(
+                    worklist, enabled_tip_mask=mask, supported_channels=channels
+                )
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    native_acceleration,
+                    "worklist_analyze_detail_lines",
+                    wraps=native_acceleration.worklist_analyze_detail_lines,
+                ) as native_call:
+                    with patch(
+                        "tecan_worklist.optimizer._window_properties",
+                        side_effect=AssertionError("eligible worklist fell back to Python"),
+                    ):
+                        actual = analyze_worklist(
+                            worklist, enabled_tip_mask=mask, supported_channels=channels
+                        )
+                    self.assertEqual(native_call.call_count, 1)
+            self.assertEqual(actual.to_dict(), expected.to_dict())
+            self.assertEqual(
+                [
+                    (
+                        unit.record_indices,
+                        unit.line_numbers,
+                        unit.signature(),
+                        unit.tip_selection.to_dict(),
+                    )
+                    for unit in actual.units
+                ],
+                [
+                    (
+                        unit.record_indices,
+                        unit.line_numbers,
+                        unit.signature(),
+                        unit.tip_selection.to_dict(),
+                    )
+                    for unit in expected.units
+                ],
+            )
+
+        unsupported = Worklist(records=[RawRecord("Z", "Z;opaque")])
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = analyze_worklist(unsupported)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_analyze_detail_lines",
+                wraps=native_acceleration.worklist_analyze_detail_lines,
+            ) as native_call:
+                actual = analyze_worklist(unsupported)
+                self.assertEqual(native_call.call_count, 0)
+        self.assertEqual(actual.to_dict(), expected.to_dict())
+
     def test_native_window_properties_match_python_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "worklist_window_properties"

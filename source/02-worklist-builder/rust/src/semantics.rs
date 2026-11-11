@@ -240,6 +240,28 @@ pub fn analyze_worklist(
     Ok(payload)
 }
 
+pub fn analyze_worklist_detail(
+    worklist: &Worklist,
+    enabled_tip_mask: Option<&str>,
+    supported_channels: usize,
+) -> Result<Value, String> {
+    let (state, mut payload) = analyze_state(worklist, enabled_tip_mask, supported_channels)?;
+    let Some(object) = payload.as_object_mut() else {
+        return Err("worklist_analysis_payload_invalid".to_owned());
+    };
+    object.insert(
+        "unit_record_indices".to_owned(),
+        json!(
+            state
+                .units
+                .iter()
+                .map(|unit| &unit.record_indices)
+                .collect::<Vec<_>>()
+        ),
+    );
+    Ok(payload)
+}
+
 fn analyze_state(
     worklist: &Worklist,
     enabled_tip_mask: Option<&str>,
