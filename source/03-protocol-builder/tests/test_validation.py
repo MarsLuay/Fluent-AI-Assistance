@@ -344,6 +344,58 @@ class GateEvaluatorNativeNormalizationTests(unittest.TestCase):
                 expected_status,
             )
 
+    def test_archive_suffix_gates_use_native_lower_with_fallback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = Path(tmp) / "synthetic.ZEIA"
+            archive.touch()
+            checksums_context = ValidationContext(
+                make_gate=_gate_record,
+                source_projects=(archive,),
+                validation_options={"project_checksum_audit": {}},
+            )
+            deferred_context = ValidationContext(
+                make_gate=_gate_record,
+                source_projects=(archive,),
+            )
+
+            def make_additions_gate(gate_id, status, summary, details=None):
+                return {
+                    "id": gate_id,
+                    "status": status,
+                    "summary": summary,
+                    "details": details or {},
+                }
+
+            def evaluate_all():
+                return [
+                    gate_evaluators.evaluate_checksums(checksums_context),
+                    gate_evaluators.evaluate_generated_zeia(deferred_context),
+                    gate_evaluators._evaluate_subroutine_additions(
+                        [archive], {}, make_additions_gate
+                    ),
+                ]
+
+            with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                expected = evaluate_all()
+
+            with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with mock.patch.object(
+                    gate_evaluators,
+                    "_native_ascii_lower",
+                    wraps=native_acceleration.ascii_lower,
+                ) as native_call:
+                    actual = evaluate_all()
+                self.assertEqual(native_call.call_count, 3)
+                native_call.assert_any_call(".ZEIA")
+            self.assertEqual(actual, expected)
+
+            with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with mock.patch.object(
+                    gate_evaluators, "_native_ascii_lower", return_value=None
+                ):
+                    forced_fallback = evaluate_all()
+            self.assertEqual(forced_fallback, expected)
+
     def test_gate_well_row_uses_native_with_python_fallback(self):
         values = ["A1", "aa12", " A2 ", "é1", f"{'A' * 30}3"]
         with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):

@@ -1107,7 +1107,7 @@ def evaluate_checksums(context: ValidationContext) -> GateRecord:
     checksum state, both known before packaging.
     """
     produces_archive = any(
-        path.suffix.lower() == ".zeia" and path.exists() for path in source_projects
+        _lower_text(path.suffix) == ".zeia" and path.exists() for path in source_projects
     )
     if not produces_archive:
         return context.make_gate(
@@ -1234,7 +1234,7 @@ def evaluate_generated_zeia(context: ValidationContext) -> GateRecord:
     the audit attached to produce the authoritative report shipped in the bundle.
     """
     produces_archive = any(
-        path.suffix.lower() == ".zeia" and path.exists() for path in source_projects
+        _lower_text(path.suffix) == ".zeia" and path.exists() for path in source_projects
     )
     if not produces_archive:
         return context.make_gate(
@@ -1320,7 +1320,7 @@ def _evaluate_subroutine_additions(
     absent and the gate defers with a trivial pass.
     """
     produces_archive = any(
-        path.suffix.lower() == ".zeia" and path.exists() for path in source_projects
+        _lower_text(path.suffix) == ".zeia" and path.exists() for path in source_projects
     )
     if not produces_archive:
         return make_gate(
