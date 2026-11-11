@@ -79,6 +79,41 @@ GOOD_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ApiV2CommandValidateTests(unittest.TestCase):
+    def test_variable_labware_index_whitespace_uses_rust_with_python_fallback(self):
+        text = (
+            "<ConfigureDataLabwareDataModel><LabwareName>"
+            " \x1cTray[LoopIndex]\u2003 \t"
+            "</LabwareName></ConfigureDataLabwareDataModel>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = (
+                command_validate._rup_configure_data_labware_variable_index_findings(text)
+            )
+        self.assertEqual(expected[0]["labware_name"], "Tray[LoopIndex]")
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_collapse_ascii_whitespace",
+                wraps=native_acceleration.collapse_ascii_whitespace,
+            ) as native_call:
+                actual = (
+                    command_validate._rup_configure_data_labware_variable_index_findings(text)
+                )
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_collapse_ascii_whitespace",
+                return_value=None,
+            ):
+                fallback = (
+                    command_validate._rup_configure_data_labware_variable_index_findings(text)
+                )
+        self.assertEqual(fallback, expected)
+
     def test_bracket_variable_names_use_rust_with_python_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "bracket_variable_names"

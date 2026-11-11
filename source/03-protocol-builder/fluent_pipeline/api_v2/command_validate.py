@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Mapping, Protocol
 
 from tecan_common.native_acceleration import (
+    collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
     ascii_casefold_equals as _native_ascii_casefold_equals,
     bracket_variable_names as _native_bracket_variable_names,
     clean_subroutine_name_ascii as _native_clean_subroutine_name_ascii,
@@ -396,7 +397,13 @@ def _rup_configure_data_labware_variable_index_findings(text: str) -> list[dict[
         name_match = re.search(r"<LabwareName>(.*?)</LabwareName>", block, re.DOTALL)
         if not name_match:
             continue
-        labware_name = re.sub(r"\s+", " ", name_match.group(1)).strip()
+        raw_labware_name = name_match.group(1)
+        native = _native_collapse_ascii_whitespace(raw_labware_name)
+        labware_name = (
+            native
+            if native is not None
+            else re.sub(r"\s+", " ", raw_labware_name).strip()
+        )
         index_match = re.search(r"\[([^\]]+)\]", labware_name)
         if not index_match or re.fullmatch(r"\d+", index_match.group(1).strip()):
             continue
