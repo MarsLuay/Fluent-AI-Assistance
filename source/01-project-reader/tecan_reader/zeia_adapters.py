@@ -13,6 +13,7 @@ from tecan_common.native_acceleration import (
     count_xscr_object_type_attributes as _native_count_xscr_object_type_attributes,
     extract_data_store_versions as _native_extract_data_store_versions,
     has_gwl_record_prefix as _native_has_gwl_record_prefix,
+    has_visionx_namespace as _native_has_visionx_namespace,
 )
 from tecan_common.performance import (
     finish_performance_marker,
@@ -738,7 +739,16 @@ def _build_probe(
             re.IGNORECASE,
         )
     versions = tuple(sorted(set(found_versions)))
-    has_visionx_namespace = bool(re.search(r"tecan\.com/TSCC/VisionX|<[^>]*:?VxData(?:\s|>)", combined, re.IGNORECASE))
+    has_visionx = _native_has_visionx_namespace(combined)
+    if has_visionx is None:
+        has_visionx = bool(
+            re.search(
+                r"tecan\.com/TSCC/VisionX|<[^>]*:?VxData(?:\s|>)",
+                combined,
+                re.IGNORECASE,
+            )
+        )
+    has_visionx_namespace = has_visionx
     has_script_structure = bool(
         re.search(r"<[^>]*:?ObjectName\b[^>]*>[^<]+</[^>]*:?ObjectName>", combined, re.IGNORECASE)
         and re.search(r"<[^>]*:?Script(?:\s|>)", combined, re.IGNORECASE)

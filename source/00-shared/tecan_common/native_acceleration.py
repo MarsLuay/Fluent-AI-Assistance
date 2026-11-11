@@ -88,6 +88,17 @@ def count_xscr_object_type_attributes(text: Any) -> int | None:
         return None
 
 
+def has_visionx_namespace(text: Any) -> bool | None:
+    """Detect VisionX markers in ASCII text, falling back on Unicode input."""
+    if not enabled() or type(text) is not str:
+        return None
+    try:
+        result = _native.has_visionx_namespace(text)
+        return result if type(result) is bool else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def xml_clean_text(value: Any) -> str | None:
     """Trim exact Unicode XML text natively, preserving Python fallback cases."""
     if not enabled():

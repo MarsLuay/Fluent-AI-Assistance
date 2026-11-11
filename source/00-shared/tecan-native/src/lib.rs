@@ -1163,6 +1163,51 @@ fn count_xscr_object_type_attributes(text: &str) -> Option<usize> {
     count_xscr_object_type_attributes_ascii(text)
 }
 
+fn has_visionx_namespace_ascii(text: &str) -> Option<bool> {
+    if !text.is_ascii() {
+        return None;
+    }
+    let bytes = text.as_bytes();
+    let url_marker = b"tecan.com/TSCC/VisionX";
+    if bytes
+        .windows(url_marker.len())
+        .any(|candidate| candidate.eq_ignore_ascii_case(url_marker))
+    {
+        return Some(true);
+    }
+    let marker = b"VxData";
+    let mut search_start = 0;
+    while let Some(relative_open) = bytes[search_start..].iter().position(|byte| *byte == b'<') {
+        let open = search_start + relative_open;
+        let content_start = open + 1;
+        let tag_end = bytes[content_start..]
+            .iter()
+            .position(|byte| *byte == b'>')
+            .map_or(bytes.len(), |relative_end| content_start + relative_end);
+        let mut candidate_start = content_start;
+        while candidate_start + marker.len() <= tag_end {
+            let next = candidate_start + marker.len();
+            if bytes[candidate_start..next].eq_ignore_ascii_case(marker)
+                && next < bytes.len()
+                && (bytes[next] == b'>' || is_python_ascii_whitespace(bytes[next]))
+            {
+                return Some(true);
+            }
+            candidate_start += 1;
+        }
+        if tag_end == bytes.len() {
+            break;
+        }
+        search_start = tag_end + 1;
+    }
+    Some(false)
+}
+
+#[pyfunction]
+fn has_visionx_namespace(text: &str) -> Option<bool> {
+    has_visionx_namespace_ascii(text)
+}
+
 #[pyfunction]
 fn xml_clean_text(text: &str) -> String {
     trim_python_whitespace(text).to_owned()
@@ -6082,6 +6127,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(has_gwl_record_prefix, module)?)?;
     module.add_function(wrap_pyfunction!(extract_data_store_versions, module)?)?;
     module.add_function(wrap_pyfunction!(count_xscr_object_type_attributes, module)?)?;
+    module.add_function(wrap_pyfunction!(has_visionx_namespace, module)?)?;
     module.add_function(wrap_pyfunction!(xml_clean_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_child_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_leaf_name_texts, module)?)?;
@@ -6955,5 +7001,22 @@ mod tests {
             count_xscr_object_type_attributes_ascii("<Object Type='é'>"),
             None
         );
+    }
+
+    #[test]
+    fn visionx_probe_marker_matches_supported_ascii_regex_cases() {
+        for text in [
+            "http://www.tecan.com/TSCC/VisionX/DataStore",
+            "<VxData>",
+            "<x:VxData >",
+            "<Root><NotVxData></Root>",
+            "<Object Value='VxData\tmore'>",
+        ] {
+            assert_eq!(has_visionx_namespace_ascii(text), Some(true), "{text:?}");
+        }
+        for text in ["", "<VxDatax>", "<VxData", "<Root>plain</Root>"] {
+            assert_eq!(has_visionx_namespace_ascii(text), Some(false), "{text:?}");
+        }
+        assert_eq!(has_visionx_namespace_ascii("<VxData> café"), None);
     }
 }

@@ -186,6 +186,45 @@ class ZeiaAdapterTests(unittest.TestCase):
         self.assertEqual(detection.status, "supported")
         self.assertEqual(detection.selected.adapter_id, "visionx-datastore-v3")
 
+    def test_visionx_marker_matches_python_regex_and_native_probe(self) -> None:
+        pattern = r"tecan\.com/TSCC/VisionX|<[^>]*:?VxData(?:\s|>)"
+        samples = (
+            "http://www.tecan.com/TSCC/VisionX/DataStore",
+            "<VxData>",
+            "<x:VxData\n attr>",
+            "<Object Value='VxData'>",
+            "<VxData/>tail",
+            "<VxDatax>",
+            "VxData>",
+            "<Object Value='VxData\u00a0'>",
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            for sample in samples:
+                native = native_acceleration.has_visionx_namespace(sample)
+                if sample.isascii() and native_acceleration.available():
+                    expected = bool(re.search(pattern, sample, re.IGNORECASE))
+                    self.assertEqual(native, expected, repr(sample))
+                else:
+                    self.assertIsNone(native, repr(sample))
+
+            with tempfile.TemporaryDirectory() as tmp:
+                archive = self._archive(
+                    Path(tmp),
+                    "visionx-probe.zeia",
+                    {"DataStore/UserSpecific/main.xscr": VISIONX_SCRIPT},
+                )
+                with patch.object(
+                    zeia_adapters_module,
+                    "_native_has_visionx_namespace",
+                    wraps=native_acceleration.has_visionx_namespace,
+                ) as native_call:
+                    accelerated = probe_zeia(archive)
+                    self.assertEqual(native_call.call_count, 1)
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                    fallback = probe_zeia(archive)
+        self.assertEqual(accelerated.status, fallback.status)
+        self.assertEqual(accelerated.selected.adapter_id, fallback.selected.adapter_id)
+
     def test_oversized_xscr_object_type_count_matches_python_regex(self) -> None:
         pattern = r"<Object\b[^>]*\bType=['\"]([^'\"]+)"
         samples = (
