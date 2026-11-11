@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Mapping, Protocol
 
 from tecan_common.native_acceleration import (
+    ascii_casefold_equals as _native_ascii_casefold_equals,
     bracket_variable_names as _native_bracket_variable_names,
     clean_subroutine_name_ascii as _native_clean_subroutine_name_ascii,
     xml_elements_by_name as _native_xml_elements_by_name,
@@ -819,7 +820,11 @@ def _first_text(root: ET.Element, name: str, default: str = "") -> str:
 
 
 def _compiled_element_disabled(element: ET.Element) -> bool:
-    return _first_text(element, "IsDisabledForExecution").casefold() == "true"
+    value = _first_text(element, "IsDisabledForExecution")
+    native = _native_ascii_casefold_equals(value, "true")
+    if native is not None:
+        return native
+    return value.casefold() == "true"
 
 
 def _elements_by_local_names(

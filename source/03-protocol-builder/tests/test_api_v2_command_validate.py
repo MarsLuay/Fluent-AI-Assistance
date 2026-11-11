@@ -212,6 +212,36 @@ class ApiV2CommandValidateTests(unittest.TestCase):
         )
         self.assertEqual(custom.string_calls, 1)
 
+    def test_disabled_flag_uses_ascii_casefold_kernel(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "ascii_casefold_equals"
+        ):
+            self.skipTest("optional Rust ASCII casefold helper is not built")
+        values = ["True", "FALSE", " \tTRUE \r\n", "", "ſTRUE"]
+        roots = []
+        for value in values:
+            root = command_validate.ET.Element("Root")
+            command_validate.ET.SubElement(
+                root, "IsDisabledForExecution"
+            ).text = value
+            roots.append(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                command_validate._compiled_element_disabled(root) for root in roots
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_ascii_casefold_equals",
+                wraps=native_acceleration.ascii_casefold_equals,
+            ) as native_call:
+                actual = [
+                    command_validate._compiled_element_disabled(root) for root in roots
+                ]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [True, False, True, False, False])
+
     def test_root_command_scan_uses_native_selector_and_comment_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_elements_by_name"
