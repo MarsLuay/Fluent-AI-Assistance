@@ -18,6 +18,7 @@ from .common import (
 )
 from tecan_common.native_acceleration import (
     append_unique_ascii_string as _native_append_unique_ascii_string,
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     pattern_join_summary as _native_pattern_join_summary,
     pattern_specification_groups as _native_pattern_specification_groups,
     pattern_liquid_step as _native_pattern_liquid_step,
@@ -582,6 +583,17 @@ def _pattern_name(
     return f"{label} from {script_name}{suffix}"
 
 
+def _has_gwl_suffix(value: Any) -> bool:
+    if not value:
+        return False
+    text = str(value)
+    if type(text) is str and text.strip() == text:
+        native = _native_ascii_casefold_trim(text)
+        if native is not None:
+            return native.endswith(".gwl")
+    return text.lower().endswith(".gwl")
+
+
 def _collect_specifications(steps: list[dict[str, Any]]) -> dict[str, list[str]]:
     if not _pattern_specification_inputs_supported(steps):
         return _collect_specifications_python(steps)
@@ -615,7 +627,7 @@ def _collect_specifications(steps: list[dict[str, Any]]) -> dict[str, list[str]]
         add("device_aliases", fields.get("DeviceAlias"))
         add("worklists", fields.get("WorklistName"))
         value = fields.get("FileName") or fields.get("Path")
-        if value and str(value).lower().endswith(".gwl"):
+        if _has_gwl_suffix(value):
             add("worklists", value)
         add("variables", fields.get("Name"))
         add("variables", fields.get("LoopVariable"))
@@ -693,7 +705,7 @@ def _collect_specifications_python(
         _append_unique(specs["device_aliases"], fields.get("DeviceAlias"))
         _append_unique(specs["worklists"], fields.get("WorklistName"))
         value = fields.get("FileName") or fields.get("Path")
-        if value and str(value).lower().endswith(".gwl"):
+        if _has_gwl_suffix(value):
             _append_unique(specs["worklists"], value)
         _append_unique(specs["variables"], fields.get("Name"))
         _append_unique(specs["variables"], fields.get("LoopVariable"))

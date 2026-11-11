@@ -197,6 +197,27 @@ class PatternSummaryHelperTests(unittest.TestCase):
                 fallback, {"labware": ["first"], "rack_types": ["second"]}
             )
 
+    def test_gwl_suffix_check_uses_rust_and_preserves_python_lower(self) -> None:
+        steps = [
+            {"fields": {"Condition": "café", "FileName": "Orders.GWL"}},
+            {"fields": {"Condition": "ready", "Path": "café.GWL"}},
+            {"fields": {"Condition": "ready", "Path": "orders.gw\u217c"}},
+            {"fields": {"Condition": "ready", "Path": " Orders.GWL "}},
+        ]
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = pattern_library._collect_specifications(steps)
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                pattern_library,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = pattern_library._collect_specifications(steps)
+                self.assertEqual(native_call.call_count, 3)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["worklists"], ["Orders.GWL", "café.GWL"])
+        self.assertFalse(pattern_library._has_gwl_suffix("orders.gw\u217c"))
+
     def test_liquid_step_uses_rust_for_supported_ascii_and_falls_back(self) -> None:
         values = ("Aspirate", "Plate A", "10", "Water")
         with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
