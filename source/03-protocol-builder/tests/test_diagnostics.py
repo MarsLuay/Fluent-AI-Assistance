@@ -55,6 +55,54 @@ class DiagnosticsTests(unittest.TestCase):
                 ]
         self.assertEqual(forced_fallback, expected)
 
+    def test_command_fallback_uses_native_ascii_lower_with_unicode_fallback(self):
+        commands = [
+            "CustomAspirateCommand",
+            "CustomDropTipsCommand",
+            "CustomTrésAspirateCommand",
+            "UnrelatedCommand",
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                diagnostics_module, "registry_command_operation", return_value=None
+            ):
+                expected = [
+                    diagnostics_module._operation_from_command_name(command)
+                    for command in commands
+                ]
+        self.assertEqual(expected, ["aspirate", "drop_tips", "aspirate", None])
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                diagnostics_module, "registry_command_operation", return_value=None
+            ):
+                with patch.object(
+                    diagnostics_module,
+                    "_native_ascii_lower",
+                    wraps=native_acceleration.ascii_lower,
+                ) as native_call:
+                    actual = [
+                        diagnostics_module._operation_from_command_name(command)
+                        for command in commands
+                    ]
+                    self.assertEqual(native_call.call_count, len(commands))
+                native_call.assert_any_call("CustomAspirateCommand")
+                native_call.assert_any_call("CustomTrésAspirateCommand")
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                diagnostics_module, "registry_command_operation", return_value=None
+            ):
+                with patch.object(
+                    diagnostics_module, "_native_ascii_lower", return_value=None
+                ):
+                    forced_fallback = [
+                        diagnostics_module._operation_from_command_name(command)
+                        for command in commands
+                    ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_diagnose_zeia_reports_missing_worklist_and_unsupported_command(self):
         with _isolated_projects() as tmp_path:
             archive = tmp_path / "broken.zeia"

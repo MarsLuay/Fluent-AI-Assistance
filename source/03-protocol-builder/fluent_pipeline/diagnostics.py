@@ -1125,7 +1125,10 @@ def _operation_from_command_name(command_id: str) -> str | None:
     operation = registry_command_operation(command_id)
     if operation:
         return operation
-    lowered = command_id.lower()
+    native_lowered = _native_ascii_lower(command_id)
+    lowered = (
+        native_lowered if native_lowered is not None else command_id.lower()
+    )
     fallbacks = {
         "addlabware": "add_labware",
         "getheadadapter": "get_head_adapter",
