@@ -464,7 +464,8 @@ def ingest_zeia(
                 for info in (member.info,)
                 if not info.is_dir()
                 and info.file_size > MAX_XML_BYTES
-                and Path(member.name).suffix.casefold() in {".xscr", *XML_OBJECT_EXTS}
+                and _casefold_path_text(Path(member.name).suffix)
+                in {".xscr", *XML_OBJECT_EXTS}
                 and not _is_known_irrelevant_metadata(member.name)
             ]
             finish_performance_marker(
@@ -481,7 +482,7 @@ def ingest_zeia(
                 if info.is_dir():
                     continue
                 entry = member.name
-                suffix = Path(entry).suffix.casefold()
+                suffix = _casefold_path_text(Path(entry).suffix)
                 if suffix == ".xscr":
                     if script_limit is not None and len(scripts) >= script_limit:
                         continue
@@ -725,7 +726,7 @@ def _build_probe(
     samples: list[tuple[str, str]] = []
     for member in inventory.members:
         info = member.info
-        if info.is_dir() or Path(info.filename).suffix.casefold() not in {
+        if info.is_dir() or _casefold_path_text(Path(info.filename).suffix) not in {
             ".xscr", ".xcmp", ".xwsp", ".xlqc", ".xlcp", ".xsit", ".xcon", ".xml", ".twl"
         }:
             continue
@@ -774,10 +775,10 @@ def _build_probe(
     else:
         has_script_structure, has_object_structure = structural_flags
     has_script_container_evidence = any(
-        Path(name).suffix.casefold() == ".xscr"
+        _casefold_path_text(Path(name).suffix) == ".xscr"
         and any(
             part in {"scripts", "datastore", "userspecific"}
-            for part in PurePosixPath(name.casefold()).parts
+            for part in PurePosixPath(_casefold_path_text(name)).parts
         )
         and text.lstrip().startswith("<")
         for name, text in samples
@@ -787,12 +788,12 @@ def _build_probe(
     worklist_samples = 0
     for member in inventory.members:
         info = member.info
-        if info.is_dir() or Path(info.filename).suffix.casefold() not in {".gwl", ".twl"}:
+        if info.is_dir() or _casefold_path_text(Path(info.filename).suffix) not in {".gwl", ".twl"}:
             continue
         if worklist_samples >= 32:
             break
         worklist_samples += 1
-        if Path(info.filename).suffix.casefold() == ".twl":
+        if _casefold_path_text(Path(info.filename).suffix) == ".twl":
             has_task_input_structure = True
             continue
         try:
@@ -1054,19 +1055,19 @@ def _object_kind(suffix: str) -> str:
     }.get(suffix, suffix.lstrip(".") or "xml")
 
 
-def _casefold_suffix(suffix: str) -> str:
-    if type(suffix) is str and suffix.strip() == suffix:
-        native = _native_ascii_casefold_trim(suffix)
+def _casefold_path_text(value: str) -> str:
+    if type(value) is str and value.strip() == value:
+        native = _native_ascii_casefold_trim(value)
         if native is not None:
             return native
-    return suffix.casefold()
+    return value.casefold()
 
 
 def _eligible_member_counts(entries: list[str] | tuple[str, ...]) -> dict[str, int]:
     if type(entries) in (list, tuple) and all(
         type(entry) is str or type(entry) is _PATH_TYPE for entry in entries
     ):
-        suffixes = [_casefold_suffix(Path(entry).suffix) for entry in entries]
+        suffixes = [_casefold_path_text(Path(entry).suffix) for entry in entries]
         native = _native_count_string_groups(
             suffixes,
             {
@@ -1080,20 +1081,20 @@ def _eligible_member_counts(entries: list[str] | tuple[str, ...]) -> dict[str, i
             return native
     return {
         "scripts": sum(
-            1 for entry in entries if _casefold_suffix(Path(entry).suffix) == ".xscr"
+            1 for entry in entries if _casefold_path_text(Path(entry).suffix) == ".xscr"
         ),
         "objects": sum(
             1
             for entry in entries
-            if _casefold_suffix(Path(entry).suffix) in XML_OBJECT_EXTS | ASSET_EXTS
+            if _casefold_path_text(Path(entry).suffix) in XML_OBJECT_EXTS | ASSET_EXTS
         ),
         "worklists": sum(
-            1 for entry in entries if _casefold_suffix(Path(entry).suffix) == ".gwl"
+            1 for entry in entries if _casefold_path_text(Path(entry).suffix) == ".gwl"
         ),
         "task_inputs": sum(
             1
             for entry in entries
-            if _casefold_suffix(Path(entry).suffix) in TASK_INPUT_EXTS
+            if _casefold_path_text(Path(entry).suffix) in TASK_INPUT_EXTS
         ),
     }
 
@@ -1158,8 +1159,8 @@ def _parse_error(
 
 
 def _is_known_irrelevant_metadata(entry: str) -> bool:
-    name = Path(entry).name.casefold()
-    parts = {part.casefold() for part in PurePosixPath(entry).parts}
+    name = _casefold_path_text(Path(entry).name)
+    parts = {_casefold_path_text(part) for part in PurePosixPath(entry).parts}
     return name in {"nodedescription.xml", "metadata.xml"} or "metadata" in parts
 
 

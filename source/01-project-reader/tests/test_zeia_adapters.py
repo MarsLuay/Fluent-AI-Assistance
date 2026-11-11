@@ -224,6 +224,34 @@ class ZeiaAdapterTests(unittest.TestCase):
         self.assertEqual(v3_detection.status, "supported")
         self.assertEqual(v3_detection.selected.adapter_id, "visionx-datastore-v3")
 
+    def test_probe_suffix_casefold_keeps_unicode_python_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = self._archive(
+                Path(tmp),
+                "unicode-suffix.zeia",
+                {
+                    "DataStore/long-s.XſCR": (
+                        '<VxData dataStoreVersion="3">'
+                        "<ObjectName>Three</ObjectName><Script /></VxData>"
+                    )
+                },
+            )
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                expected = probe_zeia(archive)
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    zeia_adapters_module,
+                    "_native_ascii_casefold_trim",
+                    wraps=native_acceleration.ascii_casefold_trim,
+                ) as native_call:
+                    actual = probe_zeia(archive)
+                    self.assertGreater(native_call.call_count, 0)
+
+        self.assertEqual(actual.status, expected.status)
+        self.assertEqual(actual.selected.adapter_id, expected.selected.adapter_id)
+        self.assertEqual(actual.status, "supported")
+        self.assertEqual(actual.selected.adapter_id, "visionx-datastore-v3")
+
     def test_gwl_probe_uses_native_ascii_match_and_python_unicode_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
