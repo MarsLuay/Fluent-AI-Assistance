@@ -1409,12 +1409,12 @@ def _copy_v2_source_tree(source_dir: Path, destination_dir: Path) -> None:
     excluded_suffixes = {".xscr", ".zeia"}
     for source in source_dir.rglob("*"):
         relative = source.relative_to(source_dir)
-        if any(part.casefold() in excluded_directories for part in relative.parts):
+        if any(_casefold_exact(part) in excluded_directories for part in relative.parts):
             continue
         if source.is_dir():
             (destination_dir / relative).mkdir(parents=True, exist_ok=True)
             continue
-        if source.suffix.casefold() in excluded_suffixes:
+        if _casefold_exact(source.suffix) in excluded_suffixes:
             continue
         _copy(source, destination_dir / relative)
 

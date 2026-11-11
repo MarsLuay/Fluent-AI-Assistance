@@ -38,6 +38,67 @@ def _ok_finalization_report() -> FinalizationReport:
     )
 
 
+class SourceTreeCopyNormalizationNativeTests(unittest.TestCase):
+    def test_excluded_paths_use_native_casefold_with_unicode_fallback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source"
+            destination = root / "destination"
+            files = {
+                "KEEP.TXT": "keep",
+                "PICK.XSCR": "exclude suffix",
+                "PICK.ZEIA": "exclude suffix",
+                "folder/inner.txt": "keep nested",
+                "original-sources/secret.txt": "exclude directory",
+                "original-ſources/unicode.txt": "unicode-equivalent directory",
+                "folder/file.xſcr": "unicode-equivalent suffix",
+            }
+            for relative, content in files.items():
+                path = source / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+
+            with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                exports._copy_v2_source_tree(source, destination)
+                expected = sorted(
+                    path.relative_to(destination).as_posix()
+                    for path in destination.rglob("*")
+                    if path.is_file()
+                )
+            self.assertEqual(expected, ["KEEP.TXT", "folder/inner.txt"])
+
+            native_destination = root / "native-destination"
+            with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with mock.patch.object(
+                    exports,
+                    "_native_ascii_casefold_trim",
+                    wraps=native_acceleration.ascii_casefold_trim,
+                ) as native_call:
+                    exports._copy_v2_source_tree(source, native_destination)
+                    actual = sorted(
+                        path.relative_to(native_destination).as_posix()
+                        for path in native_destination.rglob("*")
+                        if path.is_file()
+                    )
+                    self.assertGreater(native_call.call_count, 0)
+            self.assertEqual(actual, expected)
+
+            fallback_destination = root / "fallback-destination"
+            with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with mock.patch.object(
+                    exports,
+                    "_native_ascii_casefold_trim",
+                    return_value=None,
+                ):
+                    exports._copy_v2_source_tree(source, fallback_destination)
+            fallback = sorted(
+                path.relative_to(fallback_destination).as_posix()
+                for path in fallback_destination.rglob("*")
+                if path.is_file()
+            )
+            self.assertEqual(fallback, expected)
+
+
 class FullZeiaCopyFlagNativeTests(unittest.TestCase):
     def test_opt_in_flag_uses_native_ascii_casefold_with_python_fallback(self):
         values = ["1", " true ", "YES", "On", "0", "Straße", "ſ", ""]
