@@ -1035,6 +1035,66 @@ class ExportFinalizationTests(unittest.TestCase):
                 b"external",
             )
 
+    def test_external_payload_target_collision_uses_native_casefold_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            archive = root / "collision.zeia"
+            bundle = root / "bundle"
+            bundle.mkdir()
+            with zipfile.ZipFile(archive, "w") as output:
+                output.writestr(
+                    "fs/mapping.xml",
+                    build_fs_mapping_xml(
+                        [
+                            (16, r"C:\Tecan\Straße"),
+                            (17, r"c:\tecan\STRASSE"),
+                        ]
+                    ),
+                )
+                output.writestr("fs/16/shared.png", b"same payload")
+                output.writestr("fs/17/shared.png", b"same payload")
+
+            with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with mock.patch.object(
+                    exports,
+                    "_native_ascii_casefold_trim",
+                    wraps=native_acceleration.ascii_casefold_trim,
+                ) as native_call:
+                    deployments = exports._stage_external_file_deployments(
+                        archive, bundle_dir=bundle
+                    )
+                    folded_inputs = [call.args[0] for call in native_call.call_args_list]
+
+            target_path = r"C:\Tecan\Straße\shared.png"
+            self.assertEqual(len(deployments), 1)
+            self.assertEqual(deployments[0]["target_path"], target_path)
+            self.assertIn(target_path, folded_inputs)
+            self.assertEqual(
+                (bundle / "source" / "external-files" / "16" / "shared.png").read_bytes(),
+                b"same payload",
+            )
+
+            disabled_bundle = root / "disabled-bundle"
+            disabled_bundle.mkdir()
+            with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                disabled = exports._stage_external_file_deployments(
+                    archive, bundle_dir=disabled_bundle
+                )
+            self.assertEqual(disabled, deployments)
+
+            fallback_bundle = root / "fallback-bundle"
+            fallback_bundle.mkdir()
+            with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with mock.patch.object(
+                    exports,
+                    "_native_ascii_casefold_trim",
+                    return_value=None,
+                ):
+                    fallback = exports._stage_external_file_deployments(
+                        archive, bundle_dir=fallback_bundle
+                    )
+            self.assertEqual(fallback, deployments)
+
     def test_export_ready_to_import_runs_compiled_xscr_finalizer_first(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

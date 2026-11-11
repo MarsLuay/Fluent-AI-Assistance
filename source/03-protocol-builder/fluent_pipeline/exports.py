@@ -1481,7 +1481,7 @@ def _stage_external_file_deployments(
 
             payload = archive.read(info.filename)
             digest = hashlib.sha256(payload).hexdigest()
-            target_key = target_path.casefold()
+            target_key = _casefold_exact(target_path)
             previous = targets.get(target_key)
             if previous is not None:
                 previous_entry, previous_digest = previous
