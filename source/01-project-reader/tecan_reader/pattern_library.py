@@ -848,16 +848,18 @@ def _pattern_result(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any
 
 
 def _command_haystack(command: dict[str, Any]) -> str:
-    return " ".join(
-        str(value)
-        for value in (
-            command.get("command_type", ""),
-            command.get("raw_type", ""),
-            command.get("family", ""),
-            command.get("name", ""),
-            json.dumps(command.get("fields", {}), sort_keys=True),
+    return _lower_text(
+        " ".join(
+            str(value)
+            for value in (
+                command.get("command_type", ""),
+                command.get("raw_type", ""),
+                command.get("family", ""),
+                command.get("name", ""),
+                json.dumps(command.get("fields", {}), sort_keys=True),
+            )
         )
-    ).lower()
+    )
 
 
 def _join_summary(*parts: str) -> str:

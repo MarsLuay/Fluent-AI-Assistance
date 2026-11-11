@@ -245,6 +245,43 @@ class PatternSummaryHelperTests(unittest.TestCase):
         self.assertEqual(actual_summary, expected_summary)
         self.assertEqual(actual_summary, "Aspirate 10")
 
+    def test_command_haystack_uses_rust_and_unicode_fallback(self) -> None:
+        commands = [
+            {"command_type": "SyntheticAspirate", "fields": {}},
+            {"command_type": "Aspirateſ", "fields": {}},
+        ]
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(pattern_library, "registry_pattern_type", return_value=None):
+                expected = [
+                    pattern_library.classify_command_pattern(command)
+                    for command in commands
+                ]
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(pattern_library, "registry_pattern_type", return_value=None):
+                with patch.object(
+                    pattern_library,
+                    "_native_ascii_casefold_trim",
+                    wraps=native_acceleration.ascii_casefold_trim,
+                ) as native_call:
+                    actual = [
+                        pattern_library.classify_command_pattern(command)
+                        for command in commands
+                    ]
+                    self.assertEqual(native_call.call_count, 2)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [["aspirate"], ["aspirate"]])
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(pattern_library, "registry_pattern_type", return_value=None):
+                with patch.object(
+                    pattern_library, "_native_ascii_casefold_trim", return_value=None
+                ):
+                    fallback = [
+                        pattern_library.classify_command_pattern(command)
+                        for command in commands
+                    ]
+        self.assertEqual(fallback, expected)
+
     def test_pattern_type_normalization_uses_rust_with_python_fallback(self) -> None:
         values = (" Aspirate-Drop Tips ", "Café-Name", "Aſpirate")
         with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
