@@ -27,6 +27,7 @@ import re
 from typing import Iterable
 
 from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     ascii_profile_slug as _native_ascii_profile_slug,
 )
 
@@ -138,7 +139,7 @@ def component_taxonomy(functional_group: str | None) -> tuple[str | None, str, s
     if not fg:
         return None, "unknown", None
     major, _, subtype = fg.partition(".")
-    kind = major.strip().lower()
+    kind = _trimmed_lower(major)
     if kind not in {"carrier", "labware"}:
         kind = "unknown"
     normalized_subtype = _normalize_taxonomy_token(subtype) if subtype else None
@@ -204,7 +205,12 @@ _EXACT_CATEGORY_OVERRIDES = {
 
 
 def _lookup_builtin_category_override(name: str) -> str | None:
-    return _EXACT_CATEGORY_OVERRIDES.get(name.strip().lower())
+    return _EXACT_CATEGORY_OVERRIDES.get(_trimmed_lower(name))
+
+
+def _trimmed_lower(value: str) -> str:
+    native = _native_ascii_casefold_trim(value)
+    return native if native is not None else value.strip().lower()
 
 
 def _matches(text: str, patterns: Iterable[re.Pattern[str]]) -> bool:
