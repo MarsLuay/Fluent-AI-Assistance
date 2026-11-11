@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from tecan_common.native_acceleration import (
+    ascii_collapse_casefold_whitespace as _native_ascii_collapse_casefold_whitespace,
+)
+
 from .config import PROJECT_DIR, READY_TO_IMPORT_DIR, REPO_ROOT, SHARED_TEMP_DIR, fluentcoder_python
 
 AGENT_BRIEF_MODES = (
@@ -121,7 +125,13 @@ def normalize_agent_brief_mode(mode: str | None) -> str:
 
 def resolve_agent_brief_mode(intent: str, *, default: str = "status") -> dict[str, str | None]:
     """Map free-text user intent to a brief mode (one-liner; no guessing)."""
-    text = " ".join((intent or "").casefold().split())
+    raw_intent = intent or ""
+    native = _native_ascii_collapse_casefold_whitespace(raw_intent)
+    text = (
+        native
+        if native is not None
+        else " ".join(raw_intent.casefold().split())
+    )
     default_mode = normalize_agent_brief_mode(default)
     if not text:
         return {
