@@ -326,24 +326,24 @@ def rewrite_script_reference_guids(
     type_ids: set[str] | None = None,
 ) -> tuple[bytes, list[dict[str, str]]]:
     """Rewrite ``<Reference>`` Script GUIDs to unique local GUIDs; skip ambiguous."""
-    wanted_types = {value.casefold() for value in (type_ids or {"Script"})}
+    wanted_types = {_casefold_key(value) for value in (type_ids or {"Script"})}
     rewrites: list[dict[str, str]] = []
 
     def repl(match: re.Match[bytes]) -> bytes:
         old_guid = match.group(1).decode("utf-8", errors="replace").strip()
         type_id = match.group(2).decode("utf-8", errors="replace").strip()
         object_name = match.group(3).decode("utf-8", errors="replace").strip()
-        if type_id.casefold() not in wanted_types:
+        if _casefold_key(type_id) not in wanted_types:
             return match.group(0)
         new_guid, reason = resolve_local_script_guid_for_name(inventory, object_name)
-        if not new_guid or new_guid.casefold() == old_guid.casefold():
+        if not new_guid or _casefold_key(new_guid) == _casefold_key(old_guid):
             return match.group(0)
         if reason not in {"unique", "folder_unique"}:
             return match.group(0)
         # Locate folder for audit
         folder = ""
         for row in inventory.get("scripts") or []:
-            if str(row.get("guid") or "").casefold() == new_guid.casefold():
+            if _casefold_key(str(row.get("guid") or "")) == _casefold_key(new_guid):
                 folder = normalize_script_folder(row.get("folder"))
                 break
         rewrites.append(

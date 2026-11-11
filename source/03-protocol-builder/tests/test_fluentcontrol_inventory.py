@@ -147,6 +147,58 @@ class FluentControlInventoryTests(unittest.TestCase):
                     inventory_module._first_xml_text(text, "ObjectName"), expected
                 )
 
+    def test_script_reference_rewrite_uses_native_casefold_keys(self) -> None:
+        new_guid = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+        inventory = {
+            "scripts": [
+                {"guid": new_guid, "object_name": "SUB_Demo", "folder": "Demo"}
+            ]
+        }
+        payloads = [
+            (
+                b"<Reference><Guid>AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA</Guid>"
+                b"<TypeId>sCrIpT</TypeId><ObjectName>sub_demo</ObjectName></Reference>"
+            ),
+            (
+                b"<Reference><Guid>BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB</Guid>"
+                b"<TypeId>Script</TypeId><ObjectName>SUB_Demo</ObjectName></Reference>"
+            ),
+        ]
+
+        def rewrite_all():
+            return [
+                rewrite_script_reference_guids(
+                    payload, inventory, type_ids={"sCrIpT"}
+                )
+                for payload in payloads
+            ]
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = rewrite_all()
+        self.assertEqual(len(disabled[0][1]), 1)
+        self.assertEqual(disabled[0][1][0]["to_guid"], new_guid)
+        self.assertEqual(disabled[0][1][0]["folder"], "Demo")
+        self.assertEqual(disabled[1], (payloads[1], []))
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                inventory_module,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = rewrite_all()
+                self.assertGreater(native_call.call_count, 0)
+        self.assertEqual(enabled, disabled)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                inventory_module,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = rewrite_all()
+        self.assertEqual(fallback, disabled)
+
     def test_inventory_unique_collision_and_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory(prefix="fc_inv_") as tmp:
             root = Path(tmp)
