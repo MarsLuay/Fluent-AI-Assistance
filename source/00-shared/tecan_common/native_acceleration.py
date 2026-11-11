@@ -3028,6 +3028,17 @@ def ascii_worktable_selection_text(value: Any) -> str | None:
         return None
 
 
+def ascii_worktable_int_text(value: Any) -> str | None:
+    """Validate a trimmed ASCII signed integer for worktable fields, or fallback."""
+    if not enabled() or type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.ascii_worktable_int_text(value)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def ascii_lower_alnum_compact(value: Any) -> str | None:
     """Drop non-lowercase ASCII letters and digits, or request fallback."""
     if not enabled() or type(value) is not str or not value.isascii():

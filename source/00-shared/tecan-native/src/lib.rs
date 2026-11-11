@@ -2646,6 +2646,19 @@ fn ascii_worktable_selection_text(value: &str) -> Option<String> {
 }
 
 #[pyfunction]
+fn ascii_worktable_int_text(value: &str) -> Option<String> {
+    if !value.is_ascii() {
+        return None;
+    }
+    let digits = value.strip_prefix('-').unwrap_or(value);
+    if !digits.is_empty() && digits.bytes().all(|character| character.is_ascii_digit()) {
+        Some(value.to_owned())
+    } else {
+        Some("0".to_owned())
+    }
+}
+
+#[pyfunction]
 fn ascii_lower_alnum_compact(value: &str) -> Option<String> {
     if !value.is_ascii() {
         return None;
@@ -7759,6 +7772,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(ascii_casefold_trim, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_script_name_key, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_worktable_selection_text, module)?)?;
+    module.add_function(wrap_pyfunction!(ascii_worktable_int_text, module)?)?;
     module.add_function(wrap_pyfunction!(parse_ascii_bool_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_element_is_nil, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_lower_alnum_compact, module)?)?;
@@ -8041,6 +8055,17 @@ mod tests {
             Some("item [\u{1c}12\u{1f}]".into())
         );
         assert_eq!(ascii_worktable_selection_text("item [١]"), None);
+    }
+
+    #[test]
+    fn ascii_worktable_int_text_matches_signed_decimal_validation() {
+        for value in ["0", "42", "-1", "0007"] {
+            assert_eq!(ascii_worktable_int_text(value), Some(value.into()));
+        }
+        for value in ["", "-", "+1", "--1", "1.0", " 1 "] {
+            assert_eq!(ascii_worktable_int_text(value), Some("0".into()));
+        }
+        assert_eq!(ascii_worktable_int_text("١"), None);
     }
 
     #[test]

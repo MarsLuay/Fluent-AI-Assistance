@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol, Sequence
 
 from tecan_common.native_acceleration import (
+    ascii_worktable_int_text as _native_ascii_worktable_int_text,
     ascii_worktable_selection_text as _native_ascii_worktable_selection_text,
     xml_direct_elements_by_name as _native_xml_direct_elements_by_name,
     xml_elements_by_name as _native_xml_elements_by_name,
@@ -51,6 +52,9 @@ def _xml_text(value: Any) -> str:
 
 def _worktable_int_text(value: Any) -> str:
     text = "" if value is None else str(value).strip()
+    native = _native_ascii_worktable_int_text(text)
+    if native is not None:
+        return native
     return text if re.fullmatch(r"-?\d+", text) else "0"
 
 

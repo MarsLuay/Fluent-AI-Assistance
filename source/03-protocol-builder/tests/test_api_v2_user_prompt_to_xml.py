@@ -21,7 +21,7 @@ from fluent_pipeline.api_v2.xml_compare import compare_command_xml, extract_comm
 from fluent_pipeline.protocol_ir import MEDIA_PLACEHOLDER_BEGIN
 
 
-class WorktableSelectionNativeTests(unittest.TestCase):
+class WorktableValueNativeTests(unittest.TestCase):
     def test_ascii_bracket_index_validation_matches_python_fallback(self):
         values = [
             "  item [ 12 ] [3]  ",
@@ -65,6 +65,25 @@ class WorktableSelectionNativeTests(unittest.TestCase):
                 "",
                 "item [open",
             ],
+        )
+
+    def test_ascii_signed_integer_validation_matches_python_unicode_digits(self):
+        values = ["0", "42", "-1", "0007", "", "-", "+1", "--1", "1.0", " 1 ", "١", "-١", None, 5]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [command_module._worktable_int_text(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_module,
+                "_native_ascii_worktable_int_text",
+                wraps=native_acceleration.ascii_worktable_int_text,
+            ) as native_call:
+                actual = [command_module._worktable_int_text(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertIsNone(native_acceleration.ascii_worktable_int_text("١"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            ["0", "42", "-1", "0007", "0", "0", "0", "0", "0", "1", "١", "-١", "0", "5"],
         )
 
 
