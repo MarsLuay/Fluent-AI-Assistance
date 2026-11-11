@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 from pathlib import Path
+from unittest.mock import patch
 
+import fluent_pipeline.bundle_media as bundle_media
+from tecan_common import native_acceleration
 from fluent_pipeline.bundle_media import (
     assign_step_label_media_to_final_prompts,
     organize_bundle_touchtools_media,
@@ -14,6 +19,41 @@ from fluent_pipeline.bundle_media import (
 )
 from fluent_pipeline.media_convert import is_placeholder_image_slot, is_placeholder_video_gif, write_placeholder_video_slot
 from fluent_pipeline.protocol_ir import write_placeholder_image_slot
+
+
+def test_media_kind_normalization_uses_native_ascii_with_python_fallback() -> None:
+    values = [" Gif ", "VIDEO", " Audio ", " Image ", "Straße", "\u0130mage"]
+    pattern = re.compile(r"(?P<legacy_kind>.*)(?P<slot_kind>)")
+    matches = [pattern.match(value) for value in values]
+    expected = []
+    for value in values:
+        token = value.strip().lower()
+        expected.append("video" if token in {"gif", "video"} else token)
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        fallback = [bundle_media._media_kind_from_slot_match(match) for match in matches]
+    assert fallback == expected
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            bundle_media,
+            "_native_ascii_casefold_trim",
+            wraps=native_acceleration.ascii_casefold_trim,
+        ) as native_call:
+            actual = [bundle_media._media_kind_from_slot_match(match) for match in matches]
+            assert native_call.call_count == len(values)
+    assert actual == expected
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            bundle_media,
+            "_native_ascii_casefold_trim",
+            return_value=None,
+        ):
+            unsupported_fallback = [
+                bundle_media._media_kind_from_slot_match(match) for match in matches
+            ]
+    assert unsupported_fallback == expected
 
 
 def test_stage_generation_media_originals_copies_dropped_video(tmp_path: Path) -> None:

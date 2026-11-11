@@ -10,6 +10,10 @@ from collections.abc import Collection
 from pathlib import Path, PureWindowsPath
 from typing import Any, Mapping
 
+from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
+)
+
 ASSET_SUFFIXES = {".bmp", ".gif", ".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 AUDIO_SUFFIXES = {".mp3", ".wav"}
 IMAGE_CAPTURE_SUFFIXES = {
@@ -458,7 +462,9 @@ def _parse_prompt_number_from_basename(name: str) -> int | None:
 
 
 def _media_kind_from_slot_match(match: re.Match[str]) -> str:
-    token = str(match.group("legacy_kind") or match.group("slot_kind") or "").strip().lower()
+    raw_token = str(match.group("legacy_kind") or match.group("slot_kind") or "")
+    native = _native_ascii_casefold_trim(raw_token)
+    token = native if native is not None else raw_token.strip().lower()
     if token in {"gif", "video"}:
         return "video"
     return token
