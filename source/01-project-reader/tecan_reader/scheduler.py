@@ -30,6 +30,14 @@ _KNOWN_FIELDS = {
 }
 
 
+def _casefold_name(value: str) -> str:
+    if type(value) is str and value.strip() == value:
+        native = _native_ascii_casefold_trim(value)
+        if native is not None:
+            return native
+    return value.casefold()
+
+
 def is_scheduler_artifact(entry: str, text: str) -> bool:
     native_path_match = _native_substring_match_groups(
         [entry], [("scheduler", "scheduled", "processes", "tasks")]
@@ -70,17 +78,7 @@ def inspect_scheduler_text(text: str, *, source_name: str) -> dict[str, Any]:
     for index, element in candidates:
         if not isinstance(element.tag, str):
             continue
-        raw_kind_name = local_name(element.tag)
-        native_kind_name = (
-            _native_ascii_casefold_trim(raw_kind_name)
-            if raw_kind_name.strip() == raw_kind_name
-            else None
-        )
-        kind_name = (
-            native_kind_name
-            if native_kind_name is not None
-            else raw_kind_name.casefold()
-        )
+        kind_name = _casefold_name(local_name(element.tag))
         if kind_name not in _SCHEDULER_NAMES:
             continue
         if kind_name in {"process", "scheduledprocess", "scheduler"}:
@@ -181,7 +179,7 @@ def _record(element: Any, *, index: int, kind: str, source_name: str) -> dict[st
     if native_values is not None:
         normalized = dict(zip(field_aliases, native_values))
     else:
-        folded = {name.casefold(): value for name, value in fields.items()}
+        folded = {_casefold_name(name): value for name, value in fields.items()}
 
         def first(*names: str) -> Any:
             for name in names:
@@ -218,7 +216,7 @@ def _record(element: Any, *, index: int, kind: str, source_name: str) -> dict[st
 
 
 def _store_field(fields: dict[str, str], unknown: dict[str, list[str]], name: str, value: str) -> None:
-    if name.casefold() in _KNOWN_FIELDS:
+    if _casefold_name(name) in _KNOWN_FIELDS:
         fields[name] = value
     else:
         bucket = unknown.setdefault(name, [])

@@ -110,7 +110,7 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
                 actual = scheduler.inspect_scheduler_text(
                     source, source_name="synthetic.xml"
                 )
-                self.assertEqual(native_call.call_count, 2)
+                self.assertEqual(native_call.call_count, 4)
         self.assertEqual(actual, expected)
         self.assertEqual(len(actual["scheduler_processes"]), 1)
         self.assertEqual(len(actual["scheduler_tasks"]), 1)
@@ -125,6 +125,56 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
                     source, source_name="synthetic.xml"
                 )
         self.assertEqual(fallback, expected)
+
+    def test_scheduler_field_membership_uses_native_casefold_and_exact_fallback(self) -> None:
+        def collect() -> tuple[dict[str, str], dict[str, list[str]]]:
+            fields: dict[str, str] = {}
+            unknown: dict[str, list[str]] = {}
+            scheduler._store_field(fields, unknown, "TasKID", "synthetic-id")
+            scheduler._store_field(fields, unknown, " Description ", "preserved")
+            return fields, unknown
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = collect()
+        self.assertEqual(
+            expected,
+            ({"TasKID": "synthetic-id"}, {" Description ": ["preserved"]}),
+        )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                scheduler,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = collect()
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertIsNone(native_acceleration.ascii_casefold_trim("TasKID"))
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                scheduler,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = collect()
+        self.assertEqual(fallback, expected)
+
+        root = ET.fromstring('<Task TasKID="synthetic-id"/>')
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_record = scheduler._record(
+                root, index=0, kind="scheduler_task", source_name="synthetic.xml"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                scheduler, "_native_casefold_alias_values", return_value=None
+            ):
+                actual_record = scheduler._record(
+                    root, index=0, kind="scheduler_task", source_name="synthetic.xml"
+                )
+        self.assertEqual(actual_record, expected_record)
+        self.assertEqual(actual_record["task_id"], "synthetic-id")
 
     def test_scheduler_record_selection_preserves_source_indexes_with_native_scan(self) -> None:
         if not native_acceleration.available() or not hasattr(
