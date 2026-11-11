@@ -14,6 +14,7 @@ from typing import Any, Mapping
 from tecan_common.native_acceleration import (
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
+    xml_first_element_by_name as _native_xml_first_element_by_name,
 )
 
 from ..subroutine_dependencies import (
@@ -60,8 +61,14 @@ def _elements_by_local_name(root: ET.Element, name: str) -> list[ET.Element]:
 
 
 def _find_descendant(element: ET.Element, name: str) -> ET.Element | None:
-    nodes = _elements_by_local_name(element, name)
-    return nodes[0] if nodes else None
+    selection = _native_xml_first_element_by_name(element, name, ET.Element)
+    if selection is not None:
+        _, node = selection
+        return node
+    for child in element.iter():
+        if _local_name(child.tag) == name:
+            return child
+    return None
 
 
 def _subroutine_statement_objects(root: ET.Element) -> list[ET.Element]:

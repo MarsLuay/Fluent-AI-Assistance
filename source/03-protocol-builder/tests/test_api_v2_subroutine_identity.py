@@ -76,12 +76,17 @@ class ApiV2SubroutineIdentityTests(unittest.TestCase):
                 subroutine_identity,
                 "_native_xml_elements_by_name",
                 wraps=native_acceleration.xml_elements_by_name,
-            ) as native_call:
+            ) as native_call, patch.object(
+                subroutine_identity,
+                "_native_xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
+            ) as first_call:
                 actual_objects = subroutine_identity._subroutine_statement_objects(root)
                 actual_descendant = subroutine_identity._find_descendant(
                     root[1], "SubRoutineStatement"
                 )
-                self.assertEqual(native_call.call_count, 4)
+                self.assertEqual(native_call.call_count, 1)
+                self.assertEqual(first_call.call_count, 3)
         self.assertEqual(actual_objects, expected_objects)
         self.assertEqual(actual_objects, [root[0], root[1]])
         self.assertIs(actual_descendant, expected_descendant)
@@ -98,8 +103,8 @@ class ApiV2SubroutineIdentityTests(unittest.TestCase):
             )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(
-                native_acceleration.xml_elements_by_name(
-                    custom_root, ("SubRoutineStatement",), ET.Element
+                native_acceleration.xml_first_element_by_name(
+                    custom_root, "SubRoutineStatement", ET.Element
                 )
             )
             actual_custom = subroutine_identity._find_descendant(
