@@ -14,6 +14,7 @@ from typing import Any, Callable, Mapping, Protocol, Sequence
 
 from tecan_common.native_acceleration import (
     ascii_collapse_casefold_whitespace as _native_ascii_collapse_casefold_whitespace,
+    ascii_variable_name_is_valid as _native_ascii_variable_name_is_valid,
     bracket_variable_names as _native_bracket_variable_names,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
@@ -425,7 +426,13 @@ def _validate_fields_core(
 def _validate_fc_variable_name(field: str, name: str) -> None:
     if not name:
         raise ApiV2ValidationError(f"{field} FC variable name is empty.", field=field, command="AddLabware")
-    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
+    native = _native_ascii_variable_name_is_valid(name)
+    valid = (
+        native
+        if native is not None
+        else re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) is not None
+    )
+    if not valid:
         raise ApiV2ValidationError(
             f"{field} FC variable name {name!r} is invalid.",
             field=field,

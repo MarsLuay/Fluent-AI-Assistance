@@ -91,6 +91,43 @@ class AddLabwareValidateTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [True, True, True, False, False, False, True])
 
+    def test_fc_variable_name_validation_uses_native_ascii_pattern(self):
+        values = [
+            "Name_2",
+            "_x",
+            "2name",
+            "A-B",
+            "",
+            "Name with space",
+            "Name\n",
+            "é",
+            "ſcript",
+        ]
+
+        def outcome(name: str) -> str | None:
+            try:
+                add_labware_validate._validate_fc_variable_name("field", name)
+            except ApiV2ValidationError as error:
+                return str(error)
+            return None
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [outcome(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                add_labware_validate,
+                "_native_ascii_variable_name_is_valid",
+                wraps=native_acceleration.ascii_variable_name_is_valid,
+            ) as native_call:
+                actual = [outcome(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values) - 1)
+            self.assertIsNone(
+                native_acceleration.ascii_variable_name_is_valid("ſcript")
+            )
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual[0:2], [None, None])
+        self.assertTrue(all(message is not None for message in actual[2:]))
+
     def test_bracket_variable_names_use_shared_native_scanner(self):
         values = [
             "[A] [b_2] [A] [] [_x] [9bad] [with-dash] [[nested]] [é] [Aé]",
