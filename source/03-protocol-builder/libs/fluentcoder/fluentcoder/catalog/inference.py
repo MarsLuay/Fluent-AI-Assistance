@@ -26,6 +26,10 @@ from __future__ import annotations
 import re
 from typing import Iterable
 
+from tecan_common.native_acceleration import (
+    ascii_profile_slug as _native_ascii_profile_slug,
+)
+
 from .xcmp import XcmpComponent
 
 
@@ -208,7 +212,12 @@ def _matches(text: str, patterns: Iterable[re.Pattern[str]]) -> bool:
 
 
 def _normalize_taxonomy_token(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
+    native = _native_ascii_profile_slug(value)
+    return (
+        native
+        if native is not None
+        else re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
+    )
 
 
 def _has_plate_grid(comp: XcmpComponent) -> bool:
