@@ -68,6 +68,35 @@ def _recipe_ir():
 
 
 class ApiV2AddLabwareGoldenTests(unittest.TestCase):
+    def test_label_normalization_uses_native_ascii_and_python_unicode_fallback(self):
+        values = [" Adapter A200 ", "\u2003Plate\u00a0", "Straße", None, 0]
+        expected = [str(value or "").strip().casefold() for value in values]
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback = [add_labware_golden._norm_label(value) for value in values]
+        self.assertEqual(fallback, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                add_labware_golden,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = [add_labware_golden._norm_label(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                add_labware_golden,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                unsupported_fallback = [
+                    add_labware_golden._norm_label(value) for value in values
+                ]
+        self.assertEqual(unsupported_fallback, expected)
+
     def test_golden_payload_lookup_uses_native_selector_and_fallback(self):
         root = ET.fromstring(
             '<Root xmlns:x="urn:test"><x:AddLabwareDataV1><x:LabwareType>first</x:LabwareType>'

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Mapping
 from .. import xml_compat as ET
 from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
     xml_local_name as _native_xml_local_name,
@@ -287,7 +288,9 @@ def enrich_compiled_inventory_with_golden_compare(
 
 
 def _norm_label(value: Any) -> str:
-    return str(value or "").strip().casefold()
+    text = str(value or "")
+    native = _native_ascii_casefold_trim(text)
+    return native if native is not None else text.strip().casefold()
 
 
 def _local_name(tag: str) -> str:
