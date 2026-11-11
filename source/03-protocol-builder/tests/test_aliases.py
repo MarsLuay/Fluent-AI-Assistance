@@ -58,6 +58,31 @@ class AliasTests(unittest.TestCase):
                 forced_fallback = [aliases_module._map_keys(value) for value in values]
         self.assertEqual(forced_fallback, expected)
 
+    def test_dependency_kind_normalization_uses_native_lower_and_fallback(self):
+        protocol_ir = {
+            "dependencies": [{"kind": "DEVICE_ALIAS", "name": "Demo[001]"}],
+        }
+        alias_maps = {"device_aliases": {"Demo[001]": "Demo"}}
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = normalize_protocol_ir_aliases(protocol_ir, alias_maps)
+        self.assertEqual(expected["dependencies"][0]["name"], "Demo")
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                aliases_module,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = normalize_protocol_ir_aliases(protocol_ir, alias_maps)
+                self.assertEqual(native_call.call_count, 2)
+            native_call.assert_any_call("DEVICE_ALIAS")
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(aliases_module, "_native_ascii_lower", return_value=None):
+                forced_fallback = normalize_protocol_ir_aliases(protocol_ir, alias_maps)
+        self.assertEqual(forced_fallback, expected)
+
     def test_repo_alias_yaml_has_no_falcon_or_capholder_defaults(self):
         aliases = load_alias_maps(DEFAULT_ALIAS_DIR)
         for kind in ("labware_aliases", "catalog_aliases"):

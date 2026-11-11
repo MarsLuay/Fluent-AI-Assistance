@@ -182,7 +182,7 @@ def normalize_protocol_ir_aliases(
     for dep in ir.get("dependencies") or []:
         if not isinstance(dep, dict):
             continue
-        kind = str(dep.get("kind") or "").lower()
+        kind = _lower_text(str(dep.get("kind") or ""))
         if kind == "liquid_class":
             _normalize_field(dep, "name", "liquid_class", maps)
         elif kind in {"device", "device_alias"}:
@@ -263,10 +263,13 @@ def _lookup_alias(
     return None
 
 
+def _lower_text(value: str) -> str:
+    native = _native_ascii_lower(value)
+    return native if native is not None else value.lower()
+
+
 def _map_keys(kind: str) -> tuple[str, ...]:
-    normalized = str(kind or "").strip()
-    native = _native_ascii_lower(normalized)
-    normalized = native if native is not None else normalized.lower()
+    normalized = _lower_text(str(kind or "").strip())
     return KIND_ALIASES.get(normalized, (normalized,))
 
 
