@@ -1384,6 +1384,13 @@ class Simulator:
             direct = (holder.text or "").strip()
             if direct:
                 return self._parse_number_or_name(direct)
+            native_texts = native_acceleration.xml_all_unique_texts(
+                holder, ET.Element
+            )
+            if native_texts is not None:
+                if native_texts:
+                    return self._parse_number_or_name(native_texts[0])
+                continue
             for child in holder.iter():
                 if child is holder:
                     continue

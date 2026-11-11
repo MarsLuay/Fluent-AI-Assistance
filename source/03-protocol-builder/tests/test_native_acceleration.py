@@ -565,6 +565,7 @@ class NativeAccelerationTests(unittest.TestCase):
             for name in (
                 "xml_elements_by_name",
                 "xml_first_element_by_name",
+                "xml_all_unique_texts",
             )
         ):
             self.skipTest("optional Rust XML selectors are not built")
@@ -591,10 +592,18 @@ class NativeAccelerationTests(unittest.TestCase):
                 "xml_first_element_by_name",
                 wraps=native_acceleration.xml_first_element_by_name,
             ) as first_native_call:
-                actual_volume = simulator._xml_volume(root)
-                self.assertEqual(first_native_call.call_count, 2)
-                first_native_call.assert_any_call(root, "Volume", ET.Element)
-                first_native_call.assert_any_call(root, "Volumes", ET.Element)
+                with patch.object(
+                    native_acceleration,
+                    "xml_all_unique_texts",
+                    wraps=native_acceleration.xml_all_unique_texts,
+                ) as texts_native_call:
+                    actual_volume = simulator._xml_volume(root)
+                    self.assertEqual(first_native_call.call_count, 2)
+                    first_native_call.assert_any_call(root, "Volume", ET.Element)
+                    first_native_call.assert_any_call(root, "Volumes", ET.Element)
+                    self.assertEqual(texts_native_call.call_count, 2)
+                    texts_native_call.assert_any_call(root.find("Volume"), ET.Element)
+                    texts_native_call.assert_any_call(root.find("Volumes"), ET.Element)
 
         self.assertEqual(actual_text, expected_text)
         self.assertEqual(actual_volume, expected_volume)
