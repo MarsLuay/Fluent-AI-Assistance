@@ -232,6 +232,80 @@ class ProjectModelTests(unittest.TestCase):
             )
             self.assertEqual(nonfinite_model.to_json(), nonfinite_expected)
 
+    def test_native_project_model_identifiers_match_python_order_and_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "project_model_identifiers"
+        ):
+            self.skipTest("optional Rust project-model selector is not built")
+        record = {
+            "guid": "guid-a",
+            "script_guid": "",
+            "component_guid": "component-a",
+            "site_guid": None,
+            "workspace_guid": "workspace-a",
+            "type_id": "type-a",
+            "object_name": "Object",
+            "checksum": "sum-a",
+            "base_worktable_name": "Worktable",
+            "base_worktable_guid": "guid-b",
+            "extra": "ignored",
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = project_model._identifiers(record)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                project_model,
+                "_native_project_model_identifiers",
+                wraps=native_acceleration.project_model_identifiers,
+            ) as native_call:
+                actual = project_model._identifiers(record)
+                native_call.assert_called_once_with(record)
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            list(actual),
+            [
+                "guid",
+                "component_guid",
+                "workspace_guid",
+                "type_id",
+                "object_name",
+                "checksum",
+                "base_worktable_name",
+                "base_worktable_guid",
+            ],
+        )
+
+        class StringSubclass(str):
+            pass
+
+        unsupported = {
+            "guid": "guid-c",
+            "script_guid": 42,
+            "component_guid": False,
+            "workspace_guid": StringSubclass("workspace-c"),
+            "type_id": 0,
+            "base_worktable_name": None,
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.project_model_identifiers(unsupported))
+            with patch.object(
+                project_model,
+                "_native_project_model_identifiers",
+                wraps=native_acceleration.project_model_identifiers,
+            ) as native_call:
+                fallback = project_model._identifiers(unsupported)
+                native_call.assert_called_once_with(unsupported)
+        self.assertEqual(
+            fallback,
+            {
+                "guid": "guid-c",
+                "script_guid": "42",
+                "component_guid": "False",
+                "workspace_guid": "workspace-c",
+                "type_id": "0",
+            },
+        )
+
     def test_provenance_is_json_serializable_and_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             record = normalize_record(

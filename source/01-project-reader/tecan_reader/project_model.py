@@ -18,6 +18,7 @@ from tecan_common.native_acceleration import (
     canonical_json_compact as _native_canonical_json_compact,
     deepcopy_json as _native_deepcopy_json,
     most_common_string_counts as _native_most_common_string_counts,
+    project_model_identifiers as _native_project_model_identifiers,
     sort_string_keys as _native_sort_string_keys,
     sorted_unique_strings as _native_sorted_unique_strings,
 )
@@ -136,6 +137,9 @@ def _entry_path(record: Mapping[str, Any]) -> str:
 
 
 def _identifiers(record: Mapping[str, Any]) -> dict[str, str]:
+    native = _native_project_model_identifiers(record)
+    if native is not None:
+        return native
     identifiers: dict[str, str] = {}
     for key in (
         "guid",

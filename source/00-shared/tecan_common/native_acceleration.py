@@ -2266,6 +2266,22 @@ def deepcopy_json(value: Any) -> Any | None:
         return None
 
 
+def project_model_identifiers(record: Any) -> dict[str, str] | None:
+    """Select project-model identifier strings from an exact built-in record."""
+    if not enabled() or type(record) is not dict:
+        return None
+    try:
+        result = _native.project_model_identifiers(record)
+        if type(result) is dict and all(
+            type(key) is str and type(value) is str
+            for key, value in result.items()
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def sha256_text(value: Any) -> str | None:
     """Hash exact Unicode text natively, or request the Python hashing fallback."""
     if not enabled() or type(value) is not str:
