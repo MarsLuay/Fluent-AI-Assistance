@@ -510,7 +510,7 @@ def summarize_pattern_step(command: dict[str, Any]) -> str:
     ) or registry_manual_step(command.get("raw_type"), fields)
     if registry_summary:
         return registry_summary
-    lower_type = command_type.lower()
+    lower_type = _lower_text(command_type)
     labware = (
         fields.get("LabwareName")
         or fields.get("LabwareLable")
@@ -583,15 +583,18 @@ def _pattern_name(
     return f"{label} from {script_name}{suffix}"
 
 
+def _lower_text(value: str) -> str:
+    if type(value) is str and value.strip() == value:
+        native = _native_ascii_casefold_trim(value)
+        if native is not None:
+            return native
+    return value.lower()
+
+
 def _has_gwl_suffix(value: Any) -> bool:
     if not value:
         return False
-    text = str(value)
-    if type(text) is str and text.strip() == text:
-        native = _native_ascii_casefold_trim(text)
-        if native is not None:
-            return native.endswith(".gwl")
-    return text.lower().endswith(".gwl")
+    return _lower_text(str(value)).endswith(".gwl")
 
 
 def _collect_specifications(steps: list[dict[str, Any]]) -> dict[str, list[str]]:

@@ -197,6 +197,54 @@ class PatternSummaryHelperTests(unittest.TestCase):
                 fallback, {"labware": ["first"], "rack_types": ["second"]}
             )
 
+    def test_ascii_lower_uses_rust_for_pattern_summary(self) -> None:
+        class LowerSubclass(str):
+            def lower(self) -> str:
+                return "custom-lower"
+
+        values = (
+            "SyntheticAspirateCommandType",
+            " Aspirate ",
+            "Café",
+            "\u217c",
+            LowerSubclass(".GWL"),
+        )
+        command = {
+            "command_type": "SyntheticAspirateCommandType",
+            "fields": {"Volume": "10"},
+        }
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [pattern_library._lower_text(value) for value in values]
+            with patch.object(
+                pattern_library, "registry_manual_step", return_value=None
+            ):
+                expected_summary = pattern_library.summarize_pattern_step(command)
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                pattern_library,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = [pattern_library._lower_text(value) for value in values]
+                self.assertEqual(native_call.call_count, 3)
+            with patch.object(
+                pattern_library, "registry_manual_step", return_value=None
+            ):
+                with patch.object(
+                    pattern_library,
+                    "_native_ascii_casefold_trim",
+                    wraps=native_acceleration.ascii_casefold_trim,
+                ) as summary_native_call:
+                    actual_summary = pattern_library.summarize_pattern_step(command)
+                    summary_native_call.assert_called_once_with(
+                        "SyntheticAspirateCommandType"
+                    )
+        self.assertEqual(actual, expected)
+        expected_values = [value.lower() for value in values[:-1]] + ["custom-lower"]
+        self.assertEqual(actual, expected_values)
+        self.assertEqual(actual_summary, expected_summary)
+        self.assertEqual(actual_summary, "Aspirate 10")
+
     def test_gwl_suffix_check_uses_rust_and_preserves_python_lower(self) -> None:
         steps = [
             {"fields": {"Condition": "café", "FileName": "Orders.GWL"}},
