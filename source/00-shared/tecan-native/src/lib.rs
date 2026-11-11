@@ -1214,6 +1214,59 @@ fn xml_normalize_line_numbers_ascii(text: &str) -> Option<String> {
     normalize_line_number_tags_ascii_value(text)
 }
 
+fn normalize_xml_ascii_tail_value(text: &str) -> Option<String> {
+    if !text.is_ascii() {
+        return None;
+    }
+    let lowered: String = text
+        .bytes()
+        .filter(|byte| !is_python_ascii_whitespace(*byte))
+        .map(|byte| byte.to_ascii_lowercase() as char)
+        .collect();
+    let bytes = lowered.as_bytes();
+    let mut output = String::with_capacity(lowered.len());
+    let mut cursor = 0;
+    let mut copied_through = 0;
+    while cursor < bytes.len() {
+        if bytes[cursor] != b'<' {
+            cursor += 1;
+            continue;
+        }
+        let mut name_end = cursor + 1;
+        while bytes.get(name_end).is_some_and(|byte| {
+            byte.is_ascii_lowercase()
+                || byte.is_ascii_digit()
+                || matches!(*byte, b'_' | b':' | b'.' | b'-')
+        }) {
+            name_end += 1;
+        }
+        if name_end == cursor + 1
+            || !bytes
+                .get(name_end..)
+                .is_some_and(|suffix| suffix.starts_with(b"/>"))
+        {
+            cursor += 1;
+            continue;
+        }
+        let name = &lowered[cursor + 1..name_end];
+        output.push_str(&lowered[copied_through..cursor]);
+        output.push('<');
+        output.push_str(name);
+        output.push_str("></");
+        output.push_str(name);
+        output.push('>');
+        cursor = name_end + 2;
+        copied_through = cursor;
+    }
+    output.push_str(&lowered[copied_through..]);
+    Some(output)
+}
+
+#[pyfunction]
+fn xml_normalize_ascii_tail(text: &str) -> Option<String> {
+    normalize_xml_ascii_tail_value(text)
+}
+
 fn xml_regex_first_value_ascii(text: &str, name: &str) -> Option<String> {
     if !text.is_ascii() || !name.is_ascii() || name.is_empty() || name.contains(':') {
         return None;
@@ -7397,6 +7450,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_regex_first_value, module)?)?;
     module.add_function(wrap_pyfunction!(extract_line_number_ascii, module)?)?;
     module.add_function(wrap_pyfunction!(xml_normalize_line_numbers_ascii, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_normalize_ascii_tail, module)?)?;
     module.add_function(wrap_pyfunction!(xml_unknown_text_fields, module)?)?;
     module.add_function(wrap_pyfunction!(extract_data_store_versions, module)?)?;
     module.add_function(wrap_pyfunction!(count_xscr_object_type_attributes, module)?)?;
@@ -8300,6 +8354,19 @@ mod tests {
             normalize_line_number_tags_ascii_value("<LineNumber>１２</LineNumber>"),
             None
         );
+    }
+
+    #[test]
+    fn xml_ascii_tail_matches_whitespace_and_self_closing_regexes() {
+        assert_eq!(
+            normalize_xml_ascii_tail_value(" <Foo />\u{1c}bar <x-y:1/>"),
+            Some("<foo></foo>bar<x-y:1></x-y:1>".to_owned())
+        );
+        assert_eq!(
+            normalize_xml_ascii_tail_value("A\tB\r\n<C/>"),
+            Some("ab<c></c>".to_owned())
+        );
+        assert_eq!(normalize_xml_ascii_tail_value("\u{00a0}<Foo/>"), None);
     }
 
     #[test]

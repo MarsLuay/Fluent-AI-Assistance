@@ -993,6 +993,40 @@ def test_rga_finger_transfer_drop_source_order_is_preserved():
             ],
         )
 
+    def test_ascii_xml_compaction_and_empty_tag_expansion_use_rust(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_normalize_ascii_tail"
+        ):
+            self.skipTest("optional Rust ASCII XML normalizer is not built")
+        values = [
+            "<Root>\n <Child /></Root>",
+            "Content A\tB, <_A.1-:b/>",
+            "&lt;MiXeD /&gt;",
+            "<Café />",
+            "<LineNumber>2</LineNumber><Item />",
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [normalize_command_xml(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                xml_compare,
+                "_native_xml_normalize_ascii_tail",
+                wraps=native_acceleration.xml_normalize_ascii_tail,
+            ) as native_call:
+                actual = [normalize_command_xml(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [
+                "<root><child></child></root>",
+                "contentab,<_a.1-:b></_a.1-:b>",
+                "<mixed></mixed>",
+                "<café/>",
+                "<linenumber>0</linenumber><item></item>",
+            ],
+        )
+
     def test_golden_compare_detects_drift(self):
         golden = command_to_xml(
             AddLabware(
