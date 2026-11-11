@@ -610,6 +610,56 @@ class LiquidClassesExportTests(unittest.TestCase):
             )
         self.assertEqual(native_fallback, fallback)
 
+    def test_direct_context_scan_uses_native_selector_with_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native,
+            "xml_direct_elements_by_ascii_casefolded_name",
+        ):
+            self.skipTest("optional Rust case-folded direct-child selector is not built")
+        root = liquid_classes_export.ET.fromstring(
+            "<Root><PIPETTINGDEVICETYPE>First</PIPETTINGDEVICETYPE>"
+            "<PipettingDeviceType>Second</PipettingDeviceType></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = liquid_classes_export._direct_or_nested_text(
+                root, "PipettingDeviceType"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                liquid_classes_export,
+                "_native_xml_direct_elements_by_ascii_casefolded_name",
+                wraps=native_acceleration.xml_direct_elements_by_ascii_casefolded_name,
+            ) as native_call:
+                actual = liquid_classes_export._direct_or_nested_text(
+                    root, "PipettingDeviceType"
+                )
+                native_call.assert_called_once_with(
+                    root, ("pipettingdevicetype",), liquid_classes_export.ET.Element
+                )
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "First")
+
+        fallback_root = liquid_classes_export.ET.Element("Root")
+        fallback_root.append(liquid_classes_export.ET.Comment("fallback"))
+        unusual = liquid_classes_export.ET.SubElement(fallback_root, "Unusual")
+        unusual.tag = "aſpirate"
+        unusual.text = "unicode match"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback = liquid_classes_export._direct_or_nested_text(
+                fallback_root, "aspirate"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                liquid_classes_export._native_xml_direct_elements_by_ascii_casefolded_name(
+                    fallback_root, ("aspirate",), liquid_classes_export.ET.Element
+                )
+            )
+            native_fallback = liquid_classes_export._direct_or_nested_text(
+                fallback_root, "aspirate"
+            )
+        self.assertEqual(fallback, "unicode match")
+        self.assertEqual(native_fallback, fallback)
+
     def test_parse_xlqc_uses_filename_guid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             guid = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"

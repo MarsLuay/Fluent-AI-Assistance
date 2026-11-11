@@ -17,6 +17,8 @@ from tecan_common.native_acceleration import (
     parse_f64_decimal_text as _native_parse_f64_decimal_text,
     parse_i64_text as _native_parse_i64_text,
     xml_clean_text as _native_xml_clean_text,
+    xml_direct_elements_by_ascii_casefolded_name
+    as _native_xml_direct_elements_by_ascii_casefolded_name,
     xml_elements_by_ascii_casefolded_name
     as _native_xml_elements_by_ascii_casefolded_name,
     xml_direct_elements_by_name as _native_xml_direct_elements_by_name,
@@ -729,7 +731,12 @@ def _set_context(elem: ET.Element) -> tuple[str, str, str]:
 def _direct_or_nested_text(elem: ET.Element, local_name: str) -> str:
     """Prefer direct child text; else first matching descendant text."""
     wanted = local_name.casefold()
-    for child in list(elem):
+    direct_children = _native_xml_direct_elements_by_ascii_casefolded_name(
+        elem, (wanted,), ET.Element
+    )
+    if direct_children is None:
+        direct_children = list(elem)
+    for child in direct_children:
         if not isinstance(child.tag, str):
             continue
         if _local_name(child.tag).casefold() != wanted:
