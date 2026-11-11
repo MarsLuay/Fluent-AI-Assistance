@@ -1071,7 +1071,10 @@ def _stage_raw_video_captures(
     slot_names = {
         str(spec.get("slot") or "").strip()
         for spec in specs
-        if str(spec.get("kind") or "").lower() == "video" and str(spec.get("slot") or "").strip()
+        if (
+            _lower_text(str(spec.get("kind") or "")) == "video"
+            and str(spec.get("slot") or "").strip()
+        )
     }
     staged: list[dict[str, str]] = []
     for root in source_dirs:
@@ -1080,12 +1083,12 @@ def _stage_raw_video_captures(
         for path in sorted(root.iterdir()):
             if not path.is_file() or path.stat().st_size == 0:
                 continue
-            if path.suffix.lower() not in VIDEO_CAPTURE_SUFFIXES:
+            if _lower_text(path.suffix) not in VIDEO_CAPTURE_SUFFIXES:
                 continue
             stem = path.stem
             if stem not in slot_names:
                 continue
-            destination = media_dir / f"{stem}{path.suffix.lower()}"
+            destination = media_dir / f"{stem}{_lower_text(path.suffix)}"
             try:
                 same_source = path.resolve() == destination.resolve()
             except OSError:

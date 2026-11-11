@@ -498,6 +498,40 @@ def test_process_prompt_media_captures_stages_video_and_finalizes(tmp_path: Path
     assert report["converted_count"] == 1
 
 
+def test_raw_video_capture_uses_native_lower_with_fallback(tmp_path: Path) -> None:
+    source_dir = tmp_path / "raw"
+    source_dir.mkdir()
+    (source_dir / "step_010_video.MOV").write_bytes(b"capture")
+    media_dir = tmp_path / "media"
+    specs = [{"kind": "VIDEO", "slot": "step_010_video"}]
+
+    def stage_captures() -> list[dict[str, str]]:
+        return bundle_media._stage_raw_video_captures(
+            media_dir, specs, source_dirs=[source_dir]
+        )
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = stage_captures()
+    assert len(expected) == 1
+    assert Path(expected[0]["staged"]).name == "step_010_video.mov"
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            bundle_media,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            actual = stage_captures()
+        native_call.assert_any_call("VIDEO")
+        native_call.assert_any_call(".MOV")
+    assert actual == expected
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(bundle_media, "_native_ascii_lower", return_value=None):
+            forced_fallback = stage_captures()
+    assert forced_fallback == expected
+
+
 def test_resolve_prompt_media_cross_kind_image_fills_video_slot(tmp_path: Path) -> None:
     source_dir = tmp_path / "sources"
     source_dir.mkdir()
