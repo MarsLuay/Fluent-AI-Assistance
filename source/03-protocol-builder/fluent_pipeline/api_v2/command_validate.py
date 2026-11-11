@@ -19,6 +19,7 @@ from tecan_common.native_acceleration import (
     ascii_casefold_equals as _native_ascii_casefold_equals,
     bracket_variable_names as _native_bracket_variable_names,
     clean_subroutine_name_ascii as _native_clean_subroutine_name_ascii,
+    normalize_ascii_name as _native_normalize_ascii_name,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_local_name as _native_xml_local_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
@@ -869,6 +870,9 @@ def _subroutine_reference_matches(subroutine: str, references: set[str]) -> bool
 
 
 def _norm_name(value: Any) -> str:
+    native = _native_normalize_ascii_name(value)
+    if native is not None:
+        return native
     return str(value or "").strip().casefold()
 
 

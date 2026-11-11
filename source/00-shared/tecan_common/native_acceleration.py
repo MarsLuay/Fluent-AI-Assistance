@@ -2559,6 +2559,19 @@ def bracket_variable_names(value: Any) -> set[str] | None:
         return None
 
 
+def normalize_ascii_name(value: Any) -> str | None:
+    """Trim and lowercase supported exact ASCII names, or request Python fallback."""
+    if not enabled() or (
+        value is not None and (type(value) is not str or not value.isascii())
+    ):
+        return None
+    try:
+        result = _native.normalize_ascii_name(value or "")
+        return result if type(result) is str and result.isascii() else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def clean_subroutine_name_ascii(value: Any) -> str | None:
     """Normalize supported ASCII subroutine names natively, or request fallback."""
     if not enabled() or (

@@ -168,6 +168,37 @@ class ApiV2CommandValidateTests(unittest.TestCase):
                 command_validate._clean_subroutine_name(unicode_value), "Ä\\Sub"
             )
 
+    def test_name_normalization_uses_ascii_rust_path(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "normalize_ascii_name"
+        ):
+            self.skipTest("optional Rust ASCII name normalizer is not built")
+        values = [
+            "  HeLLo  ",
+            "\x1cMiXeD\x1f",
+            "",
+            None,
+            "Straße",
+            "\u00a0Word\u00a0",
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [command_validate._norm_name(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_normalize_ascii_name",
+                wraps=native_acceleration.normalize_ascii_name,
+            ) as native_call:
+                actual = [command_validate._norm_name(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual, ["hello", "mixed", "", "", "strasse", "word"]
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.normalize_ascii_name("Straße"))
+            self.assertIsNone(native_acceleration.normalize_ascii_name("\ud800"))
+
     def test_local_name_uses_native_text_kernel(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_tag_local_name"

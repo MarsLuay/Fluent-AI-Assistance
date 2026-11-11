@@ -5904,6 +5904,14 @@ fn zeia_object_kind_from_suffix(suffix: &str) -> String {
 }
 
 #[pyfunction]
+fn normalize_ascii_name(value: &str) -> String {
+    let trimmed = value.trim_matches(|character: char| {
+        character.is_ascii() && is_python_ascii_whitespace(character as u8)
+    });
+    trimmed.to_ascii_lowercase()
+}
+
+#[pyfunction]
 fn clean_subroutine_name_ascii(value: &str) -> String {
     let trimmed =
         value.trim_matches(|character: char| matches!(character as u32, 0x09..=0x0d | 0x1c..=0x20));
@@ -7392,6 +7400,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(count_string_groups, module)?)?;
     module.add_function(wrap_pyfunction!(bracket_variable_names, module)?)?;
     module.add_function(wrap_pyfunction!(clean_subroutine_name_ascii, module)?)?;
+    module.add_function(wrap_pyfunction!(normalize_ascii_name, module)?)?;
     module.add_function(wrap_pyfunction!(command_short_name, module)?)?;
     module.add_function(wrap_pyfunction!(entry_object_guid, module)?)?;
     module.add_function(wrap_pyfunction!(asset_reference_candidates, module)?)?;
@@ -8104,6 +8113,8 @@ mod tests {
         );
         assert_eq!(clean_subroutine_name_ascii("\" foo \""), " foo ");
         assert_eq!(clean_subroutine_name_ascii("\"\""), "");
+        assert_eq!(normalize_ascii_name(" \u{1c}MiXeD\u{1f} "), "mixed");
+        assert_eq!(normalize_ascii_name(""), "");
     }
 
     #[test]
