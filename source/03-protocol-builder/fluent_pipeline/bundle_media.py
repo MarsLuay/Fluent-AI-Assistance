@@ -631,9 +631,9 @@ def _collect_media_inventory_records(
         for path in sorted(root.iterdir()):
             if not path.is_file() or path.stat().st_size == 0:
                 continue
-            if path.name.lower() in {"readme.md", "media_manifest.json"}:
+            if _lower_text(path.name) in {"readme.md", "media_manifest.json"}:
                 continue
-            suffix = path.suffix.lower()
+            suffix = _lower_text(path.suffix)
             if (
                 suffix in ASSET_SUFFIXES
                 or suffix in AUDIO_SUFFIXES

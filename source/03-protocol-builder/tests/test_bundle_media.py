@@ -94,6 +94,47 @@ def test_deployable_media_name_and_suffix_use_native_lower_fallback(tmp_path: Pa
     assert forced_fallback == expected
 
 
+def test_media_inventory_name_and_suffix_use_native_lower_fallback(
+    tmp_path: Path,
+) -> None:
+    source_dir = tmp_path / "sources"
+    source_dir.mkdir()
+    for name in ("README.MD", "media_manifest.JSON", "PhotoÜ.PNG"):
+        (source_dir / name).write_bytes(b"media")
+
+    def collect() -> dict[str, tuple[Path, int]]:
+        return bundle_media._collect_media_inventory_records(
+            touchtools_dir=None,
+            bundle_dirs=[],
+            build_dir=None,
+            media_dir=tmp_path / "media",
+            extra_source_dirs=[source_dir],
+        )
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = collect()
+    assert set(expected) == {"PhotoÜ.PNG"}
+    assert expected["PhotoÜ.PNG"] == (source_dir / "PhotoÜ.PNG", 100)
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            bundle_media,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            actual = collect()
+        native_call.assert_any_call("README.MD")
+        native_call.assert_any_call("media_manifest.JSON")
+        native_call.assert_any_call("PhotoÜ.PNG")
+        native_call.assert_any_call(".PNG")
+    assert actual == expected
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(bundle_media, "_native_ascii_lower", return_value=None):
+            forced_fallback = collect()
+    assert forced_fallback == expected
+
+
 def test_unresolved_policy_uses_native_lower_with_unicode_fallback(tmp_path: Path) -> None:
     values = [" Fail_Gate ", "FälL_Gate"]
 
