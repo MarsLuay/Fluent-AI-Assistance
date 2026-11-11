@@ -66,6 +66,44 @@ class CommandRegistryTests(unittest.TestCase):
                 ]
         self.assertEqual(forced_fallback, expected)
 
+    def test_first_field_uses_native_ascii_lower_with_unicode_fallback(self):
+        fields = {
+            "LabwareName": "first",
+            "LABWAREname": "last",
+            "Straße": "unicode",
+        }
+        names = ["labwarename", "STRAẞE", "STRASSE"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                shared_command_registry._first_field(fields, [name]) for name in names
+            ]
+        self.assertEqual(expected, ["last", "unicode", None])
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                shared_command_registry,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_lower:
+                actual = [
+                    shared_command_registry._first_field(fields, [name])
+                    for name in names
+                ]
+            self.assertEqual(native_lower.call_count, 12)
+            native_lower.assert_any_call("Straße")
+            native_lower.assert_any_call("STRAẞE")
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                shared_command_registry, "_native_ascii_lower", return_value=None
+            ):
+                forced_fallback = [
+                    shared_command_registry._first_field(fields, [name])
+                    for name in names
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_common_registry_helpers_are_shared(self):
         helpers = {
             "command_registry_path": command_registry_path,

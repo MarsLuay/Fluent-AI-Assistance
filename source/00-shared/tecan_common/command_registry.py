@@ -209,10 +209,15 @@ def _template_values(entry: dict[str, Any], fields: dict[str, Any]) -> dict[str,
     return values
 
 
+def _lower_text(value: str) -> str:
+    native = _native_ascii_lower(value)
+    return native if native is not None else value.lower()
+
+
 def _first_field(fields: dict[str, Any], names: list[str]) -> Any:
-    by_lower = {str(key).lower(): value for key, value in fields.items()}
+    by_lower = {_lower_text(str(key)): value for key, value in fields.items()}
     for name in names:
-        value = by_lower.get(str(name).lower())
+        value = by_lower.get(_lower_text(str(name)))
         if isinstance(value, list):
             value = next((item for item in value if item not in (None, "", [])), "")
         if value not in (None, "", []):
@@ -221,7 +226,6 @@ def _first_field(fields: dict[str, Any], names: list[str]) -> Any:
 
 
 def _normalize_key(value: str) -> str:
-    native_lowered = _native_ascii_lower(value)
-    lowered = native_lowered if native_lowered is not None else value.lower()
+    lowered = _lower_text(value)
     native = _native_ascii_lower_alnum_compact(lowered)
     return native if native is not None else re.sub(r"[^a-z0-9]+", "", lowered)
