@@ -727,19 +727,18 @@ def _dedupe_windows_paths(values: list[str]) -> list[str]:
     return paths
 
 
+def _collapse_xml_whitespace(value: str) -> str:
+    native = _native_collapse_ascii_whitespace(value)
+    return native if native is not None else re.sub(r"\s+", " ", value).strip()
+
+
 def _extract_file_reference_paths(text: str) -> list[str]:
     paths: list[str] = []
     for block in _FILE_REFERENCE_BLOCK_RE.findall(text):
         match = _FILE_REFERENCE_FILE_RE.search(block)
         if not match:
             continue
-        raw_value = match.group(1)
-        native = _native_collapse_ascii_whitespace(raw_value)
-        value = (
-            native
-            if native is not None
-            else re.sub(r"\s+", " ", raw_value).strip()
-        )
+        value = _collapse_xml_whitespace(match.group(1))
         if value and value not in paths:
             paths.append(value)
     return paths
@@ -1037,7 +1036,7 @@ def audit_archive_filesystem(archive_data: dict[str, bytes]) -> list[dict[str, A
         text = data.decode("utf-8-sig", errors="replace")
         for pattern in _FS_PATH_TAG_RES:
             for match in pattern.finditer(text):
-                raw = re.sub(r"\s+", " ", match.group(1)).strip()
+                raw = _collapse_xml_whitespace(match.group(1))
                 resolved = _path_maps_to_fs_directory(raw, mapping)
                 if resolved is None:
                     native_drive_path = (
