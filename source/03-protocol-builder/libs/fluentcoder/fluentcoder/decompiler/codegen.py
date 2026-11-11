@@ -24,6 +24,10 @@ from __future__ import annotations
 import re
 from typing import Iterable, Optional, Union
 
+from tecan_common.native_acceleration import (
+    ascii_replace_non_identifier_chars as _native_ascii_replace_non_identifier_chars,
+)
+
 from ..catalog.catalog import index_exists, resolve_by_name
 from ..expressions import (
     BooleanLiteral,
@@ -1394,7 +1398,12 @@ def _allocate_var_name(label: str, label_to_var: dict[str, str]) -> str:
 
 def _to_var_name(label: str) -> str:
     """Make a Python identifier from a labware label."""
-    s = re.sub(r"[^A-Za-z0-9_]", "_", label)
+    native = _native_ascii_replace_non_identifier_chars(label)
+    s = (
+        native
+        if native is not None
+        else re.sub(r"[^A-Za-z0-9_]", "_", label)
+    )
     if s and s[0].isdigit():
         s = "_" + s
     if not s:

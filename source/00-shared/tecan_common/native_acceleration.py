@@ -3117,6 +3117,17 @@ def ascii_safe_variable_base(value: Any) -> str | None:
         return None
 
 
+def ascii_replace_non_identifier_chars(value: Any) -> str | None:
+    """Replace each disallowed ASCII identifier character with an underscore."""
+    if not enabled() or type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.ascii_replace_non_identifier_chars(value)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def ascii_variable_name_is_valid(value: Any) -> bool | None:
     """Validate an already-trimmed ASCII variable name, or request fallback."""
     if not enabled() or type(value) is not str or not value.isascii():

@@ -2779,6 +2779,22 @@ fn windows_drive_path_is_qualified(value: &str) -> bool {
 }
 
 #[pyfunction]
+fn ascii_replace_non_identifier_chars(value: &str) -> Option<String> {
+    if !value.is_ascii() {
+        return None;
+    }
+    let mut output = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        if byte.is_ascii_alphanumeric() || byte == b'_' {
+            output.push(byte as char);
+        } else {
+            output.push('_');
+        }
+    }
+    Some(output)
+}
+
+#[pyfunction]
 fn ascii_safe_component(value: &str, lowercase: bool) -> Option<String> {
     if !value.is_ascii() {
         return None;
@@ -7896,6 +7912,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(ascii_profile_slug, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_safe_filename, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_safe_variable_base, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        ascii_replace_non_identifier_chars,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(ascii_variable_name_is_valid, module)?)?;
     module.add_function(wrap_pyfunction!(windows_drive_path_prefix, module)?)?;
     module.add_function(wrap_pyfunction!(
@@ -8079,6 +8099,23 @@ mod tests {
         assert_eq!(ascii_safe_filename("---"), Some("---".into()));
         assert_eq!(ascii_safe_filename(&"a".repeat(125)), Some("a".repeat(120)));
         assert_eq!(ascii_safe_filename("東京"), None);
+    }
+
+    #[test]
+    fn ascii_replace_non_identifier_chars_matches_python_per_character_regex() {
+        for (input, expected) in [
+            ("Tecan Pump", "Tecan_Pump"),
+            ("a..b", "a__b"),
+            ("A / B", "A___B"),
+            ("a_b9", "a_b9"),
+            ("", ""),
+        ] {
+            assert_eq!(
+                ascii_replace_non_identifier_chars(input),
+                Some(expected.into())
+            );
+        }
+        assert_eq!(ascii_replace_non_identifier_chars("café"), None);
     }
 
     #[test]
