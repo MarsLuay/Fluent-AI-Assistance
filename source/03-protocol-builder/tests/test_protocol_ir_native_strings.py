@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 
 import fluent_pipeline.protocol_ir as protocol_ir_module
+import fluent_pipeline.protocol_ir_compat as protocol_ir_compat_module
 import fluent_pipeline.protocol_ir_schema as protocol_ir_schema_module
 from tecan_common import native_acceleration
 
@@ -53,6 +54,40 @@ class ProtocolIrNativeStringsTests(unittest.TestCase):
                 "tecan_pump_3",
             ],
         )
+
+    def test_setup_group_name_whitespace_normalization_uses_native_ascii(self):
+        values = [
+            "  Operator   Setup  ",
+            "Instrument\tInitialization Setup",
+            "setup current",
+            "Set up",
+            "Straße Setup",
+            "Opérator init",
+            "\u001cOperator\t\nSetup\u001f",
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                protocol_ir_compat_module.is_setup_group_name(value)
+                for value in values
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                protocol_ir_compat_module,
+                "_native_ascii_collapse_casefold_whitespace",
+                wraps=native_acceleration.ascii_collapse_casefold_whitespace,
+            ) as native_call:
+                actual = [
+                    protocol_ir_compat_module.is_setup_group_name(value)
+                    for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertIsNone(
+                native_acceleration.ascii_collapse_casefold_whitespace(
+                    "Opérator init"
+                )
+            )
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [True, True, True, False, True, False, True])
 
     def test_rup_display_type_alias_normalization_uses_native_compaction(self):
         cases = [

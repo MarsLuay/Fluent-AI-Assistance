@@ -8,6 +8,10 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from tecan_common.native_acceleration import (
+    ascii_collapse_casefold_whitespace as _native_ascii_collapse_casefold_whitespace,
+)
+
 from .media_convert import write_placeholder_video_slot  # noqa: F401
 from .policies.prompt_text import (  # noqa: F401
     MEDIA_PLACEHOLDER_BEGIN,
@@ -108,7 +112,9 @@ _EXTERNAL_INIT_TARGET_RE = re.compile(
 
 def is_setup_group_name(name: Any) -> bool:
     """Return true for group names that should collapse into one setup group."""
-    lowered = re.sub(r"\s+", " ", str(name or "").strip().casefold())
+    folded = str(name or "").strip().casefold()
+    native = _native_ascii_collapse_casefold_whitespace(folded)
+    lowered = native if native is not None else re.sub(r"\s+", " ", folded)
     if not lowered:
         return False
     if lowered in {

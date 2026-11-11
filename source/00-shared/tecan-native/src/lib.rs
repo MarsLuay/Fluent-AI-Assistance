@@ -2599,6 +2599,14 @@ fn ascii_casefold_trim(value: &str) -> Option<String> {
 }
 
 #[pyfunction]
+fn ascii_collapse_casefold_whitespace(value: &str) -> Option<String> {
+    if !value.is_ascii() {
+        return None;
+    }
+    Some(collapse_python_whitespace(value).to_ascii_lowercase())
+}
+
+#[pyfunction]
 fn ascii_script_name_key(value: &str) -> Option<String> {
     if !value.is_ascii() {
         return None;
@@ -7770,6 +7778,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(sorted_unique_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_trim, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        ascii_collapse_casefold_whitespace,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(ascii_script_name_key, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_worktable_selection_text, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_worktable_int_text, module)?)?;
@@ -8016,6 +8028,19 @@ mod tests {
         assert_eq!(ascii_casefold_trim("\u{1c}Text\u{1f}"), Some("text".into()));
         assert_eq!(ascii_casefold_trim("  "), Some(String::new()));
         assert_eq!(ascii_casefold_trim("ſcript"), None);
+    }
+
+    #[test]
+    fn ascii_collapse_casefold_whitespace_matches_regex_whitespace_runs() {
+        assert_eq!(
+            ascii_collapse_casefold_whitespace(" \tOPERATOR\n  SETUP\u{1c}"),
+            Some("operator setup".into())
+        );
+        assert_eq!(
+            ascii_collapse_casefold_whitespace("  "),
+            Some(String::new())
+        );
+        assert_eq!(ascii_collapse_casefold_whitespace("Straße"), None);
     }
 
     #[test]
