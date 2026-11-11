@@ -1,3 +1,4 @@
+import ast
 import json
 import os
 import tempfile
@@ -35,6 +36,39 @@ def _ok_finalization_report() -> FinalizationReport:
         command_validation={"failure_count": 0},
         generic_command_validation={"failure_count": 0},
     )
+
+
+class SourcePathWhitespaceNativeTests(unittest.TestCase):
+    def test_source_path_collapses_whitespace_with_native_helper_and_fallback(self):
+        source = "result = choose(\n    alpha,  \n    beta\n)"
+        node = ast.parse(source).body[0].value
+        draft_name = ""
+        current_group = ""
+        expected_path = " -> build_worktable() ->  -> choose( alpha, beta )"
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback = exports._source_path(draft_name, current_group, source, node)
+        self.assertEqual(fallback, expected_path)
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_collapse_ascii_whitespace",
+                wraps=native_acceleration.collapse_ascii_whitespace,
+            ) as native_call:
+                actual = exports._source_path(draft_name, current_group, source, node)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected_path)
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_collapse_ascii_whitespace",
+                return_value=None,
+            ):
+                unsupported_fallback = exports._source_path(
+                    draft_name, current_group, source, node
+                )
+        self.assertEqual(unsupported_fallback, expected_path)
 
 
 class ConnectorPinNormalizationTests(unittest.TestCase):
