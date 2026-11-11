@@ -87,6 +87,47 @@ class DriverMacrosExportTests(unittest.TestCase):
                 )
                 self.assertEqual(native_call.call_count, 1)
 
+    def test_child_text_uses_native_first_direct_child_and_custom_fallback(self) -> None:
+        root = driver_macros_export_module.ET.Element("Root")
+        root.append(driver_macros_export_module.ET.Comment("skip non-element tag"))
+        first = driver_macros_export_module.ET.SubElement(root, "{urn:test}Value")
+        first.text = "  "
+        second = driver_macros_export_module.ET.SubElement(root, "Value")
+        second.text = "later value"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = driver_macros_export_module._child_text(root, "Value")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                driver_macros_export_module,
+                "_native_xml_first_direct_child_by_name",
+                wraps=native_acceleration.xml_first_direct_child_by_name,
+            ) as native_call:
+                actual = driver_macros_export_module._child_text(root, "Value")
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "")
+
+        class CustomTag(str):
+            def rsplit(self, sep=None, maxsplit=-1):
+                return ["", "Value"]
+
+        custom_root = driver_macros_export_module.ET.Element("Root")
+        custom_child = driver_macros_export_module.ET.SubElement(custom_root, "Other")
+        custom_child.tag = CustomTag("{urn:test}Ignored")
+        custom_child.text = " custom value "
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = driver_macros_export_module._child_text(custom_root, "Value")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                driver_macros_export_module,
+                "_native_xml_first_direct_child_by_name",
+                wraps=native_acceleration.xml_first_direct_child_by_name,
+            ) as native_call:
+                fallback_actual = driver_macros_export_module._child_text(custom_root, "Value")
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, "custom value")
+
     def test_driver_object_path_hint_scan_uses_ascii_native_and_unicode_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

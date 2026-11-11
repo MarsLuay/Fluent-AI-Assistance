@@ -17,6 +17,7 @@ from . import xml_compat as ET
 from tecan_common.native_acceleration import (
     ascii_case_insensitive_substring_match_groups as _native_ascii_substring_match_groups,
     xml_clean_text as _native_xml_clean_text,
+    xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_local_name as _native_xml_local_name,
 )
 from fluentcoder.ir.driver_recovery import parse_driver_recovery_policy
@@ -429,6 +430,10 @@ def _text(elem: ET.Element | None) -> str:
 def _child_text(elem: ET.Element | None, local_name: str) -> str:
     if elem is None:
         return ""
+    selection = _native_xml_first_direct_child_by_name(elem, local_name, ET.Element)
+    if selection is not None:
+        _, child = selection
+        return _text(child)
     for child in list(elem):
         if isinstance(child.tag, str) and _local_name(child.tag) == local_name:
             return _text(child)
