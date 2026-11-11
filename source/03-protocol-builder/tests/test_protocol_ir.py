@@ -8,6 +8,7 @@ from pathlib import Path
 import fluent_pipeline.protocol_ir as protocol_ir_module
 import fluent_pipeline.protocol_ir_compat as protocol_ir_compat_module
 import fluent_pipeline.ir.rga_move_policy as rga_move_policy_module
+from tecan_common import native_acceleration
 from fluent_pipeline.protocol_ir import (
     CATALOG_DEFAULT_CLASS_NAMES,
     CANONICAL_IR_BUNDLE_VERSION,
@@ -136,6 +137,69 @@ XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ProtocolIRTests(unittest.TestCase):
+    def test_adapter_catalog_detection_uses_native_ascii_and_unicode_fallback(self):
+        values = ["Adapter A200", "adapter", "Straße", "Labware", None]
+        expected = ["adapter" in str(value or "").casefold() for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [
+                rga_move_policy_module._is_adapter_catalog_type(value)
+                for value in values
+            ]
+        self.assertEqual(disabled, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                rga_move_policy_module,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = [
+                    rga_move_policy_module._is_adapter_catalog_type(value)
+                    for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(enabled, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                rga_move_policy_module,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = [
+                    rga_move_policy_module._is_adapter_catalog_type(value)
+                    for value in values
+                ]
+        self.assertEqual(fallback, expected)
+
+    def test_rga_move_policy_adapter_classification_dispatches_native(self):
+        ir = {
+            "labware": [{"label": "AdapterA200", "catalog": "Adapter A200"}],
+            "steps": [
+                {
+                    "operation": "move_plate",
+                    "parameters": {
+                        "labware": "AdapterA200",
+                        "destination_location": "Site",
+                        "destination_site": 2,
+                    },
+                }
+            ],
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                rga_move_policy_module,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                converted = apply_rga_move_pattern_policy(ir)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(converted["steps"][0]["operation"], "prompt_user")
+        self.assertEqual(
+            converted["steps"][0]["parameters"]["reason"],
+            "rga_adapter_onto_move_requires_manual_verification",
+        )
+
     def test_public_helpers_come_from_protocol_ir_compat(self):
         self.assertIs(CATALOG_DEFAULT_CLASS_NAMES, protocol_ir_module.CATALOG_DEFAULT_CLASS_NAMES)
         self.assertIs(CATALOG_DEFAULT_CLASS_NAMES, protocol_ir_compat_module.CATALOG_DEFAULT_CLASS_NAMES)

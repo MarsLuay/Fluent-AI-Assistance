@@ -4,13 +4,25 @@ from __future__ import annotations
 
 from typing import Any
 
+from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
+)
+
+
+def _is_adapter_catalog_type(value: Any) -> bool:
+    text = str(value or "")
+    native = _native_ascii_casefold_trim(text)
+    normalized = native if native is not None else text.casefold()
+    return "adapter" in normalized
+
 
 def apply_rga_move_pattern_policy(ir: dict[str, Any]) -> dict[str, Any]:
     """Require physical RGA/gripper moves to come from mined source windows."""
     adapter_labels = {
         str(item.get("label") or "")
         for item in ir.get("labware") or []
-        if isinstance(item, dict) and "adapter" in str(item.get("catalog") or item.get("python_class") or "").casefold()
+        if isinstance(item, dict)
+        and _is_adapter_catalog_type(item.get("catalog") or item.get("python_class"))
     }
 
     converted: list[dict[str, Any]] = []
