@@ -1146,6 +1146,48 @@ class ReaderTests(unittest.TestCase):
                 reader_script._variable_declarations(root), fallback_declarations
             )
 
+    def test_xml_object_fields_reuse_grouped_xml_scan(self) -> None:
+        xml_text = """<Root xmlns:x="urn:test">
+          <x:ObjectName>   </x:ObjectName>
+          <ObjectName>Selected Object</ObjectName>
+          <ObjectName>Later Object</ObjectName>
+          <Name>First Name</Name><Name>Second Name</Name>
+          <TypeId>type-one</TypeId><TypeId>type-two</TypeId>
+          <FunctionalGroup> carrier </FunctionalGroup>
+          <FootPrint> footprint </FootPrint><Renderer> renderer </Renderer>
+          <Description> description </Description>
+          <ComponentGuid> component-guid </ComponentGuid>
+          <SiteGuid> site-guid </SiteGuid>
+          <BaseWorktableName> base-name </BaseWorktableName>
+          <BaseWorktableGuid> base-guid </BaseWorktableGuid>
+          <Guid> guid-one </Guid><GUID> guid-two </GUID>
+          <FutureField> future value </FutureField>
+        </Root>"""
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = reader_xmlobj.inspect_xml_object_text(
+                xml_text, source_name="fixture.xwsp", suffix=".xwsp"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                reader_xmlobj,
+                "texts_by_name",
+                wraps=reader_xmlobj.texts_by_name,
+            ) as grouped_call:
+                actual = reader_xmlobj.inspect_xml_object_text(
+                    xml_text, source_name="fixture.xwsp", suffix=".xwsp"
+                )
+                grouped_call.assert_called_once()
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["object_name"], "Selected Object")
+        self.assertEqual(actual["type_id"], "type-one")
+        self.assertEqual(actual["names"], ["First Name", "Second Name"])
+        self.assertEqual(actual["guids"], ["guid-one", "guid-two"])
+        self.assertEqual(actual["workspace_guid"], "fixture")
+        self.assertEqual(
+            actual["source_metadata"]["unknown_fields"],
+            {"FutureField": ["future value"]},
+        )
+
     def test_xml_object_unknown_fields_use_native_grouping_with_python_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_grouped_texts_excluding"

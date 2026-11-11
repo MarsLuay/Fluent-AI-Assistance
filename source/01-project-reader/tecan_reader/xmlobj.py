@@ -11,7 +11,7 @@ from tecan_common.native_acceleration import (
     xml_asset_reference_names as _native_xml_asset_reference_names,
     xml_kind_from_suffix as _native_xml_kind_from_suffix,
 )
-from tecan_common.xml_helpers import first_text, grouped_texts_excluding, texts_by_name
+from tecan_common.xml_helpers import grouped_texts_excluding, texts_by_name
 
 from .common import parse_xml_text, read_text
 
@@ -50,7 +50,11 @@ def inspect_xml_object_text(
             "SiteGuid",
         },
     )
-    object_name = first_text(root, "ObjectName") or first_text(root, "Name")
+    def first_grouped(name: str) -> str:
+        values = grouped.get(name, [])
+        return values[0] if values else ""
+
+    object_name = first_grouped("ObjectName") or first_grouped("Name")
     pin_refs = _pin_refs(text)
     asset_refs = _asset_refs(text)
     return {
@@ -58,15 +62,15 @@ def inspect_xml_object_text(
         "source": source_name,
         "entry": source_name,
         "object_name": object_name,
-        "type_id": first_text(root, "TypeId"),
-        "functional_group": first_text(root, "FunctionalGroup"),
-        "footprint": first_text(root, "FootPrint"),
-        "renderer": first_text(root, "Renderer"),
-        "description": first_text(root, "Description"),
-        "component_guid": first_text(root, "ComponentGuid"),
-        "site_guid": first_text(root, "SiteGuid"),
-        "base_worktable_name": first_text(root, "BaseWorktableName"),
-        "base_worktable_guid": first_text(root, "BaseWorktableGuid"),
+        "type_id": first_grouped("TypeId"),
+        "functional_group": first_grouped("FunctionalGroup"),
+        "footprint": first_grouped("FootPrint"),
+        "renderer": first_grouped("Renderer"),
+        "description": first_grouped("Description"),
+        "component_guid": first_grouped("ComponentGuid"),
+        "site_guid": first_grouped("SiteGuid"),
+        "base_worktable_name": first_grouped("BaseWorktableName"),
+        "base_worktable_guid": first_grouped("BaseWorktableGuid"),
         "names": grouped.get("Name", [])[:50],
         "guids": [*grouped.get("Guid", []), *grouped.get("GUID", [])][:20],
         "workspace_guid": Path(str(source_name).replace("\\", "/")).stem
