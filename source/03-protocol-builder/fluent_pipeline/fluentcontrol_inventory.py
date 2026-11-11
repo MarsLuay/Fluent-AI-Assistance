@@ -209,9 +209,9 @@ def find_unique_guid(
     guids = mapping.get(key)
     if guids is None:
         # case-insensitive fallback
-        wanted = key.casefold()
+        wanted = _casefold_key(key)
         for existing_key, values in mapping.items():
-            if str(existing_key).casefold() == wanted:
+            if _casefold_key(str(existing_key)) == wanted:
                 guids = values
                 break
     if not guids:
@@ -230,9 +230,9 @@ def collision_preflight(
     mapping = inventory.get("name_folder_to_guids") or {}
     guids: list[str] | None = mapping.get(key)
     if guids is None:
-        wanted = key.casefold()
+        wanted = _casefold_key(key)
         for existing_key, values in mapping.items():
-            if str(existing_key).casefold() == wanted:
+            if _casefold_key(str(existing_key)) == wanted:
                 guids = list(values)
                 key = str(existing_key)
                 break

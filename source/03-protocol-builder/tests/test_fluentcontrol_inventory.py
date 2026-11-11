@@ -112,6 +112,50 @@ class FluentControlInventoryTests(unittest.TestCase):
                 )
         self.assertEqual(fallback_resolution, disabled_resolution)
 
+    def test_guid_collision_lookups_use_native_casefold_fallback(self) -> None:
+        guid = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        inventory = {"name_folder_to_guids": {"Straße\\Method": [guid]}}
+
+        def lookup():
+            return (
+                find_unique_guid(inventory, "METHOD", "STRASSE"),
+                collision_preflight(inventory, "METHOD", "STRASSE"),
+            )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = lookup()
+        self.assertEqual(disabled[0], guid)
+        self.assertEqual(
+            disabled[1],
+            {
+                "status": "ok",
+                "key": "Straße\\Method",
+                "object_name": "METHOD",
+                "folder": "STRASSE",
+                "guids": [guid],
+                "guid": guid,
+            },
+        )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                inventory_module,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = lookup()
+                self.assertGreater(native_call.call_count, 0)
+        self.assertEqual(enabled, disabled)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                inventory_module,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = lookup()
+        self.assertEqual(fallback, disabled)
+
     def test_first_xml_text_uses_rust_whitespace_collapse_with_fallback(self) -> None:
         text = "<ObjectName>\x1cExample\u2003 Item \t\x1f</ObjectName>"
         expected = "Example Item"
