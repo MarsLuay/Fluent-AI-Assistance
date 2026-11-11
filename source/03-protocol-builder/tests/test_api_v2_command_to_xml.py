@@ -374,6 +374,58 @@ class ApiV2CommandSerializerTests(unittest.TestCase):
         self.assertEqual(fallback_actual, fallback_expected)
         self.assertEqual(fallback_actual, [{"target": "fallback", "source": "7"}])
 
+    def test_query_limit_double_scan_uses_native_direct_selector_and_fallback(self):
+        root = ET.fromstring(
+            "<Root><Minimum><double> </double><double>2.5</double></Minimum></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = commands_module._parse_query_limit_value(root, "Minimum")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                commands_module,
+                "_native_xml_direct_elements_by_name",
+                wraps=native_acceleration.xml_direct_elements_by_name,
+            ) as native_call:
+                actual = commands_module._parse_query_limit_value(root, "Minimum")
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, 2.5)
+
+        invalid_root = ET.fromstring(
+            "<Root><Maximum><double>invalid</double><double>9</double></Maximum></Root>"
+        )
+        self.assertEqual(
+            commands_module._parse_query_limit_value(invalid_root, "Maximum"),
+            "invalid",
+        )
+
+        class StringTag(str):
+            pass
+
+        custom_root = ET.Element("Root")
+        maximum = ET.SubElement(custom_root, "Maximum")
+        ET.SubElement(maximum, StringTag("double")).text = "3"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = commands_module._parse_query_limit_value(
+                custom_root, "Maximum"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_direct_elements_by_name(
+                    maximum, ("double",), ET.Element
+                )
+            )
+            fallback_actual = commands_module._parse_query_limit_value(
+                custom_root, "Maximum"
+            )
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, 3)
+
+        text_root = ET.fromstring("<Root><MinimumText>6</MinimumText></Root>")
+        self.assertEqual(
+            commands_module._parse_query_limit_value(text_root, "Minimum"), "6"
+        )
+
     def test_rup_variable_item_scan_uses_native_selector_and_fallback(self):
         root = ET.fromstring(
             '<Root xmlns:x="urn:test"><x:RupVariableItem>'

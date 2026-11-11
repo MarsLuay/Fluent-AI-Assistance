@@ -1453,7 +1453,12 @@ def _parse_query_limit_value(node: Any, tag: str) -> Any:
         return None
     typed = _find_descendant(node, tag)
     if typed is not None:
-        for child in typed:
+        children = _native_xml_direct_elements_by_name(
+            typed, ("double",), ET.Element
+        )
+        if children is None:
+            children = typed
+        for child in children:
             if _local_name(child.tag) == "double":
                 text = (child.text or "").strip()
                 if text:
