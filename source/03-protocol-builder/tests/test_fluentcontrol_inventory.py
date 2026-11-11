@@ -36,6 +36,82 @@ def _write_xscr(root: Path, guid: str, name: str, folder: str) -> None:
 
 
 class FluentControlInventoryTests(unittest.TestCase):
+    def test_script_name_index_uses_native_ascii_and_unicode_fallback(self) -> None:
+        class CustomName(str):
+            def casefold(self):
+                return "custom-key"
+
+        values = ["Demo", " Demo ", "Straße", "Z", CustomName("ignored")]
+        expected = [value.casefold() for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [inventory_module._casefold_key(value) for value in values]
+        self.assertEqual(disabled, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                inventory_module,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = [inventory_module._casefold_key(value) for value in values]
+                self.assertEqual(native_call.call_count, 3)
+        self.assertEqual(enabled, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                inventory_module,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = [inventory_module._casefold_key(value) for value in values]
+        self.assertEqual(fallback, expected)
+
+        inventory = {
+            "scripts": [
+                {
+                    "guid": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "object_name": "Straße",
+                    "folder": "West",
+                },
+                {
+                    "guid": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                    "object_name": "STRASSE",
+                    "folder": "East",
+                },
+            ]
+        }
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled_resolution = inventory_module.resolve_local_script_guid_for_name(
+                inventory, "StraSSe", preferred_folder="east"
+            )
+        self.assertEqual(
+            disabled_resolution,
+            ("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "folder_unique"),
+        )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                inventory_module,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled_resolution = inventory_module.resolve_local_script_guid_for_name(
+                    inventory, "StraSSe", preferred_folder="east"
+                )
+                self.assertGreater(native_call.call_count, 0)
+        self.assertEqual(enabled_resolution, disabled_resolution)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                inventory_module,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback_resolution = inventory_module.resolve_local_script_guid_for_name(
+                    inventory, "StraSSe", preferred_folder="east"
+                )
+        self.assertEqual(fallback_resolution, disabled_resolution)
+
     def test_first_xml_text_uses_rust_whitespace_collapse_with_fallback(self) -> None:
         text = "<ObjectName>\x1cExample\u2003 Item \t\x1f</ObjectName>"
         expected = "Example Item"

@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
 )
 
@@ -31,6 +32,14 @@ _REFERENCE_RE = re.compile(
 
 def normalize_script_folder(value: Any) -> str:
     return str(value or "").strip().strip("\\/")
+
+
+def _casefold_key(value: str) -> str:
+    if type(value) is str and value.strip() == value:
+        native = _native_ascii_casefold_trim(value)
+        if native is not None:
+            return native
+    return value.casefold()
 
 
 def inventory_key(folder: str, object_name: str) -> str:
@@ -271,7 +280,7 @@ def _scripts_by_object_name(inventory: dict[str, Any]) -> dict[str, list[dict[st
         name = str(row.get("object_name") or "").strip()
         if not name:
             continue
-        by_name.setdefault(name.casefold(), []).append(
+        by_name.setdefault(_casefold_key(name), []).append(
             {
                 "guid": str(row.get("guid") or ""),
                 "object_name": name,
@@ -295,7 +304,7 @@ def resolve_local_script_guid_for_name(
     name = str(object_name or "").strip()
     if not name:
         return None, "missing"
-    candidates = _scripts_by_object_name(inventory).get(name.casefold()) or []
+    candidates = _scripts_by_object_name(inventory).get(_casefold_key(name)) or []
     if not candidates:
         return None, "missing"
     if len(candidates) == 1:
@@ -303,7 +312,7 @@ def resolve_local_script_guid_for_name(
     preferred = normalize_script_folder(preferred_folder)
     if preferred:
         folder_hits = [
-            row for row in candidates if row["folder"].casefold() == preferred.casefold()
+            row for row in candidates if _casefold_key(row["folder"]) == _casefold_key(preferred)
         ]
         if len(folder_hits) == 1:
             return folder_hits[0]["guid"], "folder_unique"
