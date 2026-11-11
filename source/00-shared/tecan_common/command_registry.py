@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from tecan_common.native_acceleration import (
+    ascii_lower as _native_ascii_lower,
     ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
 )
 
@@ -220,6 +221,7 @@ def _first_field(fields: dict[str, Any], names: list[str]) -> Any:
 
 
 def _normalize_key(value: str) -> str:
-    lowered = value.lower()
+    native_lowered = _native_ascii_lower(value)
+    lowered = native_lowered if native_lowered is not None else value.lower()
     native = _native_ascii_lower_alnum_compact(lowered)
     return native if native is not None else re.sub(r"[^a-z0-9]+", "", lowered)

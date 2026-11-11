@@ -2591,6 +2591,14 @@ fn ascii_casefold_equals(value: &str, expected: &str) -> Option<bool> {
 }
 
 #[pyfunction]
+fn ascii_lower(value: &str) -> Option<String> {
+    if !value.is_ascii() {
+        return None;
+    }
+    Some(value.to_ascii_lowercase())
+}
+
+#[pyfunction]
 fn ascii_casefold_trim(value: &str) -> Option<String> {
     if !value.is_ascii() {
         return None;
@@ -7930,6 +7938,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(most_common_string_counts, module)?)?;
     module.add_function(wrap_pyfunction!(sorted_unique_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
+    module.add_function(wrap_pyfunction!(ascii_lower, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_trim, module)?)?;
     module.add_function(wrap_pyfunction!(
         ascii_collapse_casefold_whitespace,
@@ -8296,6 +8305,14 @@ mod tests {
             );
         }
         assert_eq!(ascii_first_version_token("café 1.2"), None);
+    }
+
+    #[test]
+    fn ascii_lower_matches_python_without_trimming() {
+        assert_eq!(ascii_lower(" Mixed Value "), Some(" mixed value ".into()));
+        assert_eq!(ascii_lower("AZ_09"), Some("az_09".into()));
+        assert_eq!(ascii_lower(""), Some(String::new()));
+        assert_eq!(ascii_lower("Straße"), None);
     }
 
     #[test]

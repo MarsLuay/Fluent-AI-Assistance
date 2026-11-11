@@ -26,6 +26,25 @@ class NativeAccelerationTests(unittest.TestCase):
             packages = bootstrap.workspace_packages()
         self.assertIn("tecan-native", {package.distribution for package in packages})
 
+    def test_ascii_lower_preserves_whitespace_and_uses_unicode_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "ascii_lower"
+        ):
+            self.skipTest("optional Rust ASCII lowercase helper is not built")
+        cases = [
+            (" Mixed Value ", " mixed value "),
+            ("AZ_09", "az_09"),
+            ("", ""),
+            ("Straße", None),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            self.assertTrue(
+                all(native_acceleration.ascii_lower(value) is None for value, _ in cases)
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual = [native_acceleration.ascii_lower(value) for value, _ in cases]
+        self.assertEqual(actual, [expected for _, expected in cases])
+
     def test_disabled_extension_uses_python_xml_parser(self) -> None:
         with patch.object(native_acceleration, "_native", None):
             root = ET.fromstring(b"<root><child>ok</child></root>")

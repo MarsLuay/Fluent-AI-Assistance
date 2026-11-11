@@ -29,21 +29,42 @@ import tecan_common.command_registry as shared_command_registry
 
 
 class CommandRegistryTests(unittest.TestCase):
-    def test_key_normalization_uses_native_ascii_compaction_with_python_lower_fallback(self):
+    def test_key_normalization_uses_native_lower_and_compaction_fallbacks(self):
         values = ["Command Data V2", "A_09", "Straße", "İD", "東京", ""]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             expected = [shared_command_registry._normalize_key(value) for value in values]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 shared_command_registry,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_lower, patch.object(
+                shared_command_registry,
                 "_native_ascii_lower_alnum_compact",
                 wraps=native_acceleration.ascii_lower_alnum_compact,
-            ) as native_call:
+            ) as native_compact:
                 actual = [shared_command_registry._normalize_key(value) for value in values]
-                self.assertEqual(native_call.call_count, len(values))
+                self.assertEqual(native_lower.call_count, len(values))
+                self.assertEqual(native_compact.call_count, len(values))
+                native_lower.assert_any_call("Command Data V2")
+                native_lower.assert_any_call("Straße")
+            self.assertIsNone(native_acceleration.ascii_lower("Straße"))
             self.assertIsNone(native_acceleration.ascii_lower_alnum_compact("straße"))
         self.assertEqual(actual, expected)
         self.assertEqual(actual, ["commanddatav2", "a09", "strae", "id", "", ""])
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                shared_command_registry, "_native_ascii_lower", return_value=None
+            ), patch.object(
+                shared_command_registry,
+                "_native_ascii_lower_alnum_compact",
+                return_value=None,
+            ):
+                forced_fallback = [
+                    shared_command_registry._normalize_key(value) for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
 
     def test_common_registry_helpers_are_shared(self):
         helpers = {

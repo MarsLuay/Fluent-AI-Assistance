@@ -3015,6 +3015,17 @@ def ascii_casefold_equals(value: Any, expected: Any) -> bool | None:
         return None
 
 
+def ascii_lower(value: Any) -> str | None:
+    """Lowercase exact ASCII text without trimming, or request Python fallback."""
+    if not enabled() or type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.ascii_lower(value)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def ascii_casefold_trim(value: Any) -> str | None:
     """Trim and lowercase exact ASCII text, or request Python fallback."""
     if not enabled() or type(value) is not str or not value.isascii():
