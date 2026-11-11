@@ -339,9 +339,11 @@ def _first_text(element: ET.Element, local_name: str) -> str:
         element, (local_name,), ET.Element
     )
     if children is None:
-        children = element.iter()
+        children = (
+            child for child in element.iter() if _local_name(child.tag) == local_name
+        )
     for child in children:
-        if _local_name(child.tag) == local_name and child.text:
+        if child.text:
             text = child.text.strip()
             if text:
                 return text
