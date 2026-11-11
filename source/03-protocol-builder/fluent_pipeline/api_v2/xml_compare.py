@@ -6,6 +6,9 @@ from dataclasses import dataclass
 import html
 import re
 from .. import xml_compat as ET
+from tecan_common.native_acceleration import (
+    xml_elements_by_name as _native_xml_elements_by_name,
+)
 
 
 LINE_NUMBER_RE = re.compile(r"<LineNumber>\s*\d+\s*</LineNumber>", re.IGNORECASE)
@@ -81,7 +84,10 @@ def extract_command_objects_from_xscr(xscr_text: str) -> list[dict[str, str]]:
     except ET.ParseError:
         return []
     records: list[dict[str, str]] = []
-    for element in root.iter():
+    elements = _native_xml_elements_by_name(root, ("Object",), ET.Element)
+    if elements is None:
+        elements = root.iter()
+    for element in elements:
         if _local_name(element.tag) != "Object":
             continue
         object_type = str(element.attrib.get("Type") or "")

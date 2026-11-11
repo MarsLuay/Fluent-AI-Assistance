@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import tempfile
 import unittest
-from fluent_pipeline import xml_compat as ET
 from pathlib import Path
+from unittest.mock import patch
 
+import fluent_pipeline.api_v2.xml_compare as xml_compare
+from fluent_pipeline import xml_compat as ET
+from tecan_common import native_acceleration
 from fluentcoder.expressions import NumberLiteral, StringLiteral
 from fluent_pipeline.api_v2.commands import (
     AddLabware,
@@ -317,6 +320,31 @@ RUP_VARIABLE_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ApiV2CommandSerializerTests(unittest.TestCase):
+    def test_compiled_object_scan_uses_native_selector_and_fallback(self):
+        xscr = (
+            '<Root xmlns:x="urn:test"><x:Object Type="Tecan.Commands.First">'
+            "<First /></x:Object><Object Type=\"Tecan.Core.Scripting.LabwareSectionInfo\" />"
+            '<Object Type="Tecan.Commands.Second"><Nested /></Object>'
+            '<Object Type="Tecan.Other.Ignored" /></Root>'
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = extract_command_objects_from_xscr(xscr)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                xml_compare,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = extract_command_objects_from_xscr(xscr)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual([record["command_id"] for record in actual], ["First", "Second"])
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(xml_compare, "_native_xml_elements_by_name", return_value=None):
+                fallback = extract_command_objects_from_xscr(xscr)
+        self.assertEqual(fallback, expected)
+
     def test_add_labware_roundtrip_from_xscr(self):
         records = extract_command_objects_from_xscr(ADD_LABWARE_XSCR)
         self.assertEqual(len(records), 1)
