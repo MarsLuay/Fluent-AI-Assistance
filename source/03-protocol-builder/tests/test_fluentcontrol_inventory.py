@@ -5,7 +5,10 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from tecan_common import native_acceleration
+import fluent_pipeline.fluentcontrol_inventory as inventory_module
 from fluent_pipeline.fluentcontrol_inventory import (
     build_scripts_inventory,
     build_scripts_inventory_from_target_profile,
@@ -33,6 +36,41 @@ def _write_xscr(root: Path, guid: str, name: str, folder: str) -> None:
 
 
 class FluentControlInventoryTests(unittest.TestCase):
+    def test_first_xml_text_uses_rust_whitespace_collapse_with_fallback(self) -> None:
+        text = "<ObjectName>\x1cExample\u2003 Item \t\x1f</ObjectName>"
+        expected = "Example Item"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            self.assertEqual(inventory_module._first_xml_text(text, "ObjectName"), expected)
+            self.assertEqual(inventory_module._first_xml_text(text, "Missing"), "")
+
+        calls: list[str] = []
+        native_collapse = native_acceleration.collapse_ascii_whitespace
+
+        def track_collapse(value):
+            calls.append(value)
+            return native_collapse(value)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                inventory_module,
+                "_native_collapse_ascii_whitespace",
+                side_effect=track_collapse,
+            ):
+                self.assertEqual(
+                    inventory_module._first_xml_text(text, "ObjectName"), expected
+                )
+        self.assertEqual(calls, ["\x1cExample\u2003 Item \t\x1f"])
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                inventory_module,
+                "_native_collapse_ascii_whitespace",
+                return_value=None,
+            ):
+                self.assertEqual(
+                    inventory_module._first_xml_text(text, "ObjectName"), expected
+                )
+
     def test_inventory_unique_collision_and_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory(prefix="fc_inv_") as tmp:
             root = Path(tmp)

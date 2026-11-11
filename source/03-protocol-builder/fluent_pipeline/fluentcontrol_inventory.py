@@ -15,6 +15,10 @@ import re
 from pathlib import Path
 from typing import Any, Mapping
 
+from tecan_common.native_acceleration import (
+    collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
+)
+
 _GUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
@@ -71,7 +75,9 @@ def _first_xml_text(text: str, name: str) -> str:
     match = re.search(rf"<{re.escape(name)}>(.*?)</{re.escape(name)}>", text, flags=re.DOTALL)
     if not match:
         return ""
-    return re.sub(r"\s+", " ", match.group(1)).strip()
+    raw = match.group(1)
+    native = _native_collapse_ascii_whitespace(raw)
+    return native if native is not None else re.sub(r"\s+", " ", raw).strip()
 
 
 def _read_script_identity(path: Path) -> tuple[str, str] | None:
