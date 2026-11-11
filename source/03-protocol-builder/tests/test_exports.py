@@ -162,7 +162,9 @@ class DatastoreGuidIndexNativeTests(unittest.TestCase):
             "datastore/Straße.xscr": b"duplicate",
             "datastore/AbC.xscr": b"ascii",
             "datastore/ AbC .xscr": b"spaced",
+            "Dataﬅore/Expansion.xscr": b"unicode prefix",
             "DataStore/NodeDescription.xml": b"metadata",
+            "DataStore/NodeDeſcription.xml": b"unicode suffix",
             "meta/ignored.xscr": b"ignored",
         }
         with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
@@ -178,11 +180,17 @@ class DatastoreGuidIndexNativeTests(unittest.TestCase):
                 "_native_ascii_casefold_trim",
                 wraps=native_acceleration.ascii_casefold_trim,
             ) as native_call:
-                actual = exports._datastore_entries_by_guid(archive_data)
-                actual_matches = [
-                    exports._find_datastore_entry_for_guid(archive_data, guid)
-                    for guid in ("Straße", "ABC", " AbC ", "missing")
-                ]
+                with mock.patch.object(
+                    exports,
+                    "_native_ascii_casefold_equals",
+                    wraps=native_acceleration.ascii_casefold_equals,
+                ) as native_equals_call:
+                    actual = exports._datastore_entries_by_guid(archive_data)
+                    actual_matches = [
+                        exports._find_datastore_entry_for_guid(archive_data, guid)
+                        for guid in ("Straße", "ABC", " AbC ", "missing")
+                    ]
+                    self.assertGreater(native_equals_call.call_count, 0)
                 self.assertGreater(native_call.call_count, 0)
             self.assertIsNone(native_acceleration.ascii_casefold_trim("Straße"))
         self.assertEqual(actual, expected)
@@ -193,6 +201,7 @@ class DatastoreGuidIndexNativeTests(unittest.TestCase):
                 "strasse": "DataStore/STRASSE.xscr",
                 "abc": "datastore/AbC.xscr",
                 " abc ": "datastore/ AbC .xscr",
+                "expansion": "Dataﬅore/Expansion.xscr",
             },
         )
         self.assertEqual(
@@ -211,11 +220,16 @@ class DatastoreGuidIndexNativeTests(unittest.TestCase):
                 "_native_ascii_casefold_trim",
                 return_value=None,
             ):
-                fallback = exports._datastore_entries_by_guid(archive_data)
-                fallback_matches = [
-                    exports._find_datastore_entry_for_guid(archive_data, guid)
-                    for guid in ("Straße", "ABC", " AbC ", "missing")
-                ]
+                with mock.patch.object(
+                    exports,
+                    "_native_ascii_casefold_equals",
+                    return_value=None,
+                ):
+                    fallback = exports._datastore_entries_by_guid(archive_data)
+                    fallback_matches = [
+                        exports._find_datastore_entry_for_guid(archive_data, guid)
+                        for guid in ("Straße", "ABC", " AbC ", "missing")
+                    ]
         self.assertEqual(fallback, expected)
         self.assertEqual(fallback_matches, expected_matches)
 

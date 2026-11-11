@@ -4646,12 +4646,12 @@ def _archive_nodedescription_records(archive_data: dict[str, bytes]) -> dict[str
 def _datastore_entries_by_guid(archive_data: dict[str, bytes]) -> dict[str, str]:
     entries: dict[str, str] = {}
     for entry in archive_data:
-        normalized = entry.replace("\\", "/").casefold()
-        if not normalized.startswith("datastore/"):
+        normalized = entry.replace("\\", "/")
+        if not _casefold_startswith(normalized, "datastore/"):
             continue
-        if normalized.endswith("/nodedescription.xml"):
+        if _casefold_endswith(normalized, "/nodedescription.xml"):
             continue
-        guid = _casefold_exact(Path(entry.replace("\\", "/")).stem)
+        guid = _casefold_exact(Path(normalized).stem)
         if guid:
             entries.setdefault(guid, entry)
     return entries
@@ -4667,6 +4667,20 @@ def _casefold_exact(value: str) -> str:
         if native is not None:
             return native
     return value.casefold()
+
+
+def _casefold_startswith(value: str, prefix: str) -> bool:
+    native = _native_ascii_casefold_equals(value[: len(prefix)], prefix)
+    if native is not None:
+        return native
+    return value.casefold().startswith(prefix.casefold())
+
+
+def _casefold_endswith(value: str, suffix: str) -> bool:
+    native = _native_ascii_casefold_equals(value[-len(suffix) :], suffix)
+    if native is not None:
+        return native
+    return value.casefold().endswith(suffix.casefold())
 
 
 def _unique_preserving_order(values: list[str]) -> list[str]:
@@ -5069,10 +5083,7 @@ def _archive_has_datastore_metadata(archive_data: dict[str, bytes]) -> bool:
 def _datastore_relative_entry(entry: str) -> str:
     normalized = entry.replace("/", "\\")
     prefix = "DataStore\\"
-    native_match = _native_ascii_casefold_equals(normalized[: len(prefix)], prefix)
-    if native_match is None:
-        native_match = normalized.casefold().startswith(prefix.casefold())
-    if native_match:
+    if _casefold_startswith(normalized, prefix):
         return normalized[len(prefix) :]
     return normalized
 
