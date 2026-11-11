@@ -14,6 +14,10 @@ from . import xml_compat as ET
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Protocol
 
+from tecan_common.native_acceleration import (
+    xml_elements_by_name as _native_xml_elements_by_name,
+)
+
 from .api_v2.types import ApiV2ValidationError
 from .api_v2.validate_runtime import (
     runtime_error_for_validate_failure as _shared_runtime_error_for_validate_failure,
@@ -490,6 +494,9 @@ def _normalize_base_token(location: str) -> str:
 
 
 def _find_descendant(element: ET.Element, name: str) -> ET.Element | None:
+    nodes = _native_xml_elements_by_name(element, (name,), ET.Element)
+    if nodes is not None:
+        return nodes[0] if nodes else None
     for node in element.iter():
         if _local_name(node.tag) == name:
             return node

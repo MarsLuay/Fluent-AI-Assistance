@@ -1,5 +1,8 @@
 import unittest
+from unittest.mock import patch
 
+import fluent_pipeline.api_v2_transfer_labware_validate as transfer_validate
+from tecan_common import native_acceleration
 from fluent_pipeline.api_v2.commands import TransferLabware
 from fluent_pipeline.api_v2.types import ApiV2ValidationError
 from fluent_pipeline.api_v2_transfer_labware_validate import (
@@ -37,6 +40,57 @@ class TransferLabwareValidateTests(unittest.TestCase):
         self.assertEqual(fields.labware, "Plate1")
         self.assertEqual(fields.location, "NestPlatform")
         self.assertEqual(fields.site, "2")
+
+    def test_transfer_macro_lookup_uses_native_selector_and_python_fallback(self):
+        command = _CommandStub(
+            type_name="ApplicationDriverMacro",
+            payload_xml=(
+                '<Root xmlns:x="urn:test"><x:ApplicationDriverMacro>'
+                "<Name>RGA1_TransferLabware</Name>"
+                "<ExecutionSettings>&amp;lt;TransferLabwareCommandParameters&amp;gt;"
+                "&amp;lt;Labware&amp;gt;First&amp;lt;/Labware&amp;gt;"
+                "&amp;lt;/TransferLabwareCommandParameters&amp;gt;</ExecutionSettings>"
+                "</x:ApplicationDriverMacro><ApplicationDriverMacro>"
+                "<Name>other</Name></ApplicationDriverMacro></Root>"
+            ),
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = extract_transfer_labware_fields(command)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                transfer_validate,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = extract_transfer_labware_fields(command)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertIsNotNone(actual)
+        assert actual is not None
+        self.assertEqual(actual.labware, "First")
+
+        class StringTag(str):
+            pass
+
+        root = transfer_validate.ET.Element("Root")
+        macro = transfer_validate.ET.SubElement(
+            root, StringTag("ApplicationDriverMacro")
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_macro = transfer_validate._find_descendant(
+                root, "ApplicationDriverMacro"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_name(
+                    root, ("ApplicationDriverMacro",), transfer_validate.ET.Element
+                )
+            )
+            actual_macro = transfer_validate._find_descendant(
+                root, "ApplicationDriverMacro"
+            )
+        self.assertIs(actual_macro, expected_macro)
+        self.assertIs(actual_macro, macro)
 
     def test_rejects_missing_labware_on_deck(self):
         fields = TransferLabwareFields(
