@@ -2570,6 +2570,19 @@ def bracket_variable_names(value: Any) -> set[str] | None:
         return None
 
 
+def subroutine_reference_matches_ascii(
+    subroutine: Any, references: Any
+) -> bool | None:
+    """Match exact ASCII subroutine references natively, or request Python fallback."""
+    if not enabled():
+        return None
+    try:
+        result = _native.subroutine_reference_matches_ascii(subroutine, references)
+        return result if type(result) is bool else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def normalize_ascii_name(value: Any) -> str | None:
     """Trim and lowercase supported exact ASCII names, or request Python fallback."""
     if not enabled() or (

@@ -5955,6 +5955,47 @@ fn normalize_ascii_name(value: &str) -> String {
 }
 
 #[pyfunction]
+fn subroutine_reference_matches_ascii(
+    py: Python<'_>,
+    subroutine: &Bound<'_, PyAny>,
+    references: &Bound<'_, PyAny>,
+) -> PyResult<Option<bool>> {
+    if !subroutine.get_type().is(py.get_type::<PyString>())
+        || !references.get_type().is(py.get_type::<PySet>())
+    {
+        return Ok(None);
+    }
+    let subroutine = subroutine.extract::<String>()?;
+    if !subroutine.is_ascii() {
+        return Ok(None);
+    }
+    let set = references.cast::<PySet>()?;
+    let mut reference_values = Vec::with_capacity(set.len());
+    for reference in set.iter() {
+        if !reference.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let reference = reference.extract::<String>()?;
+        if !reference.is_ascii() {
+            return Ok(None);
+        }
+        reference_values.push(reference);
+    }
+
+    let full_name = normalize_ascii_name(&subroutine);
+    let subroutine_basename = subroutine.rsplit('\\').next().unwrap_or(&subroutine);
+    let basename = normalize_ascii_name(subroutine_basename);
+    for reference in reference_values {
+        if normalize_ascii_name(&reference) == full_name
+            || normalize_ascii_name(reference.rsplit('\\').next().unwrap_or(&reference)) == basename
+        {
+            return Ok(Some(true));
+        }
+    }
+    Ok(Some(false))
+}
+
+#[pyfunction]
 fn clean_subroutine_name_ascii(value: &str) -> String {
     let trimmed =
         value.trim_matches(|character: char| matches!(character as u32, 0x09..=0x0d | 0x1c..=0x20));
@@ -7445,6 +7486,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(bracket_variable_names, module)?)?;
     module.add_function(wrap_pyfunction!(clean_subroutine_name_ascii, module)?)?;
     module.add_function(wrap_pyfunction!(normalize_ascii_name, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        subroutine_reference_matches_ascii,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(command_short_name, module)?)?;
     module.add_function(wrap_pyfunction!(entry_object_guid, module)?)?;
     module.add_function(wrap_pyfunction!(asset_reference_candidates, module)?)?;

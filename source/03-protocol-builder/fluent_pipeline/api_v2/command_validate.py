@@ -21,6 +21,7 @@ from tecan_common.native_acceleration import (
     clean_subroutine_name_ascii as _native_clean_subroutine_name_ascii,
     extract_line_number_ascii as _native_extract_line_number_ascii,
     normalize_ascii_name as _native_normalize_ascii_name,
+    subroutine_reference_matches_ascii as _native_subroutine_reference_matches_ascii,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_local_name as _native_xml_local_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
@@ -865,6 +866,9 @@ def _clean_subroutine_name(value: Any) -> str:
 
 
 def _subroutine_reference_matches(subroutine: str, references: set[str]) -> bool:
+    native = _native_subroutine_reference_matches_ascii(subroutine, references)
+    if native is not None:
+        return native
     subroutine_norm = _norm_name(subroutine.rsplit("\\", 1)[-1])
     return any(
         _norm_name(reference) == _norm_name(subroutine)

@@ -205,6 +205,53 @@ class ApiV2CommandValidateTests(unittest.TestCase):
             actual, ["123", "42", "42", "", "", "7", "١٢", "", ""]
         )
 
+    def test_subroutine_reference_match_uses_ascii_rust_path(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "subroutine_reference_matches_ascii"
+        ):
+            self.skipTest("optional Rust subroutine matcher is not built")
+        cases = [
+            ("Demo\\ExistingSub", {"exISTingsub"}),
+            ("ExistingSub", {"Demo\\EXISTINGSUB"}),
+            ("Demo\\Full Name", {" demo\\full name "}),
+            ("Demo\\Missing", {"Other\\Existing"}),
+            ("", {""}),
+            ("Straße", {"STRASSE"}),
+            ("\u00a0Name\u00a0", {"name"}),
+            ("foo", ["FOO"]),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                command_validate._subroutine_reference_matches(subroutine, references)
+                for subroutine, references in cases
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_subroutine_reference_matches_ascii",
+                wraps=native_acceleration.subroutine_reference_matches_ascii,
+            ) as native_call:
+                actual = [
+                    command_validate._subroutine_reference_matches(
+                        subroutine, references
+                    )
+                    for subroutine, references in cases
+                ]
+                self.assertEqual(native_call.call_count, len(cases))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [True, True, True, False, True, True, True, True])
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.subroutine_reference_matches_ascii(
+                    "Straße", {"STRASSE"}
+                )
+            )
+            self.assertIsNone(
+                native_acceleration.subroutine_reference_matches_ascii(
+                    "Name", {"NämE"}
+                )
+            )
+
     def test_name_normalization_uses_ascii_rust_path(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "normalize_ascii_name"
