@@ -12,6 +12,7 @@ from typing import Any, Mapping
 from .checksums import entry_checksum_state, recompute_checksum_bytes
 from tecan_common.native_acceleration import (
     ascii_safe_filesystem_key as _native_ascii_safe_filesystem_key,
+    windows_drive_path_prefix_any_separator as _native_windows_drive_path_prefix_any_separator,
     collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
     windows_drive_path_prefix as _native_windows_drive_path_prefix,
 )
@@ -1039,7 +1040,15 @@ def audit_archive_filesystem(archive_data: dict[str, bytes]) -> list[dict[str, A
                 raw = re.sub(r"\s+", " ", match.group(1)).strip()
                 resolved = _path_maps_to_fs_directory(raw, mapping)
                 if resolved is None:
-                    if re.match(r"^[A-Za-z]:[\\/]", raw):
+                    native_drive_path = (
+                        _native_windows_drive_path_prefix_any_separator(raw)
+                    )
+                    is_drive_path = (
+                        native_drive_path
+                        if native_drive_path is not None
+                        else re.match(r"^[A-Za-z]:[\\/]", raw) is not None
+                    )
+                    if is_drive_path:
                         key = (entry, raw.casefold())
                         if key in seen:
                             continue

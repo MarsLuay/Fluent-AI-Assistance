@@ -2761,6 +2761,15 @@ fn windows_drive_path_prefix(value: &str) -> bool {
 }
 
 #[pyfunction]
+fn windows_drive_path_prefix_any_separator(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && matches!(bytes[2], b'\\' | b'/')
+}
+
+#[pyfunction]
 fn ascii_safe_component(value: &str, lowercase: bool) -> Option<String> {
     if !value.is_ascii() {
         return None;
@@ -7880,6 +7889,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(ascii_safe_variable_base, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_variable_name_is_valid, module)?)?;
     module.add_function(wrap_pyfunction!(windows_drive_path_prefix, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        windows_drive_path_prefix_any_separator,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(ascii_safe_component, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_safe_filesystem_key, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_word_boundary_contains, module)?)?;
@@ -8099,6 +8112,16 @@ mod tests {
             "é:\\path",
         ] {
             assert!(!windows_drive_path_prefix(value), "{value:?}");
+        }
+    }
+
+    #[test]
+    fn windows_drive_path_prefix_with_slashes_matches_python_regex() {
+        for value in [r"C:\folder", "Z:/folder", "C:/répertoire"] {
+            assert!(windows_drive_path_prefix_any_separator(value), "{value:?}");
+        }
+        for value in ["", "1:/path", "C:relative", "\\\\server\\share", "é:/path"] {
+            assert!(!windows_drive_path_prefix_any_separator(value), "{value:?}");
         }
     }
 

@@ -541,6 +541,42 @@ def test_archive_collision_key_uses_native_ascii_sanitizer(tmp_path, monkeypatch
     assert [path.read_bytes() for path in actual] == [payload for _, payload in entries]
 
 
+def test_archive_audit_drive_path_check_uses_native_slash_helper(monkeypatch) -> None:
+    archive_data = {
+        "script.xscr": (
+            b"<Root><FileReference><File>C:/Data/unmapped.bin</File>"
+            b"</File></FileReference><FileReference><File>"
+            b"D:\\r\xc3\xa9pertoire\\image.png</File></FileReference></Root>"
+        )
+    }
+    monkeypatch.setenv("TECAN_DISABLE_RUST_ACCELERATION", "1")
+    expected = zeia_filesystem_module.audit_archive_filesystem(archive_data)
+
+    calls: list[str] = []
+    native_prefix = native_acceleration.windows_drive_path_prefix_any_separator
+
+    def track_prefix(value):
+        calls.append(value)
+        return native_prefix(value)
+
+    monkeypatch.setenv("TECAN_DISABLE_RUST_ACCELERATION", "0")
+    monkeypatch.setattr(
+        zeia_filesystem_module,
+        "_native_windows_drive_path_prefix_any_separator",
+        track_prefix,
+    )
+    actual = zeia_filesystem_module.audit_archive_filesystem(archive_data)
+
+    assert actual == expected
+    assert [item["referenced_path"] for item in actual] == [
+        "C:/Data/unmapped.bin",
+        "D:\\répertoire\\image.png",
+    ]
+    assert calls == ["C:/Data/unmapped.bin", "D:\\répertoire\\image.png"]
+    assert native_prefix("C:/Data/file.bin") is True
+    assert native_prefix("é:/Data/file.bin") is False
+
+
 def test_audio_path_in_media_path_map() -> None:
     ir = {
         "protocol": {"name": "AudioDemo"},
