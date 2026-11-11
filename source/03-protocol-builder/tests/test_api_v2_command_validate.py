@@ -5,7 +5,10 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from tecan_common import native_acceleration
+import fluent_pipeline.api_v2.command_validate as command_validate
 from fluent_pipeline.api_v2.command_validate import (
     API_V2_ISSUE_ID,
     OfflineCommandValidateProvider,
@@ -76,6 +79,50 @@ GOOD_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ApiV2CommandValidateTests(unittest.TestCase):
+    def test_root_command_scan_uses_native_selector_and_comment_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        root = command_validate.ET.fromstring(
+            '<Root xmlns:x="urn:test">'
+            '<x:Object Type="Example.Commands.First"><Data /></x:Object>'
+            '<Object Type="Example.Commands.Second" />'
+            '<Object Type="Example.Unrelated" />'
+            '<object Type="Example.Commands.WrongCase" />'
+            "</Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = command_validate._records_from_root(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = command_validate._records_from_root(root)
+                native_call.assert_called_once_with(
+                    root, ("Object",), command_validate.ET.Element
+                )
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            [record["command_id"] for record in actual], ["First", "Second"]
+        )
+
+        commented = command_validate.ET.Element("Root")
+        commented.append(command_validate.ET.Comment("unsupported legacy tree"))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            commented_expected = command_validate._records_from_root(commented)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_name(
+                    commented, ("Object",), command_validate.ET.Element
+                )
+            )
+            commented_actual = command_validate._records_from_root(commented)
+        self.assertEqual(commented_actual, commented_expected)
+        self.assertEqual(commented_actual, [])
+
     def test_structured_failures_for_bad_xscr(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "bad.xscr"

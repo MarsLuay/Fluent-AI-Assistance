@@ -15,6 +15,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 
+from tecan_common.native_acceleration import (
+    xml_elements_by_name as _native_xml_elements_by_name,
+)
+
 from .commands import AddLabware, GetFingers, command_from_xscr_object, validate_command
 from .types import ApiV2ValidationError
 from .xml_compare import NON_EXECUTABLE_OBJECT_TYPES, extract_command_objects_from_xscr
@@ -581,7 +585,10 @@ def _records_from_xscr(root: ET.Element, text: str) -> list[dict[str, str]]:
 
 def _records_from_root(root: ET.Element) -> list[dict[str, str]]:
     records: list[dict[str, str]] = []
-    for element in root.iter():
+    elements = _native_xml_elements_by_name(root, ("Object",), ET.Element)
+    if elements is None:
+        elements = root.iter()
+    for element in elements:
         if _local_name(element.tag) != "Object":
             continue
         object_type = str(element.attrib.get("Type") or "")
