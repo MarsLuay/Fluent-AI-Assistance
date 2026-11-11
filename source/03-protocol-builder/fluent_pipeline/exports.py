@@ -23,7 +23,9 @@ from fluentcoder.expressions import (
     expression_inventory_from_xscr_text,
 )
 from tecan_common.native_acceleration import (
+    xml_direct_elements_by_name as _native_xml_direct_elements_by_name,
     xml_elements_by_name as _native_xml_elements_by_name,
+    xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
 )
 
@@ -8248,6 +8250,10 @@ def _first_descendant(parent: ET.Element | None, name: str) -> ET.Element | None
 def _direct_child(parent: ET.Element | None, name: str) -> ET.Element | None:
     if parent is None:
         return None
+    selection = _native_xml_first_direct_child_by_name(parent, name, ET.Element)
+    if selection is not None:
+        _, child = selection
+        return child
     for child in list(parent):
         if _local_name(child.tag) == name:
             return child
@@ -8257,10 +8263,17 @@ def _direct_child(parent: ET.Element | None, name: str) -> ET.Element | None:
 def _direct_children(parent: ET.Element | None, name: str) -> list[ET.Element]:
     if parent is None:
         return []
+    children = _native_xml_direct_elements_by_name(parent, (name,), ET.Element)
+    if children is not None:
+        return children
     return [child for child in list(parent) if _local_name(child.tag) == name]
 
 
 def _iter_local(parent: ET.Element, name: str):
+    elements = _native_xml_elements_by_name(parent, (name,), ET.Element)
+    if elements is not None:
+        yield from elements
+        return
     for child in parent.iter():
         if _local_name(child.tag) == name:
             yield child

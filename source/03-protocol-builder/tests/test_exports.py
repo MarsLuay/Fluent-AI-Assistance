@@ -144,6 +144,78 @@ class XscrPromptSelectorTests(unittest.TestCase):
         self.assertIs(fallback_actual, fallback_expected)
         self.assertIs(fallback_actual, custom_name)
 
+    def test_direct_and_iter_xml_helpers_use_native_selectors_and_fallback(self):
+        root = exports.ET.fromstring(
+            '<Root xmlns:x="urn:test"><x:Object><x:Nested><Object />'
+            "</x:Nested></x:Object><Object /></Root>"
+        )
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_child = exports._direct_child(root, "Object")
+            expected_children = exports._direct_children(root, "Object")
+            expected_iter = list(exports._iter_local(root, "Object"))
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_xml_first_direct_child_by_name",
+                wraps=native_acceleration.xml_first_direct_child_by_name,
+            ) as first_call, mock.patch.object(
+                exports,
+                "_native_xml_direct_elements_by_name",
+                wraps=native_acceleration.xml_direct_elements_by_name,
+            ) as direct_call, mock.patch.object(
+                exports,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as elements_call:
+                actual_child = exports._direct_child(root, "Object")
+                actual_children = exports._direct_children(root, "Object")
+                actual_iter = list(exports._iter_local(root, "Object"))
+                self.assertEqual(first_call.call_count, 1)
+                self.assertEqual(direct_call.call_count, 1)
+                self.assertEqual(elements_call.call_count, 1)
+        self.assertIs(actual_child, expected_child)
+        self.assertEqual(actual_children, expected_children)
+        self.assertEqual(actual_iter, expected_iter)
+        self.assertEqual(actual_children, [root[0], root[1]])
+        self.assertEqual(actual_iter, [root[0], root[0][0][0], root[1]])
+        self.assertIsNone(exports._direct_child(None, "Object"))
+        self.assertEqual(exports._direct_children(None, "Object"), [])
+
+        class StringTag(str):
+            pass
+
+        custom_root = exports.ET.Element("Root")
+        custom_object = exports.ET.SubElement(custom_root, StringTag("Object"))
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_child = exports._direct_child(custom_root, "Object")
+            fallback_children = exports._direct_children(custom_root, "Object")
+            fallback_iter = list(exports._iter_local(custom_root, "Object"))
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_first_direct_child_by_name(
+                    custom_root, "Object", exports.ET.Element
+                )
+            )
+            self.assertIsNone(
+                native_acceleration.xml_direct_elements_by_name(
+                    custom_root, ("Object",), exports.ET.Element
+                )
+            )
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_name(
+                    custom_root, ("Object",), exports.ET.Element
+                )
+            )
+            actual_fallback_child = exports._direct_child(custom_root, "Object")
+            actual_fallback_children = exports._direct_children(custom_root, "Object")
+            actual_fallback_iter = list(exports._iter_local(custom_root, "Object"))
+        self.assertIs(actual_fallback_child, fallback_child)
+        self.assertIs(actual_fallback_child, custom_object)
+        self.assertEqual(actual_fallback_children, fallback_children)
+        self.assertEqual(actual_fallback_children, [custom_object])
+        self.assertEqual(actual_fallback_iter, fallback_iter)
+        self.assertEqual(actual_fallback_iter, [custom_object])
+
     def test_readiness_title_scan_uses_native_selector(self):
         xml = (
             "<Root><ObjectName>Sample</ObjectName>"
