@@ -348,6 +348,49 @@ class ProtocolIrNativeStringsTests(unittest.TestCase):
                 forced_fallback = protocol_ir_compat_module._media_slot_specs_from_rows(rows)
         self.assertEqual(forced_fallback, expected)
 
+    def test_prompt_media_kind_lookup_uses_native_lower_and_unicode_fallback(self):
+        params = [
+            {"media_placeholders": [{"kind": "IMAGE", "slot": "image-slot"}]},
+            {"media_placeholders": [{"kind": "VIDEO", "slot": "video-slot"}]},
+            {"media_placeholders": [{"kind": " Image ", "slot": "space-slot"}]},
+            {"media_placeholders": [{"kind": "ÍMAGE", "slot": "unicode-slot"}]},
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                protocol_ir_compat_module.prompt_step_media_path(item)
+                for item in params
+            ]
+        self.assertEqual(
+            expected,
+            ["media/image-slot.png", "media/video-slot.gif", None, None],
+        )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                protocol_ir_compat_module,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = [
+                    protocol_ir_compat_module.prompt_step_media_path(item)
+                    for item in params
+                ]
+                self.assertGreaterEqual(native_call.call_count, len(params))
+            native_call.assert_any_call("IMAGE")
+            native_call.assert_any_call(" Image ")
+            native_call.assert_any_call("ÍMAGE")
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                protocol_ir_compat_module, "_native_ascii_lower", return_value=None
+            ):
+                forced_fallback = [
+                    protocol_ir_compat_module.prompt_step_media_path(item)
+                    for item in params
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_rup_display_type_alias_normalization_uses_native_compaction(self):
         cases = [
             ("Combo Box", False),

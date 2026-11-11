@@ -752,7 +752,7 @@ def _prompt_step_media_path_by_preference(
                 item
                 for item in placeholders
                 if isinstance(item, dict)
-                and str(item.get("kind") or "").lower() == wanted_kind
+                and _lower_text(str(item.get("kind") or "")) == wanted_kind
             ),
             None,
         )
