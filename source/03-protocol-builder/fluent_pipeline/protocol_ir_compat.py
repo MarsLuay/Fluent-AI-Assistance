@@ -10,6 +10,7 @@ from typing import Any
 
 from tecan_common.native_acceleration import (
     ascii_collapse_casefold_whitespace as _native_ascii_collapse_casefold_whitespace,
+    ascii_lower as _native_ascii_lower,
 )
 
 from .media_convert import write_placeholder_video_slot  # noqa: F401
@@ -224,8 +225,13 @@ def write_placeholder_image_slot(dest: Path) -> None:
     dest.write_bytes(template.read_bytes())
 
 
+def _lower_text(value: str) -> str:
+    native = _native_ascii_lower(value)
+    return native if native is not None else value.lower()
+
+
 def media_slot_filename(slot: str, kind: str) -> str:
-    ext = MEDIA_SLOT_EXTENSIONS.get(str(kind or "").lower(), ".bin")
+    ext = MEDIA_SLOT_EXTENSIONS.get(_lower_text(str(kind or "")), ".bin")
     return f"{slot}{ext}"
 
 
