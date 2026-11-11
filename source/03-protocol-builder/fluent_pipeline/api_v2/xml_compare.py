@@ -8,6 +8,7 @@ import re
 from .. import xml_compat as ET
 from tecan_common.native_acceleration import (
     xml_elements_by_name as _native_xml_elements_by_name,
+    xml_local_name as _native_xml_local_name,
 )
 
 
@@ -70,6 +71,9 @@ def compare_command_xml(expected: str, actual: str) -> CommandXmlCompareResult:
 
 
 def _local_name(tag: str) -> str:
+    native = _native_xml_local_name(tag)
+    if native is not None:
+        return native
     if "}" in tag:
         return tag.rsplit("}", 1)[-1]
     return tag
