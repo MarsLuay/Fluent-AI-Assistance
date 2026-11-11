@@ -2422,6 +2422,17 @@ def diagnostic_message(message: Any, code: Any) -> str | None:
         return None
 
 
+def diagnostic_redact_text(value: Any) -> str | None:
+    """Redact supported ASCII diagnostic text, or request Python regex fallback."""
+    if not enabled() or type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.diagnostic_redact_text(value)
+        return result if type(result) is str and result.isascii() else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def xml_kind_from_suffix(suffix: Any) -> str | None:
     """Classify supported ASCII XML suffixes natively, or request Python fallback."""
     if not enabled() or type(suffix) is not str or not suffix.isascii():

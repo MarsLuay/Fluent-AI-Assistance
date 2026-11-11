@@ -171,6 +171,65 @@ class IngestionDiagnosticTests(unittest.TestCase):
                 native_sort.assert_not_called()
         self.assertEqual(actual_fallback, expected_fallback)
 
+    def test_native_diagnostic_redaction_matches_python_for_ascii_text(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "diagnostic_redact_text"
+        ):
+            self.skipTest("optional Rust diagnostic redactor is not built")
+        keywords = (
+            "password", "passwd", "token", "secret", "apikey", "api_key", "api-key", "APIkey"
+        )
+        whitespace = (
+            "", " ", "\t", "\n", "\v", "\f", "\r", "\x1c", "\x1d", "\x1e", "\x1f"
+        )
+        samples = [
+            "provider token=top-secret",
+            "password: hunter2",
+            "PASSWD : value,token=another",
+            "api-key=secret;api_key:second",
+            "password=,token=abc",
+            "password=:token=consumed",
+            "xpassword=not-a-match",
+            "passwordX=not-a-match",
+            "password_=not-a-match",
+            "prefix/password=secret",
+            "no credentials in this text",
+            "password\x1c=\x1fsecret\x1d; tail",
+        ]
+        samples.extend(
+            f"left {keyword}{before}{separator}{after}secret-value, token=second right"
+            for keyword in keywords
+            for before in whitespace
+            for separator in (":", "=")
+            for after in whitespace
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [diagnostics_module._redact_text(value) for value in samples]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                diagnostics_module,
+                "_native_diagnostic_redact_text",
+                wraps=diagnostics_module._native_diagnostic_redact_text,
+            ) as native_redact:
+                actual = [diagnostics_module._redact_text(value) for value in samples]
+                self.assertEqual(native_redact.call_count, len(samples))
+        self.assertEqual(actual, expected)
+        self.assertNotIn("secret-value", "\n".join(actual))
+
+    def test_native_diagnostic_redaction_falls_back_for_unicode(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "diagnostic_redact_text"
+        ):
+            self.skipTest("optional Rust diagnostic redactor is not built")
+        samples = ("pássword=secret", "password\u00a0secret", "ſecret=unicode-secret")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            for value in samples:
+                self.assertIsNone(native_acceleration.diagnostic_redact_text(value))
+                self.assertEqual(
+                    diagnostics_module._redact_text(value),
+                    diagnostics_module._SENSITIVE_VALUE_RE.sub(r"\1=<redacted>", value),
+                )
+
     def test_sensitive_message_and_exception_details_are_redacted(self) -> None:
         diagnostic = make_diagnostic(
             DiagnosticCode.PARSER_FAILED,

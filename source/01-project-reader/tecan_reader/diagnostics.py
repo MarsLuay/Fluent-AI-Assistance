@@ -9,6 +9,7 @@ import zipfile
 
 from tecan_common.native_acceleration import (
     diagnostic_message as _native_diagnostic_message,
+    diagnostic_redact_text as _native_diagnostic_redact_text,
     diagnostic_sort_indices as _native_diagnostic_sort_indices,
 )
 
@@ -20,6 +21,9 @@ _SENSITIVE_VALUE_RE = re.compile(
 
 
 def _redact_text(value: str) -> str:
+    native = _native_diagnostic_redact_text(value)
+    if native is not None:
+        return native
     return _SENSITIVE_VALUE_RE.sub(r"\1=<redacted>", value)
 
 

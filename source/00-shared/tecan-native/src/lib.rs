@@ -5391,6 +5391,108 @@ fn diagnostic_message(message: Option<String>, code: Option<String>) -> String {
         .unwrap_or_else(|| "ingestion diagnostic".to_owned())
 }
 
+fn diagnostic_redaction_word(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || byte == b'_'
+}
+
+fn diagnostic_redaction_prefix_matches(bytes: &[u8], prefix: &[u8]) -> bool {
+    bytes
+        .get(..prefix.len())
+        .is_some_and(|candidate| candidate.eq_ignore_ascii_case(prefix))
+}
+
+fn diagnostic_redaction_keyword_end(bytes: &[u8], start: usize) -> Option<usize> {
+    if start > 0 && diagnostic_redaction_word(bytes[start - 1]) {
+        return None;
+    }
+    let tail = bytes.get(start..)?;
+    let keyword_len = if diagnostic_redaction_prefix_matches(tail, b"password") {
+        8
+    } else if diagnostic_redaction_prefix_matches(tail, b"passwd") {
+        6
+    } else if diagnostic_redaction_prefix_matches(tail, b"token") {
+        5
+    } else if diagnostic_redaction_prefix_matches(tail, b"secret") {
+        6
+    } else if diagnostic_redaction_prefix_matches(tail, b"api") {
+        let mut end = 3;
+        if tail
+            .get(end)
+            .is_some_and(|byte| matches!(*byte, b'_' | b'-'))
+        {
+            end += 1;
+        }
+        if !tail
+            .get(end..end + 3)
+            .is_some_and(|suffix| suffix.eq_ignore_ascii_case(b"key"))
+        {
+            return None;
+        }
+        end + 3
+    } else {
+        return None;
+    };
+    let end = start + keyword_len;
+    if end < bytes.len() && diagnostic_redaction_word(bytes[end]) {
+        return None;
+    }
+    Some(end)
+}
+
+fn diagnostic_redaction_whitespace(byte: u8) -> bool {
+    matches!(byte, b' ' | b'\t' | b'\n' | b'\r' | 0x0b..=0x0c | 0x1c..=0x1f)
+}
+
+#[pyfunction]
+fn diagnostic_redact_text(value: &str) -> Option<String> {
+    if !value.is_ascii() {
+        return None;
+    }
+    let bytes = value.as_bytes();
+    let mut output = String::with_capacity(value.len());
+    let mut cursor = 0;
+    let mut copied_through = 0;
+    while cursor < bytes.len() {
+        let Some(keyword_end) = diagnostic_redaction_keyword_end(bytes, cursor) else {
+            cursor += 1;
+            continue;
+        };
+        let mut value_start = keyword_end;
+        while value_start < bytes.len() && diagnostic_redaction_whitespace(bytes[value_start]) {
+            value_start += 1;
+        }
+        if value_start == bytes.len() || !matches!(bytes[value_start], b':' | b'=') {
+            cursor += 1;
+            continue;
+        }
+        value_start += 1;
+        while value_start < bytes.len() && diagnostic_redaction_whitespace(bytes[value_start]) {
+            value_start += 1;
+        }
+        let mut match_end = value_start;
+        while match_end < bytes.len()
+            && !diagnostic_redaction_whitespace(bytes[match_end])
+            && !matches!(bytes[match_end], b',' | b';')
+        {
+            match_end += 1;
+        }
+        if match_end == value_start {
+            cursor += 1;
+            continue;
+        }
+        output.push_str(&value[copied_through..cursor]);
+        output.push_str(&value[cursor..keyword_end]);
+        output.push_str("=<redacted>");
+        copied_through = match_end;
+        cursor = match_end;
+    }
+    if copied_through == 0 {
+        return Some(value.to_owned());
+    }
+    output.push_str(&value[copied_through..]);
+    Some(output)
+}
+
 #[pyfunction]
 fn xml_kind_from_suffix(suffix: &str) -> Option<String> {
     if !suffix.is_ascii() {
@@ -6792,6 +6894,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(canonical_json_compact, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_sort_indices, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_message, module)?)?;
+    module.add_function(wrap_pyfunction!(diagnostic_redact_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_kind_from_suffix, module)?)?;
     module.add_function(wrap_pyfunction!(command_short_name, module)?)?;
     module.add_function(wrap_pyfunction!(entry_object_guid, module)?)?;
