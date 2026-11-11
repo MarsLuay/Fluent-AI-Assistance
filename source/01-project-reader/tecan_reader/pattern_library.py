@@ -760,8 +760,8 @@ def _search_pattern_rows(
     source_script: str | None,
     limit: int,
 ) -> list[dict[str, Any]]:
-    pattern = f"%{query.lower()}%"
-    script_pattern = f"%{source_script.lower()}%" if source_script else None
+    pattern = f"%{_lower_text(query)}%"
+    script_pattern = f"%{_lower_text(source_script)}%" if source_script else None
     params: list[Any] = [
         pattern, pattern, pattern, pattern, pattern, pattern, pattern,
         pattern, pattern,

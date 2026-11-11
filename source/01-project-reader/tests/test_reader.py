@@ -26,6 +26,7 @@ from tecan_reader.common import (
 import tecan_reader.gwl as reader_gwl
 import tecan_reader.xmlobj as reader_xmlobj
 import tecan_reader.script as reader_script
+import tecan_reader.pattern_library as pattern_library
 from tecan_reader.gwl import inspect_gwl, inspect_gwl_lines
 from tecan_reader.pattern_library import mine_script_patterns, search_script_patterns, summarize_script_patterns
 import sqlite3
@@ -2552,6 +2553,28 @@ class ReaderTests(unittest.TestCase):
             )
             tip_hits = search_script_patterns(db_path, "MCA384TipBox", pattern_type="pick_up_tips")
             aspirate_hits = search_script_patterns(db_path, "Water Free Single", pattern_type="aspirate")
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                expected_filtered_hits = search_script_patterns(
+                    db_path,
+                    "MCA384TIPBOX",
+                    pattern_type="Pick-Up Tips",
+                    source_script="MCA384PATTERNSCRIPT",
+                )
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    pattern_library,
+                    "_native_ascii_casefold_trim",
+                    wraps=native_acceleration.ascii_casefold_trim,
+                ) as native_lower:
+                    actual_filtered_hits = search_script_patterns(
+                        db_path,
+                        "MCA384TIPBOX",
+                        pattern_type="Pick-Up Tips",
+                        source_script="MCA384PATTERNSCRIPT",
+                    )
+                    native_lower.assert_any_call("MCA384TIPBOX")
+                    native_lower.assert_any_call("MCA384PATTERNSCRIPT")
+                    native_lower.assert_any_call("Pick-Up Tips")
             drop_hits = search_script_patterns(db_path, "Waste", pattern_type="drop_tips")
             gripper_hits = search_script_patterns(db_path, "AdapterA200", pattern_type="gripper")
 
@@ -2565,6 +2588,11 @@ class ReaderTests(unittest.TestCase):
         self.assertGreaterEqual(summary["pattern_type_counts"]["dispense"], 1)
         self.assertTrue(tip_hits["results"])
         self.assertEqual(tip_hits["results"][0]["source_script"], "MCA384PatternScript")
+        self.assertEqual(actual_filtered_hits, expected_filtered_hits)
+        self.assertTrue(actual_filtered_hits["results"])
+        self.assertEqual(
+            actual_filtered_hits["pattern_type_filter"], "pick_up_tips"
+        )
         self.assertTrue(any(step["step_number"] == 1 for step in tip_hits["results"][0]["steps"]))
         self.assertTrue(any("Pick up tips" in step["summary"] for step in tip_hits["results"][0]["steps"]))
         self.assertTrue(aspirate_hits["results"])
