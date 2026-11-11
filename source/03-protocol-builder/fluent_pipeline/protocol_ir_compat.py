@@ -905,7 +905,7 @@ def _group_media_slot_specs_by_step(
 
 
 def _media_spec_rup_kind(spec: Mapping[str, Any]) -> str:
-    raw = str(spec.get("rup_kind") or "").strip().lower()
+    raw = _lower_text(str(spec.get("rup_kind") or "").strip())
     if raw in {"standard", "worktable"}:
         return raw
     command_id = str(spec.get("command_id") or "").strip()

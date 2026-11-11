@@ -264,6 +264,46 @@ class ProtocolIrNativeStringsTests(unittest.TestCase):
                 ]
         self.assertEqual(forced_fallback, expected)
 
+    def test_media_rup_kind_uses_native_ascii_lower_and_python_fallback(self):
+        specs = [
+            {"rup_kind": "  WORKTABLE "},
+            {"rup_kind": "Standard"},
+            {"rup_kind": "Wörktable", "command_id": "RUPStandardStatement"},
+            {"rup_kind": "NÖNE"},
+            {"rup_kind": None, "command_id": "RUPWorktableStatement"},
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                protocol_ir_compat_module._media_spec_rup_kind(spec)
+                for spec in specs
+            ]
+        self.assertEqual(expected, ["worktable", "standard", "standard", "", "worktable"])
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                protocol_ir_compat_module,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = [
+                    protocol_ir_compat_module._media_spec_rup_kind(spec)
+                    for spec in specs
+                ]
+                self.assertEqual(native_call.call_count, len(specs))
+            native_call.assert_any_call("Wörktable")
+            native_call.assert_any_call("NÖNE")
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                protocol_ir_compat_module, "_native_ascii_lower", return_value=None
+            ):
+                forced_fallback = [
+                    protocol_ir_compat_module._media_spec_rup_kind(spec)
+                    for spec in specs
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_rup_display_type_alias_normalization_uses_native_compaction(self):
         cases = [
             ("Combo Box", False),
