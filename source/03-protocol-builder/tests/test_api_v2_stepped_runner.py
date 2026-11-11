@@ -140,6 +140,33 @@ class ApiV2SteppedRunnerTests(unittest.TestCase):
         self.assertEqual(actual_direct_children, expected_direct_children)
         self.assertEqual(actual_direct_children, [custom_object])
 
+    def test_local_name_uses_native_helper_and_python_fallback(self):
+        tag = "{urn:example}Statement"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = stepped_inventory._local_name(tag)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                stepped_inventory,
+                "_native_xml_local_name",
+                wraps=native_acceleration.xml_local_name,
+            ) as native_call:
+                actual = stepped_inventory._local_name(tag)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "Statement")
+
+        class StringTag(str):
+            pass
+
+        custom_tag = StringTag("{urn:custom}Statement")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = stepped_inventory._local_name(custom_tag)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.xml_local_name(custom_tag))
+            fallback_actual = stepped_inventory._local_name(custom_tag)
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, "Statement")
+
     def test_extract_commands_from_xscr_maps_statement_objects(self):
         with tempfile.TemporaryDirectory() as tmp:
             xscr = Path(tmp) / "demo.xscr"
