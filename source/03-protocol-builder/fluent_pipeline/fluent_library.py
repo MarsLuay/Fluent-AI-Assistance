@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
     ascii_safe_filename as _native_ascii_safe_filename,
     collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
@@ -73,10 +74,10 @@ def list_local_fluent_scripts(database: str | Path | None = None) -> list[dict[s
     return sorted(
         records,
         key=lambda item: (
-            str(item.get("object_name") or "").casefold(),
-            str(item.get("object_path") or "").casefold(),
-            str(item.get("scope") or "").casefold(),
-            str(item.get("path") or "").casefold(),
+            _casefold_key(item.get("object_name")),
+            _casefold_key(item.get("object_path")),
+            _casefold_key(item.get("scope")),
+            _casefold_key(item.get("path")),
         ),
     )
 
@@ -172,6 +173,15 @@ def _first_xml_text(text: str, tag: str) -> str:
     raw_text = match.group(1)
     native = _native_collapse_ascii_whitespace(raw_text)
     return native if native is not None else re.sub(r"\s+", " ", raw_text).strip()
+
+
+def _casefold_key(value: Any) -> str:
+    text = str(value or "")
+    if text.strip() == text:
+        native = _native_ascii_casefold_trim(text)
+        if native is not None:
+            return native
+    return text.casefold()
 
 
 def _name_key(value: Any) -> str:
