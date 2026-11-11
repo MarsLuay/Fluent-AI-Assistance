@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Protocol
 
 from tecan_common.native_acceleration import (
+    parse_ascii_bool_text as _native_parse_ascii_bool_text,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
     xml_local_name as _native_xml_local_name,
@@ -125,12 +126,14 @@ def extract_transfer_labware_fields(command: TransferLabwareCommandLike) -> Tran
         return None
     macro_name = _child_text(macro, "Name") or RGA_TRANSFER_MACRO
     settings = _child_text(macro, "ExecutionSettings")
+    move_to_base_text = _parse_transfer_setting(settings, "MoveToBase", "false")
+    fixed_site_text = _parse_transfer_setting(settings, "FixedSite", "true")
     return TransferLabwareFields(
         labware=_parse_transfer_setting(settings, "Labware"),
         location=_parse_transfer_setting(settings, "Location"),
         site=_parse_transfer_setting(settings, "Site", "1") or "1",
-        move_to_base=_parse_transfer_setting(settings, "MoveToBase", "false").lower() == "true",
-        fixed_site=_parse_transfer_setting(settings, "FixedSite", "true").lower() == "true",
+        move_to_base=_text_is_true(move_to_base_text),
+        fixed_site=_text_is_true(fixed_site_text),
         macro_name=macro_name,
     )
 
@@ -468,6 +471,11 @@ def _validate_fields_core(fields: TransferLabwareFields) -> None:
         raise ApiV2ValidationError("location is required.", field="location", command="TransferLabware")
     if not str(fields.site or "").strip() and not _is_dynamic_expression(fields.location):
         raise ApiV2ValidationError("site is required.", field="site", command="TransferLabware")
+
+
+def _text_is_true(value: str) -> bool:
+    native = _native_parse_ascii_bool_text(value)
+    return native if native is not None else value.lower() == "true"
 
 
 def _parse_transfer_setting(settings: str, tag: str, default: str = "") -> str:

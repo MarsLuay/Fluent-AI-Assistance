@@ -32,6 +32,50 @@ class _CommandStub:
 
 
 class TransferLabwareValidateTests(unittest.TestCase):
+    def test_transfer_boolean_flags_use_native_ascii_and_python_lower_fallback(self):
+        cases = [
+            ("true", "FALSE", True, False),
+            ("TRUE", "true", True, True),
+            ("truſe", "false", False, False),
+        ]
+        for move_text, fixed_text, expected_move, expected_fixed in cases:
+            with self.subTest(move_text=move_text, fixed_text=fixed_text):
+                payload = _TRANSFER_XSCR.replace(
+                    "false&amp;lt;/MoveToBase&amp;gt;",
+                    f"{move_text}&amp;lt;/MoveToBase&amp;gt;",
+                ).replace(
+                    "true&amp;lt;/FixedSite&amp;gt;",
+                    f"{fixed_text}&amp;lt;/FixedSite&amp;gt;",
+                )
+                command = _CommandStub(
+                    type_name="ApplicationDriverMacro", payload_xml=payload
+                )
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                    fallback = extract_transfer_labware_fields(command)
+                self.assertIsNotNone(fallback)
+                assert fallback is not None
+                self.assertEqual(fallback.move_to_base, expected_move)
+                self.assertEqual(fallback.fixed_site, expected_fixed)
+
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                    with patch.object(
+                        transfer_validate,
+                        "_native_parse_ascii_bool_text",
+                        wraps=native_acceleration.parse_ascii_bool_text,
+                    ) as native_call:
+                        actual = extract_transfer_labware_fields(command)
+                        self.assertEqual(native_call.call_count, 2)
+                self.assertEqual(actual, fallback)
+
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                    with patch.object(
+                        transfer_validate,
+                        "_native_parse_ascii_bool_text",
+                        return_value=None,
+                    ):
+                        forced_fallback = extract_transfer_labware_fields(command)
+                self.assertEqual(forced_fallback, fallback)
+
     def test_local_name_uses_native_helper_and_preserves_custom_fallback(self):
         tag = "{urn:example}Labware"
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
