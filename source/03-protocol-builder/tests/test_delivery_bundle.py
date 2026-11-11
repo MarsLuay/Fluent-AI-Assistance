@@ -131,6 +131,49 @@ class DeliveryBundleValidationTests(unittest.TestCase):
         self.assertIn("xscr_published", codes)
         self.assertIn("unexpected_bat", codes)
 
+    def test_manifest_xscr_suffix_uses_native_lower_with_unicode_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = _write_valid_bundle(Path(tmp))
+            manifest_path = bundle / "source" / "delivery_manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            paths = ["debug.XSCR", "Dëbug.XSCR"]
+            for path in paths:
+                (bundle / path).write_text("<Root />\\n", encoding="utf-8")
+            manifest["deliverables"].extend(
+                {"kind": "script", "path": path} for path in paths
+            )
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            with patch.dict(
+                "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+            ):
+                fallback_result = validate_v2_delivery_bundle(bundle)
+            with patch.dict(
+                "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+            ):
+                with patch.object(
+                    delivery_bundle_module,
+                    "_native_ascii_lower",
+                    wraps=native_acceleration.ascii_lower,
+                ) as native_call:
+                    accelerated_result = validate_v2_delivery_bundle(bundle)
+                    native_call.assert_any_call("debug.XSCR")
+                    native_call.assert_any_call("Dëbug.XSCR")
+            with patch.dict(
+                "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+            ):
+                with patch.object(
+                    delivery_bundle_module,
+                    "_native_ascii_lower",
+                    return_value=None,
+                ):
+                    forced_fallback_result = validate_v2_delivery_bundle(bundle)
+
+        for result in (fallback_result, accelerated_result, forced_fallback_result):
+            self.assertIn(
+                "xscr_manifest_deliverable", {issue.code for issue in result.issues}
+            )
+
     def test_external_deployment_requires_exact_path_and_hash(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             bundle = _write_valid_bundle(Path(tmp))

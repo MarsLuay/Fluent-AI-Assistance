@@ -268,7 +268,9 @@ def _validate_manifest_artifacts(
             add_issue("invalid_manifest_deliverable", "delivery manifest deliverables must be objects", manifest_path)
             continue
         path = str(item.get("path") or "")
-        if path.lower().endswith(".xscr"):
+        native_path = _native_ascii_lower(path)
+        lowered_path = native_path if native_path is not None else path.lower()
+        if lowered_path.endswith(".xscr"):
             add_issue("xscr_manifest_deliverable", "standalone XSCR files may not be manifest deliverables", path)
         if path and not (bundle_dir / path).exists():
             add_issue("manifest_deliverable_missing", "manifest deliverable path is missing from the bundle", bundle_dir / path)
