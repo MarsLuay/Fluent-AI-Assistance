@@ -17,6 +17,7 @@ from typing import Any, Mapping, Protocol
 
 from tecan_common.native_acceleration import (
     collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
+    parse_ascii_bool_text as _native_parse_ascii_bool_text,
     ascii_casefold_equals as _native_ascii_casefold_equals,
     bracket_variable_names as _native_bracket_variable_names,
     clean_subroutine_name_ascii as _native_clean_subroutine_name_ascii,
@@ -548,7 +549,7 @@ def _validate_add_labware_cross_command(
             location=_first_text(add_labware, "Location"),
             site=_first_text(add_labware, "Position", "1") or 1,
             rotation=_first_text(add_labware, "Rotation", "0") or 0,
-            has_lid=_first_text(add_labware, "HasLid", "False").lower() == "true",
+            has_lid=_text_is_true(_first_text(add_labware, "HasLid", "False")),
         )
         label_key = fields.label_key()
         slot = fields.slot_key()
@@ -838,6 +839,11 @@ def _first_text(root: ET.Element, name: str, default: str = "") -> str:
             text = _clean_text(element.text)
             return text if text else default
     return default
+
+
+def _text_is_true(value: str) -> bool:
+    native = _native_parse_ascii_bool_text(value)
+    return native if native is not None else value.lower() == "true"
 
 
 def _compiled_element_disabled(element: ET.Element) -> bool:

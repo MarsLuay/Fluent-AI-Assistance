@@ -79,6 +79,34 @@ GOOD_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ApiV2CommandValidateTests(unittest.TestCase):
+    def test_text_true_uses_native_ascii_parser_and_python_lower_fallback(self):
+        values = ["true", "TRUE", "False", "truſe", " true\u2003", ""]
+        expected = [value.lower() == "true" for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [command_validate._text_is_true(value) for value in values]
+        self.assertEqual(disabled, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_parse_ascii_bool_text",
+                wraps=native_acceleration.parse_ascii_bool_text,
+            ) as native_call:
+                actual = [command_validate._text_is_true(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_parse_ascii_bool_text",
+                return_value=None,
+            ):
+                forced_fallback = [
+                    command_validate._text_is_true(value) for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_variable_labware_index_whitespace_uses_rust_with_python_fallback(self):
         text = (
             "<ConfigureDataLabwareDataModel><LabwareName>"
