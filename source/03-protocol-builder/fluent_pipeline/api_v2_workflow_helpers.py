@@ -6,6 +6,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
+)
+
 
 EXECUTION_STEPS_KEY = "execution_steps"
 EXECUTION_SUMMARY_KEY = "execution_summary"
@@ -33,6 +37,13 @@ class FluentContextCheckConfig:
     variable_seeds: tuple[tuple[str, str], ...] = field(default_factory=tuple)
 
 
+def _normalize_initialize_selection(value: Any) -> str:
+    raw = value or "workspace"
+    native = _native_ascii_casefold_trim(raw)
+    selection = native if native is not None else raw.strip().casefold()
+    return selection if selection in {"workspace", "method"} else "workspace"
+
+
 def build_initialize_steps(
     config: FluentContextCheckConfig,
     *,
@@ -46,9 +57,7 @@ def build_initialize_steps(
         fallback_names_for_initialize_step,
     )
 
-    selection = (config.initialize_selection or "workspace").strip().casefold()
-    if selection not in {"workspace", "method"}:
-        selection = "workspace"
+    selection = _normalize_initialize_selection(config.initialize_selection)
     script = str(config.script_workspace or "").strip()
     init_only = str(config.initialize_workspace or "").strip()
     plan = build_initialization_worktable_plan(manifest, ir=ir, spec=spec)

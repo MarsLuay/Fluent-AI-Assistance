@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import unittest
+from unittest.mock import patch
 
+import fluent_pipeline.api_v2_workflow_helpers as workflow_helpers
+from tecan_common import native_acceleration
 from fluent_pipeline.initialization_worktables import (
     INITIALIZATION_COMMENT_REASON,
     MAX_OPERATOR_FALLBACK_WORKTABLES,
@@ -54,6 +58,55 @@ def _sample_manifest() -> dict:
 
 
 class InitializationWorktableTests(unittest.TestCase):
+    def test_selection_normalization_uses_native_ascii_with_unicode_fallback(self):
+        values = [
+            " METHOD ",
+            "\tWorkspace\n",
+            "unknown",
+            "workſpace",
+            None,
+            "",
+            0,
+        ]
+        expected = []
+        for value in values:
+            normalized = (value or "workspace").strip().casefold()
+            expected.append(
+                normalized if normalized in {"workspace", "method"} else "workspace"
+            )
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback = [
+                workflow_helpers._normalize_initialize_selection(value)
+                for value in values
+            ]
+        self.assertEqual(fallback, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                workflow_helpers,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = [
+                    workflow_helpers._normalize_initialize_selection(value)
+                    for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                workflow_helpers,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                unsupported_fallback = [
+                    workflow_helpers._normalize_initialize_selection(value)
+                    for value in values
+                ]
+        self.assertEqual(unsupported_fallback, expected)
+
     def test_detect_candidates_prefers_spec_init_worktable(self):
         manifest = _sample_manifest()
         ir = {
