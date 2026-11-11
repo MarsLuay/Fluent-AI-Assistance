@@ -39,6 +39,34 @@ _GOOD_PAYLOAD = """<Object Type="Tecan.Core.Scripting.Worktable.Data.AddLabwareD
 
 
 class AddLabwareValidateTests(unittest.TestCase):
+    def test_local_name_uses_native_helper_and_preserves_custom_fallback(self):
+        tag = "{urn:example}Labware"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = add_labware_validate._local_name(tag)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                add_labware_validate,
+                "_native_xml_local_name",
+                wraps=native_acceleration.xml_local_name,
+            ) as native_call:
+                actual = add_labware_validate._local_name(tag)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "Labware")
+
+        class CustomTag(str):
+            def rsplit(self, sep=None, maxsplit=-1):
+                return ["", "PythonFallback"]
+
+        custom_tag = CustomTag("{urn:example}ignored")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = add_labware_validate._local_name(custom_tag)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.xml_local_name(custom_tag))
+            fallback_actual = add_labware_validate._local_name(custom_tag)
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, "PythonFallback")
+
     def test_add_labware_descendant_lookup_uses_native_selector_and_fallback(self):
         command = _CommandStub(
             payload_xml=(

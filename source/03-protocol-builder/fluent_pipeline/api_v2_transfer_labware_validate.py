@@ -17,6 +17,7 @@ from typing import Any, Callable, Mapping, Protocol
 from tecan_common.native_acceleration import (
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
+    xml_local_name as _native_xml_local_name,
 )
 
 from .api_v2.types import ApiV2ValidationError
@@ -521,6 +522,9 @@ def _child_text(element: ET.Element | None, name: str, default: str = "") -> str
 
 
 def _local_name(tag: str) -> str:
+    native = _native_xml_local_name(tag)
+    if native is not None:
+        return native
     return tag.rsplit("}", 1)[-1]
 
 
