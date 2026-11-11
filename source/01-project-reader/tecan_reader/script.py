@@ -371,6 +371,14 @@ def _all_text_values(root: ET.Element) -> list[str]:
     return all_text_values(root)
 
 
+def _lower_text(value: str) -> str:
+    if type(value) is str and value.strip() == value:
+        native = native_acceleration.ascii_casefold_trim(value)
+        if native is not None:
+            return native
+    return value.lower()
+
+
 def _casefold_equals(value: str, expected: str) -> bool:
     native = native_acceleration.ascii_casefold_equals(value, expected)
     if native is not None:
@@ -543,7 +551,7 @@ def _warnings(commands: list[dict[str, Any]]) -> list[str]:
         raw_types, search_groups
     )
     if matches is None:
-        lowered_types = [raw_type.lower() for raw_type in raw_types]
+        lowered_types = [_lower_text(raw_type) for raw_type in raw_types]
         matches = [
             any(needle in value for value in lowered_types for needle in group)
             for group in search_groups
@@ -572,7 +580,7 @@ def _warnings(commands: list[dict[str, Any]]) -> list[str]:
         pin_match[0]
         if pin_match is not None
         else any(
-            "pin" in str(value).lower()
+            "pin" in _lower_text(str(value))
             for command in commands
             for value in command.get("fields", {}).values()
         )
