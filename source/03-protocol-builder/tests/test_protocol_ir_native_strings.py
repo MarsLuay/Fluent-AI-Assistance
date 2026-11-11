@@ -391,6 +391,70 @@ class ProtocolIrNativeStringsTests(unittest.TestCase):
                 ]
         self.assertEqual(forced_fallback, expected)
 
+    def test_media_selection_normalizes_kind_aliases_with_native_fallback(self):
+        specs = [
+            {
+                "step_id": "worktable",
+                "slot": "wt-image",
+                "kind": "IMAGE",
+                "rup_kind": "WORKTABLE",
+            },
+            {
+                "step_id": "worktable",
+                "slot": "wt-video",
+                "kind": "VIDEO",
+                "rup_kind": "WORKTABLE",
+            },
+            {
+                "step_id": "standard",
+                "slot": "std-image",
+                "kind": "IMAGE",
+                "rup_kind": "STANDARD",
+            },
+            {
+                "step_id": "standard",
+                "slot": "std-video",
+                "kind": "VIDEO",
+                "rup_kind": "STANDARD",
+            },
+            {
+                "step_id": "unicode",
+                "slot": "unicode-video",
+                "kind": "VÍDEO",
+                "rup_kind": "STANDARD",
+            },
+        ]
+
+        def select_slots():
+            grouped = protocol_ir_compat_module._group_media_slot_specs_by_step(
+                specs
+            )
+            return protocol_ir_compat_module._prompt_display_media_slots(grouped)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = select_slots()
+        self.assertEqual(expected, ({"std-video"}, {"wt-image"}))
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                protocol_ir_compat_module,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = select_slots()
+                self.assertGreaterEqual(native_call.call_count, len(specs))
+            native_call.assert_any_call("IMAGE")
+            native_call.assert_any_call("VIDEO")
+            native_call.assert_any_call("VÍDEO")
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                protocol_ir_compat_module, "_native_ascii_lower", return_value=None
+            ):
+                forced_fallback = select_slots()
+        self.assertEqual(forced_fallback, expected)
+
     def test_rup_display_type_alias_normalization_uses_native_compaction(self):
         cases = [
             ("Combo Box", False),

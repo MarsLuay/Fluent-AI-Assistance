@@ -230,6 +230,10 @@ def _lower_text(value: str) -> str:
     return native if native is not None else value.lower()
 
 
+def _media_kind(media: Mapping[str, Any], default: str = "") -> str:
+    return _lower_text(str(media.get("kind") or default))
+
+
 def media_slot_filename(slot: str, kind: str) -> str:
     ext = MEDIA_SLOT_EXTENSIONS.get(_lower_text(str(kind or "")), ".bin")
     return f"{slot}{ext}"
@@ -497,7 +501,7 @@ def force_worktable_prompt_images(ir: dict[str, Any]) -> dict[str, Any]:
                 if not isinstance(media, dict):
                     continue
                 media["rup_kind"] = "worktable"
-                if str(media.get("kind") or "").lower() == "image":
+                if _media_kind(media) == "image":
                     media["worktable_display"] = True
         step["command_id"] = "RUPWorktableStatement"
         step["name"] = step.get("name") or "RUP Worktable"
@@ -691,7 +695,7 @@ def prompt_image_media_slots(ir: dict[str, Any]) -> list[dict[str, Any]]:
                 media
                 for media in (params.get("media_placeholders") or [])
                 if isinstance(media, dict)
-                and str(media.get("kind") or "").lower() == "image"
+                and _media_kind(media) == "image"
             ),
             None,
         )
@@ -731,7 +735,7 @@ def prompt_step_worktable_media_path(params: dict[str, Any]) -> str | None:
                 None,
             )
             if selected:
-                kind = str(selected.get("kind") or "media").lower()
+                kind = _media_kind(selected, "media")
                 slot = str(selected.get("slot") or "").strip()
                 return str(selected.get("path") or media_slot_relative_path(slot, kind))
     return _prompt_step_media_path_by_preference(params, ("image", "video"))
@@ -752,7 +756,7 @@ def _prompt_step_media_path_by_preference(
                 item
                 for item in placeholders
                 if isinstance(item, dict)
-                and _lower_text(str(item.get("kind") or "")) == wanted_kind
+                and _media_kind(item) == wanted_kind
             ),
             None,
         )
@@ -811,7 +815,7 @@ def _media_slot_specs_from_rows(rows: list[dict[str, Any]]) -> list[dict[str, An
             slot = str(media.get("slot") or "").strip()
             if not slot:
                 continue
-            kind = _lower_text(str(media.get("kind") or "media"))
+            kind = _media_kind(media, "media")
             specs.append(
                 {
                     "filename": media_slot_filename(slot, kind),
@@ -933,7 +937,7 @@ def _prompt_display_media_slots(
                     (
                         item
                         for item in grouped
-                        if str(item.get("kind") or "").lower() == "image"
+                        if _media_kind(item) == "image"
                     ),
                     None,
                 )
@@ -942,7 +946,7 @@ def _prompt_display_media_slots(
                     (
                         item
                         for item in grouped
-                        if str(item.get("kind") or "").lower() == "video"
+                        if _media_kind(item) == "video"
                     ),
                     None,
                 )
@@ -954,7 +958,7 @@ def _prompt_display_media_slots(
                 (
                     item
                     for item in grouped
-                    if str(item.get("kind") or "").lower() == "video"
+                    if _media_kind(item) == "video"
                 ),
                 None,
             )
@@ -963,7 +967,7 @@ def _prompt_display_media_slots(
                     (
                         item
                         for item in grouped
-                        if str(item.get("kind") or "").lower() == "image"
+                        if _media_kind(item) == "image"
                     ),
                     None,
                 )
@@ -975,7 +979,7 @@ def _prompt_display_media_slots(
             (
                 item
                 for item in grouped
-                if str(item.get("kind") or "").lower() == "video"
+                if _media_kind(item) == "video"
             ),
             None,
         )
@@ -984,7 +988,7 @@ def _prompt_display_media_slots(
                 (
                     item
                     for item in grouped
-                    if str(item.get("kind") or "").lower() == "image"
+                    if _media_kind(item) == "image"
                 ),
                 None,
             )
@@ -994,7 +998,7 @@ def _prompt_display_media_slots(
             (
                 item
                 for item in grouped
-                if str(item.get("kind") or "").lower() == "image"
+                if _media_kind(item) == "image"
             ),
             None,
         )
@@ -1003,7 +1007,7 @@ def _prompt_display_media_slots(
                 (
                     item
                     for item in grouped
-                    if str(item.get("kind") or "").lower() == "video"
+                    if _media_kind(item) == "video"
                 ),
                 None,
             )
@@ -1022,7 +1026,7 @@ def worktable_pipeline_video_slots(specs: list[dict[str, Any]]) -> set[str]:
     return {
         str(spec.get("slot") or "").strip()
         for spec in filtered
-        if str(spec.get("kind") or "").lower() == "video"
+        if _media_kind(spec) == "video"
         and str(spec.get("slot") or "").strip() in worktable_detail_slots
     }
 
@@ -1056,7 +1060,7 @@ def build_media_path_map_from_specs(
     )
     entries: list[dict[str, Any]] = []
     for spec in specs:
-        kind = str(spec.get("kind") or "media").lower()
+        kind = _media_kind(spec, "media")
         slot = str(spec.get("slot") or "").strip()
         filename = spec.get("filename") or media_slot_filename(slot, kind)
         bundle_relative = spec.get("path") or media_slot_relative_path(slot, kind)
