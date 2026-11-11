@@ -155,6 +155,34 @@ class DatastorePrefixNativeTests(unittest.TestCase):
         self.assertEqual(fallback, expected)
 
 
+class CasefoldDedupNativeTests(unittest.TestCase):
+    def test_unique_preserving_order_uses_ascii_native_and_unicode_fallback(self):
+        values = [" Alpha ", "alpha", "Straße", "STRASSE", "", "\u2003", "東京", "東京"]
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = exports._unique_preserving_order(values)
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = exports._unique_preserving_order(values)
+                self.assertEqual(native_call.call_count, 6)
+            self.assertIsNone(native_acceleration.ascii_casefold_trim("Straße"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["Alpha", "Straße", "東京"])
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = exports._unique_preserving_order(values)
+        self.assertEqual(fallback, expected)
+
+
 class ConnectorPinNormalizationTests(unittest.TestCase):
     def test_pin_normalization_uses_rust_for_ascii_and_python_for_unicode(self):
         values = ["WorktablePin_A-12", "Straße", "ſcript", "東京"]

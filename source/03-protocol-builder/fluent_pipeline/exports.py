@@ -4666,9 +4666,13 @@ def _unique_preserving_order(values: list[str]) -> list[str]:
     out: list[str] = []
     for value in values:
         clean = value.strip()
-        if not clean or clean.casefold() in seen:
+        if not clean:
             continue
-        seen.add(clean.casefold())
+        folded = _native_ascii_casefold_trim(clean)
+        key = folded if folded is not None else clean.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
         out.append(clean)
     return out
 
