@@ -24,6 +24,38 @@ class FluentLibraryNativeTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, ["helperscriptv2", "strasse", "script", "", "", ""])
 
+    def test_xml_text_whitespace_uses_native_collapse_with_python_fallback(self):
+        text = "<ObjectName> \tAlpha\nBeta\u2003 </ObjectName>"
+        expected = "Alpha Beta"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback = fluent_library._first_xml_text(text, "ObjectName")
+        self.assertEqual(fallback, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                fluent_library,
+                "_native_collapse_ascii_whitespace",
+                wraps=native_acceleration.collapse_ascii_whitespace,
+            ) as native_call:
+                actual = fluent_library._first_xml_text(text, "ObjectName")
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                fluent_library,
+                "_native_collapse_ascii_whitespace",
+                return_value=None,
+            ):
+                unsupported_fallback = fluent_library._first_xml_text(
+                    text, "ObjectName"
+                )
+        self.assertEqual(unsupported_fallback, expected)
+        self.assertEqual(
+            fluent_library._first_xml_text("<Other>ignored</Other>", "ObjectName"),
+            "",
+        )
+
     def test_safe_filename_matches_ascii_replacement_trimming_and_truncation(self):
         values = [
             "Simple-name.xscr",

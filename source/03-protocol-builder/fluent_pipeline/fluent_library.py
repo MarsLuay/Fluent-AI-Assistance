@@ -11,6 +11,7 @@ from typing import Any
 from tecan_common.native_acceleration import (
     ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
     ascii_safe_filename as _native_ascii_safe_filename,
+    collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
 )
 
 from .runner import PipelineError, ensure_parent
@@ -168,7 +169,9 @@ def _first_xml_text(text: str, tag: str) -> str:
     )
     if not match:
         return ""
-    return re.sub(r"\s+", " ", match.group(1)).strip()
+    raw_text = match.group(1)
+    native = _native_collapse_ascii_whitespace(raw_text)
+    return native if native is not None else re.sub(r"\s+", " ", raw_text).strip()
 
 
 def _name_key(value: Any) -> str:
