@@ -131,6 +131,42 @@ class FriendlyDeviceNameNativeTests(unittest.TestCase):
         self.assertEqual(forced_fallback, expected)
 
 
+class DraftManualDeviceAttributeNativeTests(unittest.TestCase):
+    def test_device_attribute_matching_uses_rust_with_fallback(self):
+        source = """def build_worktable():
+    head = worktable.MCA96
+    arm = worktable.LiHa
+    fca = worktable.FCA
+    other = worktable.Mca384
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            draft_path = Path(tmp) / "draft.py"
+            draft_path.write_text(source, encoding="utf-8")
+            with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                expected = exports._extract_draft_manual_details(draft_path)
+            expected_names = [item["name"] for item in expected["selected_items"]]
+            self.assertEqual(expected_names, ["MCA96 head", "LiHa arm", "FCA arm"])
+
+            with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with mock.patch.object(
+                    exports,
+                    "_native_ascii_casefold_trim",
+                    wraps=native_acceleration.ascii_casefold_trim,
+                ) as native_call:
+                    enabled = exports._extract_draft_manual_details(draft_path)
+                    self.assertGreaterEqual(native_call.call_count, 4)
+                    native_call.assert_any_call("MCA96")
+                    native_call.assert_any_call("Mca384")
+            self.assertEqual(enabled, expected)
+
+            with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with mock.patch.object(
+                    exports, "_native_ascii_casefold_trim", return_value=None
+                ):
+                    forced_fallback = exports._extract_draft_manual_details(draft_path)
+            self.assertEqual(forced_fallback, expected)
+
+
 class SourceTreeCopyNormalizationNativeTests(unittest.TestCase):
     def test_excluded_paths_use_native_casefold_with_unicode_fallback(self):
         with tempfile.TemporaryDirectory() as tmp:

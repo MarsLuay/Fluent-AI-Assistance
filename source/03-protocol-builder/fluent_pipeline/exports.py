@@ -7683,7 +7683,12 @@ def _extract_draft_manual_details(draft_path: Path | None) -> dict[str, object]:
         call = value if isinstance(value, ast.Call) else None
 
         if isinstance(statement, ast.Assign) and isinstance(statement.value, ast.Attribute):
-            if statement.value.attr.lower() in {"mca96", "liha", "fca"} and target_name:
+            attribute = statement.value.attr
+            native_attribute = _native_ascii_casefold_trim(attribute)
+            attribute_key = (
+                native_attribute if native_attribute is not None else attribute.lower()
+            )
+            if attribute_key in {"mca96", "liha", "fca"} and target_name:
                 selected_items.append(
                     {
                         "kind": "device",
