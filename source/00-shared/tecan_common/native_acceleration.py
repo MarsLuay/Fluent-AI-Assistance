@@ -806,6 +806,32 @@ def xml_elements_by_name(
         return None
 
 
+def xml_elements_ending_with(
+    root: Any, suffix: Any, element_type: Any
+) -> list[Any] | None:
+    """Select XML elements whose exact string tag ends with a suffix."""
+    if (
+        not enabled()
+        or type(root) is not element_type
+        or type(suffix) is not str
+    ):
+        return None
+    try:
+        result = _native.xml_elements_ending_with(root, suffix, element_type)
+        if type(result) is list and all(type(element) is element_type for element in result):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_has_unmodeled_local_name(
     root: Any, known_names: Any, allowed_prefixes: Any, element_type: Any
 ) -> bool | None:

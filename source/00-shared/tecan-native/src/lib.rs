@@ -2697,6 +2697,35 @@ fn xml_elements_by_name<'py>(
 }
 
 #[pyfunction]
+fn xml_elements_ending_with<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    suffix: String,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let output = PyList::empty(py);
+    let iterator = root.call_method0("iter")?;
+    for element in iterator.try_iter()? {
+        let element = element?;
+        if !element.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = element.getattr("tag")?;
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        if tag.ends_with(&suffix) {
+            output.append(element)?;
+        }
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn xml_has_unmodeled_local_name<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -5829,6 +5858,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_all_unique_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_grouped_texts_excluding, module)?)?;
     module.add_function(wrap_pyfunction!(xml_elements_by_name, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_elements_ending_with, module)?)?;
     module.add_function(wrap_pyfunction!(xml_has_unmodeled_local_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_first_element_by_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_first_direct_child_by_name, module)?)?;

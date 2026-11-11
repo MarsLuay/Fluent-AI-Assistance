@@ -6,6 +6,8 @@ import re
 from .. import xml_compat as ET
 from typing import Any, Mapping, MutableMapping, Protocol, Sequence
 
+from tecan_common import native_acceleration
+
 
 def format_remove_labware_trace(*, labware: str) -> str:
     """api-v2-079: readable RemoveLabware label for ExecuteCommand traces."""
@@ -213,8 +215,7 @@ def command_trace_for_stepped(command: Any) -> str:
         root = ET.fromstring(f"<Root>{payload}</Root>" if not payload.lstrip().startswith("<") else payload)
         from .commands import command_from_xscr_object
 
-        for element in root.iter():
-            if element.tag.endswith("Object") or element.tag == "Object":
+        for element in _xml_object_elements(root):
                 typed = command_from_xscr_object(element, command_id=getattr(command, "type_name", None))
                 to_string = getattr(typed, "to_string", None)
                 if callable(to_string):
@@ -245,6 +246,19 @@ def enrich_stepped_log_entry(log_entry: dict[str, Any], command: Any) -> None:
     trace, extra = stepped_command_trace(command)
     if extra.get("labware_name"):
         log_entry.setdefault("labware_name", extra["labware_name"])
+
+
+def _xml_object_elements(root: ET.Element):
+    elements = native_acceleration.xml_elements_ending_with(
+        root, "Object", ET.Element
+    )
+    if elements is None:
+        elements = root.iter()
+    return (
+        element
+        for element in elements
+        if element.tag.endswith("Object") or element.tag == "Object"
+    )
 
 
 def _xml_field(payload: str, *names: str, default: str = "?") -> str:

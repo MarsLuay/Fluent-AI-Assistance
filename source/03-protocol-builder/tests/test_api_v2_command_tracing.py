@@ -1,5 +1,7 @@
 import unittest
+from unittest.mock import patch
 
+import fluent_pipeline.api_v2.command_tracing as command_tracing
 from fluent_pipeline.api_v2.command_tracing import (
     format_set_location_trace,
     merge_set_location_traces_into_details,
@@ -7,6 +9,8 @@ from fluent_pipeline.api_v2.command_tracing import (
 )
 from fluent_pipeline.api_v2.commands import SetLocation
 from fluent_pipeline.api_v2_stepped_inventory import ICommand
+from tecan_common import native_acceleration
+from tecan_common import xml_compat as ET
 
 
 _SET_LOCATION_XSCR = """<?xml version="1.0" encoding="utf-8"?>
@@ -36,6 +40,48 @@ _ADD_LABWARE_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ApiV2CommandTracingTests(unittest.TestCase):
+    def test_object_suffix_scan_uses_native_selector_and_fallback(self):
+        root = ET.fromstring(
+            '<Root><Object /><PayloadObject /><Nested><OtherObject /></Nested></Root>'
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                element
+                for element in root.iter()
+                if element.tag.endswith("Object") or element.tag == "Object"
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_elements_ending_with",
+                wraps=native_acceleration.xml_elements_ending_with,
+            ) as native_call:
+                actual = list(command_tracing._xml_object_elements(root))
+                native_call.assert_called_once_with(root, "Object", ET.Element)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [root[0], root[1], root[2][0]])
+
+        class StringTag(str):
+            pass
+
+        custom_root = ET.Element("Root")
+        custom_object = ET.SubElement(custom_root, StringTag("CustomObject"))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = [
+                element
+                for element in custom_root.iter()
+                if element.tag.endswith("Object") or element.tag == "Object"
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_elements_ending_with(
+                    custom_root, "Object", ET.Element
+                )
+            )
+            fallback_actual = list(command_tracing._xml_object_elements(custom_root))
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, [custom_object])
+
     def test_format_set_location_trace_omits_zero_rotation(self):
         trace = format_set_location_trace(
             labware="Plate1",
