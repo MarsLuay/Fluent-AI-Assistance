@@ -396,7 +396,7 @@ def stage_generation_media_originals(
             )
 
     for spec in specs or []:
-        if str(spec.get("kind") or "").lower() != "video":
+        if _lower_text(str(spec.get("kind") or "")) != "video":
             continue
         filename = str(spec.get("filename") or "")
         if not filename:

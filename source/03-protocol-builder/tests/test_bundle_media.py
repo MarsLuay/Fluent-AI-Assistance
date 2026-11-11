@@ -141,8 +141,26 @@ def test_stage_generation_media_originals_copies_dropped_video(tmp_path: Path) -
             "destination": str(media_dir / "step_001_video.gif"),
         }
     ]
-    specs = [{"kind": "video", "filename": "step_001_video.gif", "slot": "step_001_video"}]
-    originals_dir = stage_generation_media_originals(build_dir, media_dir, ops, specs=specs)
+    specs = [{"kind": "VIDEO", "filename": "step_001_video.gif", "slot": "step_001_video"}]
+
+    def stage_originals() -> Path:
+        return stage_generation_media_originals(build_dir, media_dir, ops, specs=specs)
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected_dir = stage_originals()
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            bundle_media,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            originals_dir = stage_originals()
+            native_call.assert_any_call("VIDEO")
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(bundle_media, "_native_ascii_lower", return_value=None):
+            forced_fallback_dir = stage_originals()
+
+    assert originals_dir == expected_dir == forced_fallback_dir
     assert (originals_dir / "step_001_video.mp4").is_file()
     provenance = json.loads((build_dir / "source" / "reports" / "media_provenance.json").read_text())
     assert provenance["entries"][0]["operation"] == "video_to_gif"
