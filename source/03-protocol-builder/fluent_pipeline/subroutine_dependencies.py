@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
 )
@@ -271,7 +272,9 @@ def _dedupe_equivalent_script_records(
     unique: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     for script in scripts:
-        guid = str(script.get("guid") or script.get("script_guid") or "").strip().casefold()
+        raw_guid = str(script.get("guid") or script.get("script_guid") or "")
+        native_guid = _native_ascii_casefold_trim(raw_guid)
+        guid = native_guid if native_guid is not None else raw_guid.strip().casefold()
         if guid:
             identity = ("guid", guid)
         else:

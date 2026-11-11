@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest import mock
 
 import fluent_pipeline.exports as exports
+import fluent_pipeline.subroutine_dependencies as subroutine_dependencies_module
 from fluent_pipeline.compiled_xscr_finalizer import FinalizationReport
 from fluent_pipeline.checksum import stamp_checksum
 from fluent_pipeline.runner import PipelineError
@@ -407,6 +408,29 @@ class ProjectScriptPayloadTests(unittest.TestCase):
 
 
 class SubroutineResolutionTests(unittest.TestCase):
+    def test_script_record_deduplication_uses_native_ascii_guid_normalization(self):
+        scripts = [
+            {"guid": "  ABCD  ", "record": 1},
+            {"guid": "abcd", "record": 2},
+            {"guid": "ſcript", "record": 3},
+            {"guid": "SCRIPT", "record": 4},
+        ]
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = subroutine_dependencies_module._dedupe_equivalent_script_records(scripts)
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                subroutine_dependencies_module,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = subroutine_dependencies_module._dedupe_equivalent_script_records(scripts)
+                self.assertEqual(native_call.call_count, len(scripts))
+            self.assertIsNone(native_acceleration.ascii_casefold_trim("ſcript"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [scripts[0], scripts[2]])
+        self.assertIs(actual[0], scripts[0])
+        self.assertIs(actual[1], scripts[2])
+
     def _scripts(self):
         return [
             {
