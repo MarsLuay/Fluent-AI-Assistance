@@ -9,6 +9,7 @@ from typing import Any, Mapping, Protocol, Sequence
 
 from tecan_common.native_acceleration import (
     xml_elements_by_name as _native_xml_elements_by_name,
+    xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
 )
 
 from fluentcoder.expressions import (
@@ -992,6 +993,10 @@ def _child_text(element: Any, name: str, default: str = "") -> str:
         return default
     if not isinstance(element, ET.Element):
         return default
+    selection = _native_xml_first_direct_child_by_name(element, name, ET.Element)
+    if selection is not None:
+        _, child = selection
+        return (child.text or "").strip() if child is not None else default
     for child in element:
         if _local_name(child.tag) == name:
             return (child.text or "").strip()
