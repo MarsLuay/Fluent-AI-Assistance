@@ -19,6 +19,7 @@ from typing import Any, Mapping, Protocol
 from tecan_common.native_acceleration import (
     xml_direct_elements_by_name as _native_xml_direct_elements_by_name,
     xml_elements_by_name as _native_xml_elements_by_name,
+    xml_local_name as _native_xml_local_name,
 )
 
 from ..command_registry import registry_command_approved_passthrough, registry_command_support_status
@@ -382,6 +383,9 @@ def _elements_by_local_name(root: ET.Element, name: str) -> list[ET.Element]:
 
 
 def _local_name(tag: Any) -> str:
+    native = _native_xml_local_name(tag)
+    if native is not None:
+        return native
     text = str(tag)
     if "}" in text:
         return text.rsplit("}", 1)[-1]
