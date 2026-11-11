@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import re
 import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
+import tecan_reader.zeia_adapters as zeia_adapters_module
+from tecan_common import native_acceleration
 from tecan_reader.zeia_adapters import (
     ZeiaFormatError,
     ingest_zeia,
@@ -80,6 +84,65 @@ class ZeiaAdapterTests(unittest.TestCase):
         self.assertEqual(v2_detection.selected.adapter_id, "visionx-datastore-v2")
         self.assertEqual(v3_detection.status, "supported")
         self.assertEqual(v3_detection.selected.adapter_id, "visionx-datastore-v3")
+
+    def test_gwl_probe_uses_native_ascii_match_and_python_unicode_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ascii_archive = self._archive(
+                root,
+                "ascii-worklist.zeia",
+                {"Worklists/records.gwl": "  d1;destination\r\n"},
+            )
+            unicode_archive = self._archive(
+                root,
+                "unicode-worklist.zeia",
+                {"Worklists/records.gwl": "\u00a0A;source\n"},
+            )
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    zeia_adapters_module,
+                    "_native_has_gwl_record_prefix",
+                    wraps=native_acceleration.has_gwl_record_prefix,
+                ) as native_call:
+                    ascii_probe = probe_zeia(ascii_archive)
+                    unicode_probe = probe_zeia(unicode_archive)
+                    self.assertEqual(native_call.call_count, 2)
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                ascii_fallback_probe = probe_zeia(ascii_archive)
+                unicode_fallback_probe = probe_zeia(unicode_archive)
+
+        self.assertEqual(ascii_probe.status, ascii_fallback_probe.status)
+        self.assertEqual(unicode_probe.status, unicode_fallback_probe.status)
+        self.assertEqual(ascii_probe.status, "supported")
+        self.assertEqual(unicode_probe.status, "supported")
+        if native_acceleration.available():
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                pattern = r"^\s*[ADWB](?:[1-4])?;"
+                flags = re.IGNORECASE | re.MULTILINE
+                for codepoint in range(128):
+                    whitespace = chr(codepoint)
+                    if whitespace.isspace():
+                        candidate = f"{whitespace}A;"
+                        self.assertEqual(
+                            native_acceleration.has_gwl_record_prefix(candidate),
+                            re.search(pattern, candidate, flags) is not None,
+                            repr(candidate),
+                        )
+                for candidate in (
+                    "A;source",
+                    "d1;destination",
+                    "foo\n \tW4;wash",
+                    "foo\rD;not-a-line-start",
+                    "A5;wrong-digit",
+                    "A ;missing-semicolon-position",
+                    "B2x;extra-character",
+                ):
+                    self.assertEqual(
+                        native_acceleration.has_gwl_record_prefix(candidate),
+                        re.search(pattern, candidate, flags) is not None,
+                        repr(candidate),
+                    )
+                self.assertIsNone(native_acceleration.has_gwl_record_prefix("\u00a0A;source"))
 
     def test_worklists_are_canonical_entities(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

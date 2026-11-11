@@ -1004,6 +1004,42 @@ fn xml_tag_local_name(tag: &str) -> String {
     tag.rsplit('}').next().unwrap_or(tag).to_owned()
 }
 
+fn has_gwl_record_prefix_ascii(text: &str) -> Option<bool> {
+    if !text.is_ascii() {
+        return None;
+    }
+    let bytes = text.as_bytes();
+    let mut line_start = 0;
+    loop {
+        let mut index = line_start;
+        while index < bytes.len() && matches!(bytes[index], 0x09..=0x0d | 0x1c..=0x20) {
+            index += 1;
+        }
+        if index < bytes.len() {
+            let command = bytes[index].to_ascii_uppercase();
+            if matches!(command, b'A' | b'D' | b'W' | b'B') {
+                index += 1;
+                if index < bytes.len() && matches!(bytes[index], b'1'..=b'4') {
+                    index += 1;
+                }
+                if index < bytes.len() && bytes[index] == b';' {
+                    return Some(true);
+                }
+            }
+        }
+        let Some(next_line) = bytes[line_start..].iter().position(|byte| *byte == b'\n') else {
+            break;
+        };
+        line_start += next_line + 1;
+    }
+    Some(false)
+}
+
+#[pyfunction]
+fn has_gwl_record_prefix(text: &str) -> Option<bool> {
+    has_gwl_record_prefix_ascii(text)
+}
+
 #[pyfunction]
 fn xml_clean_text(text: &str) -> String {
     trim_python_whitespace(text).to_owned()
@@ -5920,6 +5956,7 @@ fn pattern_windows<'py>(
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(parse_xml, module)?)?;
     module.add_function(wrap_pyfunction!(xml_tag_local_name, module)?)?;
+    module.add_function(wrap_pyfunction!(has_gwl_record_prefix, module)?)?;
     module.add_function(wrap_pyfunction!(xml_clean_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_child_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_leaf_name_texts, module)?)?;
@@ -6728,5 +6765,22 @@ mod tests {
         assert_eq!(xml_clean_text(" \tvalue\r\n"), "value");
         assert_eq!(xml_kind_from_suffix(".XWSP"), Some("workspace".into()));
         assert_eq!(xml_kind_from_suffix("...Custom"), Some("custom".into()));
+    }
+
+    #[test]
+    fn gwl_prefix_probe_matches_ascii_python_regex_behavior() {
+        for text in [
+            "A;source",
+            "d1;destination",
+            "  W4;wash\r\n",
+            "\u{1c}B;blank",
+            "\n\tA;source",
+        ] {
+            assert_eq!(has_gwl_record_prefix_ascii(text), Some(true), "{text:?}");
+        }
+        for text in ["", "X;ignored", "A5;ignored", "A ;ignored", "A"] {
+            assert_eq!(has_gwl_record_prefix_ascii(text), Some(false), "{text:?}");
+        }
+        assert_eq!(has_gwl_record_prefix_ascii("\u{00a0}A;source"), None);
     }
 }

@@ -53,6 +53,17 @@ def xml_local_name(tag: Any) -> str | None:
         return None
 
 
+def has_gwl_record_prefix(text: Any) -> bool | None:
+    """Recognize ASCII GWL record prefixes, falling back for Unicode whitespace."""
+    if not enabled() or type(text) is not str:
+        return None
+    try:
+        result = _native.has_gwl_record_prefix(text)
+        return result if type(result) is bool else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def xml_clean_text(value: Any) -> str | None:
     """Trim exact Unicode XML text natively, preserving Python fallback cases."""
     if not enabled():

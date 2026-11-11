@@ -9,6 +9,9 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 import zipfile
 
+from tecan_common.native_acceleration import (
+    has_gwl_record_prefix as _native_has_gwl_record_prefix,
+)
 from tecan_common.performance import (
     finish_performance_marker,
     performance_marker,
@@ -763,7 +766,12 @@ def _build_probe(
             )
         except (OSError, RuntimeError, zipfile.BadZipFile):
             continue
-        if re.search(r"^\s*[ADWB](?:[1-4])?;", text, re.IGNORECASE | re.MULTILINE):
+        has_record_prefix = _native_has_gwl_record_prefix(text)
+        if has_record_prefix is None:
+            has_record_prefix = bool(
+                re.search(r"^\s*[ADWB](?:[1-4])?;", text, re.IGNORECASE | re.MULTILINE)
+            )
+        if has_record_prefix:
             has_worklist_structure = True
             break
     return ArchiveProbe(
