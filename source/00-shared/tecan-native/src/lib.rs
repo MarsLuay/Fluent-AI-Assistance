@@ -5357,6 +5357,21 @@ fn sha256_text(value: &str) -> String {
 }
 
 #[pyfunction]
+fn sha256_file(path: &str) -> Option<String> {
+    let mut file = File::open(path).ok()?;
+    let mut digest = Sha256::new();
+    let mut buffer = [0_u8; 1024 * 1024];
+    loop {
+        let read = file.read(&mut buffer).ok()?;
+        if read == 0 {
+            break;
+        }
+        digest.update(&buffer[..read]);
+    }
+    Some(format!("{:x}", digest.finalize()))
+}
+
+#[pyfunction]
 fn canonical_json(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<String> {
     let json = py_to_json(py, value)?;
     let compact =
@@ -7241,6 +7256,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(source_content_fingerprint, module)?)?;
     module.add_function(wrap_pyfunction!(catalog_content_fingerprints, module)?)?;
     module.add_function(wrap_pyfunction!(sha256_text, module)?)?;
+    module.add_function(wrap_pyfunction!(sha256_file, module)?)?;
     module.add_function(wrap_pyfunction!(canonical_json, module)?)?;
     module.add_function(wrap_pyfunction!(canonical_json_compact, module)?)?;
     module.add_function(wrap_pyfunction!(project_model_identifiers, module)?)?;

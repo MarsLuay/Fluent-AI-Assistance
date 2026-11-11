@@ -2375,6 +2375,23 @@ def sha256_text(value: Any) -> str | None:
         return None
 
 
+def sha256_file(path: Any) -> str | None:
+    """Stream-hash exact ``Path`` values, or request the Python fallback."""
+    if not enabled() or type(path) is not _PathType:
+        return None
+    try:
+        result = _native.sha256_file(str(path))
+        if (
+            type(result) is str
+            and len(result) == 64
+            and all(character in "0123456789abcdef" for character in result)
+        ):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def canonical_json(value: Any) -> str | None:
     """Serialize JSON-compatible values with sorted keys, or request fallback."""
     if not enabled():

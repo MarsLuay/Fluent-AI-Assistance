@@ -1,3 +1,4 @@
+import hashlib
 import sqlite3
 import tempfile
 import unittest
@@ -159,6 +160,39 @@ class TestProjectIndexResultDeduplication(unittest.TestCase):
             self.assertIsNone(native_acceleration.project_index_dedupe_indices(unhashable))
             with self.assertRaises(TypeError):
                 project_index._dedupe_results(unhashable)
+
+
+class TestProjectIndexFileHash(unittest.TestCase):
+    def test_native_streaming_hash_matches_python_for_empty_and_multi_chunk_files(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "sha256_file"
+        ):
+            self.skipTest("optional Rust file hasher is not built")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            empty_path = Path(tmp) / "empty.bin"
+            empty_path.write_bytes(b"")
+            large_path = Path(tmp) / "large.bin"
+            large_content = bytes(range(256)) * 8193
+            large_path.write_bytes(large_content)
+            cases = [
+                (empty_path, hashlib.sha256(b"").hexdigest()),
+                (large_path, hashlib.sha256(large_content).hexdigest()),
+            ]
+            for path, expected in cases:
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                    python_result = project_index._sha256(path)
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                    self.assertEqual(native_acceleration.sha256_file(path), expected)
+                    native_result = project_index._sha256(path)
+                self.assertEqual(python_result, expected)
+                self.assertEqual(native_result, python_result)
+
+            missing_path = Path(tmp) / "missing.bin"
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                self.assertIsNone(native_acceleration.sha256_file(missing_path))
+                with self.assertRaises(FileNotFoundError):
+                    project_index._sha256(missing_path)
 
 
 class TestIndexSchemaMigration(unittest.TestCase):
