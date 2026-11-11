@@ -489,6 +489,74 @@ class NativeAccelerationTests(unittest.TestCase):
             ["KeyValueOfintSiteΩ"],
         )
 
+    def test_driver_recovery_field_scan_uses_native_selector_with_parity(self) -> None:
+        from fluentcoder.ir import driver_recovery
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_ascii_casefolded_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        macro = ET.fromstring(
+            '<Macro xmlns:ns="urn:test"><ErrorHandling>'
+            "<ns:ERRORCODE> CODE </ns:ERRORCODE><aCtIoN> Retry </aCtIoN>"
+            "<MAXRETRIES>invalid</MAXRETRIES><Retries>2</Retries>"
+            "<Nested><Reference>example-handler</Reference></Nested>"
+            "</ErrorHandling></Macro>"
+        )
+        policy_element = macro.find("ErrorHandling")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = driver_recovery.parse_driver_recovery_policy(macro)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_ascii_casefolded_name",
+                wraps=native_acceleration.xml_elements_by_ascii_casefolded_name,
+            ) as native_call:
+                actual = driver_recovery.parse_driver_recovery_policy(macro)
+                native_call.assert_called_once_with(
+                    policy_element,
+                    driver_recovery._RECOVERY_FIELD_TAGS,
+                    ET.Element,
+                )
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual.error_code, "CODE")
+        self.assertEqual(actual.action, "Retry")
+        self.assertEqual(actual.max_retries, 2)
+        self.assertEqual(actual.source_metadata["invalid_max_retries"], "invalid")
+        self.assertEqual(actual.handler_target, "example-handler")
+
+    def test_driver_recovery_field_scan_falls_back_for_unicode_names(self) -> None:
+        from fluentcoder.ir import driver_recovery
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_ascii_casefolded_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        macro = ET.fromstring(
+            '<Macro xmlns:ns="urn:test"><ErrorHandling>'
+            "<ns:Errorſource>example device</ns:Errorſource>"
+            "</ErrorHandling></Macro>"
+        )
+        policy_element = macro.find("ErrorHandling")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = driver_recovery.parse_driver_recovery_policy(macro)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_elements_by_ascii_casefolded_name",
+                wraps=native_acceleration.xml_elements_by_ascii_casefolded_name,
+            ) as native_call:
+                actual = driver_recovery.parse_driver_recovery_policy(macro)
+                native_call.assert_called_once_with(
+                    policy_element,
+                    driver_recovery._RECOVERY_FIELD_TAGS,
+                    ET.Element,
+                )
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual.error_source, "example device")
+
     def test_xcon_orientation_rows_use_native_selector_with_python_parity(self) -> None:
         from fluentcoder.catalog import xcon
 

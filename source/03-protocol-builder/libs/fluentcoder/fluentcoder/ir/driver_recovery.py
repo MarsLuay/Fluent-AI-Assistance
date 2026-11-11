@@ -13,6 +13,8 @@ from typing import Any, Mapping
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from tecan_common import native_acceleration
+
 from .. import xml_compat as ET
 
 
@@ -42,6 +44,34 @@ _FIELD_TAGS = {
     "max_retries": "MaxRetries",
     "handler_target": "HandlerTarget",
 }
+_RECOVERY_FIELD_TAGS = frozenset(
+    {
+        "errorcategory",
+        "category",
+        "errortype",
+        "exceptioncategory",
+        "errorcode",
+        "code",
+        "exceptioncode",
+        "errorsource",
+        "source",
+        "driver",
+        "drivername",
+        "action",
+        "recoveryaction",
+        "onerror",
+        "failureaction",
+        "maxretries",
+        "retrycount",
+        "retries",
+        "attempts",
+        "handlertarget",
+        "handler",
+        "subroutine",
+        "target",
+        "reference",
+    }
+)
 
 
 class DriverRecoveryPolicy(BaseModel):
@@ -155,7 +185,11 @@ def parse_driver_recovery_policy(macro_element: ET.Element) -> DriverRecoveryPol
             "attributes": dict(first.attrib),
         },
     }
-    for element in first.iter():
+    native = native_acceleration.xml_elements_by_ascii_casefolded_name(
+        first, _RECOVERY_FIELD_TAGS, ET.Element
+    )
+    elements = native if native is not None else first.iter()
+    for element in elements:
         if not isinstance(element.tag, str):
             continue
         text = (element.text or "").strip()
