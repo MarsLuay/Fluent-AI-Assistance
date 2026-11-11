@@ -155,6 +155,71 @@ class DatastorePrefixNativeTests(unittest.TestCase):
         self.assertEqual(fallback, expected)
 
 
+class DatastoreGuidIndexNativeTests(unittest.TestCase):
+    def test_guid_keys_use_native_ascii_and_exact_unicode_fallback(self):
+        archive_data = {
+            "DataStore/STRASSE.xscr": b"first",
+            "datastore/Straße.xscr": b"duplicate",
+            "datastore/AbC.xscr": b"ascii",
+            "datastore/ AbC .xscr": b"spaced",
+            "DataStore/NodeDescription.xml": b"metadata",
+            "meta/ignored.xscr": b"ignored",
+        }
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = exports._datastore_entries_by_guid(archive_data)
+            expected_matches = [
+                exports._find_datastore_entry_for_guid(archive_data, guid)
+                for guid in ("Straße", "ABC", " AbC ", "missing")
+            ]
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = exports._datastore_entries_by_guid(archive_data)
+                actual_matches = [
+                    exports._find_datastore_entry_for_guid(archive_data, guid)
+                    for guid in ("Straße", "ABC", " AbC ", "missing")
+                ]
+                self.assertGreater(native_call.call_count, 0)
+            self.assertIsNone(native_acceleration.ascii_casefold_trim("Straße"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual_matches, expected_matches)
+        self.assertEqual(
+            actual,
+            {
+                "strasse": "DataStore/STRASSE.xscr",
+                "abc": "datastore/AbC.xscr",
+                " abc ": "datastore/ AbC .xscr",
+            },
+        )
+        self.assertEqual(
+            actual_matches,
+            [
+                "DataStore/STRASSE.xscr",
+                "datastore/AbC.xscr",
+                "datastore/ AbC .xscr",
+                None,
+            ],
+        )
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = exports._datastore_entries_by_guid(archive_data)
+                fallback_matches = [
+                    exports._find_datastore_entry_for_guid(archive_data, guid)
+                    for guid in ("Straße", "ABC", " AbC ", "missing")
+                ]
+        self.assertEqual(fallback, expected)
+        self.assertEqual(fallback_matches, expected_matches)
+
+
 class CasefoldDedupNativeTests(unittest.TestCase):
     def test_unique_preserving_order_uses_ascii_native_and_unicode_fallback(self):
         values = [" Alpha ", "alpha", "Straße", "STRASSE", "", "\u2003", "東京", "東京"]

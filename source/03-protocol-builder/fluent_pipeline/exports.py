@@ -4651,14 +4651,22 @@ def _datastore_entries_by_guid(archive_data: dict[str, bytes]) -> dict[str, str]
             continue
         if normalized.endswith("/nodedescription.xml"):
             continue
-        guid = Path(entry.replace("\\", "/")).stem.casefold()
+        guid = _casefold_exact(Path(entry.replace("\\", "/")).stem)
         if guid:
             entries.setdefault(guid, entry)
     return entries
 
 
 def _find_datastore_entry_for_guid(archive_data: dict[str, bytes], guid: str) -> str | None:
-    return _datastore_entries_by_guid(archive_data).get(guid.casefold())
+    return _datastore_entries_by_guid(archive_data).get(_casefold_exact(guid))
+
+
+def _casefold_exact(value: str) -> str:
+    if type(value) is str and value.strip() == value:
+        native = _native_ascii_casefold_trim(value)
+        if native is not None:
+            return native
+    return value.casefold()
 
 
 def _unique_preserving_order(values: list[str]) -> list[str]:
