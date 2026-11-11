@@ -7,12 +7,76 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
+import fluent_pipeline.cli.rendering as rendering_module
+from tecan_common import native_acceleration
 from fluent_pipeline.cli.commands.projects import _cmd_create_collection
 from fluent_pipeline.cli.parser import _build_parser
 from fluent_pipeline.progress import ProgressEmitter, ProgressEvent, ProgressStage, render_plain_progress_event
 
 
 class ProgressTests(unittest.TestCase):
+    def test_progress_mode_uses_native_ascii_lower_with_unicode_fallback(self):
+        values = [
+            True,
+            False,
+            "AUTO",
+            " JSON ",
+            " None ",
+            "automatic",
+            "JÖN",
+            None,
+            0,
+        ]
+        with mock.patch.dict(
+            "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+        ):
+            expected = [
+                rendering_module.normalize_progress_mode(value) for value in values
+            ]
+        self.assertEqual(
+            expected,
+            [
+                "plain",
+                "none",
+                "auto",
+                "json",
+                "none",
+                "auto",
+                "auto",
+                "auto",
+                "auto",
+            ],
+        )
+
+        with mock.patch.dict(
+            "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+        ):
+            with mock.patch.object(
+                rendering_module,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = [
+                    rendering_module.normalize_progress_mode(value)
+                    for value in values
+                ]
+                self.assertEqual(native_call.call_count, 7)
+            native_call.assert_any_call("AUTO")
+            native_call.assert_any_call("JÖN")
+        self.assertEqual(actual, expected)
+
+        with mock.patch.dict(
+            "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+        ):
+            with mock.patch.object(
+                rendering_module, "_native_ascii_lower", return_value=None
+            ):
+                forced_fallback = [
+                    rendering_module.normalize_progress_mode(value)
+                    for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_create_collection_progress_defaults_to_auto(self):
         args = _build_parser().parse_args(
             ["create-collection", "combined", "--context", "first"]

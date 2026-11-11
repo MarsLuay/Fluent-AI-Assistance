@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 from typing import Any, TextIO
 
+from tecan_common.native_acceleration import ascii_lower as _native_ascii_lower
+
 from ..authoring_status import AuthoringState, AuthoringStatus
 from ..application_services import (
     BundleVerificationResult,
@@ -35,7 +37,9 @@ def normalize_progress_mode(value: Any) -> ProgressMode:
         return "plain"
     if value is False:
         return "none"
-    mode = str(value or "auto").strip().lower()
+    mode_text = str(value or "auto").strip()
+    native_mode = _native_ascii_lower(mode_text)
+    mode = native_mode if native_mode is not None else mode_text.lower()
     if mode in {"auto", "plain", "json", "none"}:
         return mode
     return "auto"
