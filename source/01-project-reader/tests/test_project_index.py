@@ -353,6 +353,30 @@ class TestSearchProjectIndex(unittest.TestCase):
                 ]
         self.assertEqual(fallback, expected)
 
+    def test_lower_text_uses_rust_and_preserves_python_fallback(self):
+        class LowerSubclass(str):
+            def lower(self) -> str:
+                return "custom-lower"
+
+        values = ("Worktable", " Café ", "\u217c", LowerSubclass("ABC"))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [project_index._lower_text(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = [project_index._lower_text(value) for value in values]
+                self.assertEqual(native_call.call_count, 2)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["worktable", " café ", "\u217c", "custom-lower"])
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(native_acceleration, "ascii_casefold_trim", return_value=None):
+                fallback = [project_index._lower_text(value) for value in values]
+        self.assertEqual(fallback, expected)
+
     def test_exact_entity_lookup_casefolds_with_rust_and_preserves_fallbacks(self):
         conn = sqlite3.connect(self.db_path)
         conn.execute(

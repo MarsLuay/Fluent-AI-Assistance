@@ -28,16 +28,19 @@ from .zeia_adapters import ingest_zeia
 SCHEMA_VERSION = "2"
 
 
+def _lower_text(value: str) -> str:
+    if type(value) is str and value.strip() == value:
+        native = native_acceleration.ascii_casefold_trim(value)
+        if native is not None:
+            return native
+    return value.lower()
+
+
 def _normalize_kind_filter(kind: str | None) -> str | None:
     if not kind:
         return None
     stripped = kind.strip()
-    native = (
-        native_acceleration.ascii_casefold_trim(stripped)
-        if type(stripped) is str and stripped.strip() == stripped
-        else None
-    )
-    lowered = native if native is not None else stripped.lower()
+    lowered = _lower_text(stripped)
     return lowered.replace("-", "_").replace(" ", "_")
 
 
@@ -219,7 +222,7 @@ def discover_zeia_paths(paths: Iterable[str | Path]) -> list[Path]:
                 sorted(item for item in path.rglob("*.zeia") if item.is_file())
             )
             continue
-        if path.is_file() and path.suffix.lower() == ".zeia":
+        if path.is_file() and _lower_text(path.suffix) == ".zeia":
             discovered.append(path)
             continue
         raise FileNotFoundError(f"No .zeia file found at {path}")
@@ -563,7 +566,7 @@ def _index_references(
         type_id = ref.get("type_id") or ""
         object_name = ref.get("object_name") or ref.get("guid") or ""
         metadata = {"type_id": type_id, "guid": ref.get("guid") or ""}
-        kind = "worktable" if "worktable" in type_id.lower() else "reference"
+        kind = "worktable" if "worktable" in _lower_text(type_id) else "reference"
         _insert_entity(
             conn,
             EntityRecord(zeia_id, script_id, kind, object_name, type_id, source_path, metadata),
@@ -773,7 +776,7 @@ def _index_command_field_entities(
             continue
         kind = (
             "worklist"
-            if family == "Worklist" or value.lower().endswith(".gwl")
+            if family == "Worklist" or _lower_text(value).endswith(".gwl")
             else "dependency"
         )
         _insert_entity(
@@ -1035,19 +1038,21 @@ def _insert_entity(
 
 
 def _entity_kind_for_object(obj: dict[str, Any]) -> str:
-    object_kind = str(obj.get("kind") or "").lower()
-    haystack = " ".join(
-        str(value or "")
-        for value in (
-            obj.get("object_name"),
-            obj.get("type_id"),
-            obj.get("functional_group"),
-            obj.get("footprint"),
-            obj.get("renderer"),
-            obj.get("source"),
-            " ".join(obj.get("names", [])),
+    object_kind = _lower_text(str(obj.get("kind") or ""))
+    haystack = _lower_text(
+        " ".join(
+            str(value or "")
+            for value in (
+                obj.get("object_name"),
+                obj.get("type_id"),
+                obj.get("functional_group"),
+                obj.get("footprint"),
+                obj.get("renderer"),
+                obj.get("source"),
+                " ".join(obj.get("names", [])),
+            )
         )
-    ).lower()
+    )
     if object_kind == "workspace" or "worktable" in haystack:
         return "worktable"
     if object_kind == "liquid_class":
@@ -1070,7 +1075,7 @@ def _search_rows(
     kind: str | None,
     limit: int,
 ) -> list[dict[str, Any]]:
-    pattern = f"%{query.lower()}%"
+    pattern = f"%{_lower_text(query)}%"
     candidates: list[dict[str, Any]] = []
     if kind not in {"command", "command_sequence"}:
         candidates.extend(_search_entities(conn, pattern, kind=kind, limit=limit))
