@@ -18,6 +18,7 @@ from tecan_common.native_acceleration import (
     canonical_json_compact as _native_canonical_json_compact,
     deepcopy_json as _native_deepcopy_json,
     most_common_string_counts as _native_most_common_string_counts,
+    project_model_entry_path as _native_project_model_entry_path,
     project_model_identifiers as _native_project_model_identifiers,
     sort_string_keys as _native_sort_string_keys,
     sorted_unique_strings as _native_sorted_unique_strings,
@@ -132,6 +133,9 @@ class SourceProvenance:
 
 
 def _entry_path(record: Mapping[str, Any]) -> str:
+    native = _native_project_model_entry_path(record)
+    if native is not None:
+        return native
     value = record.get("entry") or record.get("source") or ""
     return str(value).replace("\\", "/")
 

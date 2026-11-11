@@ -232,6 +232,72 @@ class ProjectModelTests(unittest.TestCase):
             )
             self.assertEqual(nonfinite_model.to_json(), nonfinite_expected)
 
+    def test_native_project_model_entry_path_matches_selection_and_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "project_model_entry_path"
+        ):
+            self.skipTest("optional Rust project-model path selector is not built")
+        records = [
+            {"entry": "Scripts\\main.xscr", "source": "ignored.xscr"},
+            {"entry": "", "source": "Scripts\\fallback.xscr"},
+            {"entry": None, "source": "Scripts\\source.xscr"},
+            {},
+            {"entry": "", "source": ""},
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [project_model._entry_path(record) for record in records]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                project_model,
+                "_native_project_model_entry_path",
+                wraps=native_acceleration.project_model_entry_path,
+            ) as native_call:
+                actual = [project_model._entry_path(record) for record in records]
+                self.assertEqual(native_call.call_count, len(records))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [
+                "Scripts/main.xscr",
+                "Scripts/fallback.xscr",
+                "Scripts/source.xscr",
+                "",
+                "",
+            ],
+        )
+
+        class StringSubclass(str):
+            pass
+
+        unsupported = [
+            {"entry": False, "source": "Scripts\\false-fallback.xscr"},
+            {"entry": 0, "source": "Scripts\\zero-fallback.xscr"},
+            {"entry": StringSubclass("Scripts\\subclass.xscr")},
+            {"entry": Path("Scripts\\path.xscr")},
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_fallback = [project_model._entry_path(record) for record in unsupported]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertTrue(
+                all(
+                    native_acceleration.project_model_entry_path(record) is None
+                    for record in unsupported
+                )
+            )
+            actual_fallback = [
+                project_model._entry_path(record) for record in unsupported
+            ]
+        self.assertEqual(actual_fallback, expected_fallback)
+        self.assertEqual(
+            actual_fallback,
+            [
+                "Scripts/false-fallback.xscr",
+                "Scripts/zero-fallback.xscr",
+                "Scripts/subclass.xscr",
+                "Scripts/path.xscr",
+            ],
+        )
+
     def test_native_project_model_identifiers_match_python_order_and_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "project_model_identifiers"

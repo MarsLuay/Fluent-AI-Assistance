@@ -5410,6 +5410,30 @@ fn project_model_identifiers<'py>(
 }
 
 #[pyfunction]
+fn project_model_entry_path(py: Python<'_>, record: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+    if !record.get_type().is(py.get_type::<PyDict>()) {
+        return Ok(None);
+    }
+    let record = record.cast::<PyDict>()?;
+    for key in ["entry", "source"] {
+        let Some(value) = record.get_item(key)? else {
+            continue;
+        };
+        if value.is_none() {
+            continue;
+        }
+        if !value.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let value = value.extract::<String>()?;
+        if !value.is_empty() {
+            return Ok(Some(value.replace('\\', "/")));
+        }
+    }
+    Ok(Some(String::new()))
+}
+
+#[pyfunction]
 fn diagnostic_sort_indices(keys_json: &str) -> PyResult<Option<String>> {
     let Ok(keys) = serde_json::from_str::<Vec<Vec<String>>>(keys_json) else {
         return Ok(None);
@@ -6932,6 +6956,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(canonical_json, module)?)?;
     module.add_function(wrap_pyfunction!(canonical_json_compact, module)?)?;
     module.add_function(wrap_pyfunction!(project_model_identifiers, module)?)?;
+    module.add_function(wrap_pyfunction!(project_model_entry_path, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_sort_indices, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_message, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_redact_text, module)?)?;

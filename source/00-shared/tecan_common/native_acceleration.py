@@ -2282,6 +2282,17 @@ def project_model_identifiers(record: Any) -> dict[str, str] | None:
         return None
 
 
+def project_model_entry_path(record: Any) -> str | None:
+    """Select and normalize an exact-string record path, or request fallback."""
+    if not enabled() or type(record) is not dict:
+        return None
+    try:
+        result = _native.project_model_entry_path(record)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def sha256_text(value: Any) -> str | None:
     """Hash exact Unicode text natively, or request the Python hashing fallback."""
     if not enabled() or type(value) is not str:
