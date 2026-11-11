@@ -28,6 +28,19 @@ from .zeia_adapters import ingest_zeia
 SCHEMA_VERSION = "2"
 
 
+def _normalize_kind_filter(kind: str | None) -> str | None:
+    if not kind:
+        return None
+    stripped = kind.strip()
+    native = (
+        native_acceleration.ascii_casefold_trim(stripped)
+        if type(stripped) is str and stripped.strip() == stripped
+        else None
+    )
+    lowered = native if native is not None else stripped.lower()
+    return lowered.replace("-", "_").replace(" ", "_")
+
+
 def require_current_index_schema(conn: sqlite3.Connection) -> None:
     """Refuse to read an index that was not rebuilt for this schema."""
     value = _metadata_value(conn, "schema_version")
@@ -336,9 +349,7 @@ def search_project_index(
     conn = _connect(database)
     try:
         require_current_index_schema(conn)
-        normalized_kind = (
-            kind.strip().lower().replace("-", "_").replace(" ", "_") if kind else None
-        )
+        normalized_kind = _normalize_kind_filter(kind)
         rows = _search_rows(conn, query=query, kind=normalized_kind, limit=limit)
         return {
             "kind": "project_index_search",
@@ -380,7 +391,7 @@ def find_entity_candidates(
             if native_needle is not None
             else raw_identifier.casefold()
         )
-        normalized_kind = kind.strip().lower().replace("-", "_").replace(" ", "_") if kind else None
+        normalized_kind = _normalize_kind_filter(kind)
         rows = conn.execute(
             """
             SELECT e.kind, e.name, e.value, e.source_path, e.command_index,

@@ -329,6 +329,30 @@ class TestSearchProjectIndex(unittest.TestCase):
         self.assertEqual(result["result_count"], 1)
         self.assertEqual(result["results"][0]["name"], "Water")
 
+    def test_kind_filter_normalization_uses_rust_with_unicode_fallback(self):
+        values = (" Liquid-Class ", "Café-Kind", "\u217c", "", None)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [project_index._normalize_kind_filter(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = [project_index._normalize_kind_filter(value) for value in values]
+                self.assertEqual(native_call.call_count, 3)
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual, ["liquid_class", "café_kind", "\u217c", None, None]
+        )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(native_acceleration, "ascii_casefold_trim", return_value=None):
+                fallback = [
+                    project_index._normalize_kind_filter(value) for value in values
+                ]
+        self.assertEqual(fallback, expected)
+
     def test_exact_entity_lookup_casefolds_with_rust_and_preserves_fallbacks(self):
         conn = sqlite3.connect(self.db_path)
         conn.execute(
@@ -358,7 +382,7 @@ class TestSearchProjectIndex(unittest.TestCase):
                     find_entity_candidates(self.db_path, identifier, kind=kind)
                     for identifier, kind in queries
                 ]
-                self.assertEqual(native_call.call_count, 2)
+                self.assertEqual(native_call.call_count, 5)
         self.assertEqual(actual, expected)
         self.assertEqual(
             [result["status"] for result in actual],
