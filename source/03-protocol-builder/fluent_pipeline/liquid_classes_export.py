@@ -19,6 +19,7 @@ from tecan_common.native_acceleration import (
     xml_clean_text as _native_xml_clean_text,
     xml_elements_by_ascii_casefolded_name
     as _native_xml_elements_by_ascii_casefolded_name,
+    xml_direct_elements_by_name as _native_xml_direct_elements_by_name,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
@@ -868,20 +869,14 @@ def _microscript_section_names(elem: ET.Element) -> list[str]:
 def _mine_microscript(elem: ET.Element, *, max_commands: int = 128) -> list[dict[str, Any]]:
     """Mine MicroScriptSection bodies as ordered commands plus captured payloads."""
     sections: list[dict[str, Any]] = []
-    for child in list(elem):
-        if not isinstance(child.tag, str):
-            continue
-        if _local_name(child.tag) != "MicroScriptSection":
-            continue
+    for child in _direct_elements_by_local_name(elem, "MicroScriptSection"):
         name = _child_text(child, "Name") or _text(child)
         if not name:
             continue
         commands: list[str] = []
         records: list[dict[str, Any]] = []
         truncated = False
-        for objects in list(child):
-            if not isinstance(objects.tag, str) or _local_name(objects.tag) != "Objects":
-                continue
+        for objects in _direct_elements_by_local_name(child, "Objects"):
             truncated = _walk_script_objects(
                 objects, commands, records, max_commands=max_commands
             ) or truncated
@@ -906,11 +901,9 @@ def _walk_script_objects(
 ) -> bool:
     """Append Object Type leaf names and nested command records."""
     truncated = False
-    for obj in list(objects_elem):
+    for obj in _direct_elements_by_local_name(objects_elem, "Object"):
         if len(out) >= max_commands:
             return True
-        if not isinstance(obj.tag, str) or _local_name(obj.tag) != "Object":
-            continue
         type_attr = str(obj.attrib.get("Type") or obj.attrib.get("type") or "").strip()
         short = type_attr.rsplit(".", 1)[-1] if type_attr else ""
         if not short:
@@ -932,9 +925,7 @@ def _walk_script_objects(
             for typed in list(obj):
                 if not isinstance(typed.tag, str):
                     continue
-                for maybe in list(typed):
-                    if not isinstance(maybe.tag, str) or _local_name(maybe.tag) != "Objects":
-                        continue
+                for maybe in _direct_elements_by_local_name(typed, "Objects"):
                     if _walk_script_objects(maybe, out, children, max_commands=max_commands):
                         truncated = True
             if children:
@@ -944,9 +935,7 @@ def _walk_script_objects(
         for typed in list(obj):
             if not isinstance(typed.tag, str):
                 continue
-            for maybe in list(typed):
-                if not isinstance(maybe.tag, str) or _local_name(maybe.tag) != "Objects":
-                    continue
+            for maybe in _direct_elements_by_local_name(typed, "Objects"):
                 if _walk_script_objects(maybe, out, records, max_commands=max_commands):
                     truncated = True
     return truncated or len(out) >= max_commands
@@ -1130,6 +1119,21 @@ def _coerce_scalar(text: str) -> Any:
         return int(raw)
     except ValueError:
         return raw
+
+
+def _direct_elements_by_local_name(
+    parent: ET.Element, local_name: str
+) -> list[ET.Element]:
+    elements = _native_xml_direct_elements_by_name(
+        parent, (local_name,), ET.Element
+    )
+    if elements is not None:
+        return elements
+    return [
+        child
+        for child in list(parent)
+        if isinstance(child.tag, str) and _local_name(child.tag) == local_name
+    ]
 
 
 def _find(elem: ET.Element | None, local_name: str) -> ET.Element | None:

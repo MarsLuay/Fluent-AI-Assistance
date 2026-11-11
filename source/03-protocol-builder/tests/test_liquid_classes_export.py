@@ -421,6 +421,84 @@ class LiquidClassesExportTests(unittest.TestCase):
         self.assertEqual(fallback, "unicode match")
         self.assertEqual(native_fallback, fallback)
 
+    def test_microscript_child_scans_use_native_selector_with_fallback(
+        self,
+    ) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_direct_elements_by_name"
+        ):
+            self.skipTest("optional Rust direct-child XML selector is not built")
+        root = liquid_classes_export.ET.fromstring(
+            '<Root xmlns:x="urn:test">'
+            "<x:MicroScriptSection><Name>First</Name><Objects>"
+            '<Object Type="Namespace.CommandOne" />'
+            "</Objects></x:MicroScriptSection>"
+            "<Other />"
+            "<microscriptsection><Name>Ignored</Name></microscriptsection>"
+            "<MicroScriptSection><Name>Second</Name><Objects>"
+            '<Object Type="Namespace.CommandTwo" />'
+            "</Objects></MicroScriptSection></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = liquid_classes_export._mine_microscript(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                liquid_classes_export,
+                "_native_xml_direct_elements_by_name",
+                wraps=native_acceleration.xml_direct_elements_by_name,
+            ) as native_call:
+                actual = liquid_classes_export._mine_microscript(root)
+                self.assertGreaterEqual(native_call.call_count, 5)
+        self.assertEqual(actual, expected)
+        self.assertEqual([item["name"] for item in actual], ["First", "Second"])
+        self.assertEqual(
+            [item["commands"] for item in actual],
+            [["CommandOne"], ["CommandTwo"]],
+        )
+
+        limited_root = liquid_classes_export.ET.fromstring(
+            "<Root><MicroScriptSection><Name>Limited</Name><Objects>"
+            '<Object Type="Command.First" /><Other />'
+            '<Object Type="Command.Second" />'
+            "</Objects></MicroScriptSection></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            limited_expected = liquid_classes_export._mine_microscript(
+                limited_root, max_commands=1
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            limited_actual = liquid_classes_export._mine_microscript(
+                limited_root, max_commands=1
+            )
+        self.assertEqual(limited_actual, limited_expected)
+        self.assertEqual(limited_actual[0]["commands"], ["First"])
+        self.assertTrue(limited_actual[0]["commands_truncated"])
+
+        commented_root = liquid_classes_export.ET.Element("Root")
+        commented_root.append(liquid_classes_export.ET.Comment("fallback"))
+        section = liquid_classes_export.ET.SubElement(
+            commented_root, "MicroScriptSection"
+        )
+        liquid_classes_export.ET.SubElement(section, "Name").text = "Commented"
+        objects = liquid_classes_export.ET.SubElement(section, "Objects")
+        liquid_classes_export.ET.SubElement(
+            objects, "Object", {"Type": "Namespace.Command"}
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback = liquid_classes_export._mine_microscript(commented_root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                liquid_classes_export._native_xml_direct_elements_by_name(
+                    commented_root,
+                    ("MicroScriptSection",),
+                    liquid_classes_export.ET.Element,
+                )
+            )
+            native_fallback = liquid_classes_export._mine_microscript(
+                commented_root
+            )
+        self.assertEqual(native_fallback, fallback)
+
     def test_parse_xlqc_uses_filename_guid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             guid = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
