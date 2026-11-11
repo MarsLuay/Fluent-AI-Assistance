@@ -2525,6 +2525,57 @@ fn xml_variable_definition_elements<'py>(
 }
 
 #[pyfunction]
+fn xml_runtime_variable_definition_candidates<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let output = PyList::empty(py);
+    let iterator = root.call_method0("iter")?;
+    for element in iterator.try_iter()? {
+        let element = element?;
+        if !element.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = element.getattr("tag")?;
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        if matches!(local, "anyType" | "VariableDefinitionHelper") {
+            output.append(element)?;
+            continue;
+        }
+        let mut has_name = false;
+        let mut has_type_name = false;
+        let mut has_query_on_startup = false;
+        for child in element.try_iter()? {
+            let child = child?;
+            if !child.get_type().is(element_type) {
+                return Ok(None);
+            }
+            let child_tag = child.getattr("tag")?;
+            if !child_tag.get_type().is(py.get_type::<PyString>()) {
+                return Ok(None);
+            }
+            let child_tag = child_tag.extract::<String>()?;
+            let child_local = child_tag.rsplit('}').next().unwrap_or(child_tag.as_str());
+            has_name |= child_local == "Name";
+            has_type_name |= child_local == "TypeName";
+            has_query_on_startup |= child_local == "QueryOnStartup";
+        }
+        if has_name && has_type_name && has_query_on_startup {
+            output.append(element)?;
+        }
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn xml_elements_by_folded_name_with_children<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -5904,6 +5955,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     module.add_function(wrap_pyfunction!(xml_variable_definition_elements, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        xml_runtime_variable_definition_candidates,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(casefold_alias_values, module)?)?;
     module.add_function(wrap_pyfunction!(merge_unique_string_groups, module)?)?;
     module.add_function(wrap_pyfunction!(sort_string_keys, module)?)?;

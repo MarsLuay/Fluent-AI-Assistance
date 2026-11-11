@@ -1090,6 +1090,32 @@ def xml_variable_definition_elements(root: Any, element_type: Any) -> list[Any] 
         return None
 
 
+def xml_runtime_variable_definition_candidates(
+    root: Any, element_type: Any
+) -> list[Any] | None:
+    """Select candidate nodes for the runtime-variable audit in document order."""
+    if not enabled() or type(root) is not element_type:
+        return None
+    try:
+        result = _native.xml_runtime_variable_definition_candidates(
+            root, element_type
+        )
+        if type(result) is list and all(
+            type(element) is element_type for element in result
+        ):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_grouped_texts_excluding(
     root: Any, excluded_names: Any, limit: Any, element_type: Any
 ) -> list[tuple[str, list[str]]] | None:

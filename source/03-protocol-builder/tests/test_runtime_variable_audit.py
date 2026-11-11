@@ -73,6 +73,85 @@ class RuntimeVariableAuditTests(unittest.TestCase):
         }
         self.assertEqual(expected_variable_names_from_ir(ir), ("OperatorMode", "PlateCount"))
 
+    def test_variable_definition_candidate_scan_uses_native_and_fallback(self):
+        root = ET.fromstring(
+            '<Root xmlns:x="urn:test">'
+            '<x:anyType type="Tecan.VariableDefinitionHelper"><Nested>'
+            "<Name>Alpha</Name></Nested></x:anyType>"
+            "<VariableDefinitionHelper><Name>Beta</Name><TypeName>String</TypeName>"
+            "<QueryOnStartup>false</QueryOnStartup></VariableDefinitionHelper>"
+            "<Other><Name>Gamma</Name><TypeName>Integer</TypeName>"
+            "<QueryOnStartup>true</QueryOnStartup></Other>"
+            "<Other><Name>Skipped</Name><TypeName>String</TypeName></Other>"
+            "</Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = list(
+                runtime_variable_audit_module._variable_definition_candidates(root)
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                runtime_variable_audit_module,
+                "_native_runtime_candidates",
+                wraps=native_acceleration.xml_runtime_variable_definition_candidates,
+            ) as native_call:
+                actual = list(
+                    runtime_variable_audit_module._variable_definition_candidates(root)
+                )
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(expected, list(root.iter()))
+        actual_locals = [
+            runtime_variable_audit_module._local_name(item.tag) for item in actual
+        ]
+        self.assertEqual(
+            actual_locals, ["anyType", "VariableDefinitionHelper", "Other"]
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "variables.xscr"
+            ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                expected_names = expected_variable_names_from_xscr(path)
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    runtime_variable_audit_module,
+                    "_native_runtime_candidates",
+                    wraps=(
+                        native_acceleration.xml_runtime_variable_definition_candidates
+                    ),
+                ) as names_native_call:
+                    actual_names = expected_variable_names_from_xscr(path)
+                    self.assertEqual(names_native_call.call_count, 1)
+        self.assertEqual(actual_names, expected_names)
+        self.assertEqual(actual_names, ("Alpha", "Beta", "Gamma"))
+
+        class StringTag(str):
+            pass
+
+        custom_root = ET.Element("Root")
+        custom_helper = ET.SubElement(
+            custom_root, StringTag("VariableDefinitionHelper")
+        )
+        ET.SubElement(custom_helper, "Name").text = "Fallback"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = list(
+                runtime_variable_audit_module._variable_definition_candidates(
+                    custom_root
+                )
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_runtime_variable_definition_candidates(
+                    custom_root, ET.Element
+                )
+            )
+            fallback_actual = list(
+                runtime_variable_audit_module._variable_definition_candidates(
+                    custom_root
+                )
+            )
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, list(custom_root.iter()))
+
     def test_expected_names_from_xscr_variable_definitions(self):
         root = ET.Element("VxData")
         helper = ET.SubElement(root, "VariableDefinitionHelper")

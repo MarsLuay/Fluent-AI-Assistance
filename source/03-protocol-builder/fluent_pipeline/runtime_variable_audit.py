@@ -13,11 +13,12 @@ import re
 from . import xml_compat as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from .query_variable_audit import normalize_query_variable_names
 from tecan_common.native_acceleration import (
     xml_elements_by_name as _native_xml_elements_by_name,
+    xml_runtime_variable_definition_candidates as _native_runtime_candidates,
 )
 
 
@@ -72,7 +73,7 @@ def expected_variable_names_from_xscr(xscr_path: Path | None) -> tuple[str, ...]
     except (ET.ParseError, OSError, UnicodeDecodeError):
         return ()
     names: set[str] = set()
-    for element in root.iter():
+    for element in _variable_definition_candidates(root):
         local = _local_name(element.tag)
         if local == "anyType":
             type_hint = " ".join(str(value) for value in element.attrib.values())
@@ -86,6 +87,11 @@ def expected_variable_names_from_xscr(xscr_path: Path | None) -> tuple[str, ...]
         if _is_variable_name(name):
             names.add(name)
     return tuple(sorted(names))
+
+
+def _variable_definition_candidates(root: ET.Element) -> Iterable[ET.Element]:
+    native = _native_runtime_candidates(root, ET.Element)
+    return native if native is not None else root.iter()
 
 
 def expected_variable_names_from_ir(protocol_ir: Mapping[str, Any]) -> tuple[str, ...]:
