@@ -402,6 +402,80 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
         self.assertEqual(model.task_inputs[0]["records"][0]["fields"]["TaskName"], "Task A")
         self.assertNotEqual(model.task_inputs[0]["kind"], "worklist")
 
+    def test_twl_xml_attribute_fields_use_native_scan_with_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_attribute_name_values"
+        ):
+            self.skipTest("optional Rust XML attribute collector is not built")
+        root = ET.Element(
+            "Task",
+            {
+                "Name": " attribute name ",
+                "Future": " first attribute ",
+                "{urn:test}Future": "second attribute",
+                "Empty": "",
+                "taskname": "attribute task",
+            },
+        )
+        ET.SubElement(root, "Future").text = " child value "
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = task_input._element_record(root, index=3)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration._native,
+                "xml_attribute_name_values",
+                wraps=native_acceleration._native.xml_attribute_name_values,
+            ) as rust_call:
+                with patch.object(
+                    task_input,
+                    "_native_xml_attribute_name_values",
+                    wraps=task_input._native_xml_attribute_name_values,
+                ) as native_call:
+                    actual = task_input._element_record(root, index=3)
+                    native_call.assert_called_once_with(root, ET.Element)
+                    rust_call.assert_called_once()
+                native_attributes = native_acceleration.xml_attribute_name_values(
+                    root, ET.Element
+                )
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["fields"]["Name"], " attribute name ")
+        self.assertEqual(actual["task_name"], "attribute task")
+        self.assertEqual(
+            actual["unknown_fields"],
+            {
+                "Empty": [""],
+                "Future": [
+                    " first attribute ",
+                    "child value",
+                    "second attribute",
+                ],
+            },
+        )
+        self.assertEqual(
+            native_attributes,
+            [
+                ("Name", " attribute name "),
+                ("Future", " first attribute "),
+                ("Future", "second attribute"),
+                ("Empty", ""),
+                ("taskname", "attribute task"),
+            ],
+        )
+
+        class StringSubclass(str):
+            pass
+
+        unsupported = ET.Element("Task")
+        unsupported.attrib["Vendor"] = StringSubclass(" preserved ")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            python_fallback = task_input._element_record(unsupported, index=0)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                task_input._native_xml_attribute_name_values(unsupported, ET.Element)
+            )
+            native_fallback = task_input._element_record(unsupported, index=0)
+        self.assertEqual(native_fallback, python_fallback)
+
     def test_twl_record_selection_matches_python_casefold_for_unicode_tags(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_elements_by_folded_name_with_children"

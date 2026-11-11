@@ -22,6 +22,7 @@ from tecan_common.native_acceleration import (
     merge_unique_string_groups,
     sort_string_keys,
     sorted_unique_strings,
+    xml_attribute_name_values as _native_xml_attribute_name_values,
     xml_elements_by_folded_name_with_children,
 )
 from tecan_common.xml_helpers import local_name
@@ -146,12 +147,21 @@ def _element_record(element: Any, *, index: int) -> dict[str, Any]:
             values[name] = text
         else:
             unknown.setdefault(name, []).append(text)
-    for name, value in element.attrib.items():
-        key = local_name(name).casefold()
-        if key in _KNOWN_FIELDS:
-            values[local_name(name)] = str(value)
-        else:
-            unknown.setdefault(local_name(name), []).append(str(value))
+    native_attributes = _native_xml_attribute_name_values(element, ET.Element)
+    if native_attributes is None:
+        for name, value in element.attrib.items():
+            local = local_name(name)
+            key = local.casefold()
+            if key in _KNOWN_FIELDS:
+                values[local] = str(value)
+            else:
+                unknown.setdefault(local, []).append(str(value))
+    else:
+        for name, value in native_attributes:
+            if name.casefold() in _KNOWN_FIELDS:
+                values[name] = value
+            else:
+                unknown.setdefault(name, []).append(value)
     if not values and not unknown:
         return {}
     record = {
