@@ -18,6 +18,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from .query_variable_audit import normalize_query_variable_names
 from tecan_common.native_acceleration import (
     xml_elements_by_name as _native_xml_elements_by_name,
+    xml_local_name as _native_xml_local_name,
     xml_runtime_variable_definition_candidates as _native_runtime_candidates,
 )
 
@@ -329,6 +330,9 @@ def validation_diff_check_for_runtime_audit(audit: RuntimeVariableAudit) -> dict
 
 
 def _local_name(tag: str) -> str:
+    native = _native_xml_local_name(tag)
+    if native is not None:
+        return native
     if "}" in tag:
         return tag.rsplit("}", 1)[-1]
     return tag

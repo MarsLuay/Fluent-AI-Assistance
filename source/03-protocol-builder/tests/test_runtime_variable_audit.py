@@ -19,6 +19,34 @@ from fluent_pipeline.runtime_variable_audit import (
 
 
 class RuntimeVariableAuditTests(unittest.TestCase):
+    def test_local_name_uses_native_helper_and_custom_python_fallback(self):
+        tag = "{urn:example}VariableDefinitionHelper"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = runtime_variable_audit_module._local_name(tag)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                runtime_variable_audit_module,
+                "_native_xml_local_name",
+                wraps=native_acceleration.xml_local_name,
+            ) as native_call:
+                actual = runtime_variable_audit_module._local_name(tag)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "VariableDefinitionHelper")
+
+        class CustomTag(str):
+            def rsplit(self, sep=None, maxsplit=-1):
+                return ["", "PythonFallback"]
+
+        custom_tag = CustomTag("{urn:example}Ignored")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = runtime_variable_audit_module._local_name(custom_tag)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.xml_local_name(custom_tag))
+            fallback_actual = runtime_variable_audit_module._local_name(custom_tag)
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, "PythonFallback")
+
     def test_first_text_uses_native_selector_and_fallback(self):
         root = ET.fromstring(
             "<Root><Name> </Name><Name> First </Name>"
