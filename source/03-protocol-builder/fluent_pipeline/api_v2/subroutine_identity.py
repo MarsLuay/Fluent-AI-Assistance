@@ -11,6 +11,10 @@ from .. import xml_compat as ET
 from pathlib import Path
 from typing import Any, Mapping
 
+from tecan_common.native_acceleration import (
+    xml_elements_by_name as _native_xml_elements_by_name,
+)
+
 from ..subroutine_dependencies import (
     clean_subroutine_reference,
     norm_subroutine_key,
@@ -41,18 +45,21 @@ def _child_text(element: ET.Element | None, name: str, default: str = "") -> str
     return default
 
 
+def _elements_by_local_name(root: ET.Element, name: str) -> list[ET.Element]:
+    elements = _native_xml_elements_by_name(root, (name,), ET.Element)
+    if elements is not None:
+        return elements
+    return [element for element in root.iter() if _local_name(element.tag) == name]
+
+
 def _find_descendant(element: ET.Element, name: str) -> ET.Element | None:
-    for node in element.iter():
-        if _local_name(node.tag) == name:
-            return node
-    return None
+    nodes = _elements_by_local_name(element, name)
+    return nodes[0] if nodes else None
 
 
 def _subroutine_statement_objects(root: ET.Element) -> list[ET.Element]:
     objects: list[ET.Element] = []
-    for element in root.iter():
-        if _local_name(element.tag) != "Object":
-            continue
+    for element in _elements_by_local_name(root, "Object"):
         object_type = str(element.attrib.get("Type") or "")
         if "SubRoutineStatement" in object_type or _find_descendant(element, "SubRoutineStatement") is not None:
             objects.append(element)

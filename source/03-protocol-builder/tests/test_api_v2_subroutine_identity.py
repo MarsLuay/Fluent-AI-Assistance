@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import tempfile
 import unittest
-from fluent_pipeline import xml_compat as ET
 from pathlib import Path
+from unittest.mock import patch
 
+import fluent_pipeline.api_v2.subroutine_identity as subroutine_identity
+from fluent_pipeline import xml_compat as ET
+from tecan_common import native_acceleration
 from fluent_pipeline.api_v2.commands import (
     Subroutine,
     VariableMapping,
@@ -56,6 +59,55 @@ SUBROUTINE_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ApiV2SubroutineIdentityTests(unittest.TestCase):
+    def test_subroutine_identity_xml_scans_use_native_selector_and_fallback(self):
+        root = ET.fromstring(
+            '<Root xmlns:x="urn:test">'
+            '<x:Object Type="Tecan.SubRoutineStatement" />'
+            '<Object Type="Other"><x:SubRoutineStatement /></Object>'
+            '<Object Type="Other"><Unrelated /></Object></Root>'
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_objects = subroutine_identity._subroutine_statement_objects(root)
+            expected_descendant = subroutine_identity._find_descendant(
+                root[1], "SubRoutineStatement"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                subroutine_identity,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual_objects = subroutine_identity._subroutine_statement_objects(root)
+                actual_descendant = subroutine_identity._find_descendant(
+                    root[1], "SubRoutineStatement"
+                )
+                self.assertEqual(native_call.call_count, 4)
+        self.assertEqual(actual_objects, expected_objects)
+        self.assertEqual(actual_objects, [root[0], root[1]])
+        self.assertIs(actual_descendant, expected_descendant)
+        self.assertIs(actual_descendant, root[1][0])
+
+        class StringTag(str):
+            pass
+
+        custom_root = ET.Element("Root")
+        custom_element = ET.SubElement(custom_root, StringTag("SubRoutineStatement"))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_custom = subroutine_identity._find_descendant(
+                custom_root, "SubRoutineStatement"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_name(
+                    custom_root, ("SubRoutineStatement",), ET.Element
+                )
+            )
+            actual_custom = subroutine_identity._find_descendant(
+                custom_root, "SubRoutineStatement"
+            )
+        self.assertIs(actual_custom, expected_custom)
+        self.assertIs(actual_custom, custom_element)
+
     def test_subroutine_from_ir_step_maps_fields(self):
         command = subroutine_from_ir_step(
             {
