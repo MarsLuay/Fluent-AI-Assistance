@@ -6841,11 +6841,11 @@ def _xscr_operator_prompts(root: ET.Element) -> list[dict[str, Any]]:
     )
     elements = _native_xml_elements_by_name(root, statement_names, ET.Element)
     if elements is None:
-        elements = root.iter()
+        elements = (
+            el for el in root.iter() if _local_name(el.tag) in statement_names
+        )
     for el in elements:
         statement_name = _local_name(el.tag)
-        if statement_name not in statement_names:
-            continue
         variables = _xscr_rup_variable_items(el)
         prompt = {
             "kind": statement_name,
@@ -6868,10 +6868,12 @@ def _xscr_rup_variable_items(statement: ET.Element) -> list[dict[str, str]]:
         statement, ("RupVariableItem",), ET.Element
     )
     if elements is None:
-        elements = statement.iter()
+        elements = (
+            item
+            for item in statement.iter()
+            if _local_name(item.tag) == "RupVariableItem"
+        )
     for item in elements:
-        if _local_name(item.tag) != "RupVariableItem":
-            continue
         record = {
             "name": _direct_text(item, "VariableName") or "",
             "display_text": _direct_text(item, "DisplayText") or "",
