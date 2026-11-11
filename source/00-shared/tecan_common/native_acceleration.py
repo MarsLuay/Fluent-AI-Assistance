@@ -86,6 +86,17 @@ def extract_line_number_ascii(text: Any) -> str | None:
         return None
 
 
+def xml_normalize_line_numbers_ascii(text: Any) -> str | None:
+    """Replace supported ASCII XML line-number tags natively, or request fallback."""
+    if not enabled() or type(text) is not str or not text.isascii():
+        return None
+    try:
+        result = _native.xml_normalize_line_numbers_ascii(text)
+        return result if type(result) is str and result.isascii() else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def xml_unknown_text_fields(
     text: Any, known_names: Any, limit: Any
 ) -> list[tuple[str, list[str]]] | None:

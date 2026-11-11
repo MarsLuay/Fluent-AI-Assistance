@@ -955,6 +955,44 @@ def test_rga_finger_transfer_drop_source_order_is_preserved():
         b = "<Object><Cmd><LineNumber>99</LineNumber><LabwareName>A</LabwareName></Cmd></Object>"
         self.assertEqual(normalize_command_xml(a), normalize_command_xml(b))
 
+    def test_ascii_line_number_normalization_uses_rust_with_python_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_normalize_line_numbers_ascii"
+        ):
+            self.skipTest("optional Rust line-number normalizer is not built")
+        values = [
+            "<LineNumber>1</LineNumber>",
+            "<LINENUMBER>\x1c 2 \x1f</linenumber>",
+            "<LineNumber>12</LineNumber><LineNumber>003</LineNumber>",
+            "<LineNumber>x</LineNumber>",
+            "<LineNumber>١٢</LineNumber>",
+            "<LİneNumber>4</LİneNumber>",
+            "&lt;LineNumber&gt;99&lt;/LineNumber&gt;",
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [normalize_command_xml(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                xml_compare,
+                "_native_xml_normalize_line_numbers_ascii",
+                wraps=native_acceleration.xml_normalize_line_numbers_ascii,
+            ) as native_call:
+                actual = [normalize_command_xml(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [
+                "<linenumber>0</linenumber>",
+                "<linenumber>0</linenumber>",
+                "<linenumber>0</linenumber><linenumber>0</linenumber>",
+                "<linenumber>x</linenumber>",
+                "<linenumber>0</linenumber>",
+                expected[5],
+                "<linenumber>0</linenumber>",
+            ],
+        )
+
     def test_golden_compare_detects_drift(self):
         golden = command_to_xml(
             AddLabware(

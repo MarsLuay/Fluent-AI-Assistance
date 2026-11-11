@@ -1156,6 +1156,64 @@ fn extract_line_number_ascii(text: &str) -> Option<String> {
     Some(extract_line_number_ascii_value(text))
 }
 
+fn normalize_line_number_tags_ascii_value(text: &str) -> Option<String> {
+    const OPEN: &[u8] = b"<LineNumber>";
+    const CLOSE: &[u8] = b"</LineNumber>";
+    const REPLACEMENT: &str = "<LineNumber>0</LineNumber>";
+    if !text.is_ascii() {
+        return None;
+    }
+    let bytes = text.as_bytes();
+    let mut output = String::with_capacity(text.len());
+    let mut cursor = 0;
+    let mut copied_through = 0;
+    while cursor + OPEN.len() <= bytes.len() {
+        let open_end = cursor + OPEN.len();
+        if !bytes[cursor..open_end].eq_ignore_ascii_case(OPEN) {
+            cursor += 1;
+            continue;
+        }
+        let mut value_start = open_end;
+        while value_start < bytes.len() && is_python_ascii_whitespace(bytes[value_start]) {
+            value_start += 1;
+        }
+        let mut value_end = value_start;
+        while value_end < bytes.len() && bytes[value_end].is_ascii_digit() {
+            value_end += 1;
+        }
+        if value_start == value_end {
+            cursor += 1;
+            continue;
+        }
+        let mut close_start = value_end;
+        while close_start < bytes.len() && is_python_ascii_whitespace(bytes[close_start]) {
+            close_start += 1;
+        }
+        let Some(close_end) = close_start.checked_add(CLOSE.len()) else {
+            cursor += 1;
+            continue;
+        };
+        if bytes
+            .get(close_start..close_end)
+            .is_some_and(|closing| closing.eq_ignore_ascii_case(CLOSE))
+        {
+            output.push_str(&text[copied_through..cursor]);
+            output.push_str(REPLACEMENT);
+            cursor = close_end;
+            copied_through = close_end;
+        } else {
+            cursor += 1;
+        }
+    }
+    output.push_str(&text[copied_through..]);
+    Some(output)
+}
+
+#[pyfunction]
+fn xml_normalize_line_numbers_ascii(text: &str) -> Option<String> {
+    normalize_line_number_tags_ascii_value(text)
+}
+
 fn xml_regex_first_value_ascii(text: &str, name: &str) -> Option<String> {
     if !text.is_ascii() || !name.is_ascii() || name.is_empty() || name.contains(':') {
         return None;
@@ -7338,6 +7396,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(has_gwl_record_prefix, module)?)?;
     module.add_function(wrap_pyfunction!(xml_regex_first_value, module)?)?;
     module.add_function(wrap_pyfunction!(extract_line_number_ascii, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_normalize_line_numbers_ascii, module)?)?;
     module.add_function(wrap_pyfunction!(xml_unknown_text_fields, module)?)?;
     module.add_function(wrap_pyfunction!(extract_data_store_versions, module)?)?;
     module.add_function(wrap_pyfunction!(count_xscr_object_type_attributes, module)?)?;
@@ -8221,6 +8280,26 @@ mod tests {
             assert_eq!(has_gwl_record_prefix_ascii(text), Some(false), "{text:?}");
         }
         assert_eq!(has_gwl_record_prefix_ascii("\u{00a0}A;source"), None);
+    }
+
+    #[test]
+    fn line_number_tag_normalization_matches_ascii_regex_shape() {
+        assert_eq!(
+            normalize_line_number_tags_ascii_value(
+                "<LINEnumber>\u{1c}123 \t</lineNUMBER><LineNumber>bad</LineNumber>"
+            ),
+            Some("<LineNumber>0</LineNumber><LineNumber>bad</LineNumber>".to_owned())
+        );
+        assert_eq!(
+            normalize_line_number_tags_ascii_value(
+                "<LineNumber>1</LineNumber><LineNumber> 22 </LineNumber>"
+            ),
+            Some("<LineNumber>0</LineNumber><LineNumber>0</LineNumber>".to_owned())
+        );
+        assert_eq!(
+            normalize_line_number_tags_ascii_value("<LineNumber>１２</LineNumber>"),
+            None
+        );
     }
 
     #[test]

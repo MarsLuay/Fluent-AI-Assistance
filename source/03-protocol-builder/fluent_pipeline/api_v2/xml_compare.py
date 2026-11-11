@@ -9,6 +9,7 @@ from .. import xml_compat as ET
 from tecan_common.native_acceleration import (
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_local_name as _native_xml_local_name,
+    xml_normalize_line_numbers_ascii as _native_xml_normalize_line_numbers_ascii,
 )
 
 
@@ -37,7 +38,12 @@ def normalize_command_xml(xml_text: str) -> str:
     if not text:
         return ""
     text = html.unescape(text)
-    text = LINE_NUMBER_RE.sub("<LineNumber>0</LineNumber>", text)
+    native = _native_xml_normalize_line_numbers_ascii(text)
+    text = (
+        native
+        if native is not None
+        else LINE_NUMBER_RE.sub("<LineNumber>0</LineNumber>", text)
+    )
     text = WHITESPACE_RE.sub("><", text)
     text = re.sub(r"\s+", "", text)
     text = re.sub(r"<([a-z0-9_:.-]+)/>", r"<\1></\1>", text.lower())
