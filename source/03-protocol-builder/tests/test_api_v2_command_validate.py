@@ -146,11 +146,27 @@ class ApiV2CommandValidateTests(unittest.TestCase):
                     root
                 )
                 actual_labware = command_validate._compiled_labware_name_fields(root)
-                self.assertEqual(native_call.call_count, 2)
+                actual_first_text = command_validate._first_text(root, "Name")
+                self.assertEqual(native_call.call_count, 5)
         self.assertEqual(actual_variables, expected_variables)
         self.assertEqual(actual_variables, {"first", "second"})
         self.assertEqual(actual_labware, expected_labware)
         self.assertEqual(actual_labware, ["first", "second"])
+        self.assertEqual(actual_first_text, "first")
+
+        commented = command_validate.ET.Element("Root")
+        commented.append(command_validate.ET.Comment("fallback"))
+        command_validate.ET.SubElement(commented, "Name").text = "comment-safe"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_text = command_validate._first_text(commented, "Name")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_name(
+                    commented, ("Name",), command_validate.ET.Element
+                )
+            )
+            native_fallback_text = command_validate._first_text(commented, "Name")
+        self.assertEqual(native_fallback_text, fallback_text)
 
     def test_structured_failures_for_bad_xscr(self):
         with tempfile.TemporaryDirectory() as tmp:

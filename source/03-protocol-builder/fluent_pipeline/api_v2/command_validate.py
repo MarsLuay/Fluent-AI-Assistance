@@ -795,7 +795,10 @@ def _compiled_labware_name_fields(root: ET.Element) -> list[str]:
 
 
 def _first_text(root: ET.Element, name: str, default: str = "") -> str:
-    for element in root.iter():
+    elements = _native_xml_elements_by_name(root, (name,), ET.Element)
+    if elements is None:
+        elements = root.iter()
+    for element in elements:
         if _local_name(element.tag) == name:
             text = (element.text or "").strip()
             return text if text else default
