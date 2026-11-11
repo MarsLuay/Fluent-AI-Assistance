@@ -455,6 +455,87 @@ class ProtocolIrNativeStringsTests(unittest.TestCase):
                 forced_fallback = select_slots()
         self.assertEqual(forced_fallback, expected)
 
+    def test_verification_rup_mode_uses_native_ascii_lower_with_unicode_fallback(self):
+        modes = ["WORKTABLE", "STANDARD", "MIXED", "  WORKTABLE  ", "Wörktable"]
+
+        def resolve_modes():
+            return [
+                protocol_ir_compat_module.resolve_verification_prompt_rup_kind(
+                    {}, default_rup_kind=mode
+                )
+                for mode in modes
+            ]
+
+        def annotation_summary(mode: str) -> tuple[str, str, bool]:
+            ir = {
+                "steps": [
+                    {
+                        "id": "step",
+                        "operation": "prompt_user",
+                        "parameters": {"prompt": "Review the result."},
+                    }
+                ]
+            }
+            annotated = (
+                protocol_ir_compat_module.annotate_verification_prompts_with_media(
+                    ir, default_rup_kind=mode
+                )
+            )
+            step = annotated["steps"][0]
+            params = step["parameters"]
+            image = params["media_placeholders"][0]
+            return (
+                params["rup_kind"],
+                step["command_id"],
+                bool(image.get("worktable_display")),
+            )
+
+        annotation_modes = ["WORKTABLE", "STANDARD", "Wörktable"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = resolve_modes()
+            expected_annotations = [
+                annotation_summary(mode) for mode in annotation_modes
+            ]
+        self.assertEqual(
+            expected,
+            ["worktable", "standard", "standard", "worktable", "standard"],
+        )
+        self.assertEqual(
+            expected_annotations,
+            [
+                ("worktable", "RUPWorktableStatement", True),
+                ("standard", "RUPStandardStatement", False),
+                ("standard", "RUPStandardStatement", False),
+            ],
+        )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                protocol_ir_compat_module,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = resolve_modes()
+                actual_annotations = [
+                    annotation_summary(mode) for mode in annotation_modes
+                ]
+                self.assertGreaterEqual(native_call.call_count, len(modes))
+            native_call.assert_any_call("WORKTABLE")
+            native_call.assert_any_call("Wörktable")
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual_annotations, expected_annotations)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                protocol_ir_compat_module, "_native_ascii_lower", return_value=None
+            ):
+                forced_fallback = resolve_modes()
+                forced_annotations = [
+                    annotation_summary(mode) for mode in annotation_modes
+                ]
+        self.assertEqual(forced_fallback, expected)
+        self.assertEqual(forced_annotations, expected_annotations)
+
     def test_rup_display_type_alias_normalization_uses_native_compaction(self):
         cases = [
             ("Combo Box", False),

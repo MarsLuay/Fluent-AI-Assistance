@@ -330,7 +330,7 @@ def resolve_verification_prompt_rup_kind(
     *,
     default_rup_kind: str = "mixed",
 ) -> str:
-    mode = str(default_rup_kind or "mixed").strip().lower()
+    mode = _lower_text(str(default_rup_kind or "mixed").strip())
     if mode == "worktable":
         return "worktable"
     if mode == "standard":
@@ -353,7 +353,7 @@ def annotate_verification_prompts_with_media(
     *,
     default_rup_kind: str = "mixed",
 ) -> dict[str, Any]:
-    mode = str(default_rup_kind or "mixed").strip().lower()
+    mode = _lower_text(str(default_rup_kind or "mixed").strip())
     if mode not in {"standard", "worktable", "mixed"}:
         mode = "mixed"
 
