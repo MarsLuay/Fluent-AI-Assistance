@@ -1244,7 +1244,7 @@ class ReaderTests(unittest.TestCase):
         </Root>"""
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             expected = reader_xmlobj.inspect_xml_object_text(
-                xml_text, source_name="fixture.xwsp", suffix=".xwsp"
+                xml_text, source_name="fixture.xwsp", suffix=".XWSP"
             )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
@@ -1258,11 +1258,12 @@ class ReaderTests(unittest.TestCase):
                     wraps=xml_helpers._native_xml_texts_by_name,
                 ) as native_grouped_call:
                     actual = reader_xmlobj.inspect_xml_object_text(
-                        xml_text, source_name="fixture.xwsp", suffix=".xwsp"
+                        xml_text, source_name="fixture.xwsp", suffix=".XWSP"
                     )
                     grouped_call.assert_called_once()
                     native_grouped_call.assert_called_once()
         self.assertEqual(actual, expected)
+        self.assertEqual(actual["kind"], "workspace")
         self.assertEqual(actual["object_name"], "Selected Object")
         self.assertEqual(actual["type_id"], "type-one")
         self.assertEqual(actual["names"], ["First Name", "Second Name"])

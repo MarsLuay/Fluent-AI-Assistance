@@ -58,8 +58,9 @@ def inspect_xml_object_text(
     object_name = first_grouped("ObjectName") or first_grouped("Name")
     pin_refs = _pin_refs(text)
     asset_refs = _asset_refs(text)
+    kind = _kind_from_suffix(suffix)
     return {
-        "kind": _kind_from_suffix(suffix),
+        "kind": kind,
         "source": source_name,
         "entry": source_name,
         "object_name": object_name,
@@ -75,7 +76,7 @@ def inspect_xml_object_text(
         "names": grouped.get("Name", [])[:50],
         "guids": [*grouped.get("Guid", []), *grouped.get("GUID", [])][:20],
         "workspace_guid": Path(str(source_name).replace("\\", "/")).stem
-        if suffix.lower() == ".xwsp"
+        if kind == "workspace"
         else "",
         "pin_refs": pin_refs,
         "asset_refs": asset_refs,
