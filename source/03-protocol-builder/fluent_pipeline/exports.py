@@ -23,6 +23,7 @@ from fluentcoder.expressions import (
     expression_inventory_from_xscr_text,
 )
 from tecan_common.native_acceleration import (
+    xml_clean_text as _native_xml_clean_text,
     xml_direct_elements_by_name as _native_xml_direct_elements_by_name,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
@@ -8231,7 +8232,9 @@ def _direct_text(parent: ET.Element | None, name: str) -> str | None:
 def _text(node: ET.Element | None) -> str | None:
     if node is None or node.text is None:
         return None
-    value = node.text.strip()
+    value = _native_xml_clean_text(node.text)
+    if value is None:
+        value = node.text.strip()
     return value or None
 
 

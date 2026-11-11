@@ -65,6 +65,44 @@ class XscrPromptSelectorTests(unittest.TestCase):
         self.assertEqual(fallback_actual, fallback_expected)
         self.assertEqual(fallback_actual, "PythonFallback")
 
+    def test_text_cleaning_uses_native_unicode_strip_and_custom_fallback(self):
+        class TextNode:
+            def __init__(self, text):
+                self.text = text
+
+        nodes = [
+            TextNode("  value \t"),
+            TextNode("\u2003value\u00a0"),
+            TextNode("\u2003"),
+            TextNode(""),
+        ]
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [exports._text(node) for node in nodes]
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_xml_clean_text",
+                wraps=native_acceleration.xml_clean_text,
+            ) as native_call:
+                actual = [exports._text(node) for node in nodes]
+                self.assertEqual(native_call.call_count, len(nodes))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["value", "value", None, None])
+
+        class CustomText(str):
+            def strip(self, *args, **kwargs):
+                return "python-custom-strip"
+
+        custom_node = TextNode(CustomText(" raw "))
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_xml_clean_text",
+                wraps=native_acceleration.xml_clean_text,
+            ) as native_call:
+                self.assertEqual(exports._text(custom_node), "python-custom-strip")
+                self.assertEqual(native_call.call_count, 1)
+
     def test_readiness_titles_use_native_selector_and_python_fallback(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "synthetic.xscr"
