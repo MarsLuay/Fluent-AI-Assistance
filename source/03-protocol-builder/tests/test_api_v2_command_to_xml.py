@@ -584,8 +584,8 @@ class ApiV2CommandSerializerTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 commands_module,
-                "_native_xml_elements_by_name",
-                wraps=native_acceleration.xml_elements_by_name,
+                "_native_xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
             ) as native_call:
                 actual = commands_module._find_descendant(root, "Target")
                 self.assertEqual(native_call.call_count, 1)
@@ -602,8 +602,8 @@ class ApiV2CommandSerializerTests(unittest.TestCase):
             fallback_expected = commands_module._find_descendant(custom_root, "Target")
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(
-                native_acceleration.xml_elements_by_name(
-                    custom_root, ("Target",), ET.Element
+                native_acceleration.xml_first_element_by_name(
+                    custom_root, "Target", ET.Element
                 )
             )
             fallback_actual = commands_module._find_descendant(custom_root, "Target")

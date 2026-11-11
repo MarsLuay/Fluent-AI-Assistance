@@ -1030,9 +1030,10 @@ def _find_descendant(element: Any, name: str) -> Any:
 
     if not isinstance(element, ET.Element):
         return None
-    nodes = _native_xml_elements_by_name(element, (name,), ET.Element)
-    if nodes is not None:
-        return nodes[0] if nodes else None
+    selection = _native_xml_first_element_by_name(element, name, ET.Element)
+    if selection is not None:
+        _, node = selection
+        return node
     for node in element.iter():
         if _local_name(node.tag) == name:
             return node
