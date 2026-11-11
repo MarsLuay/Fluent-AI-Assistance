@@ -113,6 +113,47 @@ class FullExportReadinessTests(unittest.TestCase):
             {item["code"] for item in result.to_dict()["diagnostics"]},
         )
 
+    def test_unresolved_diagnostic_uses_native_substring_with_unicode_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native,
+            "ascii_case_insensitive_substring_match_values",
+        ):
+            self.skipTest("optional Rust substring matcher is not built")
+        items = [
+            UnresolvedReference(
+                "synthetic.zeia",
+                "entry",
+                "entity",
+                "target",
+                "unknown",
+                diagnostic_code=code,
+            )
+            for code in (
+                "DEPENDENCY_AMBIGUOUS",
+                "DEPENDENCY_AMBIGUOUſ",
+                "DEPENDENCY_UNRESOLVED",
+            )
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [readiness_module._unresolved_diagnostic(item) for item in items]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_case_insensitive_substring_match_values",
+                wraps=native_acceleration.ascii_case_insensitive_substring_match_values,
+            ) as native_call:
+                actual = [readiness_module._unresolved_diagnostic(item) for item in items]
+                self.assertEqual(native_call.call_count, 3)
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            [item["code"] for item in actual],
+            [
+                DiagnosticCode.DEPENDENCY_AMBIGUOUS,
+                DiagnosticCode.DEPENDENCY_AMBIGUOUS,
+                DiagnosticCode.DEPENDENCY_UNRESOLVED,
+            ],
+        )
+
     def test_required_dependency_stays_partial_in_dependency_rich_export(self) -> None:
         result = resolve_full_export_readiness(
             _model(

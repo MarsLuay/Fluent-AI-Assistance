@@ -27,6 +27,15 @@ def _casefold_equals(value: str, expected: str) -> bool:
     return value.casefold() == expected
 
 
+def _contains_casefold(value: str, needle: str) -> bool:
+    native = native_acceleration.ascii_case_insensitive_substring_match_values(
+        [value], needle
+    )
+    if native is not None:
+        return native[0]
+    return needle.casefold() in value.casefold()
+
+
 class ReadinessStatus(str, Enum):
     """Factual status of an export, independent of user approval."""
 
@@ -643,7 +652,7 @@ def _diagnostic_status(diagnostics: Sequence[Mapping[str, Any]]) -> ReadinessSta
 
 
 def _unresolved_diagnostic(item: UnresolvedReference) -> dict[str, Any]:
-    ambiguous = "ambiguous" in item.diagnostic_code.casefold()
+    ambiguous = _contains_casefold(item.diagnostic_code, "ambiguous")
     code = DiagnosticCode.DEPENDENCY_AMBIGUOUS if ambiguous else DiagnosticCode.DEPENDENCY_UNRESOLVED
     return make_diagnostic(
         code,
