@@ -119,6 +119,14 @@ def _casefold_equal(left: str, right: str) -> bool:
     return native if native is not None else left.casefold() == right.casefold()
 
 
+def _casefold_key(value: str) -> str:
+    if type(value) is str and value.strip() == value:
+        native = _native_ascii_casefold_trim(value)
+        if native is not None:
+            return native
+    return value.casefold()
+
+
 def _workspace_by_name(catalog: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     indexed: dict[str, dict[str, Any]] = {}
     for workspace in catalog:
@@ -471,7 +479,7 @@ def detect_initialization_worktable_candidates(
             not any("bind to this worktable" in reason for reason in item.reasons),
             not item.has_fca_waste,
             -item.score,
-            item.name.casefold(),
+            _casefold_key(item.name),
         )
     )
     return tuple(scored)

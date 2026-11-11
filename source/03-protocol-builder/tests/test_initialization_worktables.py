@@ -183,6 +183,38 @@ class InitializationWorktableTests(unittest.TestCase):
                 ]
         self.assertEqual(fallback, expected)
 
+    def test_sort_casefold_key_preserves_python_semantics_and_fallback(self):
+        class CustomText(str):
+            def casefold(self):
+                return "custom-result"
+
+        values = ["Alpha", " alpha ", "Straße", "ſ", "Z", "Å", CustomText("Alpha")]
+        expected = [value.casefold() for value in values]
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [initialization_worktables._casefold_key(value) for value in values]
+        self.assertEqual(disabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                initialization_worktables,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = [initialization_worktables._casefold_key(value) for value in values]
+                self.assertEqual(native_call.call_count, 5)
+        self.assertEqual(enabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                initialization_worktables,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = [
+                    initialization_worktables._casefold_key(value) for value in values
+                ]
+        self.assertEqual(fallback, expected)
+
     def test_selection_normalization_uses_native_ascii_with_unicode_fallback(self):
         values = [
             " METHOD ",
@@ -594,7 +626,14 @@ class InitializationWorktableTests(unittest.TestCase):
             ],
         }
 
-        plan = build_initialization_worktable_plan(manifest, ir=ir, spec=None)
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                initialization_worktables,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                plan = build_initialization_worktable_plan(manifest, ir=ir, spec=None)
+                self.assertGreater(native_call.call_count, 0)
 
         self.assertIsNotNone(plan)
         assert plan is not None
