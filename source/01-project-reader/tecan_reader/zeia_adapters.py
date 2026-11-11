@@ -14,6 +14,7 @@ from tecan_common.native_acceleration import (
     extract_data_store_versions as _native_extract_data_store_versions,
     has_gwl_record_prefix as _native_has_gwl_record_prefix,
     has_visionx_namespace as _native_has_visionx_namespace,
+    xml_regex_first_value as _native_xml_regex_first_value,
     zeia_xml_structural_flags as _native_zeia_xml_structural_flags,
 )
 from tecan_common.performance import (
@@ -980,6 +981,9 @@ def _inspect_object_member(
 
 
 def _xml_value(text: str, name: str) -> str:
+    native = _native_xml_regex_first_value(text, name)
+    if native is not None:
+        return native
     match = re.search(rf"<(?:[A-Za-z_][\w.-]*:)?{re.escape(name)}(?:\s[^>]*)?>(.*?)</(?:[A-Za-z_][\w.-]*:)?{re.escape(name)}>", text, re.IGNORECASE | re.DOTALL)
     return re.sub(r"\s+", " ", match.group(1)).strip() if match else ""
 

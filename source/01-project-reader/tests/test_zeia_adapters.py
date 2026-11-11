@@ -333,6 +333,54 @@ class ZeiaAdapterTests(unittest.TestCase):
         self.assertEqual(accelerated["command_count"], 2)
         self.assertEqual(accelerated["command_count"], fallback["command_count"])
 
+    def test_xml_scalar_probe_matches_python_regex_and_unicode_fallback(self) -> None:
+        name = "Name"
+        pattern = (
+            rf"<(?:[A-Za-z_][\w.-]*:)?{re.escape(name)}"
+            rf"(?:\s[^>]*)?>(.*?)</(?:[A-Za-z_][\w.-]*:)?{re.escape(name)}>"
+        )
+        samples = (
+            "<Name>  alpha\tbeta\n</Name>",
+            "<x:Name a='1'>first</bad:Name><Name>second</Name>",
+            "prefix <NameX>wrong</NameX><Name>later</Name>",
+            "<Name/>ignored</Name>",
+            "<Name>unterminated",
+            "<Name>outer <Name>inner</Name>",
+            "<Name a='>'>value</Name>",
+            "<1x:Name>bad prefix</Name>",
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            for sample in samples:
+                match = re.search(pattern, sample, re.IGNORECASE | re.DOTALL)
+                expected = re.sub(r"\s+", " ", match.group(1)).strip() if match else ""
+                native = native_acceleration.xml_regex_first_value(sample, name)
+                if native_acceleration.available():
+                    self.assertEqual(native, expected, repr(sample))
+                else:
+                    self.assertIsNone(native, repr(sample))
+                self.assertEqual(zeia_adapters_module._xml_value(sample, name), expected)
+
+            unicode_text = "<Name> café </Name>"
+            self.assertIsNone(native_acceleration.xml_regex_first_value(unicode_text, name))
+            self.assertEqual(zeia_adapters_module._xml_value(unicode_text, name), "café")
+
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                for sample in samples:
+                    match = re.search(pattern, sample, re.IGNORECASE | re.DOTALL)
+                    expected = re.sub(r"\s+", " ", match.group(1)).strip() if match else ""
+                    self.assertEqual(zeia_adapters_module._xml_value(sample, name), expected)
+
+            with patch.object(
+                zeia_adapters_module,
+                "_native_xml_regex_first_value",
+                wraps=native_acceleration.xml_regex_first_value,
+            ) as native_call:
+                self.assertEqual(
+                    zeia_adapters_module._xml_value("<Name>native</Name>", name),
+                    "native",
+                )
+                self.assertEqual(native_call.call_count, 1)
+
     def test_worklists_are_canonical_entities(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             archive = self._archive(

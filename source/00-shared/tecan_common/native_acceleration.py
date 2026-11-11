@@ -64,6 +64,17 @@ def has_gwl_record_prefix(text: Any) -> bool | None:
         return None
 
 
+def xml_regex_first_value(text: Any, name: Any) -> str | None:
+    """Extract a simple tag value natively from ASCII text; otherwise fall back."""
+    if not enabled() or type(text) is not str or type(name) is not str:
+        return None
+    try:
+        result = _native.xml_regex_first_value(text, name)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def extract_data_store_versions(text: Any) -> list[str] | None:
     """Extract ZEIA versions natively for ASCII text; fall back for Unicode."""
     if not enabled() or type(text) is not str:

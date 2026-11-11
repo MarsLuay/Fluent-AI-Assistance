@@ -1008,6 +1008,10 @@ fn is_python_ascii_whitespace(byte: u8) -> bool {
     matches!(byte, 0x09..=0x0d | 0x1c..=0x20)
 }
 
+fn is_python_regex_ascii_whitespace(byte: u8) -> bool {
+    matches!(byte, 0x09..=0x0d | b' ')
+}
+
 fn has_gwl_record_prefix_ascii(text: &str) -> Option<bool> {
     if !text.is_ascii() {
         return None;
@@ -1042,6 +1046,104 @@ fn has_gwl_record_prefix_ascii(text: &str) -> Option<bool> {
 #[pyfunction]
 fn has_gwl_record_prefix(text: &str) -> Option<bool> {
     has_gwl_record_prefix_ascii(text)
+}
+
+fn optional_ascii_xml_prefix_length(bytes: &[u8]) -> usize {
+    let Some(first) = bytes.first().copied() else {
+        return 0;
+    };
+    if !(first.is_ascii_alphabetic() || first == b'_') {
+        return 0;
+    }
+    let mut index = 1;
+    while index < bytes.len()
+        && (is_ascii_word(bytes[index]) || matches!(bytes[index], b'.' | b'-'))
+    {
+        index += 1;
+    }
+    if index < bytes.len() && bytes[index] == b':' {
+        index + 1
+    } else {
+        0
+    }
+}
+
+fn xml_name_matches_at_ascii(text: &[u8], start: usize, name: &[u8]) -> bool {
+    start + name.len() <= text.len() && text[start..start + name.len()].eq_ignore_ascii_case(name)
+}
+
+fn xml_opening_tag_value_end_ascii(text: &[u8], start: usize, name: &[u8]) -> Option<usize> {
+    if text.get(start) != Some(&b'<') {
+        return None;
+    }
+    let tag_start = start + 1;
+    let name_start = tag_start + optional_ascii_xml_prefix_length(&text[tag_start..]);
+    if !xml_name_matches_at_ascii(text, name_start, name) {
+        return None;
+    }
+    let after_name = name_start + name.len();
+    match text.get(after_name).copied()? {
+        b'>' => Some(after_name + 1),
+        byte if is_python_regex_ascii_whitespace(byte) => text[after_name + 1..]
+            .iter()
+            .position(|byte| *byte == b'>')
+            .map(|relative_end| after_name + 1 + relative_end + 1),
+        _ => None,
+    }
+}
+
+fn xml_closing_tag_matches_ascii(text: &[u8], start: usize, name: &[u8]) -> Option<usize> {
+    if text.get(start..start + 2)? != b"</" {
+        return None;
+    }
+    let tag_start = start + 2;
+    let name_start = tag_start + optional_ascii_xml_prefix_length(&text[tag_start..]);
+    if !xml_name_matches_at_ascii(text, name_start, name) {
+        return None;
+    }
+    let close = name_start + name.len();
+    (text.get(close) == Some(&b'>')).then_some(close + 1)
+}
+
+fn collapse_python_regex_ascii_whitespace(value: &str) -> String {
+    value
+        .split(|character| matches!(character, '\t'..='\r' | ' '))
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn xml_regex_first_value_ascii(text: &str, name: &str) -> Option<String> {
+    if !text.is_ascii() || !name.is_ascii() || name.is_empty() || name.contains(':') {
+        return None;
+    }
+    let bytes = text.as_bytes();
+    let name = name.as_bytes();
+    let mut search_start = 0;
+    while let Some(relative_open) = bytes[search_start..].iter().position(|byte| *byte == b'<') {
+        let open = search_start + relative_open;
+        let Some(value_start) = xml_opening_tag_value_end_ascii(bytes, open, name) else {
+            search_start = open + 1;
+            continue;
+        };
+        let mut close_search = value_start;
+        while let Some(relative_close) = bytes[close_search..].iter().position(|byte| *byte == b'<')
+        {
+            let close = close_search + relative_close;
+            if xml_closing_tag_matches_ascii(bytes, close, name).is_some() {
+                let captured = &text[value_start..close];
+                return Some(collapse_python_regex_ascii_whitespace(captured));
+            }
+            close_search = close + 1;
+        }
+        search_start = open + 1;
+    }
+    Some(String::new())
+}
+
+#[pyfunction]
+fn xml_regex_first_value(text: &str, name: &str) -> Option<String> {
+    xml_regex_first_value_ascii(text, name)
 }
 
 fn extract_data_store_versions_ascii(text: &str) -> Option<Vec<String>> {
@@ -6292,6 +6394,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(parse_xml, module)?)?;
     module.add_function(wrap_pyfunction!(xml_tag_local_name, module)?)?;
     module.add_function(wrap_pyfunction!(has_gwl_record_prefix, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_regex_first_value, module)?)?;
     module.add_function(wrap_pyfunction!(extract_data_store_versions, module)?)?;
     module.add_function(wrap_pyfunction!(count_xscr_object_type_attributes, module)?)?;
     module.add_function(wrap_pyfunction!(has_visionx_namespace, module)?)?;
@@ -7121,6 +7224,44 @@ mod tests {
             assert_eq!(has_gwl_record_prefix_ascii(text), Some(false), "{text:?}");
         }
         assert_eq!(has_gwl_record_prefix_ascii("\u{00a0}A;source"), None);
+    }
+
+    #[test]
+    fn xml_scalar_scan_preserves_ascii_regex_capture_and_whitespace() {
+        for (text, name, expected) in [
+            ("<ObjectName> A \r\n B </ObjectName>", "ObjectName", "A B"),
+            (
+                "<x:ObjectName attr='x'>Some <ignored> content</other:ObjectName>",
+                "ObjectName",
+                "Some <ignored> content",
+            ),
+            (
+                "<ObjectName>outer <ObjectName>inner</ObjectName>",
+                "ObjectName",
+                "outer <ObjectName>inner",
+            ),
+            (
+                "<foo:ObjectName>first</x:ObjectName><ObjectName>second</ObjectName>",
+                "ObjectName",
+                "first",
+            ),
+            ("<ObjectName/>ignored</ObjectName>", "ObjectName", ""),
+            ("<ObjectName >missing close", "ObjectName", ""),
+            (
+                "<1:ObjectName>invalid prefix</ObjectName>",
+                "ObjectName",
+                "",
+            ),
+            ("<ObjectName>Case</Objectname>", "ObjectName", "Case"),
+        ] {
+            assert_eq!(
+                xml_regex_first_value_ascii(text, name),
+                Some(expected.to_string()),
+                "{text:?}"
+            );
+        }
+        assert_eq!(xml_regex_first_value_ascii("<Name>é</Name>", "Name"), None);
+        assert_eq!(xml_regex_first_value_ascii("<Name>x</Name>", "é"), None);
     }
 
     #[test]
