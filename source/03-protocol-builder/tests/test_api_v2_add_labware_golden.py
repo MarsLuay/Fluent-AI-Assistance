@@ -79,8 +79,8 @@ class ApiV2AddLabwareGoldenTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 add_labware_golden,
-                "_native_xml_elements_by_name",
-                wraps=native_acceleration.xml_elements_by_name,
+                "_native_xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
             ) as native_call:
                 actual = add_labware_golden._find_descendant(root, "AddLabwareDataV1")
                 self.assertEqual(native_call.call_count, 1)
@@ -101,8 +101,8 @@ class ApiV2AddLabwareGoldenTests(unittest.TestCase):
             )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(
-                native_acceleration.xml_elements_by_name(
-                    custom_root, ("AddLabwareDataV1",), ET.Element
+                native_acceleration.xml_first_element_by_name(
+                    custom_root, "AddLabwareDataV1", ET.Element
                 )
             )
             fallback_actual = add_labware_golden._find_descendant(
