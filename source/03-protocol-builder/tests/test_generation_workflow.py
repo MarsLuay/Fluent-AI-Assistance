@@ -1,6 +1,8 @@
 from dataclasses import replace as dataclass_replace
 import json
+import random
 import sqlite3
+import string
 import tempfile
 import unittest
 import zipfile
@@ -87,6 +89,19 @@ class SourceVariableRefNativeTests(unittest.TestCase):
             None,
             42,
         ]
+        generator = random.Random(20260312)
+        alphabet = (
+            string.ascii_letters
+            + string.digits
+            + "_'\"+-*/()[]{}.: \t\n\r"
+        )
+        values.extend(
+            "".join(
+                generator.choice(alphabet)
+                for _ in range(generator.randrange(48))
+            )
+            for _ in range(80)
+        )
         with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             expected = [
                 generation_workflow_module._source_condition_variable_refs(value)
@@ -108,7 +123,7 @@ class SourceVariableRefNativeTests(unittest.TestCase):
             )
         self.assertEqual(actual, expected)
         self.assertEqual(
-            actual,
+            actual[:6],
             [
                 {
                     "count",
