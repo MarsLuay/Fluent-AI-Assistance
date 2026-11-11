@@ -36,6 +36,14 @@ def _contains_casefold(value: str, needle: str) -> bool:
     return needle.casefold() in value.casefold()
 
 
+def _casefold_text(value: str) -> str:
+    if type(value) is str and value.strip() == value:
+        native = native_acceleration.ascii_casefold_trim(value)
+        if native is not None:
+            return native
+    return value.casefold()
+
+
 class ReadinessStatus(str, Enum):
     """Factual status of an export, independent of user approval."""
 
@@ -491,10 +499,10 @@ def _find_conflicts(records: Sequence[Mapping[str, Any]]) -> list[IdentifierConf
         names = [record.get("object_name"), *(record.get("names") or [])]
         for name in names:
             if name:
-                identifiers.setdefault(("name", str(name).casefold()), []).append(source)
+                identifiers.setdefault(("name", _casefold_text(str(name))), []).append(source)
         for guid in record.get("guids") or []:
             if guid:
-                identifiers.setdefault(("guid", str(guid).casefold()), []).append(source)
+                identifiers.setdefault(("guid", _casefold_text(str(guid))), []).append(source)
     conflicts = []
     for (identifier_type, identifier), candidates in sorted(identifiers.items()):
         unique = {item["fingerprint"] for item in candidates}
@@ -511,12 +519,16 @@ def _record_fingerprint(record: Mapping[str, Any]) -> tuple[str, ...]:
     if native is not None:
         return native
     return (
-        str(record.get("kind") or "").casefold(),
-        str(record.get("object_name") or "").casefold(),
-        str(record.get("type_id") or "").casefold(),
-        ",".join(sorted(str(value).casefold() for value in record.get("guids") or [])),
-        ",".join(sorted(str(value).casefold() for value in record.get("names") or [])),
-        str(record.get("functional_group") or "").casefold(),
+        _casefold_text(str(record.get("kind") or "")),
+        _casefold_text(str(record.get("object_name") or "")),
+        _casefold_text(str(record.get("type_id") or "")),
+        ",".join(
+            sorted(_casefold_text(str(value)) for value in record.get("guids") or [])
+        ),
+        ",".join(
+            sorted(_casefold_text(str(value)) for value in record.get("names") or [])
+        ),
+        _casefold_text(str(record.get("functional_group") or "")),
     )
 
 
@@ -531,10 +543,10 @@ def _find_unresolved(
     for record in records:
         for name in [record.get("object_name"), *(record.get("names") or [])]:
             if name:
-                name_index.setdefault(str(name).casefold(), []).append(record)
+                name_index.setdefault(_casefold_text(str(name)), []).append(record)
         for guid in [*(record.get("guids") or []), record.get("guid")]:
             if guid:
-                guid_index.setdefault(str(guid).casefold(), []).append(record)
+                guid_index.setdefault(_casefold_text(str(guid)), []).append(record)
     unresolved: list[UnresolvedReference] = []
     for script in scripts:
         provenance = script.get("provenance") or {}
@@ -585,8 +597,8 @@ def _find_unresolved(
 def _lookup(name: str, guid: str, names: Mapping[str, list[Mapping[str, Any]]], guids: Mapping[str, list[Mapping[str, Any]]]) -> list[Mapping[str, Any]]:
     found: list[Mapping[str, Any]] = []
     fingerprints: set[tuple[str, ...]] = set()
-    guid_matches = guids.get(guid.casefold(), []) if guid else []
-    for record in [*names.get(name.casefold(), []), *guid_matches]:
+    guid_matches = guids.get(_casefold_text(guid), []) if guid else []
+    for record in [*names.get(_casefold_text(name), []), *guid_matches]:
         fingerprint = _record_fingerprint(record)
         if fingerprint not in fingerprints:
             found.append(record)
@@ -614,7 +626,11 @@ def _kind_token(value: Any) -> str:
     native = native_acceleration.readiness_kind_token(value)
     if native is not None:
         return native
-    return "".join(character for character in str(value or "").casefold() if character.isalnum())
+    return "".join(
+        character
+        for character in _casefold_text(str(value or ""))
+        if character.isalnum()
+    )
 
 
 def _candidate(record: Mapping[str, Any]) -> dict[str, Any]:

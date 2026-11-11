@@ -273,6 +273,36 @@ class FullExportReadinessTests(unittest.TestCase):
                 self.assertEqual(native_call.call_count, len(records))
         self.assertEqual(actual, expected)
 
+    def test_casefold_text_uses_rust_with_exact_python_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "ascii_casefold_trim"
+        ):
+            self.skipTest("optional Rust ASCII casefold helper is not built")
+
+        class StringSubclass(str):
+            pass
+
+        values = ["Workspace", "Straße", " Name ", StringSubclass("Label")]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [readiness_module._casefold_text(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = [readiness_module._casefold_text(value) for value in values]
+                self.assertEqual(native_call.call_count, 2)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["workspace", "strasse", " name ", "label"])
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration, "ascii_casefold_trim", return_value=None
+            ):
+                fallback = [readiness_module._casefold_text(value) for value in values]
+        self.assertEqual(fallback, expected)
+
     def test_duplicate_identifier_is_ambiguous(self) -> None:
         result = resolve_full_export_readiness(
             [
@@ -282,6 +312,50 @@ class FullExportReadinessTests(unittest.TestCase):
         )
         self.assertEqual(result.status, ReadinessStatus.AMBIGUOUS)
         self.assertEqual(result.conflicts[0].identifier, "same")
+
+        unicode_result = resolve_full_export_readiness(
+            [
+                _model(
+                    "one.zeia",
+                    objects=[_object("workspace", "Straße", "one")],
+                ),
+                _model(
+                    "two.zeia",
+                    objects=[_object("workspace", "STRASSE", "two")],
+                ),
+            ]
+        )
+        self.assertEqual(unicode_result.status, ReadinessStatus.AMBIGUOUS)
+        self.assertEqual(unicode_result.conflicts[0].identifier, "strasse")
+
+    def test_unicode_casefold_reference_lookup_matches_python(self) -> None:
+        models = [
+            _model(
+                "source.zeia",
+                scripts=[
+                    _script(
+                        "Source",
+                        reference={"object_name": "STRASSE", "type_id": "reference"},
+                    )
+                ],
+            ),
+            _model(
+                "target.zeia",
+                objects=[_object("workspace", "Straße", "workspace-guid")],
+            ),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = resolve_full_export_readiness(models).to_dict()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = resolve_full_export_readiness(models).to_dict()
+                self.assertGreater(native_call.call_count, 0)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["unresolved_references"], [])
 
     def test_parse_warning_is_complete_with_warnings(self) -> None:
         result = resolve_full_export_readiness(
