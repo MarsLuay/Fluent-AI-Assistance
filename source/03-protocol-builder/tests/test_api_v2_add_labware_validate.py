@@ -39,6 +39,46 @@ _GOOD_PAYLOAD = """<Object Type="Tecan.Core.Scripting.Worktable.Data.AddLabwareD
 
 
 class AddLabwareValidateTests(unittest.TestCase):
+    def test_has_lid_boolean_uses_native_ascii_parser_and_python_lower_fallback(self):
+        values = ["true", "TRUE", "tRuE", "False", " truſe ", ""]
+        for raw in values:
+            with self.subTest(raw=raw):
+                payload = (
+                    "<Object><AddLabwareDataV1><LabwareType>Type</LabwareType>"
+                    "<LabwareLable>Label</LabwareLable><Location>Site</Location>"
+                    f"<HasLid>{raw}</HasLid>"
+                    "</AddLabwareDataV1></Object>"
+                )
+                command = _CommandStub(payload_xml=payload)
+                expected = raw.strip().lower() == "true"
+
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                    fallback = add_labware_validate.extract_add_labware_fields(command)
+                self.assertIsNotNone(fallback)
+                assert fallback is not None
+                self.assertEqual(fallback.has_lid, expected)
+
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                    with patch.object(
+                        add_labware_validate,
+                        "_native_parse_ascii_bool_text",
+                        wraps=native_acceleration.parse_ascii_bool_text,
+                    ) as native_call:
+                        actual = add_labware_validate.extract_add_labware_fields(command)
+                        self.assertEqual(native_call.call_count, 1)
+                self.assertEqual(actual, fallback)
+
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                    with patch.object(
+                        add_labware_validate,
+                        "_native_parse_ascii_bool_text",
+                        return_value=None,
+                    ):
+                        unsupported_fallback = add_labware_validate.extract_add_labware_fields(
+                            command
+                        )
+                self.assertEqual(unsupported_fallback, fallback)
+
     def test_local_name_uses_native_helper_and_preserves_custom_fallback(self):
         tag = "{urn:example}Labware"
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
