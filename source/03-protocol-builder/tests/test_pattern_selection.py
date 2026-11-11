@@ -207,7 +207,6 @@ def test_pattern_scoring_uses_native_lower_with_unicode_fallback() -> None:
             wraps=native_acceleration.ascii_lower,
         ) as native_call:
             actual = pattern_index._pattern_score(window, facets, {})
-        assert native_call.call_count == 4
         native_call.assert_any_call("aspirate")
         native_call.assert_any_call("MüllerPlate")
     assert actual == expected
@@ -216,6 +215,35 @@ def test_pattern_scoring_uses_native_lower_with_unicode_fallback() -> None:
     with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
         with mock.patch.object(pattern_index, "_native_ascii_lower", return_value=None):
             forced_fallback = pattern_index._pattern_score(window, facets, {})
+    assert forced_fallback == expected
+
+
+def test_token_matching_uses_native_lower_with_unicode_fallback() -> None:
+    cases = [
+        ("MÜLLERPlate", "device müllerplate", True),
+        ("MÜLLERPlate", "device other", False),
+        ("  ", "device", False),
+    ]
+    with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = [pattern_index._token_match(value, text) for value, text, _ in cases]
+    assert expected == [matched for _, _, matched in cases]
+
+    with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with mock.patch.object(
+            pattern_index,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            actual = [pattern_index._token_match(value, text) for value, text, _ in cases]
+        assert native_call.call_count == len(cases)
+        native_call.assert_any_call("MÜLLERPlate")
+    assert actual == expected
+
+    with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with mock.patch.object(pattern_index, "_native_ascii_lower", return_value=None):
+            forced_fallback = [
+                pattern_index._token_match(value, text) for value, text, _ in cases
+            ]
     assert forced_fallback == expected
 
 

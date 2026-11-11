@@ -447,7 +447,7 @@ def _confidence(window: Mapping[str, Any]) -> float:
 
 
 def _token_match(value: str, haystack: str) -> bool:
-    normalized = str(value).strip().casefold()
+    normalized = _casefold_text(str(value).strip())
     if not normalized:
         return False
     return bool(re.search(rf"(?<![a-z0-9]){re.escape(normalized)}(?![a-z0-9])", haystack)) or normalized in haystack
