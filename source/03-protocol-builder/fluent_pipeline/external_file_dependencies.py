@@ -18,6 +18,9 @@ from typing import Any, Mapping
 
 from .exports import _script_file_references
 from .subroutine_dependencies import clean_subroutine_reference, resolve_subroutine_dependencies
+from tecan_common.native_acceleration import (
+    windows_drive_path_prefix as _native_windows_drive_path_prefix,
+)
 
 _FILE_TAG_RE = re.compile(r"<File>(.*?)</File>", re.DOTALL | re.IGNORECASE)
 _APPLICATION_TAG_RE = re.compile(r"<Application>(.*?)</Application>", re.DOTALL | re.IGNORECASE)
@@ -40,11 +43,20 @@ def _normalize_path_text(value: str) -> str:
     return os.path.expandvars(text)
 
 
+def _is_windows_drive_path(text: str) -> bool:
+    native = _native_windows_drive_path_prefix(text)
+    return (
+        native
+        if native is not None
+        else re.match(r"^[A-Za-z]:\\", text) is not None
+    )
+
+
 def _looks_like_windows_path(value: str) -> bool:
     text = _normalize_path_text(value)
     if not text or text.startswith("$"):
         return False
-    if re.match(r"^[A-Za-z]:\\", text):
+    if _is_windows_drive_path(text):
         return True
     return text.startswith("\\\\")
 
@@ -163,7 +175,7 @@ def _expected_exists(expected: str) -> bool:
 def _permission_sensitive_path(expected: str) -> bool:
     """True when the expected path is outside the user profile (often needs elevation)."""
     text = _normalize_path_text(expected)
-    if not re.match(r"^[A-Za-z]:\\", text):
+    if not _is_windows_drive_path(text):
         return False
     home = os.environ.get("USERPROFILE") or str(Path.home().resolve())
     home = _normalize_path_text(home).casefold()

@@ -4,6 +4,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import fluent_pipeline.external_file_dependencies as external_file_dependencies_module
+from tecan_common import native_acceleration
 from fluent_pipeline.external_file_dependencies import (
     audit_external_file_dependencies,
     default_external_file_search_roots,
@@ -14,6 +16,68 @@ from fluent_pipeline.external_file_dependencies import (
 
 
 class ExternalFileDependencyTests(unittest.TestCase):
+    def test_windows_drive_path_detection_native_parity(self):
+        values = [
+            r"C:\Users\Tester\file.bin",
+            r"C:\Program Files\Apps\sample.bin",
+            r"C:\répertoire\sample.bin",
+            r"\\server\share\sample.bin",
+            "C:/portable/file.bin",
+            "relative/path",
+            r"1:\not-drive\file",
+            r"$ROOT\file",
+        ]
+
+        def classify() -> list[tuple[bool, bool]]:
+            return [
+                (
+                    external_file_dependencies_module._looks_like_windows_path(value),
+                    external_file_dependencies_module._permission_sensitive_path(value),
+                )
+                for value in values
+            ]
+
+        with patch.dict(
+            "os.environ",
+            {
+                "TECAN_DISABLE_RUST_ACCELERATION": "1",
+                "USERPROFILE": r"C:\Users\Tester",
+            },
+        ):
+            expected = classify()
+        with patch.dict(
+            "os.environ",
+            {
+                "TECAN_DISABLE_RUST_ACCELERATION": "0",
+                "USERPROFILE": r"C:\Users\Tester",
+            },
+        ):
+            with patch.object(
+                external_file_dependencies_module,
+                "_native_windows_drive_path_prefix",
+                wraps=native_acceleration.windows_drive_path_prefix,
+            ) as native_call:
+                actual = classify()
+                self.assertEqual(native_call.call_count, len(values) * 2 - 1)
+            self.assertTrue(
+                native_acceleration.windows_drive_path_prefix(r"C:\répertoire")
+            )
+            self.assertIsNone(native_acceleration.windows_drive_path_prefix(None))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [
+                (True, False),
+                (True, True),
+                (True, True),
+                (True, False),
+                (True, True),
+                (False, False),
+                (False, False),
+                (False, False),
+            ],
+        )
+
     def test_extracts_tubeye_path_from_xscr(self):
         with tempfile.TemporaryDirectory() as tmp:
             xscr = Path(tmp) / "script.xscr"

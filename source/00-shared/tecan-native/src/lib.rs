@@ -2755,6 +2755,12 @@ fn ascii_variable_name_is_valid(value: &str) -> Option<bool> {
 }
 
 #[pyfunction]
+fn windows_drive_path_prefix(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() >= 3 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && bytes[2] == b'\\'
+}
+
+#[pyfunction]
 fn ascii_safe_component(value: &str, lowercase: bool) -> Option<String> {
     if !value.is_ascii() {
         return None;
@@ -7849,6 +7855,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(ascii_safe_filename, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_safe_variable_base, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_variable_name_is_valid, module)?)?;
+    module.add_function(wrap_pyfunction!(windows_drive_path_prefix, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_safe_component, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_word_boundary_contains, module)?)?;
     module.add_function(wrap_pyfunction!(label_base_ascii_text, module)?)?;
@@ -8051,6 +8058,23 @@ mod tests {
             assert_eq!(ascii_variable_name_is_valid(value), Some(false));
         }
         assert_eq!(ascii_variable_name_is_valid("é"), None);
+    }
+
+    #[test]
+    fn windows_drive_path_prefix_matches_python_ascii_regex() {
+        for value in [r"C:\", r"z:\folder\file", "C:\\répertoire"] {
+            assert!(windows_drive_path_prefix(value), "{value:?}");
+        }
+        for value in [
+            "",
+            "1:\\path",
+            "C:/path",
+            "C:relative",
+            "\\\\server\\share",
+            "é:\\path",
+        ] {
+            assert!(!windows_drive_path_prefix(value), "{value:?}");
+        }
     }
 
     #[test]
