@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import tecan_reader.zeia_adapters as zeia_adapters_module
 from tecan_common import native_acceleration
+from tecan_common.xml_compat import MAX_XML_BYTES
 from tecan_reader.zeia_adapters import (
     ZeiaFormatError,
     ingest_zeia,
@@ -184,6 +185,55 @@ class ZeiaAdapterTests(unittest.TestCase):
                     self.assertEqual(native_call.call_count, 1)
         self.assertEqual(detection.status, "supported")
         self.assertEqual(detection.selected.adapter_id, "visionx-datastore-v3")
+
+    def test_oversized_xscr_object_type_count_matches_python_regex(self) -> None:
+        pattern = r"<Object\b[^>]*\bType=['\"]([^'\"]+)"
+        samples = (
+            "<Object Type='T1' /><object TYPE=\"T2\" />",
+            "<ObjectType='bad'>",
+            "<Object Type = 'bad'>",
+            '<Object data="Type=\'inside\'">',
+            "<Object Type='first' x='y' Type='last'>",
+            "<Object Type='unterminated",
+            "<Object Type=''>",
+            "<Object\nTYPE='line'>",
+            "<Object Type='one'><Object Type='two'>",
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            if native_acceleration.available():
+                for sample in samples:
+                    self.assertEqual(
+                        native_acceleration.count_xscr_object_type_attributes(sample),
+                        len(re.findall(pattern, sample, re.IGNORECASE)),
+                        repr(sample),
+                    )
+                self.assertIsNone(
+                    native_acceleration.count_xscr_object_type_attributes(
+                        "<Object Type='café'>"
+                    )
+                )
+
+            oversized_text = "<Root><Object Type='A'/><Object Type='B'/></Root>"
+            with patch.object(
+                zeia_adapters_module,
+                "_native_count_xscr_object_type_attributes",
+                wraps=native_acceleration.count_xscr_object_type_attributes,
+            ) as native_call:
+                accelerated = zeia_adapters_module._inspect_script_member(
+                    oversized_text.encode(),
+                    "Scripts/example.xscr",
+                    size_bytes=MAX_XML_BYTES + 1,
+                )
+                self.assertEqual(native_call.call_count, 1)
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                fallback = zeia_adapters_module._inspect_script_member(
+                    oversized_text.encode(),
+                    "Scripts/example.xscr",
+                    size_bytes=MAX_XML_BYTES + 1,
+                )
+
+        self.assertEqual(accelerated["command_count"], 2)
+        self.assertEqual(accelerated["command_count"], fallback["command_count"])
 
     def test_worklists_are_canonical_entities(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

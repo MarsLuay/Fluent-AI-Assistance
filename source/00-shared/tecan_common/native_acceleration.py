@@ -77,6 +77,17 @@ def extract_data_store_versions(text: Any) -> list[str] | None:
         return None
 
 
+def count_xscr_object_type_attributes(text: Any) -> int | None:
+    """Count XSCR Object Type regex matches for ASCII text only."""
+    if not enabled() or type(text) is not str:
+        return None
+    try:
+        result = _native.count_xscr_object_type_attributes(text)
+        return result if type(result) is int else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def xml_clean_text(value: Any) -> str | None:
     """Trim exact Unicode XML text natively, preserving Python fallback cases."""
     if not enabled():

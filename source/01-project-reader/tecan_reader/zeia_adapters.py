@@ -10,6 +10,7 @@ from typing import Any, Protocol
 import zipfile
 
 from tecan_common.native_acceleration import (
+    count_xscr_object_type_attributes as _native_count_xscr_object_type_attributes,
     extract_data_store_versions as _native_extract_data_store_versions,
     has_gwl_record_prefix as _native_has_gwl_record_prefix,
 )
@@ -884,7 +885,11 @@ def _inspect_script_member(
     text = data[: min(len(data), 1024 * 1024)].decode("utf-8-sig", errors="replace")
     object_name = _xml_value(text, "ObjectName") or Path(entry).stem
     checksum = _xml_value(text, "Checksum")
-    commands = re.findall(r"<Object\b[^>]*\bType=['\"]([^'\"]+)", text, re.IGNORECASE)
+    command_count = _native_count_xscr_object_type_attributes(text)
+    if command_count is None:
+        command_count = len(
+            re.findall(r"<Object\b[^>]*\bType=['\"]([^'\"]+)", text, re.IGNORECASE)
+        )
     return {
         "kind": "xscr",
         "source": entry,
@@ -900,7 +905,7 @@ def _inspect_script_member(
         "query_prompts": [],
         "operator_prompts": [],
         "set_variables": [],
-        "command_count": len(commands),
+        "command_count": command_count,
         "command_counts": {},
         "family_counts": {},
         "commands": [],

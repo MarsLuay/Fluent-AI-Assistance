@@ -1096,6 +1096,73 @@ fn extract_data_store_versions(text: &str) -> Option<Vec<String>> {
     extract_data_store_versions_ascii(text)
 }
 
+fn is_ascii_word(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || byte == b'_'
+}
+
+fn count_xscr_object_type_attributes_ascii(text: &str) -> Option<usize> {
+    if !text.is_ascii() {
+        return None;
+    }
+    let bytes = text.as_bytes();
+    let object_tag = b"<object";
+    let type_attribute = b"type=";
+    let mut count = 0;
+    let mut search_start = 0;
+    while search_start + object_tag.len() <= bytes.len() {
+        let Some(relative_start) = bytes[search_start..]
+            .windows(object_tag.len())
+            .position(|candidate| candidate.eq_ignore_ascii_case(object_tag))
+        else {
+            break;
+        };
+        let start = search_start + relative_start;
+        let after_object = start + object_tag.len();
+        if after_object < bytes.len() && is_ascii_word(bytes[after_object]) {
+            search_start = start + 1;
+            continue;
+        }
+        let tag_end = bytes[after_object..]
+            .iter()
+            .position(|byte| *byte == b'>')
+            .map_or(bytes.len(), |relative_end| after_object + relative_end);
+        let mut candidate_start = after_object;
+        let mut captured_end = None;
+        while candidate_start + type_attribute.len() <= tag_end {
+            let has_boundary = candidate_start == 0 || !is_ascii_word(bytes[candidate_start - 1]);
+            if has_boundary
+                && bytes[candidate_start..candidate_start + type_attribute.len()]
+                    .eq_ignore_ascii_case(type_attribute)
+            {
+                let quote_index = candidate_start + type_attribute.len();
+                if quote_index < bytes.len() && matches!(bytes[quote_index], b'\'' | b'"') {
+                    let value_start = quote_index + 1;
+                    let value_end = bytes[value_start..]
+                        .iter()
+                        .position(|byte| matches!(byte, b'\'' | b'"'))
+                        .map_or(bytes.len(), |relative_end| value_start + relative_end);
+                    if value_end > value_start {
+                        captured_end = Some(value_end);
+                    }
+                }
+            }
+            candidate_start += 1;
+        }
+        if let Some(match_end) = captured_end {
+            count += 1;
+            search_start = match_end;
+        } else {
+            search_start = start + 1;
+        }
+    }
+    Some(count)
+}
+
+#[pyfunction]
+fn count_xscr_object_type_attributes(text: &str) -> Option<usize> {
+    count_xscr_object_type_attributes_ascii(text)
+}
+
 #[pyfunction]
 fn xml_clean_text(text: &str) -> String {
     trim_python_whitespace(text).to_owned()
@@ -6014,6 +6081,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_tag_local_name, module)?)?;
     module.add_function(wrap_pyfunction!(has_gwl_record_prefix, module)?)?;
     module.add_function(wrap_pyfunction!(extract_data_store_versions, module)?)?;
+    module.add_function(wrap_pyfunction!(count_xscr_object_type_attributes, module)?)?;
     module.add_function(wrap_pyfunction!(xml_clean_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_child_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_leaf_name_texts, module)?)?;
@@ -6860,6 +6928,31 @@ mod tests {
         );
         assert_eq!(
             extract_data_store_versions_ascii("dataStoreVersion=\"3\u{00a0}"),
+            None
+        );
+    }
+
+    #[test]
+    fn oversized_xscr_object_type_count_preserves_regex_boundaries() {
+        for (text, expected) in [
+            ("<Object Type='T1' /><object TYPE=\"T2\" />", 2),
+            ("<ObjectType='bad'>", 0),
+            ("<Object Type = 'bad'>", 0),
+            ("<Object data=\"Type='inside'\">", 1),
+            ("<Object Type='first' x='y' Type='last'>", 1),
+            ("<Object Type='unterminated", 1),
+            ("<Object Type=''>", 0),
+            ("<Object\nTYPE='line'>", 1),
+            ("<Object Type='one'><Object Type='two'>", 2),
+        ] {
+            assert_eq!(
+                count_xscr_object_type_attributes_ascii(text),
+                Some(expected),
+                "{text:?}"
+            );
+        }
+        assert_eq!(
+            count_xscr_object_type_attributes_ascii("<Object Type='é'>"),
             None
         );
     }
