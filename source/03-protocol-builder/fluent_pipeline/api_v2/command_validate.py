@@ -19,6 +19,7 @@ from tecan_common.native_acceleration import (
     ascii_casefold_equals as _native_ascii_casefold_equals,
     bracket_variable_names as _native_bracket_variable_names,
     clean_subroutine_name_ascii as _native_clean_subroutine_name_ascii,
+    extract_line_number_ascii as _native_extract_line_number_ascii,
     normalize_ascii_name as _native_normalize_ascii_name,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_local_name as _native_xml_local_name,
@@ -663,6 +664,9 @@ def _record_for_element(
 
 
 def _extract_line_number_from_xml(xml_text: str) -> str:
+    native = _native_extract_line_number_ascii(xml_text)
+    if native is not None:
+        return native
     match = re.search(r"<LineNumber>\s*(\d+)\s*</LineNumber>", xml_text)
     return match.group(1) if match else ""
 

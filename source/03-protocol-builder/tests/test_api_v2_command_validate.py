@@ -168,6 +168,43 @@ class ApiV2CommandValidateTests(unittest.TestCase):
                 command_validate._clean_subroutine_name(unicode_value), "Ä\\Sub"
             )
 
+    def test_line_number_extraction_uses_ascii_rust_path(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "extract_line_number_ascii"
+        ):
+            self.skipTest("optional Rust ASCII line-number parser is not built")
+        values = [
+            "before<LineNumber>123</LineNumber>",
+            "<LineNumber>\v\f\r\n\t 42 \t</LineNumber>",
+            "<LineNumber>\x1c42\x1f</LineNumber>",
+            "<LineNumber>12 34</LineNumber>",
+            "<LineNumber>123abc</LineNumber>",
+            "<LineNumber>x</LineNumber><LineNumber>7</LineNumber>",
+            "<LineNumber>١٢</LineNumber>",
+            "<LineNumber attr=\"x\">5</LineNumber>",
+            "",
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                command_validate._extract_line_number_from_xml(value)
+                for value in values
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_extract_line_number_ascii",
+                wraps=native_acceleration.extract_line_number_ascii,
+            ) as native_call:
+                actual = [
+                    command_validate._extract_line_number_from_xml(value)
+                    for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual, ["123", "42", "42", "", "", "7", "١٢", "", ""]
+        )
+
     def test_name_normalization_uses_ascii_rust_path(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "normalize_ascii_name"

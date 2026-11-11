@@ -1113,6 +1113,49 @@ fn collapse_python_regex_ascii_whitespace(value: &str) -> String {
         .join(" ")
 }
 
+fn extract_line_number_ascii_value(text: &str) -> String {
+    const OPEN: &[u8] = b"<LineNumber>";
+    const CLOSE: &[u8] = b"</LineNumber>";
+    let bytes = text.as_bytes();
+    let mut search_start = 0;
+    while search_start + OPEN.len() <= bytes.len() {
+        let Some(relative_open) = bytes[search_start..]
+            .windows(OPEN.len())
+            .position(|window| window == OPEN)
+        else {
+            break;
+        };
+        let open = search_start + relative_open;
+        let mut cursor = open + OPEN.len();
+        while cursor < bytes.len() && is_python_ascii_whitespace(bytes[cursor]) {
+            cursor += 1;
+        }
+        let digits_start = cursor;
+        while cursor < bytes.len() && bytes[cursor].is_ascii_digit() {
+            cursor += 1;
+        }
+        if cursor > digits_start {
+            let digits_end = cursor;
+            while cursor < bytes.len() && is_python_ascii_whitespace(bytes[cursor]) {
+                cursor += 1;
+            }
+            if bytes[cursor..].starts_with(CLOSE) {
+                return text[digits_start..digits_end].to_owned();
+            }
+        }
+        search_start = open + 1;
+    }
+    String::new()
+}
+
+#[pyfunction]
+fn extract_line_number_ascii(text: &str) -> Option<String> {
+    if !text.is_ascii() {
+        return None;
+    }
+    Some(extract_line_number_ascii_value(text))
+}
+
 fn xml_regex_first_value_ascii(text: &str, name: &str) -> Option<String> {
     if !text.is_ascii() || !name.is_ascii() || name.is_empty() || name.contains(':') {
         return None;
@@ -7253,6 +7296,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_tag_local_name, module)?)?;
     module.add_function(wrap_pyfunction!(has_gwl_record_prefix, module)?)?;
     module.add_function(wrap_pyfunction!(xml_regex_first_value, module)?)?;
+    module.add_function(wrap_pyfunction!(extract_line_number_ascii, module)?)?;
     module.add_function(wrap_pyfunction!(xml_unknown_text_fields, module)?)?;
     module.add_function(wrap_pyfunction!(extract_data_store_versions, module)?)?;
     module.add_function(wrap_pyfunction!(count_xscr_object_type_attributes, module)?)?;
@@ -8132,6 +8176,31 @@ mod tests {
             assert_eq!(has_gwl_record_prefix_ascii(text), Some(false), "{text:?}");
         }
         assert_eq!(has_gwl_record_prefix_ascii("\u{00a0}A;source"), None);
+    }
+
+    #[test]
+    fn line_number_extraction_matches_ascii_regex_shape() {
+        assert_eq!(
+            extract_line_number_ascii_value(
+                "<LineNumber> \t123\r\n</LineNumber><LineNumber>456</LineNumber>"
+            ),
+            "123"
+        );
+        assert_eq!(
+            extract_line_number_ascii_value("<LineNumber>\u{1c}42\u{1f}</LineNumber>"),
+            "42"
+        );
+        assert_eq!(
+            extract_line_number_ascii_value(
+                "<LineNumber>12 34</LineNumber><LineNumber>005</LineNumber>"
+            ),
+            "005"
+        );
+        assert_eq!(
+            extract_line_number_ascii_value("<LineNumber>+12</LineNumber>"),
+            ""
+        );
+        assert_eq!(extract_line_number_ascii_value("<LineNumber>12"), "");
     }
 
     #[test]
