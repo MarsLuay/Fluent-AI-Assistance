@@ -1,5 +1,9 @@
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
+from tecan_common import native_acceleration
+import fluent_pipeline.compatibility as compatibility_module
 from fluent_pipeline.compatibility import (
     TargetSetup,
     build_compatibility_report,
@@ -8,6 +12,38 @@ from fluent_pipeline.compatibility import (
 
 
 class CompatibilityMatrixTests(unittest.TestCase):
+    def test_version_whitespace_uses_rust_with_python_fallback(self):
+        selected_resource = "Product 3.8\u2003SP1"
+        manual_path = Path("manual.pdf")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = compatibility_module._extract_fluentcontrol_version(
+                selected_resource, manual_path
+            )
+
+        self.assertEqual(expected, "3.8 SP1")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                compatibility_module,
+                "_native_collapse_ascii_whitespace",
+                wraps=native_acceleration.collapse_ascii_whitespace,
+            ) as native_call:
+                actual = compatibility_module._extract_fluentcontrol_version(
+                    selected_resource, manual_path
+                )
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                compatibility_module,
+                "_native_collapse_ascii_whitespace",
+                return_value=None,
+            ):
+                fallback = compatibility_module._extract_fluentcontrol_version(
+                    selected_resource, manual_path
+                )
+        self.assertEqual(fallback, expected)
+
     def test_report_extracts_current_manual_metadata(self):
         report = build_compatibility_report(connector="unitelabs")
 

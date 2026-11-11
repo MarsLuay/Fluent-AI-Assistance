@@ -13,6 +13,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from tecan_common.native_acceleration import (
+    collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
+)
+
 from .config import TECAN_AI_DIR
 
 
@@ -884,7 +888,14 @@ def _extract_fluentcontrol_version(selected_resource: str, pdf_path: Path) -> st
         normalized = value.replace("-", " ")
         match = re.search(r"\b(\d+(?:\.\d+)+(?:\s+SP\d+)?)\b", normalized, flags=re.IGNORECASE)
         if match:
-            return re.sub(r"\s+", " ", match.group(1)).upper().replace("SP", "SP")
+            raw_version = match.group(1)
+            native = _native_collapse_ascii_whitespace(raw_version)
+            version = (
+                native
+                if native is not None
+                else re.sub(r"\s+", " ", raw_version).strip()
+            )
+            return version.upper().replace("SP", "SP")
     return None
 
 
@@ -905,7 +916,14 @@ def _extract_windows_environment(text_path: Path) -> str | None:
     )
     if not match:
         return None
-    return re.sub(r"\s+", " ", match.group(0)).replace(",", "")
+    raw_environment = match.group(0)
+    native = _native_collapse_ascii_whitespace(raw_environment)
+    environment = (
+        native
+        if native is not None
+        else re.sub(r"\s+", " ", raw_environment).strip()
+    )
+    return environment.replace(",", "")
 
 
 def _source_md_value(text: str, label: str) -> str | None:
