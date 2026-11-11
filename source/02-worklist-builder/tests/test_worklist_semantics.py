@@ -13,6 +13,8 @@ from tecan_common.worklist_contract import (
     LoadWorklistContract,
     build_execution_contract,
     normalize_load_worklist,
+    parse_command_tip_mask,
+    parse_selected_tip_indexes,
     _normalize_tip_system as normalize_tip_system,
 )
 from tecan_worklist.cli import main
@@ -241,6 +243,44 @@ class WorklistSemanticsTests(unittest.TestCase):
                     else:
                         with self.assertRaises(ValueError):
                             parse_enabled_tip_mask(value, supported_channels=channels)
+
+    def test_native_contract_tip_parsers_match_python_and_fall_back_on_edges(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_parse_contract_tip_mask"
+        ):
+            self.skipTest("optional Rust contract tip parser is not built")
+
+        cases = [
+            (parse_command_tip_mask, "5", 8, True),
+            (parse_command_tip_mask, 16, 4, True),
+            (parse_command_tip_mask, "invalid", 8, False),
+            (parse_command_tip_mask, 1 << 200, 8, False),
+            (parse_command_tip_mask, "١", 8, False),
+            (parse_command_tip_mask, None, 8, False),
+            (parse_selected_tip_indexes, [0, 2, 2], 8, True),
+            (parse_selected_tip_indexes, (2, 0), 8, True),
+            (parse_selected_tip_indexes, [0, 8], 8, True),
+            (parse_selected_tip_indexes, ["invalid"], 8, False),
+            (parse_selected_tip_indexes, {0, 2}, 8, False),
+            (parse_selected_tip_indexes, (127,), 128, False),
+            (parse_selected_tip_indexes, [1 << 200], 8, False),
+        ]
+        for parser, value, channels, use_native in cases:
+            with self.subTest(parser=parser.__name__, value=value, channels=channels):
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                    expected = parser(value, supported_channels=channels)
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                    with patch.object(
+                        native_acceleration,
+                        "worklist_parse_contract_tip_mask",
+                        wraps=native_acceleration.worklist_parse_contract_tip_mask,
+                    ) as native_call:
+                        actual = parser(value, supported_channels=channels)
+                    if use_native:
+                        native_call.assert_called_once()
+                    else:
+                        native_call.assert_not_called()
+                self.assertEqual(actual, expected)
 
     def test_native_tip_selection_matches_python_and_falls_back_on_edges(self):
         if not native_acceleration.available() or not hasattr(

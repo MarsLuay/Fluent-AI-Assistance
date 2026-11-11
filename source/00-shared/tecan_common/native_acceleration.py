@@ -3230,6 +3230,62 @@ def worklist_load_contract(
         return None
 
 
+def worklist_parse_contract_tip_mask(
+    value: Any,
+    selected_indexes: bool,
+    supported_channels: int,
+) -> tuple[int | None, str, tuple[int, ...]] | None:
+    """Parse supported Load Worklist tip values with the native contract core."""
+    if (
+        not enabled()
+        or type(selected_indexes) is not bool
+        or type(supported_channels) is not int
+        or not 0 <= supported_channels <= 128
+    ):
+        return None
+    try:
+        encoded = _native.worklist_parse_contract_tip_mask(
+            _encode_json(value), selected_indexes, supported_channels
+        )
+        if encoded is None:
+            return None
+        result = json.loads(encoded)
+        parsed_value = result.get("value") if isinstance(result, dict) else None
+        status = result.get("status") if isinstance(result, dict) else None
+        channels = result.get("channels") if isinstance(result, dict) else None
+        if (
+            type(result) is not dict
+            or (parsed_value is not None and type(parsed_value) is not int)
+            or status not in {"unavailable", "malformed", "out_of_range", "valid"}
+            or type(channels) is not list
+            or any(
+                type(channel) is not int
+                or channel < 1
+                or channel > supported_channels
+                for channel in channels
+            )
+            or (
+                status == "valid"
+                and (parsed_value is None or not channels)
+            )
+            or (
+                status in {"unavailable", "malformed"}
+                and (parsed_value is not None or channels)
+            )
+        ):
+            return None
+        return parsed_value, status, tuple(channels)
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def worklist_validate_transfers(
     transfers: Any, strict: bool
 ) -> dict[str, Any] | None:

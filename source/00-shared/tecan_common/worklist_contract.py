@@ -52,11 +52,34 @@ def _first(fields: Mapping[str, Any], names: tuple[str, ...]) -> Any:
     return None
 
 
+def _native_contract_integer_supported(value: Any) -> bool:
+    if type(value) is int:
+        parsed = value
+    elif type(value) is str and value.isascii():
+        try:
+            parsed = int(value.strip(), 10)
+        except ValueError:
+            return False
+    else:
+        return False
+    return -(1 << 127) <= parsed < (1 << 127)
+
+
 def parse_command_tip_mask(value: Any, *, supported_channels: int = 8) -> tuple[int | None, str, tuple[int, ...]]:
     """Parse a Load Worklist mask, where multiple selected channels are valid."""
 
     if value in (None, ""):
         return None, "unavailable", ()
+    if (
+        type(supported_channels) is int
+        and 0 <= supported_channels <= 128
+        and _native_contract_integer_supported(value)
+    ):
+        native = native_acceleration.worklist_parse_contract_tip_mask(
+            value, False, supported_channels
+        )
+        if native is not None:
+            return native
     try:
         mask = int(str(value).strip(), 10)
     except (TypeError, ValueError):
@@ -83,6 +106,18 @@ def parse_selected_tip_indexes(
     if value in (None, ""):
         return None, "unavailable", ()
     values = value if isinstance(value, (list, tuple, set)) else [value]
+    native_values = list(value) if type(value) is tuple else value
+    if (
+        type(supported_channels) is int
+        and 0 <= supported_channels < 128
+        and type(value) in (str, int, list, tuple)
+        and all(_native_contract_integer_supported(item) for item in values)
+    ):
+        native = native_acceleration.worklist_parse_contract_tip_mask(
+            native_values, True, supported_channels
+        )
+        if native is not None:
+            return native
     indexes: list[int] = []
     for item in values:
         try:

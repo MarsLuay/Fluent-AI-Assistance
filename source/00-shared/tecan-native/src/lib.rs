@@ -5725,6 +5725,28 @@ fn extension_counts(suffixes: Vec<String>) -> Vec<(String, usize)> {
 }
 
 #[pyfunction]
+fn worklist_parse_contract_tip_mask(
+    value_json: &str,
+    selected_indexes: bool,
+    supported_channels: usize,
+) -> PyResult<Option<String>> {
+    let Ok(value) = serde_json::from_str::<Value>(value_json) else {
+        return Ok(None);
+    };
+    let parsed = if selected_indexes {
+        tecan_worklist_builder::contracts::parse_selected_tip_indexes(&value, supported_channels)
+    } else {
+        tecan_worklist_builder::contracts::parse_command_tip_mask(&value, supported_channels)
+    };
+    let payload = serde_json::json!({
+        "value": parsed.value,
+        "status": parsed.status,
+        "channels": parsed.channels,
+    });
+    Ok(serde_json::to_string(&payload).ok())
+}
+
+#[pyfunction]
 fn worklist_execution_contract(commands_json: &str) -> PyResult<String> {
     let commands: Value = serde_json::from_str(commands_json)
         .map_err(|error| PyValueError::new_err(error.to_string()))?;
@@ -6781,6 +6803,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(compact_list, module)?)?;
     module.add_function(wrap_pyfunction!(extension_counts, module)?)?;
     module.add_function(wrap_pyfunction!(path_suffixes, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_parse_contract_tip_mask, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_execution_contract, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_load_contract, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_validate_transfers, module)?)?;
