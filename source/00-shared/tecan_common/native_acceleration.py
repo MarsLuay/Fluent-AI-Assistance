@@ -236,6 +236,21 @@ def normalize_script_folder_path(value: Any) -> str | None:
         return None
 
 
+def format_script_display_name(folder: Any, object_name: Any) -> str | None:
+    """Add the folder prefix to a script name natively, or request fallback."""
+    if (
+        not enabled()
+        or type(folder) is not str
+        or type(object_name) is not str
+    ):
+        return None
+    try:
+        result = _native.format_script_display_name(folder, object_name)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def xml_direct_child_texts(root: Any, element_type: Any) -> list[str] | None:
     """Collect non-empty, trimmed texts from direct standard XML children."""
     if not enabled():

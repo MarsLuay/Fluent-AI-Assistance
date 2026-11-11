@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from tecan_common.native_acceleration import (
+    format_script_display_name as _native_format_script_display_name,
     normalize_script_folder_path as _native_normalize_script_folder_path,
 )
 
@@ -190,6 +191,9 @@ def _normalize_folder(value: Any) -> str:
 
 
 def _display_name(folder: str, object_name: str) -> str:
+    native = _native_format_script_display_name(folder, object_name)
+    if native is not None:
+        return native
     if folder and "\\" not in object_name:
         return f"{folder}\\{object_name}"
     return object_name

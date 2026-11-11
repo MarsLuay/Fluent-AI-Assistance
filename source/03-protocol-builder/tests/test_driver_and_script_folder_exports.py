@@ -336,6 +336,33 @@ class ScriptFolderBindingsExportTests(unittest.TestCase):
             ],
         )
 
+    def test_display_name_formatting_uses_native_and_python_fallback(self) -> None:
+        cases = [
+            ("folder", "script", "folder\\script"),
+            ("folder", "nested\\script", "nested\\script"),
+            ("", "script", "script"),
+            ("folder", "", "folder\\"),
+            ("路径", "名字", "路径\\名字"),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                script_folder_bindings_export_module._display_name(folder, name)
+                for folder, name, _ in cases
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                script_folder_bindings_export_module,
+                "_native_format_script_display_name",
+                wraps=native_acceleration.format_script_display_name,
+            ) as native_call:
+                actual = [
+                    script_folder_bindings_export_module._display_name(folder, name)
+                    for folder, name, _ in cases
+                ]
+                self.assertEqual(native_call.call_count, len(cases))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [value for _, _, value in cases])
+
     def test_builds_folder_tree_and_worktable_bindings(self) -> None:
         manifest = {
             "scripts": [

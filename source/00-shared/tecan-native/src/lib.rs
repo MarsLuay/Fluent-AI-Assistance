@@ -1800,6 +1800,19 @@ fn normalize_script_folder_path(text: &str) -> String {
     normalize_script_folder_path_value(text)
 }
 
+fn format_script_display_name_value(folder: &str, object_name: &str) -> String {
+    if !folder.is_empty() && !object_name.contains('\\') {
+        format!("{folder}\\{object_name}")
+    } else {
+        object_name.to_owned()
+    }
+}
+
+#[pyfunction]
+fn format_script_display_name(folder: &str, object_name: &str) -> String {
+    format_script_display_name_value(folder, object_name)
+}
+
 #[pyfunction]
 fn xml_direct_child_texts<'py>(
     py: Python<'py>,
@@ -7527,6 +7540,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(zeia_xml_structural_flags, module)?)?;
     module.add_function(wrap_pyfunction!(xml_clean_text, module)?)?;
     module.add_function(wrap_pyfunction!(normalize_script_folder_path, module)?)?;
+    module.add_function(wrap_pyfunction!(format_script_display_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_child_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_leaf_name_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_record_children, module)?)?;
@@ -8440,6 +8454,24 @@ mod tests {
         assert_eq!(
             normalize_script_folder_path_value("\u{00a0}é/路径/\u{2003}"),
             "é\\路径"
+        );
+    }
+
+    #[test]
+    fn script_display_name_matches_python_folder_prefix_rule() {
+        assert_eq!(
+            format_script_display_name_value("folder", "script"),
+            "folder\\script"
+        );
+        assert_eq!(
+            format_script_display_name_value("folder", "nested\\script"),
+            "nested\\script"
+        );
+        assert_eq!(format_script_display_name_value("", "script"), "script");
+        assert_eq!(format_script_display_name_value("folder", ""), "folder\\");
+        assert_eq!(
+            format_script_display_name_value("路径", "名字"),
+            "路径\\名字"
         );
     }
 
