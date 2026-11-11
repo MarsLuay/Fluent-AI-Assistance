@@ -17,6 +17,7 @@ from tecan_common.native_acceleration import (
     parse_f64_decimal_text as _native_parse_f64_decimal_text,
     parse_i64_text as _native_parse_i64_text,
     xml_clean_text as _native_xml_clean_text,
+    xml_elements_by_name as _native_xml_elements_by_name,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
 )
@@ -189,6 +190,27 @@ _FIELD_ALIASES = {
 }
 
 
+def _supported_heads(root: ET.Element | None) -> list[str]:
+    if root is None:
+        return []
+    elements = _native_xml_elements_by_name(
+        root, ("PipettingDeviceType",), ET.Element
+    )
+    if elements is None:
+        elements = [
+            elem
+            for elem in root.iter()
+            if isinstance(elem.tag, str)
+            and _local_name(elem.tag) == "PipettingDeviceType"
+        ]
+    supported_heads: list[str] = []
+    for elem in elements:
+        head = (elem.text or "").strip()
+        if head and head not in supported_heads:
+            supported_heads.append(head)
+    return supported_heads
+
+
 def parse_xlqc(path: Path | str, *, max_xml_bytes: int = 4 * 1024 * 1024) -> dict[str, Any]:
     """Parse one ``.xlqc`` into portable catalog fields.
 
@@ -204,18 +226,9 @@ def parse_xlqc(path: Path | str, *, max_xml_bytes: int = 4 * 1024 * 1024) -> dic
     root = ET.fromstring(data.decode("utf-8", errors="replace"), max_bytes=max_xml_bytes)
     payload = _find(root, "Payload")
     name = _child_text(payload, "ObjectName") or path.stem
-    supported_heads: list[str] = []
     payload_data = _find(payload, "PayloadData") if payload is not None else None
     search_root = payload_data if payload_data is not None else root
-    if search_root is not None:
-        for elem in search_root.iter():
-            if not isinstance(elem.tag, str):
-                continue
-            if _local_name(elem.tag) != "PipettingDeviceType":
-                continue
-            head = (elem.text or "").strip()
-            if head and head not in supported_heads:
-                supported_heads.append(head)
+    supported_heads = _supported_heads(search_root)
     profiles = _mine_profiles(search_root)
     sections = _summary_sections(profiles) or _pipetting_sections(search_root)
     entry = _clean(
