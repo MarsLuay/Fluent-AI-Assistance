@@ -11,6 +11,7 @@ from typing import Any, Mapping
 
 from . import xml_compat as ET
 from tecan_common.native_acceleration import (
+    windows_drive_path_prefix as _native_windows_drive_path_prefix,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
 )
@@ -877,6 +878,15 @@ def _register_root_namespace(root: Any) -> None:
         ET.register_namespace("sd", tag[1:].split("}", 1)[0])
 
 
+def _has_windows_drive_prefix(value: str) -> bool:
+    native = _native_windows_drive_path_prefix(value)
+    return (
+        native
+        if native is not None
+        else re.match(r"^[A-Za-z]:\\", value) is not None
+    )
+
+
 def _source_file_reference_paths(paths: list[Path]) -> list[str]:
     references: list[str] = []
     pattern = re.compile(
@@ -891,7 +901,7 @@ def _source_file_reference_paths(paths: list[Path]) -> list[str]:
         except OSError:
             continue
         references.extend(_clean_windows_literal(match) for match in pattern.findall(text))
-    return [value for value in references if re.match(r"^[A-Za-z]:\\", value)]
+    return [value for value in references if _has_windows_drive_prefix(value)]
 
 
 def _compiled_external_command_paths(path: Path) -> list[str]:
@@ -906,7 +916,7 @@ def _compiled_external_command_paths(path: Path) -> list[str]:
             flags=re.DOTALL | re.IGNORECASE,
         ):
             value = _clean_windows_literal(raw)
-            if re.match(r"^[A-Za-z]:\\", value):
+            if _has_windows_drive_prefix(value):
                 values.append(value)
     return values
 
