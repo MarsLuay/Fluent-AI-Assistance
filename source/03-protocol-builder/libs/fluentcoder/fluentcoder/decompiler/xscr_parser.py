@@ -29,6 +29,7 @@ from tecan_common.native_acceleration import (
     xml_first_nonempty_texts as _native_xml_first_nonempty_texts,
     parse_ascii_bool_text as _native_parse_ascii_bool_text,
     parse_f64_decimal_text as _native_parse_f64_decimal_text,
+    parse_i64_text as _native_parse_i64_text,
     xscr_object_fields as _native_xscr_object_fields,
 )
 from tecan_common.performance import performance_marker
@@ -997,8 +998,13 @@ def _parse_int_list(obj: ET.Element, field_name: str) -> list[int]:
     values: list[int] = []
     for el in elements_by_name(container, {"int"}):
         if el.text:
+            stripped = el.text.strip()
+            native = _native_parse_i64_text(stripped)
+            if native is not None:
+                values.append(native)
+                continue
             try:
-                values.append(int(el.text.strip()))
+                values.append(int(stripped))
             except ValueError:
                 continue
     return values

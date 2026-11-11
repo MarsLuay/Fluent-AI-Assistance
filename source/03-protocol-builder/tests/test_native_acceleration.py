@@ -143,6 +143,36 @@ class NativeAccelerationTests(unittest.TestCase):
         self.assertEqual(actual[2], "identifier")
         self.assertEqual(actual[3], "diti-id")
 
+    def test_selected_tip_integer_list_uses_native_i64_with_python_fallback(self) -> None:
+        from fluentcoder.decompiler import xscr_parser
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "parse_i64_text"
+        ):
+            self.skipTest("optional Rust signed-integer parser is not built")
+        root = ET.fromstring(
+            "<Object><SelectedTipsIndexes>"
+            "<int>1</int><int>-2</int><int> +3 </int><int>1_0</int>"
+            "<int>١٢</int><int>999999999999999999999999999999999</int>"
+            "<int>invalid</int><int> </int><int/>"
+            "</SelectedTipsIndexes></Object>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = xscr_parser._parse_int_list(root, "SelectedTipsIndexes")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                xscr_parser,
+                "_native_parse_i64_text",
+                wraps=native_acceleration.parse_i64_text,
+            ) as native_call:
+                actual = xscr_parser._parse_int_list(root, "SelectedTipsIndexes")
+                self.assertEqual(native_call.call_count, 8)
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [1, -2, 3, 10, 12, 999999999999999999999999999999999],
+        )
+
     def test_rga_transfer_inner_fields_use_native_xml_helpers(self) -> None:
         from html import escape
 
