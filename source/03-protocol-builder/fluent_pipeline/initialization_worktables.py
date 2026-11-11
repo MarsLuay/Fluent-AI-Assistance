@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 from tecan_common.native_acceleration import (
+    ascii_casefold_equals as _native_ascii_casefold_equals,
     ascii_casefold_trim as _native_ascii_casefold_trim,
 )
 
@@ -70,7 +71,9 @@ class InitializationWorktablePlan:
         init_script = self.primary_init_script or "the initialization"
         if self.primary_init_worktable and (
             not self.script_worktable
-            or self.primary_init_worktable.casefold() != self.script_worktable.casefold()
+            or not _casefold_equal(
+                self.primary_init_worktable, self.script_worktable
+            )
         ):
             return (
                 "Initialization won't work on this worktable so initialize on "
@@ -109,6 +112,11 @@ def _norm(value: Any) -> str:
     text = str(value or "")
     native = _native_ascii_casefold_trim(text)
     return native if native is not None else text.strip().casefold()
+
+
+def _casefold_equal(left: str, right: str) -> bool:
+    native = _native_ascii_casefold_equals(left, right)
+    return native if native is not None else left.casefold() == right.casefold()
 
 
 def _workspace_by_name(catalog: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:

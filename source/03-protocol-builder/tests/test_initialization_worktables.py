@@ -85,6 +85,63 @@ class InitializationWorktableTests(unittest.TestCase):
                 fallback = [initialization_worktables._norm(value) for value in values]
         self.assertEqual(fallback, expected)
 
+    def test_comment_worktable_comparison_uses_native_ascii_and_unicode_fallback(self):
+        cases = [
+            (
+                "initdeck",
+                "InitDeck",
+                "Initialize the instrument before running this method on initdeck.",
+            ),
+            (
+                "STRASSE",
+                "Straße",
+                "Initialize the instrument before running this method on STRASSE.",
+            ),
+            (
+                "OtherDeck",
+                "InitDeck",
+                "Initialization won't work on this worktable so initialize on InitDeck worktable in InitMethod script first.",
+            ),
+        ]
+
+        def build_text(script_worktable: str, primary_init_worktable: str) -> str:
+            plan = initialization_worktables.InitializationWorktablePlan(
+                script_worktable=script_worktable,
+                script_worktable_guid=None,
+                primary_init_worktable=primary_init_worktable,
+                primary_init_worktable_guid=None,
+                primary_init_script="InitMethod",
+                fallback_init_worktables=(),
+                candidates=(),
+            )
+            return plan.comment_text()
+
+        expected = [
+            text for _, _, text in cases
+        ]
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [build_text(script, primary) for script, primary, _ in cases]
+        self.assertEqual(disabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                initialization_worktables,
+                "_native_ascii_casefold_equals",
+                wraps=native_acceleration.ascii_casefold_equals,
+            ) as native_call:
+                enabled = [build_text(script, primary) for script, primary, _ in cases]
+                self.assertEqual(native_call.call_count, len(cases))
+        self.assertEqual(enabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                initialization_worktables,
+                "_native_ascii_casefold_equals",
+                return_value=None,
+            ):
+                fallback = [build_text(script, primary) for script, primary, _ in cases]
+        self.assertEqual(fallback, expected)
+
     def test_selection_normalization_uses_native_ascii_with_unicode_fallback(self):
         values = [
             " METHOD ",
