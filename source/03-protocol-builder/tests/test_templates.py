@@ -235,6 +235,44 @@ class TemplateLibraryTests(unittest.TestCase):
         self.assertIs(actual[0], manifest["scripts"][0])
         self.assertIs(actual[1], manifest["scripts"][1])
 
+    def test_parameter_evidence_keys_use_native_compaction_and_unicode_fallback(self):
+        records = [
+            {
+                "qualified_name": "synthetic-evidence",
+                "STRASSE": "ASCII spelling",
+                "Straße": "casefold expansion",
+                "ſtrasse": "long-s folding",
+                "東京strasse": "Unicode fallback",
+            }
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = template_library_module._parameter_evidence_candidates(
+                "Straße", records, "Straße"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                template_library_module,
+                "_native_ascii_lower_alnum_compact",
+                wraps=native_acceleration.ascii_lower_alnum_compact,
+            ) as native_call:
+                actual = template_library_module._parameter_evidence_candidates(
+                    "Straße", records, "Straße"
+                )
+                self.assertEqual(native_call.call_count, 6)
+            self.assertIsNone(
+                native_acceleration.ascii_lower_alnum_compact("東京strasse")
+            )
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            [candidate.value for candidate in actual],
+            [
+                "ASCII spelling",
+                "casefold expansion",
+                "long-s folding",
+                "Unicode fallback",
+            ],
+        )
+
     def test_template_inventory_contains_expected_shapes(self):
         templates = list_templates()
         names = {item["name"] for item in templates}

@@ -8,7 +8,10 @@ from pathlib import Path
 import re
 from typing import Any, Mapping
 
-from tecan_common.native_acceleration import ascii_casefold_trim as _native_ascii_casefold_trim
+from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
+    ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
+)
 
 from .config import PROJECT_DIR
 from .inference import (
@@ -1292,11 +1295,23 @@ def _parameter_evidence_candidates(
     records: list[Mapping[str, Any]],
     task: str,
 ) -> tuple[InferenceCandidate, ...]:
-    wanted = re.sub(r"[^a-z0-9]", "", parameter_name.casefold())
+    wanted_folded = parameter_name.casefold()
+    native_wanted = _native_ascii_lower_alnum_compact(wanted_folded)
+    wanted = (
+        native_wanted
+        if native_wanted is not None
+        else re.sub(r"[^a-z0-9]", "", wanted_folded)
+    )
     candidates: list[InferenceCandidate] = []
     for index, record in enumerate(records):
         for key, value in _walk_mapping_values(record):
-            normalized = re.sub(r"[^a-z0-9]", "", key.casefold())
+            folded = key.casefold()
+            native_key = _native_ascii_lower_alnum_compact(folded)
+            normalized = (
+                native_key
+                if native_key is not None
+                else re.sub(r"[^a-z0-9]", "", folded)
+            )
             if normalized != wanted or not _has_request_value(value):
                 continue
             candidates.append(
