@@ -332,7 +332,7 @@ def _dependencies(root: ET.Element) -> dict[str, list[str]]:
     )
     if pin_matches is None:
         worktable_pin_locations = _sorted_unique_strings(
-            [value for value in locations if "pin" in str(value).casefold()]
+            [value for value in locations if "pin" in _casefold_text(str(value))]
         )
     else:
         worktable_pin_locations = _sorted_unique_strings(
@@ -377,6 +377,14 @@ def _lower_text(value: str) -> str:
         if native is not None:
             return native
     return value.lower()
+
+
+def _casefold_text(value: str) -> str:
+    if type(value) is str and value.strip() == value:
+        native = native_acceleration.ascii_casefold_trim(value)
+        if native is not None:
+            return native
+    return value.casefold()
 
 
 def _casefold_equals(value: str, expected: str) -> bool:

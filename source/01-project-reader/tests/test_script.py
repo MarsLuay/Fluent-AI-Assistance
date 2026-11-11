@@ -84,11 +84,33 @@ class ScriptTests(unittest.TestCase):
                     ["Pin café"], "pin"
                 )
             )
-            unicode_actual = script._dependencies(unicode_root)
+            with patch.object(
+                native_acceleration,
+                "ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_fold:
+                unicode_actual = script._dependencies(unicode_root)
+                native_fold.assert_any_call("Pin café")
+                native_fold.assert_any_call("spindle")
         self.assertEqual(unicode_actual, unicode_expected)
         self.assertEqual(
-            unicode_actual["worktable_pin_locations"], ["Pin café", "spindle"]
+            unicode_actual["worktable_pin_locations"], ["Pin café", "spindle"],
         )
+
+    def test_ascii_casefold_text_preserves_python_unicode_semantics(self) -> None:
+        values = ("PIN", "AſB", " café ")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [script._casefold_text(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_fold:
+                actual = [script._casefold_text(value) for value in values]
+                self.assertEqual(native_fold.call_count, 2)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["pin", "asb", " café "])
 
     def test_interesting_field_fallback_uses_native_xml_selection(self) -> None:
         from tecan_common import xml_helpers
