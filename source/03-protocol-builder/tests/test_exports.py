@@ -431,6 +431,22 @@ class SubroutineResolutionTests(unittest.TestCase):
         self.assertIs(actual[0], scripts[0])
         self.assertIs(actual[1], scripts[2])
 
+    def test_subroutine_key_regex_uses_native_ascii_compaction_with_fallback(self):
+        values = [" Help/Subroutine_2.0 ", '"Alpha/Beta"', "Straße", "ſcript", "東京", None]
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [subroutine_dependencies_module.norm_subroutine_key(value) for value in values]
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                subroutine_dependencies_module,
+                "_native_ascii_lower_alnum_compact",
+                wraps=native_acceleration.ascii_lower_alnum_compact,
+            ) as native_call:
+                actual = [subroutine_dependencies_module.norm_subroutine_key(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertIsNone(native_acceleration.ascii_lower_alnum_compact("東京"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["helpsubroutine20", "alphabeta", "strasse", "script", "", ""])
+
     def _scripts(self):
         return [
             {

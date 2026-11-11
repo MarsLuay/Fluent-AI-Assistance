@@ -15,6 +15,7 @@ from typing import Any
 
 from tecan_common.native_acceleration import (
     ascii_casefold_trim as _native_ascii_casefold_trim,
+    ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
 )
@@ -25,7 +26,9 @@ def clean_subroutine_reference(value: Any) -> str:
 
 
 def norm_subroutine_key(value: Any) -> str:
-    return re.sub(r"[^a-z0-9]+", "", clean_subroutine_reference(value).casefold())
+    text = clean_subroutine_reference(value).casefold()
+    native = _native_ascii_lower_alnum_compact(text)
+    return native if native is not None else re.sub(r"[^a-z0-9]+", "", text)
 
 
 def subroutine_calls_from_ir(ir: dict[str, Any] | None) -> list[dict[str, Any]]:
