@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol, Sequence
 
 from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     ascii_worktable_int_text as _native_ascii_worktable_int_text,
     parse_ascii_bool_text as _native_parse_ascii_bool_text,
     ascii_worktable_selection_text as _native_ascii_worktable_selection_text,
@@ -232,6 +233,13 @@ class TransferLabware:
     def validate(self) -> None:
         from ..api_v2_transfer_labware_validate import TransferLabwareFields, validate_transfer_labware_fields
 
+        labware_key = str(self.labware or "").strip()
+        native_labware_key = _native_ascii_casefold_trim(labware_key)
+        normalized_labware_key = (
+            native_labware_key
+            if native_labware_key is not None
+            else labware_key.casefold()
+        )
         result = validate_transfer_labware_fields(
             TransferLabwareFields(
                 labware=str(self.labware or ""),
@@ -244,7 +252,7 @@ class TransferLabware:
             # validation to required-field/shape checks; the explicit offline
             # and runtime preflight validators pass real deck labels/slots and
             # still catch missing labware or occupied destinations.
-            deck_labels={str(self.labware or "").strip().casefold()},
+            deck_labels={normalized_labware_key},
             step_label="TransferLabware",
             route_assessment=self.rga_route_assessment,
             topology_transition=self.rga_topology_transition,

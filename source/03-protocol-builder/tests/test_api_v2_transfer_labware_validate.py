@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
 
+import fluent_pipeline.api_v2.commands as commands_module
 import fluent_pipeline.api_v2_transfer_labware_validate as transfer_validate
 from tecan_common import native_acceleration
 from fluent_pipeline.api_v2.commands import TransferLabware
@@ -32,6 +33,49 @@ class _CommandStub:
 
 
 class TransferLabwareValidateTests(unittest.TestCase):
+    def test_labware_key_normalization_uses_native_ascii_and_unicode_fallback(self):
+        values = [" PlateA ", "Straße", "\u2003Café\u00a0", "", None]
+        expected = [str(value or "").strip().casefold() for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [transfer_validate._norm(value) for value in values]
+        self.assertEqual(disabled, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                transfer_validate,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = [transfer_validate._norm(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(enabled, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                transfer_validate,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = [transfer_validate._norm(value) for value in values]
+        self.assertEqual(fallback, expected)
+
+    def test_typed_command_validation_uses_native_label_normalization(self):
+        command = TransferLabware(
+            labware="PlateA",
+            location="",
+            site="",
+            move_to_base=True,
+            module_name="RGA",
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                commands_module,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                command.validate()
+                self.assertEqual(native_call.call_count, 1)
+
     def test_transfer_boolean_flags_use_native_ascii_and_python_lower_fallback(self):
         cases = [
             ("true", "FALSE", True, False),
