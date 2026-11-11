@@ -7418,7 +7418,13 @@ def _normalize_report_key(key: str) -> str:
 
 
 def _classify_report(path: Path) -> str | None:
-    name = path.name.lower()
+    raw_name = path.name
+    native = (
+        _native_ascii_casefold_trim(raw_name)
+        if raw_name.strip() == raw_name
+        else None
+    )
+    name = native if native is not None else raw_name.lower()
     if "project_report" in name or name == "project.md":
         return "project_report"
     if "simulation" in name:

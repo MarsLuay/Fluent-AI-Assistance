@@ -69,6 +69,37 @@ class ReportKeyNormalizationNativeTests(unittest.TestCase):
                 forced_fallback = [exports._normalize_report_key(value) for value in values]
         self.assertEqual(forced_fallback, expected)
 
+    def test_report_filename_classification_uses_rust_without_trimming_names(self):
+        paths = [
+            Path("PROJECT_REPORT.JSON"),
+            Path("SIMULATION.XSCR"),
+            Path(" PROJECT.MD "),
+            Path("REPAIR_ẞ_HISTORY.JSON"),
+        ]
+        expected = ["project_report", "simulation_report", None, "repair_plan"]
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [exports._classify_report(path) for path in paths]
+        self.assertEqual(disabled, expected)
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = [exports._classify_report(path) for path in paths]
+                self.assertEqual(native_call.call_count, 3)
+                native_call.assert_any_call("PROJECT_REPORT.JSON")
+                native_call.assert_any_call("REPAIR_ẞ_HISTORY.JSON")
+        self.assertEqual(enabled, expected)
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports, "_native_ascii_casefold_trim", return_value=None
+            ):
+                forced_fallback = [exports._classify_report(path) for path in paths]
+        self.assertEqual(forced_fallback, expected)
+
 
 class SourceTreeCopyNormalizationNativeTests(unittest.TestCase):
     def test_excluded_paths_use_native_casefold_with_unicode_fallback(self):
