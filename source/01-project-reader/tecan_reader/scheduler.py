@@ -8,6 +8,7 @@ from typing import Any
 from tecan_common import xml_compat as ET
 from tecan_common.native_acceleration import (
     ascii_case_insensitive_substring_match_groups as _native_substring_match_groups,
+    merge_unique_string_groups as _native_merge_unique_string_groups,
     xml_direct_leaf_name_texts as _native_xml_direct_leaf_name_texts,
     xml_indexed_elements_by_folded_name as _native_indexed_elements_by_folded_name,
 )
@@ -77,13 +78,22 @@ def inspect_scheduler_text(text: str, *, source_name: str) -> dict[str, Any]:
         record = _record(element, index=index, kind=kind, source_name=source_name)
         if record:
             target.append(record)
-    unknown: dict[str, list[str]] = {}
-    for record in [*processes, *tasks]:
-        for name, values in (record.get("source_metadata", {}).get("unknown_fields") or {}).items():
-            bucket = unknown.setdefault(name, [])
-            for value in values:
-                if value not in bucket and len(bucket) < 20:
-                    bucket.append(value)
+    records = [*processes, *tasks]
+    unknown_groups = [
+        record.get("source_metadata", {}).get("unknown_fields") or {}
+        for record in records
+    ]
+    unknown = _native_merge_unique_string_groups(unknown_groups, 20)
+    if unknown is None:
+        unknown = {}
+        for record in records:
+            for name, values in (
+                record.get("source_metadata", {}).get("unknown_fields") or {}
+            ).items():
+                bucket = unknown.setdefault(name, [])
+                for value in values:
+                    if value not in bucket and len(bucket) < 20:
+                        bucket.append(value)
     return {
         "kind": "scheduler",
         "source": source_name,

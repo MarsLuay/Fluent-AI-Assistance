@@ -97,8 +97,9 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
         ):
             self.skipTest("optional Rust indexed XML selector is not built")
         source = (
-            '<Root><Other/><Process Name="Process A"/><Gap/>'
-            '<Task Name="Task A"/></Root>'
+            '<Root><Other/><Process Name="Process A" VendorMode="z"/><Gap/>'
+            '<Task Name="Task A" VendorMode="a"/>'
+            '<Task Name="Task B" VendorMode="z"/></Root>'
         )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             expected = scheduler.inspect_scheduler_text(
@@ -115,10 +116,16 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
                     "_native_indexed_elements_by_folded_name",
                     wraps=scheduler._native_indexed_elements_by_folded_name,
                 ) as native_call:
-                    actual = scheduler.inspect_scheduler_text(
-                        source, source_name="synthetic.xml"
-                    )
-                    native_call.assert_called_once()
+                    with patch.object(
+                        scheduler,
+                        "_native_merge_unique_string_groups",
+                        wraps=scheduler._native_merge_unique_string_groups,
+                    ) as merge_call:
+                        actual = scheduler.inspect_scheduler_text(
+                            source, source_name="synthetic.xml"
+                        )
+                        native_call.assert_called_once()
+                        merge_call.assert_called_once()
                     self.assertEqual(rust_call.call_count, 1)
 
         self.assertEqual(actual, expected)
@@ -128,7 +135,11 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
         )
         self.assertEqual(
             [item["record_index"] for item in actual["scheduler_tasks"]],
-            [4],
+            [4, 5],
+        )
+        self.assertEqual(
+            actual["source_metadata"]["unknown_fields"],
+            {"VendorMode": ["a", "z"]},
         )
 
         unicode_root = ET.Element("Root")
