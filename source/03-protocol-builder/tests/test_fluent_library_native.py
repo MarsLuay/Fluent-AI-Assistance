@@ -24,6 +24,33 @@ class FluentLibraryNativeTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, ["helperscriptv2", "strasse", "script", "", "", ""])
 
+    def test_safe_filename_matches_ascii_replacement_trimming_and_truncation(self):
+        values = [
+            "Simple-name.xscr",
+            "  .._Alpha / Beta__.. ",
+            "\u2003Safe Name\u00a0",
+            "名字",
+            "///",
+            "---",
+            "a" * 125,
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [fluent_library._safe_filename(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                fluent_library,
+                "_native_ascii_safe_filename",
+                wraps=native_acceleration.ascii_safe_filename,
+            ) as native_call:
+                actual = [fluent_library._safe_filename(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertIsNone(native_acceleration.ascii_safe_filename("名字"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            ["Simple-name.xscr", "Alpha_Beta", "Safe_Name", "", "", "---", "a" * 120],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

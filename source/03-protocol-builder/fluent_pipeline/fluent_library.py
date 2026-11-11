@@ -10,6 +10,7 @@ from typing import Any
 
 from tecan_common.native_acceleration import (
     ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
+    ascii_safe_filename as _native_ascii_safe_filename,
 )
 
 from .runner import PipelineError, ensure_parent
@@ -177,6 +178,9 @@ def _name_key(value: Any) -> str:
 
 
 def _safe_filename(value: str) -> str:
+    native = _native_ascii_safe_filename(value)
+    if native is not None:
+        return native
     cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "_", value.strip())
     cleaned = cleaned.strip("._")
     return cleaned[:120]

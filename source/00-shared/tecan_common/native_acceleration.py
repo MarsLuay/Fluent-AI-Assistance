@@ -3028,6 +3028,20 @@ def ascii_profile_slug(value: Any) -> str | None:
         return None
 
 
+def ascii_safe_filename(value: Any) -> str | None:
+    """Sanitize an ASCII filename after Python whitespace trimming, or fallback."""
+    if not enabled() or type(value) is not str:
+        return None
+    trimmed = value.strip()
+    if type(trimmed) is not str or not trimmed.isascii():
+        return None
+    try:
+        result = _native.ascii_safe_filename(trimmed)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def ascii_word_boundary_contains(value: Any, word: Any) -> bool | None:
     """Match an ASCII word using explicit lowercase-letter/digit boundaries."""
     if (

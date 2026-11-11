@@ -2633,6 +2633,26 @@ fn ascii_profile_slug(value: &str) -> Option<String> {
 }
 
 #[pyfunction]
+fn ascii_safe_filename(value: &str) -> Option<String> {
+    if !value.is_ascii() {
+        return None;
+    }
+    let mut output = String::new();
+    let mut separator_pending = false;
+    for character in value.chars() {
+        if character.is_ascii_alphanumeric() || matches!(character, '_' | '.' | '-') {
+            output.push(character);
+            separator_pending = false;
+        } else if !separator_pending {
+            output.push('_');
+            separator_pending = true;
+        }
+    }
+    let trimmed = output.trim_matches(|character| character == '.' || character == '_');
+    Some(trimmed.chars().take(120).collect())
+}
+
+#[pyfunction]
 fn ascii_word_boundary_contains(value: &str, word: &str) -> Option<bool> {
     if !value.is_ascii() || !word.is_ascii() || word.is_empty() {
         return None;
@@ -7648,6 +7668,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_element_is_nil, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_lower_alnum_compact, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_profile_slug, module)?)?;
+    module.add_function(wrap_pyfunction!(ascii_safe_filename, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_word_boundary_contains, module)?)?;
     module.add_function(wrap_pyfunction!(label_base_ascii_text, module)?)?;
     module.add_function(wrap_pyfunction!(is_guid_text, module)?)?;
@@ -7805,6 +7826,22 @@ mod tests {
         assert_eq!(ascii_lower_alnum_compact("AZ_09"), Some("09".into()));
         assert_eq!(ascii_lower_alnum_compact(""), Some(String::new()));
         assert_eq!(ascii_lower_alnum_compact("東京"), None);
+    }
+
+    #[test]
+    fn ascii_safe_filename_matches_python_replacement_and_truncation() {
+        assert_eq!(
+            ascii_safe_filename("Simple-name.xscr"),
+            Some("Simple-name.xscr".into())
+        );
+        assert_eq!(
+            ascii_safe_filename("  .._Alpha / Beta__.. "),
+            Some("Alpha_Beta".into())
+        );
+        assert_eq!(ascii_safe_filename("___"), Some(String::new()));
+        assert_eq!(ascii_safe_filename("---"), Some("---".into()));
+        assert_eq!(ascii_safe_filename(&"a".repeat(125)), Some("a".repeat(120)));
+        assert_eq!(ascii_safe_filename("東京"), None);
     }
 
     #[test]
