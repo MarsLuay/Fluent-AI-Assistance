@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from . import xml_compat as ET
+from tecan_common.native_acceleration import xml_local_name as _native_xml_local_name
 from fluentcoder.ir.driver_recovery import parse_driver_recovery_policy
 
 from .external_commands import (
@@ -399,6 +400,9 @@ def _resolve_manifest_path(
 
 
 def _local_name(tag: str) -> str:
+    native = _native_xml_local_name(tag)
+    if native is not None:
+        return native
     return tag.rsplit("}", 1)[-1] if "}" in tag else tag
 
 

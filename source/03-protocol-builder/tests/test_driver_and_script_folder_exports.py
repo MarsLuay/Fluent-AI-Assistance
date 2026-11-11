@@ -5,7 +5,10 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import fluent_pipeline.driver_macros_export as driver_macros_export_module
+from tecan_common import native_acceleration
 from fluent_pipeline.driver_macros_export import (
     DRIVER_COMMAND_CONTRACTS_SCHEMA_VERSION,
     DRIVER_MACROS_SCHEMA_VERSION,
@@ -16,6 +19,34 @@ from fluent_pipeline.script_folder_bindings_export import build_script_folder_bi
 
 
 class DriverMacrosExportTests(unittest.TestCase):
+    def test_local_name_uses_native_helper_and_custom_fallback(self) -> None:
+        tag = "{urn:example}LegacyDriverMacro"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = driver_macros_export_module._local_name(tag)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                driver_macros_export_module,
+                "_native_xml_local_name",
+                wraps=native_acceleration.xml_local_name,
+            ) as native_call:
+                actual = driver_macros_export_module._local_name(tag)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "LegacyDriverMacro")
+
+        class CustomTag(str):
+            def rsplit(self, sep=None, maxsplit=-1):
+                return ["", "PythonFallback"]
+
+        custom_tag = CustomTag("{urn:example}Ignored")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = driver_macros_export_module._local_name(custom_tag)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.xml_local_name(custom_tag))
+            fallback_actual = driver_macros_export_module._local_name(custom_tag)
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, "PythonFallback")
+
     def test_mines_legacy_driver_macro_from_xscr(self) -> None:
         xml = """<?xml version="1.0"?>
 <root>
