@@ -6,7 +6,10 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import fluent_pipeline.connector_graph_export as connector_graph_export_module
+from tecan_common import native_acceleration
 from fluent_pipeline.connector_graph_export import (
     build_connector_graph_from_geometry,
     write_connector_graph,
@@ -14,6 +17,22 @@ from fluent_pipeline.connector_graph_export import (
 
 
 class ConnectorGraphExportTests(unittest.TestCase):
+    def test_guid_text_normalization_uses_ascii_rust_and_unicode_fallback(self) -> None:
+        values = ["  ABCD-1234  ", "\u001cMIXED\u001f", "ſcript", None, 0]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [connector_graph_export_module._norm_guid(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                connector_graph_export_module,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = [connector_graph_export_module._norm_guid(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertIsNone(native_acceleration.ascii_casefold_trim("ſcript"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["abcd-1234", "mixed", "script", "", ""])
+
     def test_builds_snap_edges_from_geometry(self) -> None:
         parent = "11111111-1111-4111-8111-111111111111"
         child = "22222222-2222-4222-8222-222222222222"

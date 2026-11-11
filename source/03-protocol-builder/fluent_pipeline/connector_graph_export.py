@@ -20,6 +20,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from tecan_common.native_acceleration import ascii_casefold_trim as _native_ascii_casefold_trim
+
 from .runner import write_json
 from .worktable_datastore import (
     discover_worktable_datastore,
@@ -457,7 +459,9 @@ def _site_to_snap_anchor(site_entry: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _norm_guid(value: Any) -> str:
-    text = str(value or "").strip().casefold()
+    raw = str(value or "")
+    native = _native_ascii_casefold_trim(raw)
+    text = native if native is not None else raw.strip().casefold()
     return text if len(text) == 36 and text.count("-") == 4 else (text if text else "")
 
 

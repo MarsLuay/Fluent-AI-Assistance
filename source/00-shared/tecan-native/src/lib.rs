@@ -2591,6 +2591,14 @@ fn ascii_casefold_equals(value: &str, expected: &str) -> Option<bool> {
 }
 
 #[pyfunction]
+fn ascii_casefold_trim(value: &str) -> Option<String> {
+    if !value.is_ascii() {
+        return None;
+    }
+    Some(trim_python_whitespace(value).to_ascii_lowercase())
+}
+
+#[pyfunction]
 fn ascii_lower_alnum_compact(value: &str) -> Option<String> {
     if !value.is_ascii() {
         return None;
@@ -7614,6 +7622,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(most_common_string_counts, module)?)?;
     module.add_function(wrap_pyfunction!(sorted_unique_strings, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
+    module.add_function(wrap_pyfunction!(ascii_casefold_trim, module)?)?;
     module.add_function(wrap_pyfunction!(parse_ascii_bool_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_element_is_nil, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_lower_alnum_compact, module)?)?;
@@ -7774,6 +7783,17 @@ mod tests {
         assert_eq!(ascii_lower_alnum_compact("AZ_09"), Some("09".into()));
         assert_eq!(ascii_lower_alnum_compact(""), Some(String::new()));
         assert_eq!(ascii_lower_alnum_compact("東京"), None);
+    }
+
+    #[test]
+    fn ascii_casefold_trim_matches_python_strip_and_casefold() {
+        assert_eq!(
+            ascii_casefold_trim(" \tMixed Value\r\n"),
+            Some("mixed value".into())
+        );
+        assert_eq!(ascii_casefold_trim("\u{1c}Text\u{1f}"), Some("text".into()));
+        assert_eq!(ascii_casefold_trim("  "), Some(String::new()));
+        assert_eq!(ascii_casefold_trim("ſcript"), None);
     }
 
     #[test]
