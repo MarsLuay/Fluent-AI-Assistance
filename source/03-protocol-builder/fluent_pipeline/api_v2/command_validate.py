@@ -22,6 +22,7 @@ from tecan_common.native_acceleration import (
     extract_line_number_ascii as _native_extract_line_number_ascii,
     normalize_ascii_name as _native_normalize_ascii_name,
     subroutine_reference_matches_ascii as _native_subroutine_reference_matches_ascii,
+    xml_clean_text as _native_xml_clean_text,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_local_name as _native_xml_local_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
@@ -816,11 +817,23 @@ def _first_text(root: ET.Element, name: str, default: str = "") -> str:
         _, element = selection
         if element is None:
             return default
-        text = (element.text or "").strip()
+        raw_text = element.text
+        native_text = _native_xml_clean_text(raw_text)
+        text = (
+            native_text
+            if native_text is not None
+            else (raw_text or "").strip()
+        )
         return text if text else default
     for element in root.iter():
         if _local_name(element.tag) == name:
-            text = (element.text or "").strip()
+            raw_text = element.text
+            native_text = _native_xml_clean_text(raw_text)
+            text = (
+                native_text
+                if native_text is not None
+                else (raw_text or "").strip()
+            )
             return text if text else default
     return default
 

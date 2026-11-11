@@ -327,6 +327,71 @@ class ApiV2CommandValidateTests(unittest.TestCase):
         )
         self.assertEqual(custom.string_calls, 1)
 
+    def test_first_text_uses_rust_unicode_strip_with_python_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_clean_text"
+        ):
+            self.skipTest("optional Rust XML text cleaner is not built")
+
+        class StringSubclass(str):
+            def strip(self) -> str:
+                return "subclass"
+
+        values = [
+            "\x1c Value \x1f",
+            "\u00a0\u2007Wide\u2007\u00a0",
+            None,
+            StringSubclass("unused"),
+        ]
+        roots = []
+        for value in values:
+            root = command_validate.ET.Element("Root")
+            command_validate.ET.SubElement(root, "Value").text = value
+            roots.append(root)
+        empty_first = command_validate.ET.Element("Root")
+        command_validate.ET.SubElement(empty_first, "Value").text = " \t "
+        command_validate.ET.SubElement(empty_first, "Value").text = "later"
+        roots.append(empty_first)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                command_validate._first_text(root, "Value", "fallback")
+                for root in roots
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_xml_clean_text",
+                wraps=native_acceleration.xml_clean_text,
+            ) as native_clean:
+                actual = [
+                    command_validate._first_text(root, "Value", "fallback")
+                    for root in roots
+                ]
+                self.assertEqual(native_clean.call_count, len(roots))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual, ["Value", "Wide", "fallback", "subclass", "fallback"]
+        )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_xml_first_element_by_name",
+                return_value=None,
+            ):
+                with patch.object(
+                    command_validate,
+                    "_native_xml_clean_text",
+                    wraps=native_acceleration.xml_clean_text,
+                ) as native_clean:
+                    fallback_selection = [
+                        command_validate._first_text(root, "Value", "fallback")
+                        for root in roots
+                    ]
+                    self.assertEqual(native_clean.call_count, len(roots))
+        self.assertEqual(fallback_selection, expected)
+
     def test_disabled_flag_uses_ascii_casefold_kernel(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "ascii_casefold_equals"
