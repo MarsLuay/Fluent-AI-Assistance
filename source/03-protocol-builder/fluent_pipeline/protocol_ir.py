@@ -3971,7 +3971,9 @@ def _rup_variable_display_type(value: Any, *, has_allowed_values: bool = False) 
     raw = str(value or "").strip()
     if raw == "TextboxWithNumpad":
         return raw
-    key = re.sub(r"[^a-z0-9]+", "", raw.casefold())
+    folded = raw.casefold()
+    native = native_acceleration.ascii_lower_alnum_compact(folded)
+    key = native if native is not None else re.sub(r"[^a-z0-9]+", "", folded)
     aliases = {
         "combobox": "Combobox",
         "combo": "Combobox",

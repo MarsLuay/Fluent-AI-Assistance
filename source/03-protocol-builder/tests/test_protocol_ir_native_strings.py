@@ -54,6 +54,43 @@ class ProtocolIrNativeStringsTests(unittest.TestCase):
             ],
         )
 
+    def test_rup_display_type_alias_normalization_uses_native_compaction(self):
+        cases = [
+            ("Combo Box", False),
+            ("RADIO-BUTTON", False),
+            ("Straße", True),
+            ("東京", False),
+            ("TextboxWithNumpad", False),
+            ("not-a-kind", False),
+            ("not-a-kind", True),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                protocol_ir_module._rup_variable_display_type(
+                    value, has_allowed_values=has_allowed_values
+                )
+                for value, has_allowed_values in cases
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_lower_alnum_compact",
+                wraps=native_acceleration.ascii_lower_alnum_compact,
+            ) as native_call:
+                actual = [
+                    protocol_ir_module._rup_variable_display_type(
+                        value, has_allowed_values=has_allowed_values
+                    )
+                    for value, has_allowed_values in cases
+                ]
+                self.assertEqual(native_call.call_count, len(cases) - 1)
+            self.assertIsNone(native_acceleration.ascii_lower_alnum_compact("東京"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            ["Combobox", "RadioButton", "Combobox", "Empty", "TextboxWithNumpad", "Empty", "Combobox"],
+        )
+
     def test_protocol_identifier_and_filename_components_match_python_fallback(self):
         values = ["__My-Protocol.Name__", "!!!", "Straße", "東京", " \u2003Mixed Name\u00a0 "]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
