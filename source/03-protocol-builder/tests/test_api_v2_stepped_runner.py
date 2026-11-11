@@ -60,21 +60,41 @@ class ApiV2SteppedRunnerTests(unittest.TestCase):
             expected_statements = stepped_inventory._first_descendant(
                 expected_objects[0], "Statements"
             )
+            expected_direct_child = stepped_inventory._direct_child(root, "Object")
+            expected_direct_children = stepped_inventory._direct_children(root, "Object")
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 stepped_inventory,
                 "_native_xml_elements_by_name",
                 wraps=native_acceleration.xml_elements_by_name,
-            ) as native_call:
+            ) as elements_call, patch.object(
+                stepped_inventory,
+                "_native_xml_first_direct_child_by_name",
+                wraps=native_acceleration.xml_first_direct_child_by_name,
+            ) as first_direct_call, patch.object(
+                stepped_inventory,
+                "_native_xml_direct_elements_by_name",
+                wraps=native_acceleration.xml_direct_elements_by_name,
+            ) as direct_call:
                 actual_objects = list(stepped_inventory._iter_local(root, "Object"))
                 actual_statements = stepped_inventory._first_descendant(
                     actual_objects[0], "Statements"
                 )
-                self.assertEqual(native_call.call_count, 2)
+                actual_direct_child = stepped_inventory._direct_child(root, "Object")
+                actual_direct_children = stepped_inventory._direct_children(
+                    root, "Object"
+                )
+                self.assertEqual(elements_call.call_count, 2)
+                self.assertEqual(first_direct_call.call_count, 1)
+                self.assertEqual(direct_call.call_count, 1)
         self.assertEqual(actual_objects, expected_objects)
         self.assertEqual(actual_objects, [root[0], root[0][1], root[1]])
         self.assertIs(actual_statements, expected_statements)
         self.assertIs(actual_statements, root[0][0])
+        self.assertIs(actual_direct_child, expected_direct_child)
+        self.assertIs(actual_direct_child, root[0])
+        self.assertEqual(actual_direct_children, expected_direct_children)
+        self.assertEqual(actual_direct_children, [root[0], root[1]])
         self.assertIsNone(stepped_inventory._first_descendant(None, "Statements"))
 
         class StringTag(str):
@@ -84,15 +104,41 @@ class ApiV2SteppedRunnerTests(unittest.TestCase):
         custom_object = stepped_inventory.ET.SubElement(custom_root, StringTag("Object"))
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             expected_custom = list(stepped_inventory._iter_local(custom_root, "Object"))
+            expected_direct_child = stepped_inventory._direct_child(
+                custom_root, "Object"
+            )
+            expected_direct_children = stepped_inventory._direct_children(
+                custom_root, "Object"
+            )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(
                 native_acceleration.xml_elements_by_name(
                     custom_root, ("Object",), stepped_inventory.ET.Element
                 )
             )
+            self.assertIsNone(
+                native_acceleration.xml_first_direct_child_by_name(
+                    custom_root, "Object", stepped_inventory.ET.Element
+                )
+            )
+            self.assertIsNone(
+                native_acceleration.xml_direct_elements_by_name(
+                    custom_root, ("Object",), stepped_inventory.ET.Element
+                )
+            )
             actual_custom = list(stepped_inventory._iter_local(custom_root, "Object"))
+            actual_direct_child = stepped_inventory._direct_child(
+                custom_root, "Object"
+            )
+            actual_direct_children = stepped_inventory._direct_children(
+                custom_root, "Object"
+            )
         self.assertEqual(actual_custom, expected_custom)
         self.assertEqual(actual_custom, [custom_object])
+        self.assertIs(actual_direct_child, expected_direct_child)
+        self.assertIs(actual_direct_child, custom_object)
+        self.assertEqual(actual_direct_children, expected_direct_children)
+        self.assertEqual(actual_direct_children, [custom_object])
 
     def test_extract_commands_from_xscr_maps_statement_objects(self):
         with tempfile.TemporaryDirectory() as tmp:

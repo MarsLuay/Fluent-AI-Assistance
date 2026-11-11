@@ -17,7 +17,9 @@ from pathlib import Path
 from typing import Any, Mapping, Protocol, Sequence
 
 from tecan_common.native_acceleration import (
+    xml_direct_elements_by_name as _native_xml_direct_elements_by_name,
     xml_elements_by_name as _native_xml_elements_by_name,
+    xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
 )
 
 from .api_v2_add_labware_validate import (
@@ -942,6 +944,10 @@ def _command_type_name(command_object: ET.Element) -> str:
 def _direct_child(parent: ET.Element | None, name: str) -> ET.Element | None:
     if parent is None:
         return None
+    selection = _native_xml_first_direct_child_by_name(parent, name, ET.Element)
+    if selection is not None:
+        _, child = selection
+        return child
     for child in list(parent):
         if _local_name(child.tag) == name:
             return child
@@ -951,6 +957,9 @@ def _direct_child(parent: ET.Element | None, name: str) -> ET.Element | None:
 def _direct_children(parent: ET.Element | None, name: str) -> list[ET.Element]:
     if parent is None:
         return []
+    children = _native_xml_direct_elements_by_name(parent, (name,), ET.Element)
+    if children is not None:
+        return children
     return [child for child in list(parent) if _local_name(child.tag) == name]
 
 
