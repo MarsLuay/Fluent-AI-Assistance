@@ -210,6 +210,31 @@ class TemplateLibraryTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual([candidate.value for candidate in actual], ["ASCII workspace", "Unicode workspace"])
 
+    def test_selected_script_matching_uses_native_ascii_with_unicode_fallback(self):
+        manifest = {
+            "scripts": [
+                {"name": "  Mixed Script  "},
+                {"object_name": "ſcript"},
+                {"name": "Unselected"},
+            ]
+        }
+        request_spec = {"source": {"source_scripts": ["mixed script", "SCRIPT"]}}
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = template_library_module._selected_script_records(manifest, request_spec)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                template_library_module,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = template_library_module._selected_script_records(manifest, request_spec)
+                self.assertEqual(native_call.call_count, 5)
+            self.assertIsNone(native_acceleration.ascii_casefold_trim("ſcript"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, manifest["scripts"][:2])
+        self.assertIs(actual[0], manifest["scripts"][0])
+        self.assertIs(actual[1], manifest["scripts"][1])
+
     def test_template_inventory_contains_expected_shapes(self):
         templates = list_templates()
         names = {item["name"] for item in templates}

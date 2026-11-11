@@ -950,7 +950,7 @@ def _selected_script_records(
 ) -> list[Mapping[str, Any]]:
     source = request_spec.get("source")
     requested = {
-        str(value).strip().casefold()
+        _casefold_trimmed_text(str(value))
         for value in ((source.get("source_scripts") or []) if isinstance(source, Mapping) else [])
         if str(value).strip()
     }
@@ -961,7 +961,7 @@ def _selected_script_records(
         if not isinstance(script, Mapping):
             continue
         identities = {
-            str(script.get(key) or "").strip().casefold()
+            _casefold_trimmed_text(str(script.get(key) or ""))
             for key in ("name", "object_name", "qualified_name", "entry", "extracted_path")
             if str(script.get(key) or "").strip()
         }
