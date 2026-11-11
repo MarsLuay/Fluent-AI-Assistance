@@ -1,12 +1,69 @@
-import unittest
 import json
+import os
+import unittest
+from unittest.mock import patch
 
+import fluent_pipeline.worktable_diff as worktable_diff
+from tecan_common import native_acceleration
 from fluent_pipeline.worktable_diff import (
     diff_worktable_requirements,
     render_worktable_changes_markdown,
     render_worktable_patch_json,
     worktable_patch_from_diff,
 )
+
+
+class WorktableDiffNativeStringTests(unittest.TestCase):
+    def test_normalization_uses_native_ascii_and_python_unicode_fallback(self) -> None:
+        values = [
+            None,
+            0,
+            "  File.GWL  ",
+            "  Worklist source  ",
+            "Straße",
+            "workliſt.gwl",
+            "",
+        ]
+        expected_norm = [str(value or "").strip().casefold() for value in values]
+        expected_worklist = [
+            bool(
+                (text := str(value or "").strip().lower())
+                and (text.endswith(".gwl") or "worklist" in text)
+            )
+            for value in values
+        ]
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback = (
+                [worktable_diff._norm(value) for value in values],
+                [worktable_diff._looks_like_worklist(value) for value in values],
+            )
+        self.assertEqual(fallback, (expected_norm, expected_worklist))
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                worktable_diff,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = (
+                    [worktable_diff._norm(value) for value in values],
+                    [worktable_diff._looks_like_worklist(value) for value in values],
+                )
+                self.assertEqual(native_call.call_count, len(values) * 2)
+        self.assertEqual(actual, fallback)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                worktable_diff,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                unsupported_fallback = (
+                    [worktable_diff._norm(value) for value in values],
+                    [worktable_diff._looks_like_worklist(value) for value in values],
+                )
+        self.assertEqual(unsupported_fallback, fallback)
 
 
 SOURCE_IR = {

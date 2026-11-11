@@ -7,6 +7,10 @@ import re
 from pathlib import Path
 from typing import Any
 
+from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
+)
+
 from .aliases import alias_candidates, load_alias_maps, resolve_alias
 from .worktable_geometry import build_worktable_geometry, workspace_labware_records
 
@@ -1453,12 +1457,16 @@ def _deck_location(item: dict[str, Any]) -> str:
 
 
 def _looks_like_worklist(value: Any) -> bool:
-    text = str(value or "").strip().lower()
+    raw = str(value or "")
+    native = _native_ascii_casefold_trim(raw)
+    text = native if native is not None else raw.strip().lower()
     return bool(text and (text.endswith(".gwl") or "worklist" in text))
 
 
 def _norm(value: Any) -> str:
-    return str(value or "").strip().casefold()
+    raw = str(value or "")
+    native = _native_ascii_casefold_trim(raw)
+    return native if native is not None else raw.strip().casefold()
 
 
 def _norm_path(value: Any) -> str:
