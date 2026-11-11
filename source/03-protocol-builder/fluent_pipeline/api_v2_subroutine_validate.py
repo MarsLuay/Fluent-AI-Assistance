@@ -21,6 +21,7 @@ from typing import Any, Callable, Mapping, Protocol, Sequence
 
 from tecan_common.native_acceleration import (
     xml_elements_by_name as _native_xml_elements_by_name,
+    xml_local_name as _native_xml_local_name,
 )
 
 from .subroutine_dependencies import (
@@ -452,6 +453,9 @@ def _inventory_path_from_env() -> Path | None:
 
 
 def _local_name(tag: str) -> str:
+    native = _native_xml_local_name(tag)
+    if native is not None:
+        return native
     return tag.rsplit("}", 1)[-1]
 
 

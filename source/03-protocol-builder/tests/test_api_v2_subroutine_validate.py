@@ -36,6 +36,50 @@ _SUBROUTINE_XSCR = """<Object Type="Tecan.Core.Scripting.SubRoutineStatement">
 
 
 class ApiV2SubroutineValidateTests(unittest.TestCase):
+    def test_local_name_uses_native_helper_in_selector_fallback(self):
+        tag = "{urn:example}Reference"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = subroutine_validate._local_name(tag)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                subroutine_validate,
+                "_native_xml_local_name",
+                wraps=native_acceleration.xml_local_name,
+            ) as native_call:
+                actual = subroutine_validate._local_name(tag)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "Reference")
+
+        class StringTag(str):
+            pass
+
+        custom_root = subroutine_validate.ET.Element("Root")
+        custom_child = subroutine_validate.ET.SubElement(
+            custom_root, StringTag("{urn:custom}Reference")
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = subroutine_validate._find_descendant(
+                custom_root, "Reference"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_name(
+                    custom_root, ("Reference",), subroutine_validate.ET.Element
+                )
+            )
+            with patch.object(
+                subroutine_validate,
+                "_native_xml_local_name",
+                wraps=native_acceleration.xml_local_name,
+            ) as fallback_native_call:
+                fallback_actual = subroutine_validate._find_descendant(
+                    custom_root, "Reference"
+                )
+                self.assertEqual(fallback_native_call.call_count, 2)
+        self.assertIs(fallback_actual, fallback_expected)
+        self.assertIs(fallback_actual, custom_child)
+
     def test_compiled_reference_scans_use_native_selectors_and_fallback(self):
         root = subroutine_dependencies.ET.fromstring(
             '<Root xmlns:x="urn:test"><x:Reference><x:TypeId>Script</x:TypeId>'
