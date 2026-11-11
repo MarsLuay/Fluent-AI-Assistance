@@ -5597,6 +5597,109 @@ fn readiness_candidate<'py>(
     Ok(Some(result.into_any()))
 }
 
+fn project_index_optional_text<'py>(
+    py: Python<'py>,
+    record: &Bound<'py, PyDict>,
+    key: &str,
+) -> PyResult<Option<Option<String>>> {
+    let Some(value) = record.get_item(key)? else {
+        return Ok(Some(None));
+    };
+    if value.is_none() {
+        return Ok(Some(None));
+    }
+    if !value.get_type().is(py.get_type::<PyString>()) {
+        return Ok(None);
+    }
+    match value.extract::<String>() {
+        Ok(value) => Ok(Some(Some(value))),
+        Err(_) => Ok(None),
+    }
+}
+
+fn project_index_optional_integer<'py>(
+    py: Python<'py>,
+    record: &Bound<'py, PyDict>,
+    key: &str,
+) -> PyResult<Option<Option<i64>>> {
+    let Some(value) = record.get_item(key)? else {
+        return Ok(Some(None));
+    };
+    if value.is_none() {
+        return Ok(Some(None));
+    }
+    if !value.get_type().is(py.get_type::<PyInt>()) {
+        return Ok(None);
+    }
+    match value.extract::<i64>() {
+        Ok(value) => Ok(Some(Some(value))),
+        Err(_) => Ok(None),
+    }
+}
+
+type ProjectIndexDedupeKey = (
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<i64>,
+);
+
+#[pyfunction]
+fn project_index_dedupe_indices<'py>(
+    py: Python<'py>,
+    results: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !results.get_type().is(py.get_type::<PyList>()) {
+        return Ok(None);
+    }
+    let mut seen: HashSet<ProjectIndexDedupeKey> = HashSet::new();
+    let mut indices = Vec::new();
+    for (index, result) in results.try_iter()?.enumerate() {
+        let result = result?;
+        if !result.get_type().is(py.get_type::<PyDict>()) {
+            return Ok(None);
+        }
+        let result = result.cast::<PyDict>()?;
+        let Some(kind) = project_index_optional_text(py, result, "kind")? else {
+            return Ok(None);
+        };
+        let Some(match_type) = project_index_optional_text(py, result, "match_type")? else {
+            return Ok(None);
+        };
+        let Some(name) = project_index_optional_text(py, result, "name")? else {
+            return Ok(None);
+        };
+        let Some(zeia_file) = project_index_optional_text(py, result, "zeia_file")? else {
+            return Ok(None);
+        };
+        let Some(script) = project_index_optional_text(py, result, "script")? else {
+            return Ok(None);
+        };
+        let Some(source_path) = project_index_optional_text(py, result, "source_path")? else {
+            return Ok(None);
+        };
+        let Some(command_index) = project_index_optional_integer(py, result, "command_index")?
+        else {
+            return Ok(None);
+        };
+        if seen.insert((
+            kind,
+            match_type,
+            name,
+            zeia_file,
+            script,
+            source_path,
+            command_index,
+        )) {
+            indices.push(index);
+        }
+    }
+    Ok(Some(PyList::new(py, indices)?.into_any()))
+}
+
 #[pyfunction]
 fn readiness_kind_token(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
     if value.is_none() {
@@ -7144,6 +7247,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(project_model_entry_path, module)?)?;
     module.add_function(wrap_pyfunction!(project_record_fingerprint, module)?)?;
     module.add_function(wrap_pyfunction!(readiness_candidate, module)?)?;
+    module.add_function(wrap_pyfunction!(project_index_dedupe_indices, module)?)?;
     module.add_function(wrap_pyfunction!(readiness_kind_token, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_sort_indices, module)?)?;
     module.add_function(wrap_pyfunction!(diagnostic_message, module)?)?;

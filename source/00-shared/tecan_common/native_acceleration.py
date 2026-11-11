@@ -2341,6 +2341,23 @@ def readiness_candidate(record: Any) -> dict[str, str] | None:
         return None
 
 
+def project_index_dedupe_indices(results: Any) -> list[int] | None:
+    """Return stable result indices for supported project-index row mappings."""
+    if not enabled() or type(results) is not list:
+        return None
+    try:
+        indices = _native.project_index_dedupe_indices(results)
+        if (
+            type(indices) is list
+            and all(type(index) is int and 0 <= index < len(results) for index in indices)
+            and all(left < right for left, right in zip(indices, indices[1:]))
+        ):
+            return indices
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def sha256_text(value: Any) -> str | None:
     """Hash exact Unicode text natively, or request the Python hashing fallback."""
     if not enabled() or type(value) is not str:

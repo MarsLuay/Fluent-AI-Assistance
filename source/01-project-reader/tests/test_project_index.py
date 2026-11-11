@@ -2,7 +2,10 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from tecan_common import native_acceleration
+import tecan_reader.project_index as project_index
 from tecan_reader.project_index import (
     _initialize_database,
     discover_zeia_paths,
@@ -68,6 +71,94 @@ class TestDiscoverZeiaPaths(unittest.TestCase):
         paths = discover_zeia_paths([self.file2, self.file1])
         expected = sorted([self.file1.resolve(), self.file2.resolve()], key=str)
         self.assertEqual(paths, expected)
+
+
+class TestProjectIndexResultDeduplication(unittest.TestCase):
+    def test_native_deduplication_preserves_first_result_and_order(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "project_index_dedupe_indices"
+        ):
+            self.skipTest("optional Rust project-index deduplicator is not built")
+        first = {
+            "kind": "entity",
+            "match_type": "name",
+            "name": "Alpha",
+            "zeia_file": "one.zeia",
+            "script": None,
+            "source_path": "Objects/alpha.xml",
+            "command_index": 1,
+            "payload": "first",
+        }
+        duplicate = {**first, "payload": "duplicate"}
+        results = [
+            first,
+            duplicate,
+            {**first, "name": "Beta"},
+            {**first, "command_index": 2},
+            {"kind": "entity", "match_type": "name", "name": "Nulls"},
+            {
+                "kind": "entity",
+                "match_type": "name",
+                "name": "Nulls",
+                "zeia_file": None,
+                "script": None,
+                "source_path": None,
+                "command_index": None,
+            },
+            {**first, "name": "é"},
+            {**first, "name": "é", "payload": "unicode duplicate"},
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = project_index._dedupe_results(results)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                project_index.native_acceleration,
+                "project_index_dedupe_indices",
+                wraps=native_acceleration.project_index_dedupe_indices,
+            ) as native_call:
+                actual = project_index._dedupe_results(results)
+                native_call.assert_called_once_with(results)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [first, results[2], results[3], results[4], results[6]])
+        self.assertIs(actual[0], first)
+        self.assertIs(actual[1], results[2])
+
+    def test_native_deduplicator_falls_back_for_unsupported_values(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "project_index_dedupe_indices"
+        ):
+            self.skipTest("optional Rust project-index deduplicator is not built")
+
+        class StringSubclass(str):
+            pass
+
+        unsupported = [
+            {"kind": 1, "name": "numeric"},
+            {"kind": "entity", "command_index": True},
+            {"kind": "entity", "command_index": 1},
+            {"kind": "entity", "command_index": 2**80},
+            {"kind": StringSubclass("entity"), "name": "subclass"},
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = project_index._dedupe_results(unsupported)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.project_index_dedupe_indices(unsupported))
+            actual = project_index._dedupe_results(unsupported)
+        self.assertEqual(actual, expected)
+        self.assertEqual(len(actual), 4)
+        self.assertIs(actual[1], unsupported[1])
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.project_index_dedupe_indices(
+                    [{"command_index": 2**80}]
+                )
+            )
+
+        unhashable = [{"name": ["not", "hashable"]}]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(native_acceleration.project_index_dedupe_indices(unhashable))
+            with self.assertRaises(TypeError):
+                project_index._dedupe_results(unhashable)
 
 
 class TestIndexSchemaMigration(unittest.TestCase):

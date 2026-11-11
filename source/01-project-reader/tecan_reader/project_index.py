@@ -13,6 +13,7 @@ import json
 import re
 import sqlite3
 
+from tecan_common import native_acceleration
 from .common import _connect, _connection_arg, fast_json_dumps, to_jsonable
 from tecan_common.performance import performance_marker
 from .project_model import CanonicalProjectModel
@@ -1215,6 +1216,9 @@ def _search_sequences(
 
 
 def _dedupe_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    native_indices = native_acceleration.project_index_dedupe_indices(results)
+    if native_indices is not None:
+        return [results[index] for index in native_indices]
     seen: set[tuple[Any, ...]] = set()
     out: list[dict[str, Any]] = []
     for result in results:
