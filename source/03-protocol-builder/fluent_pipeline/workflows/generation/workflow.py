@@ -15,6 +15,10 @@ from typing import Any, Mapping, Sequence
 import json
 import re
 
+from tecan_common.native_acceleration import (
+    ascii_variable_name_is_valid as _native_ascii_variable_name_is_valid,
+)
+
 # Load the IR module before finalizer/validation imports can initialize the
 # readiness evaluator registry. This keeps the facade import-safe while the
 # sibling gate migration is dirty or partially imported.
@@ -6465,7 +6469,13 @@ def _source_condition_variable_refs(value: Any) -> set[str]:
 
 def _add_source_variable_ref(refs: set[str], value: Any) -> None:
     text = str(value or "").strip()
-    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", text):
+    native = _native_ascii_variable_name_is_valid(text)
+    valid = (
+        native
+        if native is not None
+        else re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", text) is not None
+    )
+    if valid:
         refs.add(text)
 
 

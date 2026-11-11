@@ -9,6 +9,8 @@ from unittest import mock
 from types import SimpleNamespace
 
 import fluent_pipeline.project_context as pc
+import fluent_pipeline.workflows.generation.workflow as generation_workflow_module
+from tecan_common import native_acceleration
 from fluent_pipeline.compiled_xscr_finalizer import FinalizationReport
 from fluent_pipeline.generation_options import GenerationOptions, normalize_generation_options
 from fluent_pipeline.generation_workflow import (
@@ -38,6 +40,42 @@ from fluent_pipeline.request_spec import normalize_request_spec, write_request_s
 from fluent_pipeline.runner import CommandResult
 from fluent_pipeline.runner import PipelineError
 from fluent_pipeline.validation import scaffold_validation_report
+
+
+class SourceVariableRefNativeTests(unittest.TestCase):
+    def test_variable_ref_collection_uses_native_ascii_validator(self):
+        values = [
+            "Alpha_2",
+            "_x",
+            "2bad",
+            "alpha beta",
+            "é",
+            "ſcript",
+            "",
+            "\u001cFoo\u001f",
+        ]
+
+        def collect() -> set[str]:
+            refs: set[str] = set()
+            for value in values:
+                generation_workflow_module._add_source_variable_ref(refs, value)
+            return refs
+
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = collect()
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                generation_workflow_module,
+                "_native_ascii_variable_name_is_valid",
+                wraps=native_acceleration.ascii_variable_name_is_valid,
+            ) as native_call:
+                actual = collect()
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertIsNone(
+                native_acceleration.ascii_variable_name_is_valid("ſcript")
+            )
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, {"Alpha_2", "_x", "Foo"})
 
 
 XSCR = """<?xml version="1.0"?>
