@@ -34,6 +34,17 @@ PROTOCOL_IR_BUNDLE_SCHEMA_ID = "https://fluent-ai-assistance.local/schemas/proto
 EXPRESSION_SCHEMA_VERSION = "fluent_control.expression.v1"
 FC_VAR_PREFIX = "@fc:"
 _FC_VARIABLE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _is_fc_variable_name(name: str) -> bool:
+    native = native_acceleration.ascii_variable_name_is_valid(name)
+    return (
+        native
+        if native is not None
+        else _FC_VARIABLE_NAME_RE.fullmatch(name) is not None
+    )
+
+
 _LOOP_COUNT_EXPRESSION_KEYS = frozenset(
     {
         "number_of_loops_expression",
@@ -2013,12 +2024,12 @@ def _validate_expression(issues: list[ProtocolIRIssue], path: str, value: Any) -
         return
     if kind == "variable_reference":
         name = str(value.get("name") or "")
-        if not _FC_VARIABLE_NAME_RE.fullmatch(name):
+        if not _is_fc_variable_name(name):
             issues.append(ProtocolIRIssue(f"{path}.name", "must be a valid FluentControl variable name"))
         return
     if kind == "function_call":
         name = str(value.get("name") or "")
-        if not _FC_VARIABLE_NAME_RE.fullmatch(name):
+        if not _is_fc_variable_name(name):
             issues.append(ProtocolIRIssue(f"{path}.name", "must be a valid FluentControl function name"))
         args = value.get("arguments")
         if not isinstance(args, list):
@@ -2219,7 +2230,7 @@ def _require_text(issues: list[ProtocolIRIssue], path: str, value: Any) -> None:
 
 
 def _validate_fc_variable_name(issues: list[ProtocolIRIssue], path: str, name: str) -> None:
-    if not name or not _FC_VARIABLE_NAME_RE.fullmatch(name):
+    if not name or not _is_fc_variable_name(name):
         issues.append(
             ProtocolIRIssue(
                 path,
