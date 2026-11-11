@@ -3954,6 +3954,44 @@ def worklist_barrier_reason(kind: Any) -> str | None:
         return None
 
 
+def worklist_tip_diagnostic(
+    raw: Any, code: Any, line: Any
+) -> tuple[str, str, tuple[int, ...], str] | None:
+    """Format supported ASCII tip-selection diagnostics natively."""
+    if (
+        not enabled()
+        or type(raw) is not str
+        or not raw.isascii()
+        or type(code) is not str
+        or not code.isascii()
+        or type(line) is not int
+        or line < 0
+    ):
+        return None
+    try:
+        result = _native.worklist_tip_diagnostic(raw, code, line)
+        if (
+            type(result) is tuple
+            and len(result) == 4
+            and type(result[0]) is str
+            and type(result[1]) is str
+            and type(result[2]) is list
+            and all(type(number) is int for number in result[2])
+            and type(result[3]) is str
+        ):
+            return result[0], result[1], tuple(result[2]), result[3]
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def worklist_analyze_lines(
     lines: Any,
     enabled_tip_mask: str | None,

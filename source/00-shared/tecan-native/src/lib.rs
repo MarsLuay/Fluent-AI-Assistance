@@ -6276,6 +6276,23 @@ fn worklist_barrier_reason(kind: &str) -> Option<String> {
 }
 
 #[pyfunction]
+fn worklist_tip_diagnostic(
+    raw: &str,
+    code: &str,
+    line: usize,
+) -> Option<(String, String, Vec<usize>, String)> {
+    if !raw.is_ascii() || !code.is_ascii() {
+        return None;
+    }
+    Some((
+        code.to_owned(),
+        tecan_worklist_builder::semantics::tip_diagnostic_message(raw),
+        vec![line],
+        "error".to_owned(),
+    ))
+}
+
+#[pyfunction]
 fn worklist_analyze_lines(
     lines_json: &str,
     enabled_tip_mask: Option<&str>,
@@ -6737,6 +6754,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_count_record_types, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_window_properties, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_barrier_reason, module)?)?;
+    module.add_function(wrap_pyfunction!(worklist_tip_diagnostic, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_analyze_lines, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_optimize_lines, module)?)?;
     module.add_function(wrap_pyfunction!(clean_empty_containers, module)?)?;

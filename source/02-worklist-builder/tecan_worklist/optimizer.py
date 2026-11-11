@@ -423,9 +423,14 @@ def semantic_equivalent(
 def _append_tip_diagnostic(diagnostics: list[WorklistDiagnostic], selection: TipSelection, line: int) -> None:
     if selection.valid:
         return
+    code = selection.diagnostic_code or "tip_mask_invalid"
+    native = native_acceleration.worklist_tip_diagnostic(selection.raw, code, line)
+    if native is not None:
+        diagnostics.append(WorklistDiagnostic(*native))
+        return
     diagnostics.append(
         WorklistDiagnostic(
-            selection.diagnostic_code or "tip_mask_invalid",
+            code,
             f"Record-level TipMask {selection.raw!r} is not a supported one-hot tip selection.",
             (line,),
             "error",

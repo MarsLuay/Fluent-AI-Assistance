@@ -792,13 +792,17 @@ fn append_tip_diagnostic(diagnostics: &mut Vec<Value>, selection: &TipSelection,
     }
     diagnostics.push(diagnostic(
         selection.diagnostic_code().unwrap_or("tip_mask_invalid"),
-        &format!(
-            "Record-level TipMask {} is not a supported one-hot tip selection.",
-            python_repr(&selection.raw)
-        ),
+        &tip_diagnostic_message(&selection.raw),
         &[line],
         "error",
     ));
+}
+
+pub fn tip_diagnostic_message(raw: &str) -> String {
+    format!(
+        "Record-level TipMask {} is not a supported one-hot tip selection.",
+        python_repr(raw)
+    )
 }
 
 fn diagnostic(code: &str, message: &str, line_numbers: &[usize], severity: &str) -> Value {

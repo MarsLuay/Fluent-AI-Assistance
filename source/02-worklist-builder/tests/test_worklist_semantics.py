@@ -40,6 +40,7 @@ from tecan_worklist.optimizer import (
     optimize_worklist,
     parse_enabled_tip_mask,
     semantic_equivalent,
+    _append_tip_diagnostic,
     _barrier_reason,
     _window_properties,
 )
@@ -1695,6 +1696,47 @@ class WorklistSemanticsTests(unittest.TestCase):
                 actual = [_barrier_reason(record) for record in records]
                 self.assertEqual(native_call.call_count, len(records))
             self.assertIsNone(native_acceleration.worklist_barrier_reason("unexpected"))
+        self.assertEqual(actual, expected)
+
+    def test_native_tip_diagnostic_matches_python_repr_and_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_tip_diagnostic"
+        ):
+            self.skipTest("optional Rust tip diagnostic formatter is not built")
+        cases = [
+            ("3", 1),
+            ("not-an-int", 2),
+            ("1'2", 3),
+            ('1"2', 4),
+            ("both'\"quotes", 5),
+            ("white\nspace\t", 6),
+            ("café", 7),
+        ]
+        expected = []
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            for raw, line in cases:
+                diagnostics = []
+                _append_tip_diagnostic(diagnostics, parse_tip_selection(raw), line)
+                expected.append(diagnostics)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_tip_diagnostic",
+                wraps=native_acceleration.worklist_tip_diagnostic,
+            ) as native_call:
+                actual = []
+                for raw, line in cases:
+                    diagnostics = []
+                    _append_tip_diagnostic(diagnostics, parse_tip_selection(raw), line)
+                    actual.append(diagnostics)
+                self.assertEqual(native_call.call_count, len(cases))
+            self.assertIsNone(
+                native_acceleration.worklist_tip_diagnostic("café", "code", 1)
+            )
+            valid = []
+            _append_tip_diagnostic(valid, parse_tip_selection("1"), 8)
+            self.assertEqual(valid, [])
         self.assertEqual(actual, expected)
 
     def test_optimizer_interleaves_only_independent_explicit_units(self):
