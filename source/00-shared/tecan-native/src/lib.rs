@@ -2653,6 +2653,25 @@ fn ascii_safe_filename(value: &str) -> Option<String> {
 }
 
 #[pyfunction]
+fn ascii_safe_variable_base(value: &str) -> Option<String> {
+    if !value.is_ascii() {
+        return None;
+    }
+    let mut output = String::new();
+    let mut separator_pending = false;
+    for character in value.chars() {
+        if character.is_ascii_alphanumeric() || character == '_' {
+            output.push(character.to_ascii_lowercase());
+            separator_pending = false;
+        } else if !separator_pending {
+            output.push('_');
+            separator_pending = true;
+        }
+    }
+    Some(output.trim_matches('_').to_owned())
+}
+
+#[pyfunction]
 fn ascii_word_boundary_contains(value: &str, word: &str) -> Option<bool> {
     if !value.is_ascii() || !word.is_ascii() || word.is_empty() {
         return None;
@@ -7669,6 +7688,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(ascii_lower_alnum_compact, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_profile_slug, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_safe_filename, module)?)?;
+    module.add_function(wrap_pyfunction!(ascii_safe_variable_base, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_word_boundary_contains, module)?)?;
     module.add_function(wrap_pyfunction!(label_base_ascii_text, module)?)?;
     module.add_function(wrap_pyfunction!(is_guid_text, module)?)?;
@@ -7842,6 +7862,22 @@ mod tests {
         assert_eq!(ascii_safe_filename("---"), Some("---".into()));
         assert_eq!(ascii_safe_filename(&"a".repeat(125)), Some("a".repeat(120)));
         assert_eq!(ascii_safe_filename("東京"), None);
+    }
+
+    #[test]
+    fn ascii_safe_variable_base_matches_python_regex_and_lowercase() {
+        assert_eq!(
+            ascii_safe_variable_base("Tecan Pump"),
+            Some("tecan_pump".into())
+        );
+        assert_eq!(ascii_safe_variable_base("__Alpha__"), Some("alpha".into()));
+        assert_eq!(
+            ascii_safe_variable_base("alpha__beta"),
+            Some("alpha__beta".into())
+        );
+        assert_eq!(ascii_safe_variable_base("123Flow"), Some("123flow".into()));
+        assert_eq!(ascii_safe_variable_base("..."), Some(String::new()));
+        assert_eq!(ascii_safe_variable_base("東京"), None);
     }
 
     #[test]

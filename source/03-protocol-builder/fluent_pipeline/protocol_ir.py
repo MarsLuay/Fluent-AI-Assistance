@@ -3834,7 +3834,12 @@ def _safe_filename(value: str) -> str:
 
 
 def _safe_var(value: str, *, used: set[str]) -> str:
-    base = re.sub(r"[^A-Za-z0-9_]+", "_", value.strip()).strip("_").lower() or "item"
+    stripped = value.strip()
+    native = native_acceleration.ascii_safe_variable_base(stripped)
+    if native is not None:
+        base = native or "item"
+    else:
+        base = re.sub(r"[^A-Za-z0-9_]+", "_", stripped).strip("_").lower() or "item"
     if base[0].isdigit():
         base = f"item_{base}"
     candidate = base
