@@ -1507,7 +1507,7 @@ def _stage_external_file_deployments(
 
 
 def _is_touchtools_media_target(target_path: str) -> bool:
-    normalized = str(target_path or "").replace("/", "\\").casefold()
+    normalized = _casefold_exact(str(target_path or "").replace("/", "\\"))
     return "\\tecan\\visionx\\touchtoolsdata\\images" in normalized
 
 

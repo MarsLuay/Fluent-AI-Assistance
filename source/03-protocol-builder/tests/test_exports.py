@@ -144,6 +144,41 @@ class FullZeiaCopyFlagNativeTests(unittest.TestCase):
                 self.assertEqual(evaluate(disabled=False), expected)
 
 
+class TouchToolsTargetNormalizationNativeTests(unittest.TestCase):
+    def test_touchtools_target_detection_uses_native_ascii_and_unicode_fallback(self):
+        paths = [
+            r"C:\ProgramData\Tecan\VisionX\TouchToolsData\Images\demo.png",
+            r"C:/ProgramData/Tecan/VisionX/tOuChToolsData/Images/demo.png",
+            r"C:\Tecan\VisionX\TouchToolſData\Images\demo.png",
+            r"C:\Tecan\VisionX\TouchToolsData\Other\demo.png",
+            None,
+            r" C:\Tecan\VisionX\TouchToolsData\Images\demo.png",
+        ]
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [exports._is_touchtools_media_target(path) for path in paths]
+        self.assertEqual(expected, [True, True, True, False, False, True])
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = [exports._is_touchtools_media_target(path) for path in paths]
+                self.assertEqual(native_call.call_count, 5)
+            self.assertIsNone(native_acceleration.ascii_casefold_trim("Straße"))
+        self.assertEqual(actual, expected)
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = [exports._is_touchtools_media_target(path) for path in paths]
+        self.assertEqual(fallback, expected)
+
+
 class SourcePathWhitespaceNativeTests(unittest.TestCase):
     def test_source_path_collapses_whitespace_with_native_helper_and_fallback(self):
         source = "result = choose(\n    alpha,  \n    beta\n)"
