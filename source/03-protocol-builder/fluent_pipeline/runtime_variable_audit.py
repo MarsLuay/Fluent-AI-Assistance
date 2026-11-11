@@ -16,6 +16,9 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from .query_variable_audit import normalize_query_variable_names
+from tecan_common.native_acceleration import (
+    xml_elements_by_name as _native_xml_elements_by_name,
+)
 
 
 RUNTIME_VARIABLE_AUDIT_VERSION = "tecan.runtime_variable_audit.v1"
@@ -326,7 +329,12 @@ def _local_name(tag: str) -> str:
 
 
 def _first_text(element: ET.Element, local_name: str) -> str:
-    for child in element.iter():
+    children = _native_xml_elements_by_name(
+        element, (local_name,), ET.Element
+    )
+    if children is None:
+        children = element.iter()
+    for child in children:
         if _local_name(child.tag) == local_name and child.text:
             text = child.text.strip()
             if text:

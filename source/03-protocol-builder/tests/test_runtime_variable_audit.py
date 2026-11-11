@@ -1,8 +1,11 @@
 import tempfile
 import unittest
+from fluent_pipeline import runtime_variable_audit as runtime_variable_audit_module
 from fluent_pipeline import xml_compat as ET
 from pathlib import Path
+from unittest.mock import patch
 
+from tecan_common import native_acceleration
 from fluent_pipeline.request_spec import build_request_validation_diff, render_request_validation_diff_markdown
 from fluent_pipeline.runtime_variable_audit import (
     audit_runtime_variables_for_workflow,
@@ -16,6 +19,45 @@ from fluent_pipeline.runtime_variable_audit import (
 
 
 class RuntimeVariableAuditTests(unittest.TestCase):
+    def test_first_text_uses_native_selector_and_fallback(self):
+        root = ET.fromstring(
+            "<Root><Name> </Name><Name> First </Name>"
+            "<Nested><Name>Second</Name></Nested></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = runtime_variable_audit_module._first_text(root, "Name")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                runtime_variable_audit_module,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = runtime_variable_audit_module._first_text(root, "Name")
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "First")
+
+        class StringTag(str):
+            pass
+
+        custom_root = ET.Element("Root")
+        ET.SubElement(custom_root, StringTag("Name")).text = "Fallback"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = runtime_variable_audit_module._first_text(
+                custom_root, "Name"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_name(
+                    custom_root, ("Name",), ET.Element
+                )
+            )
+            fallback_actual = runtime_variable_audit_module._first_text(
+                custom_root, "Name"
+            )
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, "Fallback")
+
     def test_normalize_variable_names_dedupes_and_sorts(self):
         names = normalize_variable_names(["PlateCount", "TubeCount", "PlateCount", ""])
         self.assertEqual(names, ("PlateCount", "TubeCount"))
