@@ -56,6 +56,41 @@ class ApiV2StateNativeTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, ["run9", "script", "id", "", ""])
 
+    def test_enum_state_label_comparison_uses_rust_with_unicode_fallback(self):
+        values = ["READY", "ſtartup", "İD", "Unknown"]
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [state_module.parse_state_machine_states(value) for value in values]
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                state_module,
+                "_native_ascii_casefold_equals",
+                wraps=native_acceleration.ascii_casefold_equals,
+            ) as native_call:
+                actual = [state_module.parse_state_machine_states(value) for value in values]
+                self.assertGreater(native_call.call_count, 0)
+                native_call.assert_any_call("ready", "Ready")
+                self.assertIsNone(native_acceleration.ascii_casefold_equals("i\u0307d", "Ready"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [
+                StateMachineStates.READY,
+                StateMachineStates.STARTUP,
+                StateMachineStates.UNKNOWN,
+                StateMachineStates.UNKNOWN,
+            ],
+        )
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                state_module, "_native_ascii_casefold_equals", return_value=None
+            ):
+                forced_fallback = [
+                    state_module.parse_state_machine_states(value) for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_state_alias_mapping_remains_python_policy(self):
         self.assertIs(
             state_module.parse_state_machine_states("ready-mode"),

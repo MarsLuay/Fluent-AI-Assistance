@@ -12,6 +12,7 @@ from enum import Enum
 from typing import Any, Mapping, MutableMapping
 
 from tecan_common.native_acceleration import (
+    ascii_casefold_equals as _native_ascii_casefold_equals,
     ascii_casefold_trim as _native_ascii_casefold_trim,
     ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
 )
@@ -53,6 +54,11 @@ def _casefold_state_text(text: str) -> str:
     stripped = text.strip()
     native = _native_ascii_casefold_trim(stripped)
     return native if native is not None else stripped.casefold()
+
+
+def _casefold_equal(value: str, expected: str) -> bool:
+    native = _native_ascii_casefold_equals(value, expected)
+    return native if native is not None else value.casefold() == expected.casefold()
 
 
 def _compact(text: str) -> str:
@@ -114,7 +120,9 @@ def parse_state_machine_states(
 
     folded = _casefold_state_text(text)
     for member in StateMachineStates:
-        if folded == member.value.casefold() or folded == member.name.casefold():
+        if _casefold_equal(folded, member.value) or _casefold_equal(
+            folded, member.name
+        ):
             return member
 
     compact = _compact(text)
