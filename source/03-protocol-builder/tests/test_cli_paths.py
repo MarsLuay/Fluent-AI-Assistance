@@ -1286,6 +1286,41 @@ class WorkspaceLogPathTests(unittest.TestCase):
             (generations / "demo-run_v2").mkdir()
             self.assertEqual(cli_runtime._default_generation_dir(ctx, "Demo Run").name, "demo-run_v3")
 
+    def test_safe_output_label_uses_native_ascii_lower_with_unicode_fallback(self):
+        values = ["Generated Script", "Ångström Log", "___"]
+        with mock.patch.dict(
+            "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+        ):
+            expected = [cli_runtime._safe_output_label(value) for value in values]
+        self.assertEqual(
+            expected, ["generated-script", "ångström-log", "generated-protocol"]
+        )
+
+        with mock.patch.dict(
+            "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+        ):
+            with mock.patch.object(
+                cli_runtime,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = [cli_runtime._safe_output_label(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+            native_call.assert_any_call("Generated Script")
+            native_call.assert_any_call("Ångström Log")
+        self.assertEqual(actual, expected)
+
+        with mock.patch.dict(
+            "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+        ):
+            with mock.patch.object(
+                cli_runtime, "_native_ascii_lower", return_value=None
+            ):
+                forced_fallback = [
+                    cli_runtime._safe_output_label(value) for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_workflow_event_log_path_uses_logs_dir_and_out_dir_label(self):
         path = workflow_event_log_path("generated_script_final")
         self.assertEqual(path.name, "generated-script-final.events.jsonl")

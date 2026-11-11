@@ -15,6 +15,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from tecan_common.native_acceleration import ascii_lower as _native_ascii_lower
+
 from ..aliases import alias_records, load_alias_maps, normalize_protocol_ir_aliases, resolve_alias
 from ..bundle_lifecycle import (
     DEFAULT_PROBE_ROOT,
@@ -241,8 +243,10 @@ def _simulator_app_dir() -> Path:
     return candidates[0].resolve()
 
 def _safe_output_label(value: str) -> str:
+    native = _native_ascii_lower(value)
+    lowered = native if native is not None else value.lower()
     keep = []
-    for char in value.lower().strip():
+    for char in lowered.strip():
         if char.isalnum():
             keep.append(char)
         elif char in {" ", "_", "-"}:
