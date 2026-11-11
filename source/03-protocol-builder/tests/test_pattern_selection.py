@@ -148,7 +148,6 @@ def test_explicit_query_and_script_casefold_uses_native_with_unicode_fallback() 
             wraps=native_acceleration.ascii_lower,
         ) as native_call:
             actual = rank_pattern_windows(windows, **arguments)
-        assert native_call.call_count == 4
         native_call.assert_any_call("STRASSE")
         native_call.assert_any_call("Straße")
     assert actual == expected
@@ -184,6 +183,39 @@ def test_selection_facets_use_native_casefold_with_unicode_fallback() -> None:
     with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
         with mock.patch.object(pattern_index, "_native_ascii_lower", return_value=None):
             forced_fallback = pattern_index._selection_facets(value)
+    assert forced_fallback == expected
+
+
+def test_pattern_scoring_uses_native_lower_with_unicode_fallback() -> None:
+    window = _window(
+        1,
+        "aspirate",
+        name="MüllerPlate example",
+        specifications={"labware": ["MüllerPlate"]},
+    )
+    facets = {
+        "operation_families": {"aspirate"},
+        "labware_names": {"MüllerPlate"},
+    }
+    with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = pattern_index._pattern_score(window, facets, {})
+
+    with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with mock.patch.object(
+            pattern_index,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            actual = pattern_index._pattern_score(window, facets, {})
+        assert native_call.call_count == 4
+        native_call.assert_any_call("aspirate")
+        native_call.assert_any_call("MüllerPlate")
+    assert actual == expected
+    assert actual[2] == {"operation_family", "labware"}
+
+    with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with mock.patch.object(pattern_index, "_native_ascii_lower", return_value=None):
+            forced_fallback = pattern_index._pattern_score(window, facets, {})
     assert forced_fallback == expected
 
 

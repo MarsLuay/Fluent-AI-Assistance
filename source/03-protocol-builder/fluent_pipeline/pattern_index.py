@@ -343,7 +343,7 @@ def _pattern_score(
     facets: Mapping[str, set[str]],
     target: Mapping[str, Any],
 ) -> tuple[int, dict[str, int], set[str]]:
-    pattern_type = str(window.get("pattern_type") or "").casefold()
+    pattern_type = _casefold_text(str(window.get("pattern_type") or ""))
     normalized_operations = {
         _PATTERN_OPERATION_ALIASES.get(value, value)
         for value in facets.get("operation_families", set())
@@ -371,16 +371,19 @@ def _pattern_score(
         )
         for item in steps
         if isinstance(item, Mapping)
-    ).casefold()
+    )
+    step_text = _casefold_text(step_text)
     spec_text = " ".join(
         str(item)
         for values in specifications.values()
         for item in (values if isinstance(values, list) else [values])
-    ).casefold()
+    )
+    spec_text = _casefold_text(spec_text)
     all_text = " ".join(
         str(window.get(key) or "")
         for key in ("name", "source_script", "command_signature")
-    ).casefold() + " " + step_text + " " + spec_text
+    )
+    all_text = _casefold_text(all_text) + " " + step_text + " " + spec_text
 
     for facet_name, score_key, label in (
         ("device_families", "device_family", "device_family"),
