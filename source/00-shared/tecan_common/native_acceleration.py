@@ -766,6 +766,37 @@ def xml_direct_elements_by_name(
         return None
 
 
+def xml_direct_elements_by_ascii_prefix(
+    parent: Any, prefix: Any, element_type: Any
+) -> list[Any] | None:
+    """Select direct XML children whose ASCII local name has the given prefix."""
+    if (
+        not enabled()
+        or type(parent) is not element_type
+        or type(prefix) is not str
+        or not prefix.isascii()
+    ):
+        return None
+    try:
+        result = _native.xml_direct_elements_by_ascii_prefix(
+            parent, prefix, element_type
+        )
+        if type(result) is list and all(
+            type(element) is element_type for element in result
+        ):
+            return result
+        return None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_leaf_texts(root: Any, element_type: Any) -> list[str] | None:
     """Collect trimmed text from leaves with standard Element traversal semantics."""
     if not enabled() or type(root) is not element_type:

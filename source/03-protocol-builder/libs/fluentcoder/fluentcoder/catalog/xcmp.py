@@ -79,6 +79,23 @@ def _direct_children(elem: Optional[ET.Element], local_name: str) -> list[ET.Ele
     return [c for c in list(elem) if isinstance(c.tag, str) and _local(c.tag) == local_name]
 
 
+def _direct_children_with_prefix(
+    elem: Optional[ET.Element], prefix: str
+) -> list[ET.Element]:
+    if elem is None:
+        return []
+    native = native_acceleration.xml_direct_elements_by_ascii_prefix(
+        elem, prefix, ET.Element
+    )
+    if native is not None:
+        return native
+    return [
+        child
+        for child in list(elem)
+        if isinstance(child.tag, str) and _local(child.tag).startswith(prefix)
+    ]
+
+
 def _direct_child(elem: Optional[ET.Element], local_name: str) -> Optional[ET.Element]:
     if elem is None:
         return None
@@ -825,11 +842,7 @@ def _walk_workspace_occupancy(
         if elem is None:
             return None
         labware_name_map: dict[str, str] = {}
-        for kv in list(elem):
-            if not isinstance(kv.tag, str):
-                continue
-            if not _local(kv.tag).startswith("KeyValueOfstringstring"):
-                continue
+        for kv in _direct_children_with_prefix(elem, "KeyValueOfstringstring"):
             k = _text(_find(kv, "Key"))
             v = _text(_find(kv, "Value"))
             if k and v:
@@ -862,11 +875,7 @@ def _walk_workspace_occupancy(
     def _walk(container: Optional[ET.Element], site_path: tuple[int, ...]) -> None:
         if container is None:
             return
-        for node in container:
-            if not isinstance(node.tag, str):
-                continue
-            if not _local(node.tag).startswith("KeyValueOfintSite"):
-                continue
+        for node in _direct_children_with_prefix(container, "KeyValueOfintSite"):
             key = _int_text(_direct_child(node, "Key"))
             value_node = _direct_child(node, "Value")
             if key is None or value_node is None:

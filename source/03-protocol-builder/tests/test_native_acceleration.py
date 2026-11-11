@@ -385,14 +385,27 @@ class NativeAccelerationTests(unittest.TestCase):
     def test_workspace_occupancy_uses_native_structural_selectors(self) -> None:
         from fluentcoder.catalog import xcmp
 
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "xml_direct_elements_by_name"
+        if not native_acceleration.available() or not all(
+            hasattr(native_acceleration._native, name)
+            for name in (
+                "xml_direct_elements_by_name",
+                "xml_direct_elements_by_ascii_prefix",
+            )
         ):
-            self.skipTest("optional Rust XML selector is not built")
+            self.skipTest("optional Rust XML selectors are not built")
         root = ET.fromstring(
             '<Root xmlns:ns="urn:test"><Payload><PayloadData><Wrapper>'
             "<Worktables><KeyValueOfstringWorktable><Value><Frame>"
-            "<Arrangements><ns:Arrangement><Sites/></ns:Arrangement>"
+            "<Arrangements><ns:Arrangement><Sites><ns:KeyValueOfintSiteNode>"
+            "<Key>1</Key><Value><ConnectedComponent><LabwareName>"
+            "<ns:KeyValueOfstringstringField><Key>default</Key>"
+            "<Value>example item</Value></ns:KeyValueOfstringstringField>"
+            "<Nested><ns:KeyValueOfstringstringNested><Key>initial</Key>"
+            "<Value>ignored nested item</Value></ns:KeyValueOfstringstringNested>"
+            "</Nested></LabwareName><BaseLocationIdentifier>alpha</BaseLocationIdentifier>"
+            "</ConnectedComponent></Value></ns:KeyValueOfintSiteNode>"
+            "<Nested><ns:KeyValueOfintSiteNested><Key>2</Key><Value/>"
+            "</ns:KeyValueOfintSiteNested></Nested></Sites></ns:Arrangement>"
             "<Nested><ns:Arrangement><Sites/></ns:Arrangement></Nested></Arrangements>"
             "</Frame></Value></KeyValueOfstringWorktable></Worktables>"
             "</Wrapper></PayloadData></Payload></Root>"
@@ -400,6 +413,10 @@ class NativeAccelerationTests(unittest.TestCase):
         payload_data = root.find("./Payload/PayloadData")
         arrangements = payload_data.find(
             "./Wrapper/Worktables/KeyValueOfstringWorktable/Value/Frame/Arrangements"
+        )
+        sites = next(element for element in root.iter() if element.tag == "Sites")
+        labware_name = next(
+            element for element in root.iter() if element.tag == "LabwareName"
         )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             expected = xcmp._walk_workspace_occupancy(root)
@@ -413,17 +430,64 @@ class NativeAccelerationTests(unittest.TestCase):
                     native_acceleration,
                     "xml_direct_elements_by_name",
                     wraps=native_acceleration.xml_direct_elements_by_name,
-                ) as elements_native_call:
-                    actual = xcmp._walk_workspace_occupancy(root)
-                    first_native_call.assert_any_call(
-                        payload_data, "Worktables", ET.Element
-                    )
-                    elements_native_call.assert_called_once_with(
-                        arrangements, {"Arrangement"}, ET.Element
-                    )
+                ) as exact_native_call:
+                    with patch.object(
+                        native_acceleration,
+                        "xml_direct_elements_by_ascii_prefix",
+                        wraps=native_acceleration.xml_direct_elements_by_ascii_prefix,
+                    ) as prefix_native_call:
+                        actual = xcmp._walk_workspace_occupancy(root)
+                        first_native_call.assert_any_call(
+                            payload_data, "Worktables", ET.Element
+                        )
+                        exact_native_call.assert_called_once_with(
+                            arrangements, {"Arrangement"}, ET.Element
+                        )
+                        self.assertEqual(prefix_native_call.call_count, 2)
+                        prefix_native_call.assert_any_call(
+                            sites, "KeyValueOfintSite", ET.Element
+                        )
+                        prefix_native_call.assert_any_call(
+                            labware_name, "KeyValueOfstringstring", ET.Element
+                        )
 
         self.assertEqual(actual, expected)
-        self.assertEqual(actual, ([], []))
+        self.assertEqual(
+            actual,
+            (
+                [xcmp.WorkspaceOccupant((1,), 1, "example item", "alpha", None)],
+                [((1,), "alpha")],
+            ),
+        )
+
+    def test_ascii_prefix_selector_falls_back_for_unicode_local_names(self) -> None:
+        from fluentcoder.catalog import xcmp
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_direct_elements_by_ascii_prefix"
+        ):
+            self.skipTest("optional Rust XML prefix selector is not built")
+        root = ET.fromstring(
+            '<Root xmlns:ns="urn:test"><ns:KeyValueOfintSiteΩ/><Other/></Root>'
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = xcmp._direct_children_with_prefix(root, "KeyValueOfintSite")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_direct_elements_by_ascii_prefix",
+                wraps=native_acceleration.xml_direct_elements_by_ascii_prefix,
+            ) as native_call:
+                actual = xcmp._direct_children_with_prefix(root, "KeyValueOfintSite")
+                native_call.assert_called_once_with(
+                    root, "KeyValueOfintSite", ET.Element
+                )
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            [element.tag.rsplit("}", 1)[-1] for element in actual],
+            ["KeyValueOfintSiteΩ"],
+        )
 
     def test_xcon_orientation_rows_use_native_selector_with_python_parity(self) -> None:
         from fluentcoder.catalog import xcon
