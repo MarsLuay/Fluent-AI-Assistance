@@ -9,9 +9,17 @@ import subprocess
 import tempfile
 from typing import Any
 
+from tecan_common.native_acceleration import ascii_lower as _native_ascii_lower
+
 from .runner import PipelineError
 
 PLACEHOLDER_VIDEO_LABEL = "Replace with GIF"
+
+
+def _lower_text(value: str) -> str:
+    native = _native_ascii_lower(value)
+    return native if native is not None else value.lower()
+
 
 VIDEO_SOURCE_EXTENSIONS = (
     ".3gp",
@@ -167,11 +175,19 @@ def worktable_fallback_video_slots(
     fallback: set[str] = set()
     for group in grouped.values():
         image_spec = next(
-            (item for item in group if str(item.get("kind") or "").lower() == "image"),
+            (
+                item
+                for item in group
+                if _lower_text(str(item.get("kind") or "")) == "image"
+            ),
             None,
         )
         video_spec = next(
-            (item for item in group if str(item.get("kind") or "").lower() == "video"),
+            (
+                item
+                for item in group
+                if _lower_text(str(item.get("kind") or "")) == "video"
+            ),
             None,
         )
         if video_spec is None:
@@ -240,7 +256,7 @@ def convert_dropped_video_slots(
         worktable_slots = worktable_video_slots
     results: list[dict[str, Any]] = []
     for spec in specs or []:
-        if str(spec.get("kind") or "").lower() != "video":
+        if _lower_text(str(spec.get("kind") or "")) != "video":
             continue
         slot = str(spec.get("slot") or "").strip()
         filename = str(spec.get("filename") or "").strip()
@@ -315,7 +331,7 @@ def normalize_worktable_detail_gifs(
         worktable_slots = worktable_video_slots
     results: list[dict[str, Any]] = []
     for spec in specs or []:
-        if str(spec.get("kind") or "").lower() != "video":
+        if _lower_text(str(spec.get("kind") or "")) != "video":
             continue
         slot = str(spec.get("slot") or "").strip()
         filename = str(spec.get("filename") or "").strip()

@@ -1,8 +1,11 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
 import unittest.mock
 
+import fluent_pipeline.media_convert as media_convert
+from tecan_common import native_acceleration
 from fluent_pipeline.media_convert import (
     PLACEHOLDER_VIDEO_LABEL,
     convert_dropped_video_slots,
@@ -236,6 +239,80 @@ class MediaConvertTests(unittest.TestCase):
                 },
             ]
             self.assertEqual(worktable_fallback_video_slots(specs, media_dir), {"step_001_video"})
+
+    def test_media_kind_normalization_uses_native_lower_with_fallback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            media_dir = Path(tmp)
+            from fluent_pipeline.protocol_ir import write_placeholder_image_slot
+
+            write_placeholder_image_slot(media_dir / "step_001_image.png")
+            write_placeholder_video_slot(media_dir / "step_001_video.gif")
+            (media_dir / "step_001_video.mov").write_bytes(b"video")
+            specs = [
+                {
+                    "step_id": "step_001",
+                    "slot": "step_001_image",
+                    "kind": "IMAGE",
+                    "filename": "step_001_image.png",
+                },
+                {
+                    "step_id": "step_001",
+                    "slot": "step_001_video",
+                    "kind": "VIDEO",
+                    "filename": "step_001_video.gif",
+                },
+                {
+                    "step_id": "step_002",
+                    "slot": "step_002_video",
+                    "kind": "VIDÉO",
+                    "filename": "step_002_video.gif",
+                },
+            ]
+
+            def exercise():
+                fallback_slots = worktable_fallback_video_slots(specs, media_dir)
+                with unittest.mock.patch(
+                    "fluent_pipeline.media_convert.convert_video_to_worktable_gif",
+                    return_value={"bytes": 12},
+                ) as worktable_mock, unittest.mock.patch(
+                    "fluent_pipeline.media_convert.convert_video_to_gif"
+                ) as standard_mock:
+                    results = convert_dropped_video_slots(
+                        media_dir, specs, worktable_video_slots=fallback_slots
+                    )
+                worktable_mock.assert_called_once()
+                standard_mock.assert_not_called()
+                return fallback_slots, results
+
+            with unittest.mock.patch.dict(
+                os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+            ):
+                expected = exercise()
+            self.assertEqual(expected[0], {"step_001_video"})
+            self.assertEqual(len(expected[1]), 1)
+
+            with unittest.mock.patch.dict(
+                os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+            ):
+                with unittest.mock.patch.object(
+                    media_convert,
+                    "_native_ascii_lower",
+                    wraps=native_acceleration.ascii_lower,
+                ) as native_call:
+                    actual = exercise()
+                native_call.assert_any_call("IMAGE")
+                native_call.assert_any_call("VIDEO")
+                native_call.assert_any_call("VIDÉO")
+            self.assertEqual(actual, expected)
+
+            with unittest.mock.patch.dict(
+                os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+            ):
+                with unittest.mock.patch.object(
+                    media_convert, "_native_ascii_lower", return_value=None
+                ):
+                    forced_fallback = exercise()
+            self.assertEqual(forced_fallback, expected)
 
     def test_worktable_display_video_slot_overrides_real_still_image(self):
         with tempfile.TemporaryDirectory() as tmp:
