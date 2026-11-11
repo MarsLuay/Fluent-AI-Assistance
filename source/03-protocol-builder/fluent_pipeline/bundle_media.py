@@ -481,7 +481,7 @@ def _workflow_slot_base(slot: object) -> str:
     text = str(slot or "").strip()
     match = re.match(r"^(step\d{3})(?:Image|Gif|Video|Audio|$)", text, re.IGNORECASE)
     if match:
-        return match.group(1).lower()
+        return _lower_text(match.group(1))
     match = re.match(r"^step[_-]?(\d{1,3})(?:[_-](?:image|video|audio)|$)", text, re.IGNORECASE)
     if match:
         return f"step{int(match.group(1)):03d}"

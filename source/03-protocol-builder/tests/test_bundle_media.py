@@ -135,6 +135,32 @@ def test_media_inventory_name_and_suffix_use_native_lower_fallback(
     assert forced_fallback == expected
 
 
+def test_workflow_slot_base_uses_native_lower_with_unicode_fallback() -> None:
+    values = ["STEP123Image", "ſtep123Image", "step_12_video", ""]
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = [bundle_media._workflow_slot_base(value) for value in values]
+    assert expected == ["step123", "ſtep123", "step012", ""]
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            bundle_media,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            actual = [bundle_media._workflow_slot_base(value) for value in values]
+        native_call.assert_any_call("STEP123")
+        native_call.assert_any_call("ſtep123")
+    assert actual == expected
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(bundle_media, "_native_ascii_lower", return_value=None):
+            forced_fallback = [
+                bundle_media._workflow_slot_base(value) for value in values
+            ]
+    assert forced_fallback == expected
+
+
 def test_visible_prompt_media_kind_mapping_uses_native_lower_fallback() -> None:
     ir = {
         "steps": [
