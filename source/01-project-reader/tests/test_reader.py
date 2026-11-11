@@ -1147,6 +1147,10 @@ class ReaderTests(unittest.TestCase):
             )
 
     def test_xml_object_fields_reuse_grouped_xml_scan(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_texts_by_name"
+        ):
+            self.skipTest("optional Rust XML grouped-text selector is not built")
         xml_text = """<Root xmlns:x="urn:test">
           <x:ObjectName>   </x:ObjectName>
           <ObjectName>Selected Object</ObjectName>
@@ -1173,10 +1177,16 @@ class ReaderTests(unittest.TestCase):
                 "texts_by_name",
                 wraps=reader_xmlobj.texts_by_name,
             ) as grouped_call:
-                actual = reader_xmlobj.inspect_xml_object_text(
-                    xml_text, source_name="fixture.xwsp", suffix=".xwsp"
-                )
-                grouped_call.assert_called_once()
+                with patch.object(
+                    xml_helpers,
+                    "_native_xml_texts_by_name",
+                    wraps=xml_helpers._native_xml_texts_by_name,
+                ) as native_grouped_call:
+                    actual = reader_xmlobj.inspect_xml_object_text(
+                        xml_text, source_name="fixture.xwsp", suffix=".xwsp"
+                    )
+                    grouped_call.assert_called_once()
+                    native_grouped_call.assert_called_once()
         self.assertEqual(actual, expected)
         self.assertEqual(actual["object_name"], "Selected Object")
         self.assertEqual(actual["type_id"], "type-one")
