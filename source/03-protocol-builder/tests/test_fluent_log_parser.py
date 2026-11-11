@@ -76,6 +76,43 @@ class FluentLogParserNativeTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [True, True, False, True, False])
 
+    def test_single_line_uses_native_whitespace_collapse_and_fallback(self):
+        class CustomText:
+            def __str__(self) -> str:
+                return " \tCustom\u2003Value "
+
+        values = [
+            "\tAlpha \u2003Beta\x1cGamma\n",
+            "x" * 999 + " y",
+            "",
+            CustomText(),
+        ]
+        expected = [" ".join(str(value).split())[:1000] for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback = [fluent_log_parser_module._single_line(value) for value in values]
+        self.assertEqual(fallback, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                fluent_log_parser_module,
+                "_native_collapse_ascii_whitespace",
+                wraps=native_acceleration.collapse_ascii_whitespace,
+            ) as native_call:
+                actual = [fluent_log_parser_module._single_line(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                fluent_log_parser_module,
+                "_native_collapse_ascii_whitespace",
+                return_value=None,
+            ):
+                unsupported_fallback = [
+                    fluent_log_parser_module._single_line(value) for value in values
+                ]
+        self.assertEqual(unsupported_fallback, expected)
+
 
 class FluentLogParserTests(unittest.TestCase):
     def test_default_locations_include_documented_pegasus_logs(self):

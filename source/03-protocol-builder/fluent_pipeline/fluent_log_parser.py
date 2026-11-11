@@ -12,6 +12,7 @@ from typing import Any, Iterable, Mapping, Sequence
 
 from tecan_common.native_acceleration import (
     ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
+    collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
     ascii_script_name_key as _native_ascii_script_name_key,
 )
 
@@ -1758,7 +1759,10 @@ def _evidence_for_rule(rule: DiagnosticRule, records: Sequence[FluentLogRecord])
 
 
 def _single_line(text: str) -> str:
-    return " ".join(str(text).split())[:1000]
+    value = str(text)
+    native = _native_collapse_ascii_whitespace(value)
+    collapsed = native if native is not None else " ".join(value.split())
+    return collapsed[:1000]
 
 
 def _compact(values: Iterable[str]) -> list[str]:
