@@ -605,6 +605,40 @@ def test_assign_step_label_media_uses_final_visible_prompt_number() -> None:
     ]
 
 
+def test_media_assignment_sort_uses_native_lower_with_unicode_fallback() -> None:
+    files = [Path("ſtep2.MOV"), Path("STEP1.MOV")]
+
+    def assign() -> list[tuple[str, str]]:
+        ir = {
+            "steps": [
+                _prompt("step_001", media=True),
+                _prompt("step_002", media=True),
+            ]
+        }
+        assignments = assign_step_label_media_to_final_prompts(ir, files)
+        return [(item["input"], item["step_id"]) for item in assignments]
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = assign()
+    assert expected == [("STEP1.MOV", "step_001"), ("ſtep2.MOV", "step_002")]
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(
+            bundle_media,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            actual = assign()
+        native_call.assert_any_call("STEP1.MOV")
+        native_call.assert_any_call("ſtep2.MOV")
+    assert actual == expected
+
+    with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.object(bundle_media, "_native_ascii_lower", return_value=None):
+            forced_fallback = assign()
+    assert forced_fallback == expected
+
+
 def test_assign_step_label_media_skips_final_prompt_without_media() -> None:
     ir = {"steps": [_prompt("step_001", media=False), _prompt("step_002", media=True)]}
 

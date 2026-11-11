@@ -1395,7 +1395,7 @@ def assign_step_label_media_to_final_prompts(
             media_steps_by_number[number] = step
 
     assignments: list[dict[str, Any]] = []
-    for path in sorted(files, key=lambda item: item.name.lower()):
+    for path in sorted(files, key=lambda item: _lower_text(item.name)):
         match = STEP_LABEL_MEDIA_RE.match(path.name)
         if not match:
             assignments.append(
