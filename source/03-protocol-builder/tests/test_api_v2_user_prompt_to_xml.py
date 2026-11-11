@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import unittest
-from fluent_pipeline import xml_compat as ET
+from unittest.mock import patch
 
+from fluent_pipeline import xml_compat as ET
+import fluent_pipeline.api_v2.commands as command_module
+from tecan_common import native_acceleration
 from fluent_pipeline.api_v2.commands import (
     UserPrompt,
     command_from_ir_step,
@@ -16,6 +19,53 @@ from fluent_pipeline.api_v2.golden_compare import compare_xscr_commands_to_nativ
 from fluent_pipeline.api_v2.types import ApiV2ValidationError
 from fluent_pipeline.api_v2.xml_compare import compare_command_xml, extract_command_objects_from_xscr
 from fluent_pipeline.protocol_ir import MEDIA_PLACEHOLDER_BEGIN
+
+
+class WorktableSelectionNativeTests(unittest.TestCase):
+    def test_ascii_bracket_index_validation_matches_python_fallback(self):
+        values = [
+            "  item [ 12 ] [3]  ",
+            "item [abc]",
+            "item []",
+            "item [ ]",
+            "item [\u001c12\u001f]",
+            "item [١]",
+            "item [[1]",
+            "item [open",
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                command_module._worktable_selected_labware_text(value)
+                for value in values
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_module,
+                "_native_ascii_worktable_selection_text",
+                wraps=native_acceleration.ascii_worktable_selection_text,
+            ) as native_call:
+                actual = [
+                    command_module._worktable_selected_labware_text(value)
+                    for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertIsNone(
+                native_acceleration.ascii_worktable_selection_text("item [١]")
+            )
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual,
+            [
+                "item [ 12 ] [3]",
+                "",
+                "item []",
+                "",
+                "item [\u001c12\u001f]",
+                "item [١]",
+                "",
+                "item [open",
+            ],
+        )
 
 
 USER_PROMPT_XSCR = """<?xml version="1.0" encoding="utf-8"?>

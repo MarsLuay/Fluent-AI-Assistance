@@ -2612,6 +2612,40 @@ fn ascii_script_name_key(value: &str) -> Option<String> {
 }
 
 #[pyfunction]
+fn ascii_worktable_selection_text(value: &str) -> Option<String> {
+    if !value.is_ascii() {
+        return None;
+    }
+    let bytes = value.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] != b'[' {
+            index += 1;
+            continue;
+        }
+        let Some(relative_end) = bytes[index + 1..]
+            .iter()
+            .position(|character| *character == b']')
+        else {
+            index += 1;
+            continue;
+        };
+        let end = index + 1 + relative_end;
+        if end == index + 1 {
+            index += 1;
+            continue;
+        }
+        let contents = std::str::from_utf8(&bytes[index + 1..end]).ok()?;
+        let digits = trim_python_whitespace(contents);
+        if digits.is_empty() || !digits.bytes().all(|character| character.is_ascii_digit()) {
+            return Some(String::new());
+        }
+        index = end + 1;
+    }
+    Some(value.to_owned())
+}
+
+#[pyfunction]
 fn ascii_lower_alnum_compact(value: &str) -> Option<String> {
     if !value.is_ascii() {
         return None;
@@ -7724,6 +7758,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(ascii_casefold_equals, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_casefold_trim, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_script_name_key, module)?)?;
+    module.add_function(wrap_pyfunction!(ascii_worktable_selection_text, module)?)?;
     module.add_function(wrap_pyfunction!(parse_ascii_bool_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_element_is_nil, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_lower_alnum_compact, module)?)?;
@@ -7977,6 +8012,35 @@ mod tests {
         );
         assert_eq!(ascii_script_name_key("..."), Some(String::new()));
         assert_eq!(ascii_script_name_key("Straße"), None);
+    }
+
+    #[test]
+    fn ascii_worktable_selection_text_matches_bracket_index_validation() {
+        assert_eq!(
+            ascii_worktable_selection_text("item [ 12 ] [3]"),
+            Some("item [ 12 ] [3]".into())
+        );
+        assert_eq!(
+            ascii_worktable_selection_text("item []"),
+            Some("item []".into())
+        );
+        assert_eq!(
+            ascii_worktable_selection_text("item [abc]"),
+            Some(String::new())
+        );
+        assert_eq!(
+            ascii_worktable_selection_text("item [ ]"),
+            Some(String::new())
+        );
+        assert_eq!(
+            ascii_worktable_selection_text("item [[1]"),
+            Some(String::new())
+        );
+        assert_eq!(
+            ascii_worktable_selection_text("item [\u{1c}12\u{1f}]"),
+            Some("item [\u{1c}12\u{1f}]".into())
+        );
+        assert_eq!(ascii_worktable_selection_text("item [١]"), None);
     }
 
     #[test]
