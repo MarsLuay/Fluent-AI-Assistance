@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol, Sequence
 
 from tecan_common.native_acceleration import (
+    ascii_casefold_equals as _native_ascii_casefold_equals,
     ascii_casefold_trim as _native_ascii_casefold_trim,
 )
 
@@ -202,7 +203,13 @@ def variable_values_match(expected: str, actual: str) -> bool:
     right = normalize_variable_value(actual)
     if left == right:
         return True
-    if left.casefold() == right.casefold():
+    native_equal = _native_ascii_casefold_equals(left, right)
+    casefold_equal = (
+        native_equal
+        if native_equal is not None
+        else left.casefold() == right.casefold()
+    )
+    if casefold_equal:
         return True
     try:
         return float(left) == float(right)

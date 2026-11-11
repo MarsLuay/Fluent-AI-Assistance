@@ -81,6 +81,44 @@ class ApiV2StartupVariableTests(unittest.TestCase):
                 ]
         self.assertEqual(forced_fallback, expected)
 
+    def test_variable_value_comparison_uses_native_ascii_and_unicode_fallback(self):
+        pairs = [
+            ("Alpha", "ALPHA", True),
+            ("Straße", "STRAẞE", True),
+            ("NOT", "not", True),
+            ("12", "12.0", True),
+            ("50", "51", False),
+            ("TRUE", "true", True),
+        ]
+        expected = [result for _, _, result in pairs]
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [variable_values_match(left, right) for left, right, _ in pairs]
+        self.assertEqual(disabled, expected)
+
+        # Exact-equal normalized aliases bypass casefold; the other pairs reach native compare.
+        expected_native_calls = len(pairs) - 1
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                startup_variables,
+                "_native_ascii_casefold_equals",
+                wraps=native_acceleration.ascii_casefold_equals,
+            ) as native_call:
+                actual = [variable_values_match(left, right) for left, right, _ in pairs]
+                self.assertEqual(native_call.call_count, expected_native_calls)
+        self.assertEqual(actual, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                startup_variables,
+                "_native_ascii_casefold_equals",
+                return_value=None,
+            ):
+                forced_fallback = [
+                    variable_values_match(left, right) for left, right, _ in pairs
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_query_at_startup_expectations_from_ir_defaults(self):
         ir = {
             "variables": [
