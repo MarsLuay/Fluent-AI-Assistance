@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from tecan_common.native_acceleration import ascii_lower as _native_ascii_lower
+
 from .aliases import load_alias_maps, resolve_alias
 from .command_registry import (
     registry_command_approved_passthrough,
@@ -1238,7 +1240,9 @@ def _script_label(script: dict[str, Any]) -> str:
 
 
 def _looks_like_worklist(value: Any) -> bool:
-    text = str(value or "").strip().lower()
+    text = str(value or "").strip()
+    native_text = _native_ascii_lower(text)
+    text = native_text if native_text is not None else text.lower()
     return bool(text and (text.endswith(".gwl") or "worklist" in text))
 
 

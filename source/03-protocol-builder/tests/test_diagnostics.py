@@ -2,8 +2,11 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
+import fluent_pipeline.diagnostics as diagnostics_module
 import fluent_pipeline.project_context as pc
+from tecan_common import native_acceleration
 from fluent_pipeline.diagnostics import (
     _approved_passthrough_command_findings,
     _error_text_findings,
@@ -13,6 +16,45 @@ from fluent_pipeline.diagnostics import (
 
 
 class DiagnosticsTests(unittest.TestCase):
+    def test_worklist_detection_uses_native_ascii_lower_with_unicode_fallback(self):
+        values = [
+            "Deck.GWL",
+            "prefix WORKLIST suffix",
+            " no ",
+            "Straße.GWL",
+            None,
+            0,
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                diagnostics_module._looks_like_worklist(value) for value in values
+            ]
+        self.assertEqual(expected, [True, True, False, True, False, False])
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                diagnostics_module,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = [
+                    diagnostics_module._looks_like_worklist(value) for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values))
+            native_call.assert_any_call("Deck.GWL")
+            native_call.assert_any_call("Straße.GWL")
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                diagnostics_module, "_native_ascii_lower", return_value=None
+            ):
+                forced_fallback = [
+                    diagnostics_module._looks_like_worklist(value)
+                    for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_diagnose_zeia_reports_missing_worklist_and_unsupported_command(self):
         with _isolated_projects() as tmp_path:
             archive = tmp_path / "broken.zeia"
