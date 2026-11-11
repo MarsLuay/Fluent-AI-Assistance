@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
+import fluent_pipeline.api_v2_add_labware_validate as add_labware_validate
+from tecan_common import native_acceleration
 from fluent_pipeline.api_v2.commands import AddLabware, add_labware_from_ir_step
 from fluent_pipeline.api_v2.types import ApiV2ValidationError
 from fluent_pipeline.api_v2_add_labware_validate import (
@@ -36,6 +39,56 @@ _GOOD_PAYLOAD = """<Object Type="Tecan.Core.Scripting.Worktable.Data.AddLabwareD
 
 
 class AddLabwareValidateTests(unittest.TestCase):
+    def test_add_labware_descendant_lookup_uses_native_selector_and_fallback(self):
+        command = _CommandStub(
+            payload_xml=(
+                '<Root xmlns:x="urn:test"><x:AddLabwareDataV1>'
+                "<x:LabwareType>first type</x:LabwareType>"
+                "<x:LabwareLable>First</x:LabwareLable>"
+                "<x:Location>Nest</x:Location><x:Position>2</x:Position>"
+                "</x:AddLabwareDataV1><AddLabwareDataV1>"
+                "<LabwareType>second type</LabwareType></AddLabwareDataV1></Root>"
+            )
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = add_labware_validate.extract_add_labware_fields(command)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                add_labware_validate,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = add_labware_validate.extract_add_labware_fields(command)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertIsNotNone(actual)
+        assert actual is not None
+        self.assertEqual(actual.labware_type, "first type")
+        self.assertEqual(actual.labware_label, "First")
+
+        class StringTag(str):
+            pass
+
+        root = add_labware_validate.ET.Element("Root")
+        target = add_labware_validate.ET.SubElement(
+            root, StringTag("AddLabwareDataV1")
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_target = add_labware_validate._find_descendant(
+                root, "AddLabwareDataV1"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_name(
+                    root, ("AddLabwareDataV1",), add_labware_validate.ET.Element
+                )
+            )
+            actual_target = add_labware_validate._find_descendant(
+                root, "AddLabwareDataV1"
+            )
+        self.assertIs(actual_target, expected_target)
+        self.assertIs(actual_target, target)
+
     def test_slot_key(self):
         fields = AddLabwareFields(
             labware_type="96 Well Flat",
