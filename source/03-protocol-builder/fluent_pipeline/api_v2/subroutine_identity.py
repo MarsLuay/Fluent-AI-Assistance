@@ -15,6 +15,7 @@ from tecan_common.native_acceleration import (
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
+    xml_local_name as _native_xml_local_name,
 )
 
 from ..subroutine_dependencies import (
@@ -35,6 +36,9 @@ from .xml_compare import compare_command_xml, normalize_command_xml
 
 
 def _local_name(tag: str) -> str:
+    native = _native_xml_local_name(tag)
+    if native is not None:
+        return native
     return tag.rsplit("}", 1)[-1] if "}" in tag else tag
 
 
