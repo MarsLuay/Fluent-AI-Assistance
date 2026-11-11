@@ -879,9 +879,11 @@ class CliPathResolutionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             protocol = tmp_path / "draft.py"
+            uppercase_xscr = tmp_path / "draft.XSCR"
             workspace_root = tmp_path / "ready-to-import" / "unscoped" / "temp_files"
             output = workspace_root / "build" / "draft.xscr"
             protocol.write_text("def build_worktable():\n    return None\n", encoding="utf-8")
+            uppercase_xscr.write_text("<VxData><Payload /></VxData>", encoding="utf-8")
             args = SimpleNamespace(
                 context=None,
                 input=protocol,
@@ -912,25 +914,64 @@ class CliPathResolutionTests(unittest.TestCase):
                 generation_commands, "finalize_compiled_xscr", return_value=_ok_finalization_report()
             ) as finalize_mock, mock.patch.object(
                 generation_commands, "_run_cli_fluent_context_check", return_value=(None, None, None)
-            ), mock.patch(
+            ), mock.patch.object(
+                generation_commands,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call, mock.patch(
                 "fluent_pipeline.exports.export_ready_to_import",
                 side_effect=AssertionError("compile must not publish ready-to-import bundles"),
             ), mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
-                rc = generation_commands._cmd_compile(args)
+                rc_non_xscr = generation_commands._cmd_compile(args)
+                non_xscr_args = finalize_mock.call_args.args
+                stdout.truncate(0)
+                stdout.seek(0)
+                args.input = uppercase_xscr
+                rc_uppercase_xscr = generation_commands._cmd_compile(args)
+                uppercase_xscr_args = finalize_mock.call_args.args
+                native_call.assert_any_call(".XSCR")
 
-            self.assertEqual(rc, 0)
-            self.assertEqual(finalize_mock.call_count, 1)
-            final_args = finalize_mock.call_args.args
-            self.assertEqual(Path(final_args[0]).resolve(), output.resolve())
-            self.assertEqual(Path(final_args[1]).resolve(), protocol.resolve())
-            self.assertIsNone(final_args[2])
-            self.assertIsNone(final_args[3])
-            self.assertEqual(final_args[4], {"source_ir_origin": "compile_input"})
+            self.assertEqual(rc_non_xscr, 0)
+            self.assertEqual(rc_uppercase_xscr, 0)
+            self.assertEqual(finalize_mock.call_count, 2)
+            self.assertEqual(Path(non_xscr_args[0]).resolve(), output.resolve())
+            self.assertEqual(Path(non_xscr_args[1]).resolve(), protocol.resolve())
+            self.assertIsNone(non_xscr_args[2])
+            self.assertIsNone(non_xscr_args[3])
+            self.assertEqual(non_xscr_args[4], {"source_ir_origin": "compile_input"})
+            self.assertEqual(Path(uppercase_xscr_args[1]).resolve(), uppercase_xscr.resolve())
+            self.assertEqual(uppercase_xscr_args[3], [uppercase_xscr])
             normalized_stdout = stdout.getvalue().replace("/private/var/", "/var/")
             _assert_rendered_path(self, normalized_stdout, "Compiled XSCR", output)
             _assert_rendered_path(self, normalized_stdout, "Compile report", output.with_suffix(".compile.md"))
             self.assertNotIn("Ready to import", normalized_stdout)
             self.assertIn("Compiled XSCR Finalization", output.with_suffix(".compile.md").read_text(encoding="utf-8"))
+
+    def test_generation_suffix_lowering_uses_native_with_unicode_fallback(self):
+        values = [".XSCR", ".XŚCR"]
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [generation_commands._lower_text(value) for value in values]
+        self.assertEqual(expected, [value.lower() for value in values])
+
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                generation_commands,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = [generation_commands._lower_text(value) for value in values]
+            native_call.assert_any_call(".XSCR")
+            native_call.assert_any_call(".XŚCR")
+        self.assertEqual(actual, expected)
+
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                generation_commands, "_native_ascii_lower", return_value=None
+            ):
+                forced_fallback = [
+                    generation_commands._lower_text(value) for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
 
     def test_ir_build_finalizes_compiled_xscr(self):
         with tempfile.TemporaryDirectory() as tmp:

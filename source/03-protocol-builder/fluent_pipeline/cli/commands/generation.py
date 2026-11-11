@@ -16,6 +16,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from tecan_common.native_acceleration import ascii_lower as _native_ascii_lower
+
 from ...aliases import alias_records, load_alias_maps, normalize_protocol_ir_aliases, resolve_alias
 from ...bundle_lifecycle import (
     DEFAULT_PROBE_ROOT,
@@ -207,6 +209,11 @@ def _cmd_decompile(args: argparse.Namespace) -> int:
             print(f"Project context: {ctx.name}")
     return result.returncode
 
+def _lower_text(value: str) -> str:
+    native = _native_ascii_lower(value)
+    return native if native is not None else value.lower()
+
+
 def _cmd_compile(args: argparse.Namespace) -> int:
     ctx = _command_context(args.context)
     protocol = resolve_context_path(ctx, args.input)
@@ -227,7 +234,7 @@ def _cmd_compile(args: argparse.Namespace) -> int:
             output,
             protocol,
             ctx.manifest if ctx else None,
-            [protocol] if protocol.suffix.lower() == ".xscr" else None,
+            [protocol] if _lower_text(protocol.suffix) == ".xscr" else None,
             {"source_ir_origin": "compile_input"},
         )
         _append_compiled_xscr_finalization_report(compile_report, finalization_report)
