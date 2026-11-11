@@ -85,6 +85,28 @@ class IrPlannerTests(unittest.TestCase):
                     ]
         self.assertEqual(forced_fallback, expected)
 
+    def test_worklist_suffix_detection_uses_native_lower_with_unicode_fallback(self):
+        values = [" transfers.GWL ", "run.CsV", "data.TSV", "data.txt", "läufe.GWL"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [ir_planner._looks_like_worklist(value) for value in values]
+        self.assertEqual(expected, [True, True, True, False, True])
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                ir_planner,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = [ir_planner._looks_like_worklist(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+            native_call.assert_any_call("läufe.GWL")
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(ir_planner, "_native_ascii_lower", return_value=None):
+                forced_fallback = [ir_planner._looks_like_worklist(value) for value in values]
+        self.assertEqual(forced_fallback, expected)
+
     def test_script_rack_types_are_dependencies_not_labware_labels(self):
         ir = {
             "protocol": {"name": "Rack type dependency test"},

@@ -900,7 +900,7 @@ def _first_worklist(fields: dict[str, Any]) -> str | None:
 
 
 def _looks_like_worklist(value: str) -> bool:
-    return str(value).strip().lower().endswith((".gwl", ".csv", ".tsv"))
+    return _lower_text(str(value).strip()).endswith((".gwl", ".csv", ".tsv"))
 
 
 def _string_values(value: Any) -> list[str]:
