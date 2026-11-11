@@ -160,6 +160,33 @@ def test_explicit_query_and_script_casefold_uses_native_with_unicode_fallback() 
     assert forced_fallback == expected
 
 
+def test_selection_facets_use_native_casefold_with_unicode_fallback() -> None:
+    value = {
+        "operation_families": [" Aspirate ", "Straße", "", "\u2003MCA\u2003"],
+        "device_families": ["MCA384"],
+    }
+    with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        expected = pattern_index._selection_facets(value)
+    assert expected["operation_families"] == {"aspirate", "strasse", "mca"}
+
+    with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with mock.patch.object(
+            pattern_index,
+            "_native_ascii_lower",
+            wraps=native_acceleration.ascii_lower,
+        ) as native_call:
+            actual = pattern_index._selection_facets(value)
+        assert native_call.call_count == 4
+        native_call.assert_any_call("Aspirate")
+        native_call.assert_any_call("Straße")
+    assert actual == expected
+
+    with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with mock.patch.object(pattern_index, "_native_ascii_lower", return_value=None):
+            forced_fallback = pattern_index._selection_facets(value)
+    assert forced_fallback == expected
+
+
 def test_ranking_is_repeatable_and_preserves_explicit_query_and_script_overrides() -> None:
     windows = [
         _window(1, "aspirate", source_script="A", retrieval={"method": "pattern_query", "query": "aspirate"}),

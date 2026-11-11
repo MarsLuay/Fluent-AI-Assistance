@@ -321,7 +321,11 @@ _PATTERN_OPERATION_ALIASES = {
 def _selection_facets(value: Mapping[str, Any]) -> dict[str, set[str]]:
     nested = value.get("task_facets") if isinstance(value.get("task_facets"), Mapping) else value
     return {
-        key: {str(item).strip().casefold() for item in _facet_strings(nested.get(key)) if str(item).strip()}
+        key: {
+            _casefold_text(str(item).strip())
+            for item in _facet_strings(nested.get(key))
+            if str(item).strip()
+        }
         for key in _FACET_KEYS
     }
 
