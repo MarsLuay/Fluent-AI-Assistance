@@ -11,6 +11,7 @@ class PrimaryScriptSelectionTests(TestCase):
             ([" MAIN SCRIPT.XSCR; ", "miscellaneous"], "MAIN SCRIPT.XSCR"),
             (["ſcript", "example METHOD"], "example METHOD"),
             (["script", "method"], ""),
+            (["blocked.VB", "fallback METHOD"], "fallback METHOD"),
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             expected = [audit_import_context._primary_script(items) for items, _ in cases]
@@ -21,9 +22,16 @@ class PrimaryScriptSelectionTests(TestCase):
                 audit_import_context,
                 "_native_ascii_substring_match_groups",
                 wraps=native_acceleration.ascii_case_insensitive_substring_match_groups,
-            ) as native_call:
+            ) as native_call, patch.object(
+                audit_import_context,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_lower:
                 actual = [audit_import_context._primary_script(items) for items, _ in cases]
-                self.assertEqual(native_call.call_count, 6)
+                self.assertEqual(native_call.call_count, 7)
+                self.assertEqual(native_lower.call_count, 8)
+            native_lower.assert_any_call("blocked.VB")
+            native_lower.assert_any_call("ſcript")
             self.assertIsNone(
                 native_acceleration.ascii_case_insensitive_substring_match_groups(
                     ["ſcript"], [("script", "corpus", "verification", "method")]

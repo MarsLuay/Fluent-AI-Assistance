@@ -10,6 +10,7 @@ from typing import Iterable
 
 from tecan_common.native_acceleration import (
     ascii_case_insensitive_substring_match_groups as _native_ascii_substring_match_groups,
+    ascii_lower as _native_ascii_lower,
 )
 
 
@@ -73,9 +74,12 @@ def _primary_script(items: Iterable[str]) -> str:
     candidates: list[tuple[int, str]] = []
     for raw_item in items:
         item = raw_item.strip().rstrip(";").strip()
-        if not item or "\\" in item or item.lower().endswith((".png", ".gif", ".jpg", ".vb", ".exe", ".dll")):
+        if not item or "\\" in item:
             continue
-        lower = item.lower()
+        native_lower = _native_ascii_lower(item)
+        lower = native_lower if native_lower is not None else item.lower()
+        if lower.endswith((".png", ".gif", ".jpg", ".vb", ".exe", ".dll")):
+            continue
         score = 0
         native_match = _native_ascii_substring_match_groups(
             [item], [("script", "corpus", "verification", "method")]
