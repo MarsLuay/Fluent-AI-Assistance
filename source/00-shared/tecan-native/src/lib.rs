@@ -2740,6 +2740,21 @@ fn ascii_safe_variable_base(value: &str) -> Option<String> {
 }
 
 #[pyfunction]
+fn ascii_variable_name_is_valid(value: &str) -> Option<bool> {
+    if !value.is_ascii() {
+        return None;
+    }
+    let mut characters = value.chars();
+    let Some(first) = characters.next() else {
+        return Some(false);
+    };
+    Some(
+        (first.is_ascii_alphabetic() || first == '_')
+            && characters.all(|character| character.is_ascii_alphanumeric() || character == '_'),
+    )
+}
+
+#[pyfunction]
 fn ascii_safe_component(value: &str, lowercase: bool) -> Option<String> {
     if !value.is_ascii() {
         return None;
@@ -7791,6 +7806,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(ascii_profile_slug, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_safe_filename, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_safe_variable_base, module)?)?;
+    module.add_function(wrap_pyfunction!(ascii_variable_name_is_valid, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_safe_component, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_word_boundary_contains, module)?)?;
     module.add_function(wrap_pyfunction!(label_base_ascii_text, module)?)?;
@@ -7981,6 +7997,17 @@ mod tests {
         assert_eq!(ascii_safe_variable_base("123Flow"), Some("123flow".into()));
         assert_eq!(ascii_safe_variable_base("..."), Some(String::new()));
         assert_eq!(ascii_safe_variable_base("東京"), None);
+    }
+
+    #[test]
+    fn ascii_variable_name_validation_matches_python_ascii_pattern() {
+        for value in ["A", "_x", "Name_2", "Alpha9"] {
+            assert_eq!(ascii_variable_name_is_valid(value), Some(true));
+        }
+        for value in ["", "2name", "A-B", "name space"] {
+            assert_eq!(ascii_variable_name_is_valid(value), Some(false));
+        }
+        assert_eq!(ascii_variable_name_is_valid("é"), None);
     }
 
     #[test]

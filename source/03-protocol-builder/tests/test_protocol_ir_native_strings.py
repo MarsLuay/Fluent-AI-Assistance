@@ -85,6 +85,28 @@ class ProtocolIrNativeStringsTests(unittest.TestCase):
         self.assertEqual(actual[2], {"okay_1"})
         self.assertEqual(actual[3:], [set(), set()])
 
+    def test_variable_name_validation_uses_native_ascii_with_python_fallback(self):
+        values = ["Name_2", "_x", "\u001cAlpha9\u001f", "2name", "A-B", "", "é", "ſcript"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                protocol_ir_module._valid_variable_name(value) for value in values
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_variable_name_is_valid",
+                wraps=native_acceleration.ascii_variable_name_is_valid,
+            ) as native_call:
+                actual = [
+                    protocol_ir_module._valid_variable_name(value) for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertIsNone(
+                native_acceleration.ascii_variable_name_is_valid("ſcript")
+            )
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [True, True, True, False, False, False, False, False])
+
     def test_setup_group_name_whitespace_normalization_uses_native_ascii(self):
         values = [
             "  Operator   Setup  ",

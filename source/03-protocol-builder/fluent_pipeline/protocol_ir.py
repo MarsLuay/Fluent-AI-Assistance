@@ -1217,7 +1217,13 @@ def _prompt_timeout(value: Any) -> int:
 
 
 def _valid_variable_name(value: str) -> bool:
-    return re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", value.strip()) is not None
+    stripped = value.strip()
+    native = native_acceleration.ascii_variable_name_is_valid(stripped)
+    return (
+        native
+        if native is not None
+        else re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", stripped) is not None
+    )
 
 
 def _referenced_labware_labels(steps: list[dict[str, Any]]) -> set[str]:
