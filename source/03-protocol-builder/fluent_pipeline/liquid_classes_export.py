@@ -16,6 +16,8 @@ from typing import Any, Mapping
 from tecan_common.native_acceleration import (
     parse_f64_decimal_text as _native_parse_f64_decimal_text,
     parse_i64_text as _native_parse_i64_text,
+    xml_clean_text as _native_xml_clean_text,
+    xml_first_element_by_name as _native_xml_first_element_by_name,
 )
 
 from . import xml_compat as ET
@@ -1095,6 +1097,11 @@ def _find(elem: ET.Element | None, local_name: str) -> ET.Element | None:
     """
     if elem is None:
         return None
+    native = _native_xml_first_element_by_name(elem, local_name, ET.Element)
+    if native is not None:
+        supported, result = native
+        if supported:
+            return result
     for child in elem.iter():
         if isinstance(child.tag, str) and _local_name(child.tag) == local_name:
             return child
@@ -1109,6 +1116,9 @@ def _text(elem: ET.Element | None) -> str:
     """Element text or ``\"\"`` (never ``None`` — differs from xcmp._text)."""
     if elem is None or elem.text is None:
         return ""
+    native = _native_xml_clean_text(elem.text)
+    if native is not None:
+        return native
     return elem.text.strip()
 
 

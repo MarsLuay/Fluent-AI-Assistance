@@ -89,6 +89,69 @@ class LiquidClassesExportTests(unittest.TestCase):
             actual, [expected_value for _, expected_value in cases]
         )
 
+    def test_xml_scalar_queries_use_native_helpers_with_python_fallback(
+        self,
+    ) -> None:
+        if not native_acceleration.available() or not all(
+            hasattr(native_acceleration._native, name)
+            for name in ("xml_first_element_by_name", "xml_clean_text")
+        ):
+            self.skipTest("optional Rust XML scalar helpers are not built")
+        root = liquid_classes_export.ET.fromstring(
+            '<Root xmlns:x="urn:test"><x:Target>  first value  </x:Target>'
+            "<Target>later value</Target></Root>"
+        )
+        first = list(root)[0]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_element = liquid_classes_export._find(root, "Target")
+            expected_text = liquid_classes_export._text(first)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                liquid_classes_export,
+                "_native_xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
+            ) as native_find_call:
+                with patch.object(
+                    liquid_classes_export,
+                    "_native_xml_clean_text",
+                    wraps=native_acceleration.xml_clean_text,
+                ) as native_text_call:
+                    actual_element = liquid_classes_export._find(root, "Target")
+                    actual_text = liquid_classes_export._text(first)
+                    native_find_call.assert_called_once_with(
+                        root, "Target", liquid_classes_export.ET.Element
+                    )
+                    native_text_call.assert_called_once_with(first.text)
+        self.assertIs(actual_element, expected_element)
+        self.assertEqual(actual_text, expected_text)
+        self.assertEqual(actual_text, "first value")
+
+        class StringSubclass(str):
+            pass
+
+        fallback_root = liquid_classes_export.ET.Element("Root")
+        fallback_child = liquid_classes_export.ET.SubElement(fallback_root, "Target")
+        fallback_child.tag = StringSubclass("Target")
+        fallback_child.text = StringSubclass("  fallback value  ")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_element = liquid_classes_export._find(fallback_root, "Target")
+            fallback_text = liquid_classes_export._text(fallback_child)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                liquid_classes_export._native_xml_first_element_by_name(
+                    fallback_root, "Target", liquid_classes_export.ET.Element
+                )
+            )
+            self.assertIsNone(
+                liquid_classes_export._native_xml_clean_text(fallback_child.text)
+            )
+            native_fallback_element = liquid_classes_export._find(
+                fallback_root, "Target"
+            )
+            native_fallback_text = liquid_classes_export._text(fallback_child)
+        self.assertIs(native_fallback_element, fallback_element)
+        self.assertEqual(native_fallback_text, fallback_text)
+
     def test_parse_xlqc_uses_filename_guid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             guid = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
