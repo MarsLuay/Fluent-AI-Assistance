@@ -10,6 +10,8 @@ from tecan_common.native_acceleration import (
     ascii_case_insensitive_substring_match_groups as _native_substring_match_groups,
     casefold_alias_values as _native_casefold_alias_values,
     merge_unique_string_groups as _native_merge_unique_string_groups,
+    sort_string_keys as _native_sort_string_keys,
+    sorted_unique_strings as _native_sorted_unique_strings,
     xml_direct_leaf_name_texts as _native_xml_direct_leaf_name_texts,
     xml_indexed_elements_by_folded_name as _native_indexed_elements_by_folded_name,
 )
@@ -95,6 +97,15 @@ def inspect_scheduler_text(text: str, *, source_name: str) -> dict[str, Any]:
                 for value in values:
                     if value not in bucket and len(bucket) < 20:
                         bucket.append(value)
+    sorted_unknown = _native_sort_string_keys(unknown)
+    if sorted_unknown is None:
+        sorted_unknown = dict(sorted(unknown.items()))
+    unknown_fields: dict[str, list[str]] = {}
+    for name, values in sorted_unknown.items():
+        sorted_values = _native_sorted_unique_strings([values])
+        if sorted_values is None:
+            sorted_values = sorted(values)
+        unknown_fields[name] = sorted_values
     return {
         "kind": "scheduler",
         "source": source_name,
@@ -102,7 +113,7 @@ def inspect_scheduler_text(text: str, *, source_name: str) -> dict[str, Any]:
         "object_name": Path(source_name).stem,
         "scheduler_processes": processes,
         "scheduler_tasks": tasks,
-        "source_metadata": {"unknown_fields": {name: sorted(values) for name, values in sorted(unknown.items())}},
+        "source_metadata": {"unknown_fields": unknown_fields},
     }
 
 
@@ -157,6 +168,18 @@ def _record(element: Any, *, index: int, kind: str, source_name: str) -> dict[st
         normalized = {
             key: first(*aliases) for key, aliases in field_aliases.items()
         }
+    sorted_fields = _native_sort_string_keys(fields)
+    if sorted_fields is None:
+        sorted_fields = dict(sorted(fields.items()))
+    sorted_unknown = _native_sort_string_keys(unknown)
+    if sorted_unknown is None:
+        sorted_unknown = dict(sorted(unknown.items()))
+    unknown_fields: dict[str, list[str]] = {}
+    for name, values in sorted_unknown.items():
+        sorted_values = _native_sorted_unique_strings([values])
+        if sorted_values is None:
+            sorted_values = sorted(values)
+        unknown_fields[name] = sorted_values
     return {
         "kind": kind,
         "source": source_name,
@@ -164,9 +187,9 @@ def _record(element: Any, *, index: int, kind: str, source_name: str) -> dict[st
         "object_name": fields.get("Name") or fields.get("TaskName") or fields.get("ProcessName") or "",
         "record_index": index,
         "source_line": index + 1,
-        "fields": dict(sorted(fields.items())),
+        "fields": sorted_fields,
         **{key: value for key, value in normalized.items() if value not in (None, "")},
-        "source_metadata": {"unknown_fields": {name: sorted(values) for name, values in sorted(unknown.items())}},
+        "source_metadata": {"unknown_fields": unknown_fields},
     }
 
 

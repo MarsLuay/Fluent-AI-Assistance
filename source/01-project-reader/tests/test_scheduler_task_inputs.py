@@ -208,10 +208,25 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
                     "_native_xml_direct_leaf_name_texts",
                     wraps=scheduler._native_xml_direct_leaf_name_texts,
                 ) as native_call:
-                    actual = scheduler._record(
-                        root, index=7, kind="scheduler_task", source_name="synthetic.xml"
-                    )
-                    native_call.assert_called_once_with(root, ET.Element)
+                    with patch.object(
+                        scheduler,
+                        "_native_sort_string_keys",
+                        wraps=scheduler._native_sort_string_keys,
+                    ) as sort_call:
+                        with patch.object(
+                            scheduler,
+                            "_native_sorted_unique_strings",
+                            wraps=scheduler._native_sorted_unique_strings,
+                        ) as sorted_values_call:
+                            actual = scheduler._record(
+                                root,
+                                index=7,
+                                kind="scheduler_task",
+                                source_name="synthetic.xml",
+                            )
+                            native_call.assert_called_once_with(root, ET.Element)
+                            self.assertEqual(sort_call.call_count, 2)
+                            self.assertEqual(sorted_values_call.call_count, 2)
                     self.assertEqual(rust_call.call_count, 1)
 
         self.assertEqual(actual, expected)
