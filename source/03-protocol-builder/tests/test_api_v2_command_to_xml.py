@@ -321,6 +321,38 @@ RUP_VARIABLE_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ApiV2CommandSerializerTests(unittest.TestCase):
+    def test_xml_compare_ascii_lowercase_uses_native_with_unicode_fallback(self):
+        samples = [
+            "<Root><Name>ALPHA</Name><Empty/></Root>",
+            "<Root><Name>İ</Name></Root>",
+            "<Root> <Name> A </Name> </Root>",
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [normalize_command_xml(sample) for sample in samples]
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                xml_compare, "_native_xml_normalize_ascii_tail", return_value=None
+            ):
+                with patch.object(
+                    xml_compare,
+                    "_native_ascii_casefold_trim",
+                    wraps=native_acceleration.ascii_casefold_trim,
+                ) as native_call:
+                    actual = [normalize_command_xml(sample) for sample in samples]
+                    self.assertEqual(native_call.call_count, len(samples))
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                xml_compare, "_native_xml_normalize_ascii_tail", return_value=None
+            ):
+                with patch.object(
+                    xml_compare, "_native_ascii_casefold_trim", return_value=None
+                ):
+                    fallback = [normalize_command_xml(sample) for sample in samples]
+        self.assertEqual(fallback, expected)
+
     def test_child_bool_uses_native_ascii_parser_and_python_lower_fallback(self):
         cases = [
             (ET.fromstring("<Root><Flag>True</Flag></Root>"), False, True),

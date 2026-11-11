@@ -7,6 +7,7 @@ import html
 import re
 from .. import xml_compat as ET
 from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     xml_compare_diff_hint_ascii as _native_xml_compare_diff_hint_ascii,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_local_name as _native_xml_local_name,
@@ -51,8 +52,9 @@ def normalize_command_xml(xml_text: str) -> str:
         return native_tail
     text = WHITESPACE_RE.sub("><", text)
     text = re.sub(r"\s+", "", text)
-    text = re.sub(r"<([a-z0-9_:.-]+)/>", r"<\1></\1>", text.lower())
-    return text
+    native_lower = _native_ascii_casefold_trim(text)
+    lowered = native_lower if native_lower is not None else text.lower()
+    return re.sub(r"<([a-z0-9_:.-]+)/>", r"<\1></\1>", lowered)
 
 
 def compare_command_xml(expected: str, actual: str) -> CommandXmlCompareResult:
