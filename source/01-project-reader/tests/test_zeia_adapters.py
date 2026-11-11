@@ -144,6 +144,47 @@ class ZeiaAdapterTests(unittest.TestCase):
                     )
                 self.assertIsNone(native_acceleration.has_gwl_record_prefix("\u00a0A;source"))
 
+    def test_version_probe_preserves_regex_ordering_and_unicode_fallback(self) -> None:
+        text = (
+            "xDATASTOREVERSION = '3' <VxData dataStoreVersion=\"2\"> "
+            "dataStoreVersion='' dataStoreVersion=missing "
+            "DATASTOREVERSION\t=\t'legacy value'"
+        )
+        pattern = r"dataStoreVersion\s*=\s*[\"']([^\"']+)"
+        expected = tuple(sorted(set(re.findall(pattern, text, re.IGNORECASE))))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            native_values = native_acceleration.extract_data_store_versions(text)
+        if native_acceleration.available():
+            self.assertIsNotNone(native_values)
+            self.assertEqual(tuple(sorted(set(native_values or []))), expected)
+            self.assertIsNone(
+                native_acceleration.extract_data_store_versions(
+                    "dataStoreVersion\u00a0=\"3\""
+                )
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            unicode_archive = self._archive(
+                Path(tmp),
+                "unicode-version.zeia",
+                {
+                    "DataStore/v3.xscr": (
+                        '<VxData dataStoreVersion\u00a0= "3">'
+                        "<ObjectName>Three</ObjectName><Script /></VxData>"
+                    )
+                },
+            )
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    zeia_adapters_module,
+                    "_native_extract_data_store_versions",
+                    wraps=native_acceleration.extract_data_store_versions,
+                ) as native_call:
+                    detection = probe_zeia(unicode_archive)
+                    self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(detection.status, "supported")
+        self.assertEqual(detection.selected.adapter_id, "visionx-datastore-v3")
+
     def test_worklists_are_canonical_entities(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             archive = self._archive(

@@ -10,6 +10,7 @@ from typing import Any, Protocol
 import zipfile
 
 from tecan_common.native_acceleration import (
+    extract_data_store_versions as _native_extract_data_store_versions,
     has_gwl_record_prefix as _native_has_gwl_record_prefix,
 )
 from tecan_common.performance import (
@@ -728,7 +729,14 @@ def _build_probe(
         except (OSError, RuntimeError):
             continue
     combined = "\n".join(text for _name, text in samples)
-    versions = tuple(sorted(set(re.findall(r"dataStoreVersion\s*=\s*[\"']([^\"']+)", combined, re.IGNORECASE))))
+    found_versions = _native_extract_data_store_versions(combined)
+    if found_versions is None:
+        found_versions = re.findall(
+            r"dataStoreVersion\s*=\s*[\"']([^\"']+)",
+            combined,
+            re.IGNORECASE,
+        )
+    versions = tuple(sorted(set(found_versions)))
     has_visionx_namespace = bool(re.search(r"tecan\.com/TSCC/VisionX|<[^>]*:?VxData(?:\s|>)", combined, re.IGNORECASE))
     has_script_structure = bool(
         re.search(r"<[^>]*:?ObjectName\b[^>]*>[^<]+</[^>]*:?ObjectName>", combined, re.IGNORECASE)

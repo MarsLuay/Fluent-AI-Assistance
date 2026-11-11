@@ -64,6 +64,19 @@ def has_gwl_record_prefix(text: Any) -> bool | None:
         return None
 
 
+def extract_data_store_versions(text: Any) -> list[str] | None:
+    """Extract ZEIA versions natively for ASCII text; fall back for Unicode."""
+    if not enabled() or type(text) is not str:
+        return None
+    try:
+        result = _native.extract_data_store_versions(text)
+        if type(result) is list and all(type(value) is str for value in result):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def xml_clean_text(value: Any) -> str | None:
     """Trim exact Unicode XML text natively, preserving Python fallback cases."""
     if not enabled():

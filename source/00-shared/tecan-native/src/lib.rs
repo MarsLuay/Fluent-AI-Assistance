@@ -1004,6 +1004,10 @@ fn xml_tag_local_name(tag: &str) -> String {
     tag.rsplit('}').next().unwrap_or(tag).to_owned()
 }
 
+fn is_python_ascii_whitespace(byte: u8) -> bool {
+    matches!(byte, 0x09..=0x0d | 0x1c..=0x20)
+}
+
 fn has_gwl_record_prefix_ascii(text: &str) -> Option<bool> {
     if !text.is_ascii() {
         return None;
@@ -1012,7 +1016,7 @@ fn has_gwl_record_prefix_ascii(text: &str) -> Option<bool> {
     let mut line_start = 0;
     loop {
         let mut index = line_start;
-        while index < bytes.len() && matches!(bytes[index], 0x09..=0x0d | 0x1c..=0x20) {
+        while index < bytes.len() && is_python_ascii_whitespace(bytes[index]) {
             index += 1;
         }
         if index < bytes.len() {
@@ -1038,6 +1042,58 @@ fn has_gwl_record_prefix_ascii(text: &str) -> Option<bool> {
 #[pyfunction]
 fn has_gwl_record_prefix(text: &str) -> Option<bool> {
     has_gwl_record_prefix_ascii(text)
+}
+
+fn extract_data_store_versions_ascii(text: &str) -> Option<Vec<String>> {
+    if !text.is_ascii() {
+        return None;
+    }
+    let bytes = text.as_bytes();
+    let needle = b"datastoreversion";
+    let mut versions = Vec::new();
+    let mut search_start = 0;
+    while search_start + needle.len() <= bytes.len() {
+        let Some(relative_start) = bytes[search_start..]
+            .windows(needle.len())
+            .position(|candidate| candidate.eq_ignore_ascii_case(needle))
+        else {
+            break;
+        };
+        let start = search_start + relative_start;
+        let mut index = start + needle.len();
+        while index < bytes.len() && is_python_ascii_whitespace(bytes[index]) {
+            index += 1;
+        }
+        if index >= bytes.len() || bytes[index] != b'=' {
+            search_start = start + 1;
+            continue;
+        }
+        index += 1;
+        while index < bytes.len() && is_python_ascii_whitespace(bytes[index]) {
+            index += 1;
+        }
+        if index >= bytes.len() || !matches!(bytes[index], b'\'' | b'"') {
+            search_start = start + 1;
+            continue;
+        }
+        index += 1;
+        let value_start = index;
+        while index < bytes.len() && !matches!(bytes[index], b'\'' | b'"') {
+            index += 1;
+        }
+        if index == value_start {
+            search_start = start + 1;
+            continue;
+        }
+        versions.push(text[value_start..index].to_owned());
+        search_start = index;
+    }
+    Some(versions)
+}
+
+#[pyfunction]
+fn extract_data_store_versions(text: &str) -> Option<Vec<String>> {
+    extract_data_store_versions_ascii(text)
 }
 
 #[pyfunction]
@@ -5957,6 +6013,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(parse_xml, module)?)?;
     module.add_function(wrap_pyfunction!(xml_tag_local_name, module)?)?;
     module.add_function(wrap_pyfunction!(has_gwl_record_prefix, module)?)?;
+    module.add_function(wrap_pyfunction!(extract_data_store_versions, module)?)?;
     module.add_function(wrap_pyfunction!(xml_clean_text, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_child_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_direct_leaf_name_texts, module)?)?;
@@ -6782,5 +6839,28 @@ mod tests {
             assert_eq!(has_gwl_record_prefix_ascii(text), Some(false), "{text:?}");
         }
         assert_eq!(has_gwl_record_prefix_ascii("\u{00a0}A;source"), None);
+    }
+
+    #[test]
+    fn datastore_version_scan_matches_ascii_regex_substrings_and_order() {
+        let text = concat!(
+            "xDATASTOREVERSION = '3'",
+            " <VxData dataStoreVersion=\"2\">",
+            " <x dataStoreVersion=''>",
+            " dataStoreVersion=missing",
+            " DATASTOREVERSION\t=\t\"legacy value\"",
+        );
+        assert_eq!(
+            extract_data_store_versions_ascii(text),
+            Some(vec!["3".into(), "2".into(), "legacy value".into()])
+        );
+        assert_eq!(
+            extract_data_store_versions_ascii("no version"),
+            Some(Vec::new())
+        );
+        assert_eq!(
+            extract_data_store_versions_ascii("dataStoreVersion=\"3\u{00a0}"),
+            None
+        );
     }
 }
