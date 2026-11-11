@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterator, Optional, Union
 
 from tecan_common.native_acceleration import (
+    xml_has_unmodeled_local_name as _native_xml_has_unmodeled_local_name,
     xml_first_nonempty_texts as _native_xml_first_nonempty_texts,
     parse_ascii_bool_text as _native_parse_ascii_bool_text,
     parse_f64_decimal_text as _native_parse_f64_decimal_text,
@@ -870,6 +871,14 @@ def _liha_drop_tips_preserves_raw_xml(obj: ET.Element) -> bool:
     serialized = _extract_field(obj, "SerializedTipsIndexes")
     if serialized not in (None, ""):
         return True
+    native = _native_xml_has_unmodeled_local_name(
+        obj,
+        _LIHA_DROP_TIPS_KNOWN_XML_FIELDS,
+        ("LihaDropTipsScriptCommandData",),
+        ET.Element,
+    )
+    if native is not None:
+        return native
     for element in obj.iter():
         if not isinstance(element.tag, str):
             continue

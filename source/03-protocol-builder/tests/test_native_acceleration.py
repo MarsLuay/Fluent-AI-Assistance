@@ -557,6 +557,80 @@ class NativeAccelerationTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual.error_source, "example device")
 
+    def test_liha_raw_preservation_check_uses_native_allowlist(self) -> None:
+        from fluentcoder.decompiler import xscr_parser
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_has_unmodeled_local_name"
+        ):
+            self.skipTest("optional Rust XML allowlist check is not built")
+        known = ET.fromstring(
+            "<Object><SelectedTipsIndexes><int>1</int></SelectedTipsIndexes>"
+            "<LihaDropTipsScriptCommandDataV2><Data><TipMask>2</TipMask>"
+            "</Data></LihaDropTipsScriptCommandDataV2></Object>"
+        )
+        known.append(ET.Comment("ignored by the preservation check"))
+        unknown = ET.fromstring(
+            "<Object><SelectedTipsIndexes><int>1</int></SelectedTipsIndexes>"
+            "<LihaDropTipsScriptCommandDataV2><Data><VendorExtension/>"
+            "</Data></LihaDropTipsScriptCommandDataV2></Object>"
+        )
+
+        class StringSubclass(str):
+            pass
+
+        unsupported = ET.Element("Object")
+        unsupported.tag = StringSubclass("Object")
+        known_names = list(xscr_parser._LIHA_DROP_TIPS_KNOWN_XML_FIELDS)
+        allowed_prefixes = ["LihaDropTipsScriptCommandData"]
+        self.assertIs(
+            native_acceleration._native.xml_has_unmodeled_local_name(
+                known, known_names, allowed_prefixes, ET.Element
+            ),
+            False,
+        )
+        self.assertIs(
+            native_acceleration._native.xml_has_unmodeled_local_name(
+                unknown, known_names, allowed_prefixes, ET.Element
+            ),
+            True,
+        )
+        self.assertIsNone(
+            native_acceleration.xml_has_unmodeled_local_name(
+                unsupported,
+                xscr_parser._LIHA_DROP_TIPS_KNOWN_XML_FIELDS,
+                ("LihaDropTipsScriptCommandData",),
+                ET.Element,
+            )
+        )
+        roots = (known, unknown, unsupported)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                xscr_parser._liha_drop_tips_preserves_raw_xml(root)
+                for root in roots
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                xscr_parser,
+                "_native_xml_has_unmodeled_local_name",
+                wraps=xscr_parser._native_xml_has_unmodeled_local_name,
+            ) as native_call:
+                actual = [
+                    xscr_parser._liha_drop_tips_preserves_raw_xml(root)
+                    for root in roots
+                ]
+                self.assertEqual(native_call.call_count, 3)
+                for root in roots:
+                    native_call.assert_any_call(
+                        root,
+                        xscr_parser._LIHA_DROP_TIPS_KNOWN_XML_FIELDS,
+                        ("LihaDropTipsScriptCommandData",),
+                        ET.Element,
+                    )
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [False, True, False])
+
     def test_simulator_xml_text_and_volume_use_native_selectors(self) -> None:
         from fluentcoder.simulator.walk import Simulator
 

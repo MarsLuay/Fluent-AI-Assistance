@@ -2478,6 +2478,44 @@ fn xml_elements_by_name<'py>(
     Ok(Some(output.into_any()))
 }
 
+#[pyfunction]
+fn xml_has_unmodeled_local_name<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    known_names: Vec<String>,
+    allowed_prefixes: Vec<String>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<bool>> {
+    if !root.get_type().is(element_type) {
+        return Ok(None);
+    }
+    let known_names = known_names.into_iter().collect::<HashSet<_>>();
+    let iterator = root.call_method0("iter")?;
+    for element in iterator.try_iter()? {
+        let element = element?;
+        if !element.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = element.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        if !known_names.contains(local)
+            && !allowed_prefixes
+                .iter()
+                .any(|prefix| local.starts_with(prefix))
+        {
+            return Ok(Some(true));
+        }
+    }
+    Ok(Some(false))
+}
+
 fn xml_first_exact_local_text<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -5570,6 +5608,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_all_unique_texts, module)?)?;
     module.add_function(wrap_pyfunction!(xml_grouped_texts_excluding, module)?)?;
     module.add_function(wrap_pyfunction!(xml_elements_by_name, module)?)?;
+    module.add_function(wrap_pyfunction!(xml_has_unmodeled_local_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_first_element_by_name, module)?)?;
     module.add_function(wrap_pyfunction!(xml_reference_guids, module)?)?;
     module.add_function(wrap_pyfunction!(xml_mesh_reference_lists, module)?)?;

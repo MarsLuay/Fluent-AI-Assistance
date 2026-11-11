@@ -676,6 +676,35 @@ def xml_elements_by_name(
         return None
 
 
+def xml_has_unmodeled_local_name(
+    root: Any, known_names: Any, allowed_prefixes: Any, element_type: Any
+) -> bool | None:
+    """Check whether an XML tree contains a local name outside a reviewed set."""
+    if (
+        not enabled()
+        or type(root) is not element_type
+        or type(known_names) not in (set, frozenset, list, tuple)
+        or not all(type(name) is str for name in known_names)
+        or type(allowed_prefixes) not in (set, frozenset, list, tuple)
+        or not all(type(prefix) is str for prefix in allowed_prefixes)
+    ):
+        return None
+    try:
+        result = _native.xml_has_unmodeled_local_name(
+            root, list(known_names), list(allowed_prefixes), element_type
+        )
+        return result if type(result) is bool else None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_direct_elements_by_ascii_casefolded_name(
     parent: Any, names: Any, element_type: Any
 ) -> list[Any] | None:
