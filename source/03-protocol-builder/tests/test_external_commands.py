@@ -3,7 +3,11 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from fluent_pipeline import external_commands as external_commands_module
+from tecan_common import native_acceleration
+from fluent_pipeline import xml_compat as ET
 from fluent_pipeline.external_commands import (
     build_driver_usage_contracts,
     fingerprint_driver_usage_contract,
@@ -14,6 +18,78 @@ from fluent_pipeline.external_commands import (
 
 
 class ExternalCommandContractTests(unittest.TestCase):
+    def test_xml_selection_helpers_use_native_paths_and_preserve_fallback(self) -> None:
+        root = ET.fromstring(
+            '<Root xmlns:x="urn:test"><x:LegacyDriverMacro />'
+            "<ApplicationDriverMacro /><Other /></Root>"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = external_commands_module._elements_by_local_names(
+                root, ("LegacyDriverMacro", "ApplicationDriverMacro")
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                external_commands_module,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as elements_call:
+                actual = external_commands_module._elements_by_local_names(
+                    root, ("LegacyDriverMacro", "ApplicationDriverMacro")
+                )
+                self.assertEqual(elements_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [root[0], root[1]])
+
+        direct_root = ET.fromstring(
+            '<Root xmlns:x="urn:test"><x:Name> </x:Name><Name>later</Name></Root>'
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_text = external_commands_module._child_text(direct_root, "Name")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                external_commands_module,
+                "_native_xml_first_direct_child_by_name",
+                wraps=native_acceleration.xml_first_direct_child_by_name,
+            ) as direct_call:
+                actual_text = external_commands_module._child_text(direct_root, "Name")
+                self.assertEqual(direct_call.call_count, 1)
+        self.assertEqual(actual_text, expected_text)
+        self.assertEqual(actual_text, " ")
+
+        class StringTag(str):
+            pass
+
+        custom_root = ET.Element("Root")
+        custom_macro = ET.SubElement(custom_root, StringTag("LegacyDriverMacro"))
+        custom_child = ET.SubElement(custom_macro, StringTag("Name"))
+        custom_child.text = "Custom"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_elements = external_commands_module._elements_by_local_names(
+                custom_root, ("LegacyDriverMacro",)
+            )
+            fallback_text = external_commands_module._child_text(custom_macro, "Name")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_elements_by_name(
+                    custom_root, ("LegacyDriverMacro",), ET.Element
+                )
+            )
+            self.assertIsNone(
+                native_acceleration.xml_first_direct_child_by_name(
+                    custom_macro, "Name", ET.Element
+                )
+            )
+            actual_fallback_elements = external_commands_module._elements_by_local_names(
+                custom_root, ("LegacyDriverMacro",)
+            )
+            actual_fallback_text = external_commands_module._child_text(
+                custom_macro, "Name"
+            )
+        self.assertEqual(actual_fallback_elements, fallback_elements)
+        self.assertEqual(actual_fallback_elements, [custom_macro])
+        self.assertEqual(actual_fallback_text, fallback_text)
+        self.assertEqual(actual_fallback_text, "Custom")
+
     def test_captures_macro_variables_assignment_conditions_and_wait_pair(self) -> None:
         xscr = """\
 <Script>

@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 from .xml_compat import ET
+from tecan_common.native_acceleration import (
+    xml_elements_by_name as _native_xml_elements_by_name,
+    xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
+)
 from fluentcoder.ir.driver_recovery import parse_driver_recovery_policy
 
 
@@ -437,11 +441,9 @@ def _inspect_script(
     parents = {child: parent for parent in root.iter() for child in parent}
     declarations = _declarations(root)
     assignments = _assignments(root, parents)
-    macros = [
-        elem
-        for elem in root.iter()
-        if _local_name(elem.tag) in {"LegacyDriverMacro", "ApplicationDriverMacro"}
-    ]
+    macros = _elements_by_local_names(
+        root, ("LegacyDriverMacro", "ApplicationDriverMacro")
+    )
     stable_path = _stable_source_path(path, context_root)
     results: list[dict[str, Any]] = []
     for macro_index, macro in enumerate(macros):
@@ -521,9 +523,7 @@ def _assignments(
     parents: dict[ET.Element, ET.Element],
 ) -> dict[str, list[dict[str, str]]]:
     result: dict[str, list[dict[str, str]]] = {}
-    for elem in root.iter():
-        if _local_name(elem.tag) != "SetVariableStatement":
-            continue
+    for elem in _elements_by_local_names(root, ("SetVariableStatement",)):
         name = _child_text(elem, "Name")
         if not name:
             continue
@@ -589,10 +589,21 @@ def _variable_tokens(value: str) -> list[str]:
 
 
 def _child_text(elem: ET.Element, name: str) -> str:
+    selection = _native_xml_first_direct_child_by_name(elem, name, ET.Element)
+    if selection is not None:
+        _, child = selection
+        return str(child.text or "") if child is not None else ""
     for child in elem:
         if _local_name(child.tag) == name:
             return str(child.text or "")
     return ""
+
+
+def _elements_by_local_names(root: ET.Element, names: tuple[str, ...]) -> list[ET.Element]:
+    elements = _native_xml_elements_by_name(root, names, ET.Element)
+    if elements is not None:
+        return elements
+    return [element for element in root.iter() if _local_name(element.tag) in names]
 
 
 def _local_name(tag: str) -> str:
