@@ -13,6 +13,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Mapping
 
+from tecan_common.native_acceleration import ascii_casefold_trim as _native_ascii_casefold_trim
+
 from .runner import write_json
 
 CONNECTOR_COVERAGE_SCHEMA_VERSION = "tecan.connector_coverage.v1"
@@ -195,5 +197,7 @@ def _component_guids_matching_names(
 
 
 def _norm_guid(value: Any) -> str:
-    text = str(value or "").strip().casefold()
+    raw = str(value or "")
+    native = _native_ascii_casefold_trim(raw)
+    text = native if native is not None else raw.strip().casefold()
     return text if text and text != "00000000-0000-0000-0000-000000000000" else ""

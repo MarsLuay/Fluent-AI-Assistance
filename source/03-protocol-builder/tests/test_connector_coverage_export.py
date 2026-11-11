@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
+import fluent_pipeline.connector_coverage_export as connector_coverage_export_module
+from tecan_common import native_acceleration
 from fluent_pipeline.connector_coverage_export import (
     CONNECTOR_COUNT_PROFILES,
     build_connector_coverage_from_geometry,
@@ -11,6 +14,28 @@ from fluent_pipeline.connector_coverage_export import (
 
 
 class ConnectorCoverageExportTests(unittest.TestCase):
+    def test_guid_text_normalization_preserves_nil_and_unicode_fallback(self):
+        values = [
+            "  ABCD-1234  ",
+            "00000000-0000-0000-0000-000000000000",
+            "ſcript",
+            None,
+            0,
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [connector_coverage_export_module._norm_guid(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                connector_coverage_export_module,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = [connector_coverage_export_module._norm_guid(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+            self.assertIsNone(native_acceleration.ascii_casefold_trim("ſcript"))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["abcd-1234", "", "script", "", ""])
+
     def test_profiles_mined_from_geometry_components_only(self):
         demo_device = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
         demo_nest = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
