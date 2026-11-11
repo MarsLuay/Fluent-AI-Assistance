@@ -7411,7 +7411,10 @@ def _strict_report_map(report_files: dict[str, Path], reports: list[Path]) -> di
 
 
 def _normalize_report_key(key: str) -> str:
-    return key.strip().lower().replace("-", "_").replace(" ", "_")
+    stripped = key.strip()
+    native = _native_ascii_casefold_trim(stripped)
+    lowered = native if native is not None else stripped.lower()
+    return lowered.replace("-", "_").replace(" ", "_")
 
 
 def _classify_report(path: Path) -> str | None:

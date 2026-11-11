@@ -38,6 +38,38 @@ def _ok_finalization_report() -> FinalizationReport:
     )
 
 
+class ReportKeyNormalizationNativeTests(unittest.TestCase):
+    def test_report_key_lowercase_uses_rust_with_python_unicode_fallback(self):
+        values = [" Compile-Report ", "REPAIR History", "ẞ Report", "\x1cCase\x1c"]
+        expected = [
+            value.strip().lower().replace("-", "_").replace(" ", "_")
+            for value in values
+        ]
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [exports._normalize_report_key(value) for value in values]
+        self.assertEqual(disabled, expected)
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = [exports._normalize_report_key(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+                native_call.assert_any_call("ẞ Report")
+        self.assertEqual(enabled, expected)
+        self.assertEqual(expected, ["compile_report", "repair_history", "ß_report", "case"])
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports, "_native_ascii_casefold_trim", return_value=None
+            ):
+                forced_fallback = [exports._normalize_report_key(value) for value in values]
+        self.assertEqual(forced_fallback, expected)
+
+
 class SourceTreeCopyNormalizationNativeTests(unittest.TestCase):
     def test_excluded_paths_use_native_casefold_with_unicode_fallback(self):
         with tempfile.TemporaryDirectory() as tmp:
