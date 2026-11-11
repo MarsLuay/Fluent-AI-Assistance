@@ -142,6 +142,47 @@ class InitializationWorktableTests(unittest.TestCase):
                 fallback = [build_text(script, primary) for script, primary, _ in cases]
         self.assertEqual(fallback, expected)
 
+    def test_fca_waste_classification_uses_native_ascii_and_unicode_fallback(self):
+        cases = [
+            ({"location_names": ["FCA Waste Chute"]}, True),
+            ({"location_names": ["FCA Liquid Waste"]}, True),
+            ({"location_names": ["FCA Plastic"]}, False),
+            ({"location_names": ["Waste Chute"]}, False),
+            ({"location_names": ["FCA Waſte"]}, True),
+        ]
+        expected = [matched for _, matched in cases]
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [
+                initialization_worktables._workspace_has_fca_waste(workspace)
+                for workspace, _ in cases
+            ]
+        self.assertEqual(disabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                initialization_worktables,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = [
+                    initialization_worktables._workspace_has_fca_waste(workspace)
+                    for workspace, _ in cases
+                ]
+                self.assertEqual(native_call.call_count, len(cases))
+        self.assertEqual(enabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                initialization_worktables,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = [
+                    initialization_worktables._workspace_has_fca_waste(workspace)
+                    for workspace, _ in cases
+                ]
+        self.assertEqual(fallback, expected)
+
     def test_selection_normalization_uses_native_ascii_with_unicode_fallback(self):
         values = [
             " METHOD ",

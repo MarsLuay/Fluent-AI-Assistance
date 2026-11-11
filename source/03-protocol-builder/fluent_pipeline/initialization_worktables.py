@@ -191,7 +191,7 @@ def _workspace_text_values(workspace: Mapping[str, Any]) -> list[str]:
 def _workspace_has_fca_waste(workspace: Mapping[str, Any]) -> bool:
     """Return true when workspace geometry includes FCA liquid/plastics waste."""
     for text in _workspace_text_values(workspace):
-        lowered = text.casefold()
+        lowered = _norm(text)
         has_waste = "waste" in lowered
         if has_waste and "fca" in lowered:
             return True
