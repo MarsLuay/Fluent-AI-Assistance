@@ -113,23 +113,37 @@ class TestEligibleMemberCounts(unittest.TestCase):
             "trailing.",
             "...",
             Path("folder/path-object.xscr"),
+            "Unicode/long-s.XſCR",
+            "Objects/space.XCMP ",
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             expected = zeia_adapters_module._eligible_member_counts(entries)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 zeia_adapters_module,
-                "_native_count_string_groups",
-                wraps=native_acceleration.count_string_groups,
-            ) as native_call:
-                actual = zeia_adapters_module._eligible_member_counts(entries)
-                native_call.assert_called_once()
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as casefold_call:
+                with patch.object(
+                    zeia_adapters_module,
+                    "_native_count_string_groups",
+                    wraps=native_acceleration.count_string_groups,
+                ) as native_call:
+                    actual = zeia_adapters_module._eligible_member_counts(entries)
+                    native_call.assert_called_once()
+                self.assertEqual(casefold_call.call_count, len(entries) - 1)
         self.assertEqual(actual, expected)
         self.assertEqual(
             actual,
-            {"scripts": 3, "objects": 2, "worklists": 1, "task_inputs": 1},
+            {"scripts": 4, "objects": 2, "worklists": 1, "task_inputs": 1},
         )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                zeia_adapters_module,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                self.assertEqual(zeia_adapters_module._eligible_member_counts(entries), expected)
             self.assertEqual(
                 native_acceleration.count_string_groups(
                     [".xscr", ".jpg", ".xscr"],

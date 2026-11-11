@@ -10,6 +10,7 @@ from typing import Any, Protocol
 import zipfile
 
 from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
     count_string_groups as _native_count_string_groups,
     count_xscr_object_type_attributes as _native_count_xscr_object_type_attributes,
@@ -1053,11 +1054,19 @@ def _object_kind(suffix: str) -> str:
     }.get(suffix, suffix.lstrip(".") or "xml")
 
 
+def _casefold_suffix(suffix: str) -> str:
+    if type(suffix) is str and suffix.strip() == suffix:
+        native = _native_ascii_casefold_trim(suffix)
+        if native is not None:
+            return native
+    return suffix.casefold()
+
+
 def _eligible_member_counts(entries: list[str] | tuple[str, ...]) -> dict[str, int]:
     if type(entries) in (list, tuple) and all(
         type(entry) is str or type(entry) is _PATH_TYPE for entry in entries
     ):
-        suffixes = [Path(entry).suffix.casefold() for entry in entries]
+        suffixes = [_casefold_suffix(Path(entry).suffix) for entry in entries]
         native = _native_count_string_groups(
             suffixes,
             {
@@ -1070,14 +1079,22 @@ def _eligible_member_counts(entries: list[str] | tuple[str, ...]) -> dict[str, i
         if native is not None:
             return native
     return {
-        "scripts": sum(1 for entry in entries if Path(entry).suffix.casefold() == ".xscr"),
+        "scripts": sum(
+            1 for entry in entries if _casefold_suffix(Path(entry).suffix) == ".xscr"
+        ),
         "objects": sum(
             1
             for entry in entries
-            if Path(entry).suffix.casefold() in XML_OBJECT_EXTS | ASSET_EXTS
+            if _casefold_suffix(Path(entry).suffix) in XML_OBJECT_EXTS | ASSET_EXTS
         ),
-        "worklists": sum(1 for entry in entries if Path(entry).suffix.casefold() == ".gwl"),
-        "task_inputs": sum(1 for entry in entries if Path(entry).suffix.casefold() in TASK_INPUT_EXTS),
+        "worklists": sum(
+            1 for entry in entries if _casefold_suffix(Path(entry).suffix) == ".gwl"
+        ),
+        "task_inputs": sum(
+            1
+            for entry in entries
+            if _casefold_suffix(Path(entry).suffix) in TASK_INPUT_EXTS
+        ),
     }
 
 
