@@ -382,6 +382,49 @@ class NativeAccelerationTests(unittest.TestCase):
             actual_labware, {"example plate", "example rack", "example tray"}
         )
 
+    def test_workspace_occupancy_uses_native_structural_selectors(self) -> None:
+        from fluentcoder.catalog import xcmp
+
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_direct_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        root = ET.fromstring(
+            '<Root xmlns:ns="urn:test"><Payload><PayloadData><Wrapper>'
+            "<Worktables><KeyValueOfstringWorktable><Value><Frame>"
+            "<Arrangements><ns:Arrangement><Sites/></ns:Arrangement>"
+            "<Nested><ns:Arrangement><Sites/></ns:Arrangement></Nested></Arrangements>"
+            "</Frame></Value></KeyValueOfstringWorktable></Worktables>"
+            "</Wrapper></PayloadData></Payload></Root>"
+        )
+        payload_data = root.find("./Payload/PayloadData")
+        arrangements = payload_data.find(
+            "./Wrapper/Worktables/KeyValueOfstringWorktable/Value/Frame/Arrangements"
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = xcmp._walk_workspace_occupancy(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
+            ) as first_native_call:
+                with patch.object(
+                    native_acceleration,
+                    "xml_direct_elements_by_name",
+                    wraps=native_acceleration.xml_direct_elements_by_name,
+                ) as elements_native_call:
+                    actual = xcmp._walk_workspace_occupancy(root)
+                    first_native_call.assert_any_call(
+                        payload_data, "Worktables", ET.Element
+                    )
+                    elements_native_call.assert_called_once_with(
+                        arrangements, {"Arrangement"}, ET.Element
+                    )
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ([], []))
+
     def test_xcon_orientation_rows_use_native_selector_with_python_parity(self) -> None:
         from fluentcoder.catalog import xcon
 

@@ -899,11 +899,7 @@ def _walk_workspace_occupancy(
                 _walk(nested, current_path)
             arrangements = _direct_child(component_node, "Arrangements")
             if arrangements is not None:
-                for arrangement in list(arrangements):
-                    if not isinstance(arrangement.tag, str):
-                        continue
-                    if _local(arrangement.tag) != "Arrangement":
-                        continue
+                for arrangement in _direct_children(arrangements, "Arrangement"):
                     arr_sites = _find(arrangement, "Sites")
                     if arr_sites is not None:
                         _walk(arr_sites, current_path)
@@ -916,14 +912,7 @@ def _walk_workspace_occupancy(
     # carriers, sub-carriers, and leaf placement sites.
     payload = _find(root, "Payload")
     payload_data = _find(payload, "PayloadData") if payload is not None else None
-    worktables = next(
-        (
-            elem
-            for elem in (payload_data.iter() if payload_data is not None else [])
-            if isinstance(elem.tag, str) and _local(elem.tag) == "Worktables"
-        ),
-        None,
-    )
+    worktables = _find(payload_data, "Worktables")
     if worktables is not None:
         for kv in worktables:
             if not isinstance(kv.tag, str):
@@ -937,11 +926,7 @@ def _walk_workspace_occupancy(
             arrangements = _find(frame, "Arrangements")
             if arrangements is None:
                 continue
-            for arrangement in list(arrangements):
-                if not isinstance(arrangement.tag, str):
-                    continue
-                if _local(arrangement.tag) != "Arrangement":
-                    continue
+            for arrangement in _direct_children(arrangements, "Arrangement"):
                 arr_sites = _find(arrangement, "Sites")
                 if arr_sites is not None:
                     _walk(arr_sites, tuple())
