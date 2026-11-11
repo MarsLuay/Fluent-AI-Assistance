@@ -3092,6 +3092,17 @@ def ascii_profile_slug(value: Any) -> str | None:
         return None
 
 
+def ascii_first_version_token(value: Any) -> str | None:
+    """Extract the first ASCII version-like token, or request fallback."""
+    if not enabled() or type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.ascii_first_version_token(value)
+        return result if type(result) is str else None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+
+
 def ascii_safe_filename(value: Any) -> str | None:
     """Sanitize an ASCII filename after Python whitespace trimming, or fallback."""
     if not enabled() or type(value) is not str:

@@ -2701,6 +2701,38 @@ fn ascii_profile_slug(value: &str) -> Option<String> {
 }
 
 #[pyfunction]
+fn ascii_first_version_token(value: &str) -> Option<String> {
+    if !value.is_ascii() {
+        return None;
+    }
+    let bytes = value.as_bytes();
+    let is_word = |byte: u8| byte.is_ascii_alphanumeric() || byte == b'_';
+    for start in 0..bytes.len() {
+        if !bytes[start].is_ascii_digit() || (start > 0 && is_word(bytes[start - 1])) {
+            continue;
+        }
+        let mut end = start;
+        while end < bytes.len() && bytes[end].is_ascii_digit() {
+            end += 1;
+        }
+        let mut candidate_ends = vec![end];
+        while end + 1 < bytes.len() && bytes[end] == b'.' && bytes[end + 1].is_ascii_digit() {
+            end += 2;
+            while end < bytes.len() && bytes[end].is_ascii_digit() {
+                end += 1;
+            }
+            candidate_ends.push(end);
+        }
+        for candidate_end in candidate_ends.into_iter().rev() {
+            if candidate_end == bytes.len() || !is_word(bytes[candidate_end]) {
+                return Some(value[start..candidate_end].to_owned());
+            }
+        }
+    }
+    None
+}
+
+#[pyfunction]
 fn ascii_safe_filename(value: &str) -> Option<String> {
     if !value.is_ascii() {
         return None;
@@ -7910,6 +7942,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_element_is_nil, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_lower_alnum_compact, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_profile_slug, module)?)?;
+    module.add_function(wrap_pyfunction!(ascii_first_version_token, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_safe_filename, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_safe_variable_base, module)?)?;
     module.add_function(wrap_pyfunction!(
@@ -8241,6 +8274,28 @@ mod tests {
         );
         assert_eq!(ascii_profile_slug("---"), Some(String::new()));
         assert_eq!(ascii_profile_slug("東京"), None);
+    }
+
+    #[test]
+    fn ascii_first_version_token_matches_python_regex_boundaries() {
+        for (input, expected) in [
+            ("release 2.3", Some("2.3")),
+            ("!1.2beta", Some("1")),
+            ("version1.2", Some("2")),
+            ("1.2.3x", Some("1.2")),
+            ("a_2.3", Some("3")),
+            ("-12.4.5; later 7", Some("12.4.5")),
+            ("x1.2 y3", Some("2")),
+            ("1..2", Some("1")),
+            ("version", None),
+        ] {
+            assert_eq!(
+                ascii_first_version_token(input).as_deref(),
+                expected,
+                "{input:?}"
+            );
+        }
+        assert_eq!(ascii_first_version_token("café 1.2"), None);
     }
 
     #[test]

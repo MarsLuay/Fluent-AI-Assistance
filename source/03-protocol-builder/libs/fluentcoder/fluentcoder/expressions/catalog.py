@@ -9,6 +9,10 @@ from pathlib import Path
 import re
 from typing import Any, Mapping
 
+from tecan_common.native_acceleration import (
+    ascii_first_version_token as _native_ascii_first_version_token,
+)
+
 
 CATALOG_SCHEMA = "tecan.expression_symbols.v1"
 CATALOG_SCHEMA_VERSION = 1
@@ -445,10 +449,12 @@ def _target_version(value: str | None) -> str | None:
     text = str(value or "").strip()
     if not text:
         return None
-    match = re.search(r"\b\d+(?:\.\d+)*\b", text)
-    if not match:
-        return None
-    candidate = match.group(0)
+    candidate = _native_ascii_first_version_token(text)
+    if candidate is None:
+        match = re.search(r"\b\d+(?:\.\d+)*\b", text)
+        if not match:
+            return None
+        candidate = match.group(0)
     try:
         _parse_version(candidate)
     except CatalogValidationError:
