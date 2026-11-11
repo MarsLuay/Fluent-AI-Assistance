@@ -366,7 +366,20 @@ def find_entity_candidates(
     database = Path(db_path)
     conn = _connect(database)
     try:
-        needle = str(identifier).casefold()
+        raw_identifier = str(identifier)
+        native_needle = (
+            native_acceleration.ascii_casefold_trim(raw_identifier)
+            if (
+                type(raw_identifier) is str
+                and raw_identifier.strip() == raw_identifier
+            )
+            else None
+        )
+        needle = (
+            native_needle
+            if native_needle is not None
+            else raw_identifier.casefold()
+        )
         normalized_kind = kind.strip().lower().replace("-", "_").replace(" ", "_") if kind else None
         rows = conn.execute(
             """

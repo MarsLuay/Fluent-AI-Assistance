@@ -329,6 +329,52 @@ class TestSearchProjectIndex(unittest.TestCase):
         self.assertEqual(result["result_count"], 1)
         self.assertEqual(result["results"][0]["name"], "Water")
 
+    def test_exact_entity_lookup_casefolds_with_rust_and_preserves_fallbacks(self):
+        conn = sqlite3.connect(self.db_path)
+        conn.execute(
+            """INSERT INTO entities(id, zeia_file_id, script_id, kind, name, value, source_path)
+               VALUES (3, 1, 1, 'worktable', 'strasse', 'synthetic', 'unicode.xscr')"""
+        )
+        conn.commit()
+        conn.close()
+        queries = (
+            ("WATER", "liquid_class"),
+            ("Straße", "worktable"),
+            (" WATER ", "liquid_class"),
+        )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                find_entity_candidates(self.db_path, identifier, kind=kind)
+                for identifier, kind in queries
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = [
+                    find_entity_candidates(self.db_path, identifier, kind=kind)
+                    for identifier, kind in queries
+                ]
+                self.assertEqual(native_call.call_count, 2)
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            [result["status"] for result in actual],
+            ["unique", "unique", "missing"],
+        )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration, "ascii_casefold_trim", return_value=None
+            ):
+                fallback = [
+                    find_entity_candidates(self.db_path, identifier, kind=kind)
+                    for identifier, kind in queries
+                ]
+        self.assertEqual(fallback, expected)
+
     def test_exact_entity_lookup_reports_ambiguity(self):
         conn = sqlite3.connect(self.db_path)
         conn.execute(
