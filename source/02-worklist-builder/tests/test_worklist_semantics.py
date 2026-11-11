@@ -1828,6 +1828,58 @@ class WorklistSemanticsTests(unittest.TestCase):
             self.assertEqual(valid, [])
         self.assertEqual(actual, expected)
 
+    def test_native_semantic_equivalence_matches_fallback_and_guards_unsupported_records(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "worklist_semantic_equivalent_lines"
+        ):
+            self.skipTest("optional Rust semantic-equivalence helper is not built")
+
+        units = [_transfer(index, tip=tip) for index, tip in enumerate(("1", "1", "2", "2"), 1)]
+        original = Worklist(records=[record for unit in units for record in unit])
+        reordered = Worklist(
+            records=[record for index in (0, 2, 1, 3) for record in units[index]]
+        )
+        changed = Worklist(
+            records=[
+                *units[0],
+                *units[1],
+                *_transfer(3, tip="2", destination=5),
+                *units[3],
+            ]
+        )
+        cases = [(original, reordered, True), (original, changed, False)]
+
+        for left, right, expected_value in cases:
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                expected = semantic_equivalent(left, right, enabled_tip_mask="3")
+            self.assertEqual(expected, expected_value)
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    native_acceleration,
+                    "worklist_semantic_equivalent_lines",
+                    wraps=native_acceleration.worklist_semantic_equivalent_lines,
+                ) as native_call:
+                    with patch(
+                        "tecan_worklist.optimizer.analyze_worklist",
+                        side_effect=AssertionError("eligible comparison fell back to Python"),
+                    ):
+                        actual = semantic_equivalent(left, right, enabled_tip_mask="3")
+                    self.assertEqual(native_call.call_count, 1)
+            self.assertEqual(actual, expected)
+
+        unsupported = Worklist(records=[RawRecord("Z", "Z;opaque")])
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = semantic_equivalent(unsupported, unsupported)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_semantic_equivalent_lines",
+                wraps=native_acceleration.worklist_semantic_equivalent_lines,
+            ) as native_call:
+                actual = semantic_equivalent(unsupported, unsupported)
+                self.assertEqual(native_call.call_count, 0)
+        self.assertEqual(actual, expected)
+
     def test_optimizer_interleaves_only_independent_explicit_units(self):
         records = []
         for index, tip in ((1, "1"), (2, "1"), (3, "2"), (4, "2")):

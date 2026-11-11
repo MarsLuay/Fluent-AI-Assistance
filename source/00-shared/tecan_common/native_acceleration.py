@@ -4111,6 +4111,39 @@ def worklist_analyze_detail_lines(
         return None
 
 
+def worklist_semantic_equivalent_lines(
+    left_lines: Any,
+    right_lines: Any,
+    enabled_tip_mask: str | None,
+    supported_channels: int,
+) -> bool | None:
+    """Compare worklist semantics for validated native-compatible GWL lines."""
+    if (
+        not enabled()
+        or (enabled_tip_mask is not None and type(enabled_tip_mask) is not str)
+        or type(supported_channels) is not int
+        or supported_channels < 0
+    ):
+        return None
+    try:
+        result = _native.worklist_semantic_equivalent_lines(
+            _encode_json(left_lines),
+            _encode_json(right_lines),
+            enabled_tip_mask,
+            supported_channels,
+        )
+        return result if type(result) is bool else None
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def worklist_optimize_lines(
     lines: Any,
     name: str,

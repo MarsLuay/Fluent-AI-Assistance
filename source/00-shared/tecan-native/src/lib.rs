@@ -6339,6 +6339,38 @@ fn worklist_analyze_detail_lines(
 }
 
 #[pyfunction]
+fn worklist_semantic_equivalent_lines(
+    left_lines_json: &str,
+    right_lines_json: &str,
+    enabled_tip_mask: Option<&str>,
+    supported_channels: usize,
+) -> PyResult<Option<bool>> {
+    let Ok(left_lines) = serde_json::from_str::<Vec<String>>(left_lines_json) else {
+        return Ok(None);
+    };
+    let Ok(right_lines) = serde_json::from_str::<Vec<String>>(right_lines_json) else {
+        return Ok(None);
+    };
+    let left = tecan_worklist_builder::Worklist {
+        lines: left_lines,
+        ..tecan_worklist_builder::Worklist::default()
+    };
+    let right = tecan_worklist_builder::Worklist {
+        lines: right_lines,
+        ..tecan_worklist_builder::Worklist::default()
+    };
+    let Ok(equivalent) = tecan_worklist_builder::semantics::semantic_equivalent(
+        &left,
+        &right,
+        enabled_tip_mask,
+        supported_channels,
+    ) else {
+        return Ok(None);
+    };
+    Ok(Some(equivalent))
+}
+
+#[pyfunction]
 fn worklist_optimize_lines(
     lines_json: &str,
     name: &str,
@@ -6780,6 +6812,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(worklist_tip_diagnostic, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_analyze_lines, module)?)?;
     module.add_function(wrap_pyfunction!(worklist_analyze_detail_lines, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        worklist_semantic_equivalent_lines,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(worklist_optimize_lines, module)?)?;
     module.add_function(wrap_pyfunction!(clean_empty_containers, module)?)?;
     module.add_function(wrap_pyfunction!(deepcopy_json, module)?)?;

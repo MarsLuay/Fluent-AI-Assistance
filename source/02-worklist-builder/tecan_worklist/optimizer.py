@@ -666,6 +666,25 @@ def semantic_equivalent(
 ) -> bool:
     """Compare transfer and barrier semantics, ignoring safe unit ordering."""
 
+    enabled = parse_enabled_tip_mask(
+        enabled_tip_mask, supported_channels=supported_channels
+    )
+    left_lines = _native_worklist_analysis_lines(
+        list(left.records), enabled_tip_mask, enabled, supported_channels
+    )
+    right_lines = _native_worklist_analysis_lines(
+        list(right.records), enabled_tip_mask, enabled, supported_channels
+    )
+    if left_lines is not None and right_lines is not None:
+        native = native_acceleration.worklist_semantic_equivalent_lines(
+            left_lines,
+            right_lines,
+            enabled_tip_mask if type(enabled_tip_mask) is str else None,
+            supported_channels,
+        )
+        if native is not None:
+            return native
+
     left_analysis = analyze_worklist(
         left,
         enabled_tip_mask=enabled_tip_mask,
