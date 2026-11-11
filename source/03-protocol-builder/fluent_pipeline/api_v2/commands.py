@@ -1415,7 +1415,12 @@ def _parse_rup_variable_items(node: Any) -> list[dict[str, Any]]:
     if not isinstance(node, ET.Element):
         return []
     items: list[dict[str, Any]] = []
-    for element in node.iter():
+    elements = _native_xml_elements_by_name(
+        node, ("RupVariableItem",), ET.Element
+    )
+    if elements is None:
+        elements = node.iter()
+    for element in elements:
         if _local_name(element.tag) != "RupVariableItem":
             continue
         allowed_raw = _child_text(element, "AllowedValues")
