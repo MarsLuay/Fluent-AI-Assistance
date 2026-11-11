@@ -1462,16 +1462,17 @@ def _parse_query_limit_value(node: Any, tag: str) -> Any:
             typed, ("double",), ET.Element
         )
         if children is None:
-            children = typed
+            children = (
+                child for child in typed if _local_name(child.tag) == "double"
+            )
         for child in children:
-            if _local_name(child.tag) == "double":
-                text = (child.text or "").strip()
-                if text:
-                    try:
-                        numeric = float(text)
-                        return int(numeric) if numeric.is_integer() else numeric
-                    except ValueError:
-                        return text
+            text = (child.text or "").strip()
+            if text:
+                try:
+                    numeric = float(text)
+                    return int(numeric) if numeric.is_integer() else numeric
+                except ValueError:
+                    return text
     text_value = _child_text(node, f"{tag}Text")
     return text_value or None
 
