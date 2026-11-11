@@ -1899,7 +1899,17 @@ class ReaderTests(unittest.TestCase):
 
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(native_acceleration.path_suffixes(["café.txt"]))
-            self.assertEqual(extension_counts(["café.txt"]), {".txt": 1})
+            with patch.object(
+                reader_common,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as lower_call:
+                self.assertEqual(extension_counts(["café.txt"]), {".txt": 1})
+                self.assertEqual(
+                    extension_counts(["café.İ"]), {".i\u0307": 1}
+                )
+            lower_call.assert_any_call(".txt")
+            lower_call.assert_any_call(".İ")
             with patch.object(
                 reader_common,
                 "_native_extension_counts",

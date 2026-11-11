@@ -19,6 +19,7 @@ from tecan_common.native_acceleration import (
     compact_list as _native_compact_list,
     extension_counts as _native_extension_counts,
     path_suffixes as _native_path_suffixes,
+    ascii_lower as _native_ascii_lower,
     ascii_casefold_trim as _native_ascii_casefold_trim,
     ascii_variable_name_is_valid as _native_ascii_variable_name_is_valid,
 )
@@ -67,18 +68,25 @@ def parse_xml_text(
     return ET.fromstring(text, max_bytes=max_bytes, max_depth=max_depth)
 
 
+def _lower_suffix(suffix: str) -> str:
+    native = _native_ascii_lower(suffix)
+    return native if native is not None else suffix.lower()
+
+
 def extension_counts(names: Iterable[str | Path]) -> dict[str, int]:
     if type(names) in (list, tuple):
         suffixes = _native_path_suffixes(names)
         if suffixes is None:
-            suffixes = [Path(name).suffix.lower() or "<none>" for name in names]
+            suffixes = [
+                _lower_suffix(Path(name).suffix) or "<none>" for name in names
+            ]
         native = _native_extension_counts(suffixes)
         if native is not None:
             return native
         return dict(sorted(Counter(suffixes).items()))
     counts: Counter[str] = Counter()
     for name in names:
-        suffix = Path(name).suffix.lower() or "<none>"
+        suffix = _lower_suffix(Path(name).suffix) or "<none>"
         counts[suffix] += 1
     return dict(sorted(counts.items()))
 
