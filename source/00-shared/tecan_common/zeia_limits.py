@@ -9,6 +9,7 @@ import unicodedata
 import zipfile
 
 from .native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
     windows_drive_path_is_qualified as _native_windows_drive_path_is_qualified,
 )
 
@@ -100,6 +101,14 @@ def normalize_zeia_member_name(value: str) -> str:
     return "/".join(parts)
 
 
+def _casefold_member_name(name: str) -> str:
+    if type(name) is str and name.strip() == name:
+        native = _native_ascii_casefold_trim(name)
+        if native is not None:
+            return native
+    return name.casefold()
+
+
 def build_zeia_archive_inventory(
     archive: zipfile.ZipFile,
     *,
@@ -134,7 +143,7 @@ def build_zeia_archive_inventory(
                 uncompressed_size=max(int(info.file_size), 0),
             ) from exc
 
-        duplicate_key = name.casefold()
+        duplicate_key = _casefold_member_name(name)
         previous = seen.get(duplicate_key)
         if previous is not None:
             raise ZeiaArchiveValidationError(

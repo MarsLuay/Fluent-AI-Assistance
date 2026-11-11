@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from io import BytesIO
 import os
 import re
 import unittest
+import zipfile
 from unittest.mock import patch
 
 from tecan_common import native_acceleration
@@ -36,6 +38,54 @@ class ZeiaMemberPathTests(unittest.TestCase):
                     self.assertEqual(actual, expected, repr(value))
                 else:
                     self.assertIsNone(actual, repr(value))
+
+    def test_archive_duplicate_casefold_uses_rust_with_unicode_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "ascii_casefold_trim"
+        ):
+            self.skipTest("optional Rust ASCII casefold helper is not built")
+
+        def inventory_outcome(names: tuple[str, ...]) -> tuple[object, ...]:
+            payload = BytesIO()
+            with zipfile.ZipFile(payload, "w") as archive:
+                for name in names:
+                    archive.writestr(name, b"synthetic")
+            payload.seek(0)
+            try:
+                with zipfile.ZipFile(payload) as archive:
+                    inventory = zeia_limits.build_zeia_archive_inventory(archive)
+            except zeia_limits.ZeiaArchiveValidationError as exc:
+                return ("error", exc.reason, exc.entry_name, exc.previous_entry_name)
+            return ("ok", inventory.names)
+
+        cases = (
+            ("Folder/Case.xscr", "folder/case.XSCR"),
+            ("Straße.xscr", "STRASSE.xscr"),
+            (" leading.xscr", "leading.xscr"),
+        )
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [inventory_outcome(names) for names in cases]
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                zeia_limits,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = [inventory_outcome(names) for names in cases]
+                self.assertEqual(native_call.call_count, 5)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual[0][0:2], ("error", "duplicate_member"))
+        self.assertEqual(actual[1][0:2], ("error", "duplicate_member"))
+        self.assertEqual(
+            actual[2], ("ok", (" leading.xscr", "leading.xscr"))
+        )
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                zeia_limits, "_native_ascii_casefold_trim", return_value=None
+            ):
+                fallback = [inventory_outcome(names) for names in cases]
+        self.assertEqual(fallback, expected)
 
     def test_member_normalization_preserves_python_fallback_and_rejections(self) -> None:
         values = [
