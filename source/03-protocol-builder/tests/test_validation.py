@@ -292,6 +292,33 @@ class GateEvaluatorNativeNormalizationTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, ["", "", "name01", "strasse", "", "abc", "ss"])
 
+    def test_gate_well_row_uses_native_with_python_fallback(self):
+        values = ["A1", "aa12", " A2 ", "é1", f"{'A' * 30}3"]
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [gate_evaluators._parse_well(value) for value in values]
+        self.assertEqual(expected[:4], [(1, 1), (27, 12), (1, 2), None])
+
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                gate_evaluators,
+                "_native_worklist_row_name_to_index",
+                wraps=native_acceleration.worklist_row_name_to_index,
+            ) as native_call:
+                actual = [gate_evaluators._parse_well(value) for value in values]
+            self.assertEqual(native_call.call_count, 4)
+        self.assertEqual(actual, expected)
+
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                gate_evaluators,
+                "_native_worklist_row_name_to_index",
+                return_value=None,
+            ):
+                forced_fallback = [
+                    gate_evaluators._parse_well(value) for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_compatibility_facade_dependency_key_uses_native_compaction(self):
         values = [None, 0, '  "Name-01" ', "Straße", "東京", "ß"]
         with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):

@@ -14,6 +14,7 @@ from typing import Any, Mapping
 
 from tecan_common.native_acceleration import (
     ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
+    worklist_row_name_to_index as _native_worklist_row_name_to_index,
 )
 
 from fluentcoder.expressions import (
@@ -957,6 +958,9 @@ def _parse_well(value: str) -> tuple[int, int] | None:
     match = re.fullmatch(r"([A-Za-z]+)(\d+)", value.strip())
     if not match:
         return None
+    native_row = _native_worklist_row_name_to_index(match.group(1))
+    if native_row is not None:
+        return native_row + 1, int(match.group(2))
     row = 0
     for char in match.group(1).upper():
         row = row * 26 + (ord(char) - ord("A") + 1)
