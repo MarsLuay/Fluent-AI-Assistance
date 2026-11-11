@@ -119,6 +119,55 @@ class ApiV2CommandValidateTests(unittest.TestCase):
                 command_validate._bracket_variable_names(unsupported), {"Subclass"}
             )
 
+    def test_subroutine_name_cleaning_uses_ascii_rust_path(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "clean_subroutine_name_ascii"
+        ):
+            self.skipTest("optional Rust subroutine-name cleaner is not built")
+        values = [
+            " \x1c\"Macro/Sub\"\x1f \t",
+            "\" foo \"",
+            "\"\"",
+            None,
+            "\"UPPER/Path\"",
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                command_validate._clean_subroutine_name(value) for value in values
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                command_validate,
+                "_native_clean_subroutine_name_ascii",
+                wraps=native_acceleration.clean_subroutine_name_ascii,
+            ) as native_call:
+                actual = [
+                    command_validate._clean_subroutine_name(value) for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            actual, ["Macro\\Sub", " foo ", "", "", "UPPER\\Path"]
+        )
+
+        unicode_value = "\u00a0\"Ä/Sub\"\u00a0"
+
+        class StringSubclass(str):
+            pass
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.clean_subroutine_name_ascii(unicode_value)
+            )
+            self.assertIsNone(
+                native_acceleration.clean_subroutine_name_ascii(
+                    StringSubclass("\"Sub/Path\"")
+                )
+            )
+            self.assertEqual(
+                command_validate._clean_subroutine_name(unicode_value), "Ä\\Sub"
+            )
+
     def test_root_command_scan_uses_native_selector_and_comment_fallback(self):
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xml_elements_by_name"

@@ -5904,6 +5904,13 @@ fn zeia_object_kind_from_suffix(suffix: &str) -> String {
 }
 
 #[pyfunction]
+fn clean_subroutine_name_ascii(value: &str) -> String {
+    let trimmed =
+        value.trim_matches(|character: char| matches!(character as u32, 0x09..=0x0d | 0x1c..=0x20));
+    trimmed.trim_matches('"').replace('/', "\\")
+}
+
+#[pyfunction]
 fn bracket_variable_names(value: &str) -> Vec<String> {
     let bytes = value.as_bytes();
     let mut names = Vec::new();
@@ -7384,6 +7391,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(zeia_object_kind_from_suffix, module)?)?;
     module.add_function(wrap_pyfunction!(count_string_groups, module)?)?;
     module.add_function(wrap_pyfunction!(bracket_variable_names, module)?)?;
+    module.add_function(wrap_pyfunction!(clean_subroutine_name_ascii, module)?)?;
     module.add_function(wrap_pyfunction!(command_short_name, module)?)?;
     module.add_function(wrap_pyfunction!(entry_object_guid, module)?)?;
     module.add_function(wrap_pyfunction!(asset_reference_candidates, module)?)?;
@@ -8086,6 +8094,16 @@ mod tests {
             ),
             vec!["Foo", "bar_2", "_x", "nested"]
         );
+    }
+
+    #[test]
+    fn clean_subroutine_name_matches_ascii_python_stripping() {
+        assert_eq!(
+            clean_subroutine_name_ascii(" \u{1c}\"Macro/Sub\" \u{1f}"),
+            "Macro\\Sub"
+        );
+        assert_eq!(clean_subroutine_name_ascii("\" foo \""), " foo ");
+        assert_eq!(clean_subroutine_name_ascii("\"\""), "");
     }
 
     #[test]

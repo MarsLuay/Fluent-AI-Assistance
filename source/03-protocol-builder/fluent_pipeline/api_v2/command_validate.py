@@ -17,6 +17,7 @@ from typing import Any, Mapping, Protocol
 
 from tecan_common.native_acceleration import (
     bracket_variable_names as _native_bracket_variable_names,
+    clean_subroutine_name_ascii as _native_clean_subroutine_name_ascii,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
 )
@@ -846,6 +847,9 @@ def _bracket_variable_names(value: Any) -> set[str]:
 
 
 def _clean_subroutine_name(value: Any) -> str:
+    native = _native_clean_subroutine_name_ascii(value)
+    if native is not None:
+        return native
     return str(value or "").strip().strip('"').replace("/", "\\")
 
 
