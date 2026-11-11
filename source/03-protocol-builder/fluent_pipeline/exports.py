@@ -1450,7 +1450,7 @@ def _stage_external_file_deployments(
             (
                 name
                 for name in archive.namelist()
-                if name.replace("\\", "/").casefold() == "fs/mapping.xml"
+                if _casefold_exact(name.replace("\\", "/")) == "fs/mapping.xml"
             ),
             None,
         )
@@ -1460,10 +1460,12 @@ def _stage_external_file_deployments(
             key: directory
             for key, directory in parse_fs_mapping_directories(archive.read(mapping_name))
         }
-        for info in sorted(archive.infolist(), key=lambda item: item.filename.casefold()):
+        for info in sorted(
+            archive.infolist(), key=lambda item: _casefold_exact(item.filename)
+        ):
             normalized = info.filename.replace("\\", "/")
             parts = PurePosixPath(normalized).parts
-            if info.is_dir() or len(parts) < 3 or parts[0].casefold() != "fs":
+            if info.is_dir() or len(parts) < 3 or _casefold_exact(parts[0]) != "fs":
                 continue
             try:
                 fs_key = int(parts[1])
