@@ -101,6 +101,42 @@ class ReportKeyNormalizationNativeTests(unittest.TestCase):
         self.assertEqual(forced_fallback, expected)
 
 
+class DirectBooleanNativeTests(unittest.TestCase):
+    def test_xml_boolean_casefold_uses_rust_with_unicode_fallback(self):
+        values = ["TRUE", "False", "truſe", " true ", None]
+        roots = []
+        for value in values:
+            root = exports.ET.Element("Root")
+            if value is not None:
+                element = exports.ET.SubElement(root, "Enabled")
+                element.text = value
+            roots.append(root)
+        expected = [True, False, False, True, False]
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [exports._direct_bool(root, "Enabled") for root in roots]
+        self.assertEqual(disabled, expected)
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_casefold_equals",
+                wraps=native_acceleration.ascii_casefold_equals,
+            ) as native_call:
+                enabled = [exports._direct_bool(root, "Enabled") for root in roots]
+                self.assertEqual(native_call.call_count, len(values))
+                native_call.assert_any_call("TRUE", "true")
+                native_call.assert_any_call("truſe", "true")
+        self.assertEqual(enabled, expected)
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports, "_native_ascii_casefold_equals", return_value=None
+            ):
+                forced_fallback = [exports._direct_bool(root, "Enabled") for root in roots]
+        self.assertEqual(forced_fallback, expected)
+
+
 class FriendlyDeviceNameNativeTests(unittest.TestCase):
     def test_device_name_lowercase_uses_rust_with_safe_fallbacks(self):
         values = ["MCA96", " LIHA ", "LIHſA", "fca"]

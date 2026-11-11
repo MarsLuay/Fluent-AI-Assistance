@@ -6929,7 +6929,9 @@ def _xscr_rup_variable_items(statement: ET.Element) -> list[dict[str, str]]:
 
 
 def _direct_bool(parent: ET.Element, name: str) -> bool:
-    return (_direct_text(parent, name) or "").casefold() == "true"
+    value = _direct_text(parent, name) or ""
+    native = _native_ascii_casefold_equals(value, "true")
+    return native if native is not None else value.casefold() == "true"
 
 
 def _direct_values(parent: ET.Element, name: str) -> list[str]:
