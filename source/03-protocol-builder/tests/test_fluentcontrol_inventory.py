@@ -243,6 +243,75 @@ class FluentControlInventoryTests(unittest.TestCase):
                 fallback = rewrite_all()
         self.assertEqual(fallback, disabled)
 
+    def test_target_profile_script_inventory_uses_native_casefold_sort_keys(self) -> None:
+        profile = {
+            "fingerprint": "synthetic-profile",
+            "objects": {
+                "userspecific": [
+                    {
+                        "guid": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                        "object_name": "Alpha",
+                        "folder": "Folder",
+                        "kind": "SCRIPT",
+                    },
+                    {
+                        "guid": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                        "object_name": "Alpha",
+                        "folder": "Folder",
+                        "kind": "user_specific",
+                    },
+                    {
+                        "guid": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+                        "object_name": "Straße",
+                        "folder": "Folder",
+                        "kind": "other",
+                        "relative_path": "imports/legacy.XSCR",
+                    },
+                    {
+                        "guid": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+                        "object_name": "Ignored",
+                        "folder": "Folder",
+                        "kind": "other",
+                        "relative_path": "imports/other.txt",
+                    },
+                ]
+            },
+        }
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = build_scripts_inventory_from_target_profile(profile)
+        self.assertEqual(disabled["script_count"], 3)
+        self.assertEqual(
+            disabled["name_folder_to_guids"]["Folder\\Alpha"],
+            [
+                "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            ],
+        )
+        self.assertEqual(
+            [row["object_name"] for row in disabled["scripts"]],
+            ["Alpha", "Alpha", "Straße"],
+        )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                inventory_module,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = build_scripts_inventory_from_target_profile(profile)
+                self.assertGreater(native_call.call_count, 0)
+        self.assertEqual(enabled, disabled)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                inventory_module,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = build_scripts_inventory_from_target_profile(profile)
+        self.assertEqual(fallback, disabled)
+
     def test_inventory_unique_collision_and_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory(prefix="fc_inv_") as tmp:
             root = Path(tmp)

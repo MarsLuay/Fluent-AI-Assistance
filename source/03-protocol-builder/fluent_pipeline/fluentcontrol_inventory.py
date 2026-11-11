@@ -162,10 +162,10 @@ def build_scripts_inventory_from_target_profile(profile: Mapping[str, Any]) -> d
     for item in objects:
         if not isinstance(item, Mapping):
             continue
-        kind = str(item.get("kind") or item.get("type_id") or "").casefold()
-        if kind not in {"script", "user_specific", "userspecific"} and not str(
-            item.get("relative_path") or ""
-        ).casefold().endswith(".xscr"):
+        kind = _casefold_key(str(item.get("kind") or item.get("type_id") or ""))
+        if kind not in {"script", "user_specific", "userspecific"} and not _casefold_key(
+            str(item.get("relative_path") or "")
+        ).endswith(".xscr"):
             continue
         guid = str(item.get("guid") or "").strip()
         name = str(item.get("object_name") or "").strip()
@@ -175,9 +175,14 @@ def build_scripts_inventory_from_target_profile(profile: Mapping[str, Any]) -> d
         key = inventory_key(folder, name)
         rows.append({"guid": guid, "object_name": name, "folder": folder, "key": key})
         by_key.setdefault(key, []).append(guid)
-    rows.sort(key=lambda row: (row["key"].casefold(), row["guid"].casefold()))
+    rows.sort(
+        key=lambda row: (
+            _casefold_key(row["key"]),
+            _casefold_key(row["guid"]),
+        )
+    )
     for values in by_key.values():
-        values.sort(key=str.casefold)
+        values.sort(key=_casefold_key)
     return {
         "schema": "tecan.fluentcontrol.scripts_inventory.v1",
         "userspecific_dir": "",
