@@ -41,6 +41,52 @@ class TransferLabwareValidateTests(unittest.TestCase):
         self.assertEqual(fields.location, "NestPlatform")
         self.assertEqual(fields.site, "2")
 
+    def test_child_text_uses_native_direct_selector_and_python_fallback(self):
+        root = transfer_validate.ET.fromstring(
+            '<Root xmlns:x="urn:test"><x:Name> </x:Name><Name>later</Name></Root>'
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = transfer_validate._child_text(root, "Name", "default")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                transfer_validate,
+                "_native_xml_first_direct_child_by_name",
+                wraps=native_acceleration.xml_first_direct_child_by_name,
+            ) as native_call:
+                actual = transfer_validate._child_text(root, "Name", "default")
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "")
+        self.assertEqual(
+            transfer_validate._child_text(root, "Missing", "default"), "default"
+        )
+        self.assertEqual(
+            transfer_validate._child_text(None, "Name", "default"), "default"
+        )
+
+        class StringTag(str):
+            pass
+
+        custom_root = transfer_validate.ET.Element("Root")
+        custom_child = transfer_validate.ET.SubElement(custom_root, StringTag("Name"))
+        custom_child.text = "Custom"
+        transfer_validate.ET.SubElement(custom_root, "Name").text = "Later"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = transfer_validate._child_text(
+                custom_root, "Name", "default"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_first_direct_child_by_name(
+                    custom_root, "Name", transfer_validate.ET.Element
+                )
+            )
+            fallback_actual = transfer_validate._child_text(
+                custom_root, "Name", "default"
+            )
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, "Custom")
+
     def test_transfer_macro_lookup_uses_native_selector_and_python_fallback(self):
         command = _CommandStub(
             type_name="ApplicationDriverMacro",
