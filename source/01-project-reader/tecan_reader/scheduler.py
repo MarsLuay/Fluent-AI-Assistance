@@ -5,8 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from tecan_common import xml_compat as ET
 from tecan_common.native_acceleration import (
     ascii_case_insensitive_substring_match_groups as _native_substring_match_groups,
+    xml_indexed_elements_by_folded_name as _native_indexed_elements_by_folded_name,
 )
 from tecan_common.xml_helpers import local_name
 
@@ -53,7 +55,11 @@ def inspect_scheduler_text(text: str, *, source_name: str) -> dict[str, Any]:
     root = parse_xml_text(text)
     processes: list[dict[str, Any]] = []
     tasks: list[dict[str, Any]] = []
-    for index, element in enumerate(root.iter()):
+    native_indexed = _native_indexed_elements_by_folded_name(
+        root, _SCHEDULER_NAMES, ET.Element
+    )
+    candidates = native_indexed if native_indexed is not None else enumerate(root.iter())
+    for index, element in candidates:
         if not isinstance(element.tag, str):
             continue
         kind_name = local_name(element.tag).casefold()

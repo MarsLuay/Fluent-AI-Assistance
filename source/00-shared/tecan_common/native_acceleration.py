@@ -875,6 +875,45 @@ def xml_elements_by_folded_name_with_children(
         return None
 
 
+def xml_indexed_elements_by_folded_name(
+    root: Any, names: Any, element_type: Any
+) -> list[tuple[int, Any]] | None:
+    """Select Python-casefolded local names with their source traversal indexes."""
+    if (
+        not enabled()
+        or type(root) is not element_type
+        or type(names) not in (set, frozenset, list, tuple)
+        or not all(type(name) is str and name.isascii() for name in names)
+    ):
+        return None
+    try:
+        result = _native.xml_indexed_elements_by_folded_name(
+            root, list(names), element_type
+        )
+        if type(result) is not list:
+            return None
+        indexed: list[tuple[int, Any]] = []
+        for item in result:
+            if (
+                type(item) is not tuple
+                or len(item) != 2
+                or type(item[0]) is not int
+                or type(item[1]) is not element_type
+            ):
+                return None
+            indexed.append(item)
+        return indexed
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        RecursionError,
+    ):
+        return None
+
+
 def xml_variable_definition_elements(root: Any, element_type: Any) -> list[Any] | None:
     """Select supported startup-variable XML definitions in document order."""
     if not enabled() or type(root) is not element_type:

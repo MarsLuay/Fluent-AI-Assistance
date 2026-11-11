@@ -91,6 +91,79 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [expected_value for _, _, expected_value in cases])
 
+    def test_scheduler_record_selection_preserves_source_indexes_with_native_scan(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_indexed_elements_by_folded_name"
+        ):
+            self.skipTest("optional Rust indexed XML selector is not built")
+        source = (
+            '<Root><Other/><Process Name="Process A"/><Gap/>'
+            '<Task Name="Task A"/></Root>'
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = scheduler.inspect_scheduler_text(
+                source, source_name="synthetic.xml"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration._native,
+                "xml_indexed_elements_by_folded_name",
+                wraps=native_acceleration._native.xml_indexed_elements_by_folded_name,
+            ) as rust_call:
+                with patch.object(
+                    scheduler,
+                    "_native_indexed_elements_by_folded_name",
+                    wraps=scheduler._native_indexed_elements_by_folded_name,
+                ) as native_call:
+                    actual = scheduler.inspect_scheduler_text(
+                        source, source_name="synthetic.xml"
+                    )
+                    native_call.assert_called_once()
+                    self.assertEqual(rust_call.call_count, 1)
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            [item["record_index"] for item in actual["scheduler_processes"]],
+            [2],
+        )
+        self.assertEqual(
+            [item["record_index"] for item in actual["scheduler_tasks"]],
+            [4],
+        )
+
+        unicode_root = ET.Element("Root")
+        ET.SubElement(unicode_root, "Other")
+        unicode_root.append(ET.Comment("ignored tag still occupies an index"))
+        ET.SubElement(unicode_root, "Taſk")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_indexed = [
+                (index, element)
+                for index, element in enumerate(unicode_root.iter())
+                if isinstance(element.tag, str)
+                and scheduler.local_name(element.tag).casefold()
+                in scheduler._SCHEDULER_NAMES
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            actual_indexed = scheduler._native_indexed_elements_by_folded_name(
+                unicode_root, scheduler._SCHEDULER_NAMES, ET.Element
+            )
+        self.assertIsNotNone(actual_indexed)
+        self.assertEqual(actual_indexed, expected_indexed)
+        self.assertEqual([index for index, _ in actual_indexed], [3])
+
+        class StringSubclass(str):
+            pass
+
+        unsupported_root = ET.Element("Root")
+        unsupported_task = ET.SubElement(unsupported_root, "Task")
+        unsupported_task.tag = StringSubclass("Task")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                scheduler._native_indexed_elements_by_folded_name(
+                    unsupported_root, scheduler._SCHEDULER_NAMES, ET.Element
+                )
+            )
+
     def test_scheduler_processes_tasks_are_distinct_from_gwl(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             archive = self._archive(

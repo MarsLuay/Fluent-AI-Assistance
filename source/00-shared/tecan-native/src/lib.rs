@@ -2417,6 +2417,47 @@ fn xml_elements_by_folded_name_with_children<'py>(
 }
 
 #[pyfunction]
+fn xml_indexed_elements_by_folded_name<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    names: Vec<String>,
+    element_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if !root.get_type().is(element_type) || names.iter().any(|name| !name.is_ascii()) {
+        return Ok(None);
+    }
+    let output = PyList::empty(py);
+    let iterator = root.call_method0("iter")?;
+    for (index, element) in iterator.try_iter()?.enumerate() {
+        let element = element?;
+        if !element.get_type().is(element_type) {
+            return Ok(None);
+        }
+        let tag = element.getattr("tag")?;
+        if !tag.is_instance_of::<PyString>() {
+            continue;
+        }
+        if !tag.get_type().is(py.get_type::<PyString>()) {
+            return Ok(None);
+        }
+        let tag = tag.extract::<String>()?;
+        let local = tag.rsplit('}').next().unwrap_or(tag.as_str());
+        let folded = if local.is_ascii() {
+            local.to_ascii_lowercase()
+        } else {
+            PyString::new(py, local)
+                .call_method0("casefold")?
+                .extract::<String>()?
+        };
+        if names.iter().any(|name| name.eq_ignore_ascii_case(&folded)) {
+            let pair = PyTuple::new(py, [PyInt::new(py, index).into_any(), element])?;
+            output.append(pair)?;
+        }
+    }
+    Ok(Some(output.into_any()))
+}
+
+#[pyfunction]
 fn xml_first_element_by_name<'py>(
     py: Python<'py>,
     root: &Bound<'py, PyAny>,
@@ -5645,6 +5686,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(xml_leaf_texts, module)?)?;
     module.add_function(wrap_pyfunction!(
         xml_elements_by_folded_name_with_children,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        xml_indexed_elements_by_folded_name,
         module
     )?)?;
     module.add_function(wrap_pyfunction!(xml_variable_definition_elements, module)?)?;
