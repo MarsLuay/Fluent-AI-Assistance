@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 import fluent_pipeline.api_v2_workflow_helpers as workflow_helpers
+import fluent_pipeline.initialization_worktables as initialization_worktables
 from tecan_common import native_acceleration
 from fluent_pipeline.initialization_worktables import (
     INITIALIZATION_COMMENT_REASON,
@@ -58,6 +59,32 @@ def _sample_manifest() -> dict:
 
 
 class InitializationWorktableTests(unittest.TestCase):
+    def test_worktable_key_normalization_uses_native_ascii_and_unicode_fallback(self):
+        values = [" Demo_Worktable_A ", "Straße", "İmage", None, 0, ""]
+        expected = [str(value or "").strip().casefold() for value in values]
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = [initialization_worktables._norm(value) for value in values]
+        self.assertEqual(disabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                initialization_worktables,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = [initialization_worktables._norm(value) for value in values]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(enabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                initialization_worktables,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = [initialization_worktables._norm(value) for value in values]
+        self.assertEqual(fallback, expected)
+
     def test_selection_normalization_uses_native_ascii_with_unicode_fallback(self):
         values = [
             " METHOD ",

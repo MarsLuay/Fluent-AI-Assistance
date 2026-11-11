@@ -12,6 +12,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
+from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
+)
+
 from .protocol_ir import canonical_setup_group_name_for_steps
 from .worktable_ir import initialization_worktable_from_spec, worktable_guid_from_ir, worktable_name_from_ir
 
@@ -102,7 +106,9 @@ def workspace_catalog(manifest: Mapping[str, Any] | None) -> list[dict[str, Any]
 
 
 def _norm(value: Any) -> str:
-    return str(value or "").strip().casefold()
+    text = str(value or "")
+    native = _native_ascii_casefold_trim(text)
+    return native if native is not None else text.strip().casefold()
 
 
 def _workspace_by_name(catalog: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
