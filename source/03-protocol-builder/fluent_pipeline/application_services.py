@@ -48,6 +48,7 @@ from .source_family_gate import source_family_gate
 from .readiness import full_export_readiness_to_offline_validation
 from .spec_lint import LintResult, lint_request_spec_file
 from .validation import render_validation_markdown, validate_ready_to_import
+from tecan_common.native_acceleration import ascii_lower as _native_ascii_lower
 from tecan_reader.diagnostics import (
     DiagnosticCode,
     IngestionArchiveError,
@@ -1120,7 +1121,9 @@ def _simulation_passed(data: Mapping[str, Any] | None) -> bool:
         return False
     if "ok" in data:
         return bool(data.get("ok")) and not data.get("failure")
-    status = str(data.get("status") or "").lower()
+    status_text = str(data.get("status") or "")
+    native_status = _native_ascii_lower(status_text)
+    status = native_status if native_status is not None else status_text.lower()
     return status in {"ok", "passed", "pass", "success"} and not data.get("failure")
 
 

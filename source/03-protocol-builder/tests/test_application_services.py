@@ -4,6 +4,8 @@ import tempfile
 from types import SimpleNamespace
 from unittest import mock
 
+import fluent_pipeline.application_services as application_services_module
+from tecan_common import native_acceleration
 from fluent_pipeline.application_services import (
     BundleVerificationRequest,
     ExpressionSymbolQueryRequest,
@@ -35,6 +37,57 @@ from fluent_pipeline.spec_lint import LintResult
 
 
 class ApplicationServicesTests(unittest.TestCase):
+    def test_simulation_status_uses_native_ascii_lower_with_python_fallback(self):
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "ascii_lower"
+        ):
+            self.skipTest("optional Rust lowercase helper is not built")
+        values = [
+            {"status": "OK"},
+            {"status": "PASSED"},
+            {"status": " PASSED"},
+            {"status": "Päß"},
+            {"status": "FAILED"},
+            {"ok": 1, "status": "failed"},
+        ]
+        with mock.patch.dict(
+            "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+        ):
+            expected = [
+                application_services_module._simulation_passed(value)
+                for value in values
+            ]
+        self.assertEqual(expected, [True, True, False, False, False, True])
+
+        with mock.patch.dict(
+            "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+        ):
+            with mock.patch.object(
+                application_services_module,
+                "_native_ascii_lower",
+                wraps=native_acceleration.ascii_lower,
+            ) as native_call:
+                actual = [
+                    application_services_module._simulation_passed(value)
+                    for value in values
+                ]
+                self.assertEqual(native_call.call_count, 5)
+            native_call.assert_any_call("OK")
+            native_call.assert_any_call("Päß")
+        self.assertEqual(actual, expected)
+
+        with mock.patch.dict(
+            "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
+        ):
+            with mock.patch.object(
+                application_services_module, "_native_ascii_lower", return_value=None
+            ):
+                forced_fallback = [
+                    application_services_module._simulation_passed(value)
+                    for value in values
+                ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_expression_symbol_explanation_uses_shared_catalog_service(self):
         result = explain_expression_symbol(
             ExpressionSymbolQueryRequest(
