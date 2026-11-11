@@ -5,7 +5,10 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import fluent_pipeline.legacy_driver_subroutines as legacy_driver_subroutines_module
+from tecan_common import native_acceleration
 from fluent_pipeline.legacy_driver_subroutines import (
     LEGACY_DRIVER_COMMENT_REASON,
     annotate_legacy_driver_subroutine_comments,
@@ -14,6 +17,25 @@ from fluent_pipeline.legacy_driver_subroutines import (
 
 
 class LegacyDriverSubroutineAnnotationTests(unittest.TestCase):
+    def test_local_name_uses_native_helper_after_string_conversion(self):
+        class CustomTag:
+            def __str__(self):
+                return "{urn:example}LegacyDriverMacro"
+
+        tag = CustomTag()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = legacy_driver_subroutines_module._local_name(tag)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                legacy_driver_subroutines_module,
+                "_native_xml_local_name",
+                wraps=native_acceleration.xml_local_name,
+            ) as native_call:
+                actual = legacy_driver_subroutines_module._local_name(tag)
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "LegacyDriverMacro")
+
     def _ir(self, subroutine_ref: str) -> dict:
         return {
             "protocol": {"name": "Test"},

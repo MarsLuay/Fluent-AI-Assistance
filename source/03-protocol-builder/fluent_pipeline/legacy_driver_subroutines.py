@@ -15,6 +15,7 @@ from . import xml_compat as ET
 from pathlib import Path
 from typing import Any
 
+from tecan_common.native_acceleration import xml_local_name as _native_xml_local_name
 from fluentcoder.ir.driver_recovery import parse_driver_recovery_policy
 
 from .api_v2.command_summary import enrich_subroutine_load_review_record
@@ -363,4 +364,5 @@ def _first_xml_text(root: ET.Element, name: str) -> str:
 
 def _local_name(tag: Any) -> str:
     text = str(tag)
-    return text.rsplit("}", 1)[-1]
+    native = _native_xml_local_name(text)
+    return native if native is not None else text.rsplit("}", 1)[-1]
