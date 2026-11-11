@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from tecan_common.native_acceleration import ascii_casefold_trim as _native_ascii_casefold_trim
+
 from ..readiness_gates import readiness_gate, readiness_gate_approval_context_keys
 from .models import GateRecord, ValidationContext
 
@@ -149,4 +151,9 @@ def _deck_layout_metadata() -> dict[str, Any]:
 
 
 def _norm_status(item: Mapping[str, Any]) -> str:
-    return str(item.get("status") or "").strip().casefold()
+    text = str(item.get("status") or "")
+    if text.strip() == text:
+        native = _native_ascii_casefold_trim(text)
+        if native is not None:
+            return native
+    return text.strip().casefold()
