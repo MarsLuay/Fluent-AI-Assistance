@@ -37,6 +37,54 @@ class IrPlannerTests(unittest.TestCase):
                 ]
         self.assertEqual(forced_fallback, expected)
 
+    def test_operation_inference_uses_native_ascii_lower_with_unicode_fallback(self):
+        cases = [
+            ({"pattern_type": "  GRIPPER ", "name": "Ignored"}, {}, None),
+            (
+                {"pattern_type": "OTHER", "name": "ADD LABWARE"},
+                {"command_family": "OTHER", "summary": "OTHER"},
+                "add_labware",
+            ),
+            (
+                {"pattern_type": "OTHER", "name": "ADD LABWARE"},
+                {"command_family": "OTHER", "summary": "Straße"},
+                "add_labware",
+            ),
+        ]
+        fields = {}
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(ir_planner, "registry_command_operation", return_value=None):
+                expected = [
+                    ir_planner._infer_operation(window, step, fields)
+                    for window, step, _ in cases
+                ]
+        self.assertEqual(expected, [case[2] for case in cases])
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(ir_planner, "registry_command_operation", return_value=None):
+                with patch.object(
+                    ir_planner,
+                    "_native_ascii_lower",
+                    wraps=native_acceleration.ascii_lower,
+                ) as native_call:
+                    actual = [
+                        ir_planner._infer_operation(window, step, fields)
+                        for window, step, _ in cases
+                    ]
+                    self.assertEqual(native_call.call_count, 7)
+                native_call.assert_any_call("OTHER Straße")
+                native_call.assert_any_call("OTHER ADD LABWARE other straße")
+        self.assertEqual(actual, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(ir_planner, "registry_command_operation", return_value=None):
+                with patch.object(ir_planner, "_native_ascii_lower", return_value=None):
+                    forced_fallback = [
+                        ir_planner._infer_operation(window, step, fields)
+                        for window, step, _ in cases
+                    ]
+        self.assertEqual(forced_fallback, expected)
+
     def test_script_rack_types_are_dependencies_not_labware_labels(self):
         ir = {
             "protocol": {"name": "Rack type dependency test"},

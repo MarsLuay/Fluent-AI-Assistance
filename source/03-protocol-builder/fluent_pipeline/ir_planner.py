@@ -608,37 +608,46 @@ def _renumber_steps(ir: dict[str, Any]) -> None:
             step.setdefault("parameters", {})
 
 
+def _lower_text(value: str) -> str:
+    native = _native_ascii_lower(value)
+    return native if native is not None else value.lower()
+
+
 def _infer_operation(window: dict[str, Any], step: dict[str, Any], fields: dict[str, Any]) -> str | None:
-    if str(window.get("pattern_type") or "").strip().lower() == "gripper":
+    if _lower_text(str(window.get("pattern_type") or "").strip()) == "gripper":
         return None
     registry_operation = registry_command_operation(step.get("command_name"))
     if registry_operation in VALID_OPERATION_VALUES:
         return registry_operation
     if registry_operation:
         return None
-    step_text = " ".join(
-        str(value)
-        for value in (
-            step.get("command_name"),
-            step.get("command_family"),
-            step.get("summary"),
-            " ".join(str(key) for key in fields.keys()),
+    step_text = _lower_text(
+        " ".join(
+            str(value)
+            for value in (
+                step.get("command_name"),
+                step.get("command_family"),
+                step.get("summary"),
+                " ".join(str(key) for key in fields.keys()),
+            )
+            if value
         )
-        if value
-    ).lower()
+    )
     operation = _infer_operation_from_text(step_text)
     if operation:
         return operation
 
-    text = " ".join(
-        str(value)
-        for value in (
-            window.get("pattern_type"),
-            window.get("name"),
-            step_text,
+    text = _lower_text(
+        " ".join(
+            str(value)
+            for value in (
+                window.get("pattern_type"),
+                window.get("name"),
+                step_text,
+            )
+            if value
         )
-        if value
-    ).lower()
+    )
     return _infer_operation_from_text(text)
 
 
@@ -838,14 +847,9 @@ def _scalar_or_copy(value: Any) -> Any:
 
 
 def _first_field(fields: dict[str, Any], names: tuple[str, ...]) -> Any:
-    by_lower = {}
-    for key, value in fields.items():
-        native = _native_ascii_lower(key)
-        by_lower[native if native is not None else key.lower()] = value
+    by_lower = {_lower_text(key): value for key, value in fields.items()}
     for name in names:
-        native = _native_ascii_lower(name)
-        lowered_name = native if native is not None else name.lower()
-        value = by_lower.get(lowered_name)
+        value = by_lower.get(_lower_text(name))
         if value not in (None, "", []):
             if isinstance(value, list):
                 return next((item for item in value if item not in (None, "", [])), None)
