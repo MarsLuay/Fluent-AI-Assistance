@@ -222,6 +222,30 @@ class SchedulerAndTaskInputTests(unittest.TestCase):
             {"VendorAttr": ["source"], "VendorField": ["one two"]},
         )
 
+        unicode_alias_root = ET.Element("Task", {"TaſkID": "casefolded"})
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_alias = scheduler._record(
+                unicode_alias_root,
+                index=0,
+                kind="scheduler_task",
+                source_name="synthetic.xml",
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                scheduler,
+                "_native_casefold_alias_values",
+                wraps=scheduler._native_casefold_alias_values,
+            ) as alias_call:
+                actual_alias = scheduler._record(
+                    unicode_alias_root,
+                    index=0,
+                    kind="scheduler_task",
+                    source_name="synthetic.xml",
+                )
+                alias_call.assert_called_once()
+        self.assertEqual(actual_alias, expected_alias)
+        self.assertEqual(actual_alias["task_id"], "casefolded")
+
         class StringSubclass(str):
             pass
 

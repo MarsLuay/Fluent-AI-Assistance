@@ -8,6 +8,7 @@ from typing import Any
 from tecan_common import xml_compat as ET
 from tecan_common.native_acceleration import (
     ascii_case_insensitive_substring_match_groups as _native_substring_match_groups,
+    casefold_alias_values as _native_casefold_alias_values,
     merge_unique_string_groups as _native_merge_unique_string_groups,
     xml_direct_leaf_name_texts as _native_xml_direct_leaf_name_texts,
     xml_indexed_elements_by_folded_name as _native_indexed_elements_by_folded_name,
@@ -129,17 +130,33 @@ def _record(element: Any, *, index: int, kind: str, source_name: str) -> dict[st
             _store_field(fields, unknown, name, value)
     if not fields and not unknown:
         return {}
-    folded = {name.casefold(): value for name, value in fields.items()}
-    normalized = {
-        "process_id": folded.get("processid") or folded.get("id"),
-        "process_name": folded.get("processname") or folded.get("name"),
-        "task_id": folded.get("taskid") or folded.get("id"),
-        "task_name": folded.get("taskname") or folded.get("name"),
-        "script_name": folded.get("scriptname") or folded.get("script"),
-        "schedule": folded.get("schedule"),
-        "due_time": folded.get("duetime") or folded.get("duedatetime"),
-        "iteration_count": folded.get("iterationcount") or folded.get("count"),
+    field_aliases = {
+        "process_id": ("processid", "id"),
+        "process_name": ("processname", "name"),
+        "task_id": ("taskid", "id"),
+        "task_name": ("taskname", "name"),
+        "script_name": ("scriptname", "script"),
+        "schedule": ("schedule",),
+        "due_time": ("duetime", "duedatetime"),
+        "iteration_count": ("iterationcount", "count"),
     }
+    native_values = _native_casefold_alias_values(
+        fields, tuple(field_aliases.values())
+    )
+    if native_values is not None:
+        normalized = dict(zip(field_aliases, native_values))
+    else:
+        folded = {name.casefold(): value for name, value in fields.items()}
+
+        def first(*names: str) -> Any:
+            for name in names:
+                if folded.get(name):
+                    return folded[name]
+            return None
+
+        normalized = {
+            key: first(*aliases) for key, aliases in field_aliases.items()
+        }
     return {
         "kind": kind,
         "source": source_name,
