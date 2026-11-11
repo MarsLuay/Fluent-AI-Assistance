@@ -2,6 +2,8 @@ import os
 import unittest
 from unittest import mock
 
+import fluent_pipeline.api_v2.verification_helpers as verification_helpers_module
+from tecan_common import native_acceleration
 from fluent_pipeline.api_v2.verification_helpers import (
     InteriorLightOptions,
     call_interior_light,
@@ -83,6 +85,52 @@ class InteriorLightVerificationHelperTests(unittest.TestCase):
             self.assertTrue(interior_light_options_from_env().interior_light_before_prompts)
         with mock.patch.dict(os.environ, {}, clear=True):
             self.assertFalse(interior_light_options_from_env().interior_light_before_prompts)
+
+    def test_environment_flag_uses_native_ascii_and_python_unicode_fallback(self):
+        cases = [
+            ("yes", True),
+            (" TRUE ", True),
+            ("1", True),
+            ("Yeſ", True),
+            ("\u2003YES\u00a0", True),
+            ("enabled", False),
+            ("", False),
+        ]
+        for raw, expected in cases:
+            with self.subTest(raw=raw):
+                env = {
+                    "TECAN_INTERIOR_LIGHT_BEFORE_PROMPTS": raw,
+                    "TECAN_DISABLE_RUST_ACCELERATION": "0",
+                }
+                with mock.patch.dict(os.environ, env, clear=True):
+                    with mock.patch.object(
+                        verification_helpers_module,
+                        "_native_ascii_casefold_trim",
+                        wraps=native_acceleration.ascii_casefold_trim,
+                    ) as native_call:
+                        actual = interior_light_options_from_env().interior_light_before_prompts
+                        self.assertEqual(native_call.call_count, 1)
+                self.assertEqual(actual, expected)
+
+                with mock.patch.dict(
+                    os.environ,
+                    {
+                        "TECAN_INTERIOR_LIGHT_BEFORE_PROMPTS": raw,
+                        "TECAN_DISABLE_RUST_ACCELERATION": "1",
+                    },
+                    clear=True,
+                ):
+                    disabled = interior_light_options_from_env().interior_light_before_prompts
+                self.assertEqual(disabled, expected)
+
+                with mock.patch.dict(os.environ, env, clear=True):
+                    with mock.patch.object(
+                        verification_helpers_module,
+                        "_native_ascii_casefold_trim",
+                        return_value=None,
+                    ):
+                        fallback = interior_light_options_from_env().interior_light_before_prompts
+                self.assertEqual(fallback, expected)
 
 
 class InteriorLightRegistryTests(unittest.TestCase):

@@ -6,6 +6,10 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
+)
+
 
 ENVIRONMENTAL_DATA_TEMPLATE: dict[str, Any] = {
     "temperature_c": None,
@@ -37,11 +41,10 @@ def interior_light_verification_action(*, on: bool) -> dict[str, Any]:
 
 def interior_light_options_from_env() -> InteriorLightOptions:
     """Build interior-light flags from optional ``TECAN_INTERIOR_LIGHT_BEFORE_PROMPTS``."""
-    enabled = os.environ.get("TECAN_INTERIOR_LIGHT_BEFORE_PROMPTS", "").strip().casefold() in {
-        "1",
-        "true",
-        "yes",
-    }
+    raw = os.environ.get("TECAN_INTERIOR_LIGHT_BEFORE_PROMPTS", "")
+    native = _native_ascii_casefold_trim(raw)
+    normalized = native if native is not None else raw.strip().casefold()
+    enabled = normalized in {"1", "true", "yes"}
     return InteriorLightOptions(interior_light_before_prompts=enabled)
 
 
