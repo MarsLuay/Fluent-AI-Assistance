@@ -8,6 +8,36 @@ from tecan_common import native_acceleration
 
 
 class CompiledXscrFinalizerTests(unittest.TestCase):
+    def test_first_text_whitespace_uses_native_helper_and_python_fallback(self):
+        text = "<Value> \tAlpha\nBeta\u2003 </Value>"
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = finalizer._first_xml_text_from_text(text, "Value")
+        self.assertEqual(expected, "Alpha Beta")
+
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                finalizer,
+                "_native_collapse_ascii_whitespace",
+                wraps=native_acceleration.collapse_ascii_whitespace,
+            ) as native_call:
+                actual = finalizer._first_xml_text_from_text(text, "Value")
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+
+        with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                finalizer,
+                "_native_collapse_ascii_whitespace",
+                return_value=None,
+            ):
+                unsupported_fallback = finalizer._first_xml_text_from_text(
+                    text, "Value"
+                )
+        self.assertEqual(unsupported_fallback, expected)
+        self.assertEqual(
+            finalizer._first_xml_text_from_text("<Other />", "Value"), ""
+        )
+
     def test_external_path_prefixes_use_native_helper_and_python_fallback(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             source_path = Path(temp_dir) / "source.xscr"

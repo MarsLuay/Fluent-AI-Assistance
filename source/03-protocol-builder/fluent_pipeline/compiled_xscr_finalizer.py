@@ -11,6 +11,7 @@ from typing import Any, Mapping
 
 from . import xml_compat as ET
 from tecan_common.native_acceleration import (
+    collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
     windows_drive_path_prefix as _native_windows_drive_path_prefix,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
@@ -950,7 +951,9 @@ def _first_xml_text_from_text(text: str, name: str) -> str:
     match = re.search(rf"<{re.escape(name)}>(.*?)</{re.escape(name)}>", text, flags=re.DOTALL)
     if not match:
         return ""
-    return re.sub(r"\s+", " ", match.group(1)).strip()
+    raw_text = match.group(1)
+    native = _native_collapse_ascii_whitespace(raw_text)
+    return native if native is not None else re.sub(r"\s+", " ", raw_text).strip()
 
 
 def _safe_read_text(path: Path) -> str:
