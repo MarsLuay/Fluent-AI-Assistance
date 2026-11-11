@@ -1451,6 +1451,19 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [guid, guid, guid, guid, "", "", "", "", "", "", "", ""])
 
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(native_acceleration, "entry_object_guid", return_value=None):
+                with patch.object(
+                    native_acceleration,
+                    "ascii_casefold_trim",
+                    wraps=native_acceleration.ascii_casefold_trim,
+                ) as native_lower:
+                    fallback_guid = reader_script._entry_object_guid(
+                        f"C:\\Data\\{guid.upper()}.XSCR"
+                    )
+                    native_lower.assert_called_once_with(guid.upper())
+        self.assertEqual(fallback_guid, guid)
+
     def test_native_xscr_command_records_preserve_fields_and_python_classification(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "xscr_command_records"

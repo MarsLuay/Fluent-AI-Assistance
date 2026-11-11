@@ -507,7 +507,7 @@ def _entry_object_guid(source_name: str) -> str:
         re.IGNORECASE,
     ):
         return ""
-    guid = stem.lower()
+    guid = _lower_text(stem)
     return "" if guid == "00000000-0000-0000-0000-000000000000" else guid
 
 
