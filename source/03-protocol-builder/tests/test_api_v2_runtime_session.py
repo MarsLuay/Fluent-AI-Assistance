@@ -9,6 +9,42 @@ from tecan_common import native_acceleration
 
 
 class RuntimeSessionIdentityTests(unittest.TestCase):
+    def test_method_inventory_uses_native_ascii_and_python_unicode_fallback(self) -> None:
+        runnable = [" MethodA ", "Café", "Straße", "Runner", "methoda", ""]
+        maintenance = ["methoda", "CAFÉ", "STRASSE", "Maintenance", "Straße", ""]
+        expected = {
+            "runnable_count": 5,
+            "maintenance_count": 5,
+            "assay_runnable": ["Runner"],
+            "maintenance_methods": [
+                "methoda", "CAFÉ", "STRASSE", "Maintenance", "Straße"
+            ],
+            "maintenance_only": ["Maintenance"],
+        }
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            disabled = runtime_session.partition_method_inventory(runnable, maintenance)
+        self.assertEqual(disabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                runtime_session,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                enabled = runtime_session.partition_method_inventory(runnable, maintenance)
+                self.assertEqual(native_call.call_count, 10)
+        self.assertEqual(enabled, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                runtime_session,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                fallback = runtime_session.partition_method_inventory(runnable, maintenance)
+        self.assertEqual(fallback, expected)
+
     def test_identity_match_uses_native_ascii_and_python_unicode_fallback(self) -> None:
         cases = [
             (" User@example.test ", "user@EXAMPLE.TEST", True),

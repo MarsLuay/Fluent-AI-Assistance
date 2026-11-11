@@ -6,7 +6,13 @@ from typing import Any, Mapping
 
 from tecan_common.native_acceleration import (
     ascii_casefold_equals as _native_ascii_casefold_equals,
+    ascii_casefold_trim as _native_ascii_casefold_trim,
 )
+
+
+def _casefold_key(value: str) -> str:
+    native = _native_ascii_casefold_trim(value)
+    return native if native is not None else value.casefold()
 
 
 def dispose_concrete_runtime_controller(
@@ -45,9 +51,20 @@ def partition_method_inventory(
     """api-v2-081: separate assay runnable names from maintenance-only names."""
     runnable = [str(item).strip() for item in (runnable_methods or []) if str(item).strip()]
     maintenance = [str(item).strip() for item in (maintenance_methods or []) if str(item).strip()]
-    maintenance_set = {name.casefold() for name in maintenance}
-    assay = [name for name in runnable if name.casefold() not in maintenance_set]
-    maintenance_only = [name for name in maintenance if name.casefold() not in {n.casefold() for n in runnable}]
+    runnable_keys = [_casefold_key(name) for name in runnable]
+    maintenance_keys = [_casefold_key(name) for name in maintenance]
+    runnable_key_set = set(runnable_keys)
+    maintenance_key_set = set(maintenance_keys)
+    assay = [
+        name
+        for name, key in zip(runnable, runnable_keys)
+        if key not in maintenance_key_set
+    ]
+    maintenance_only = [
+        name
+        for name, key in zip(maintenance, maintenance_keys)
+        if key not in runnable_key_set
+    ]
     return {
         "runnable_count": len(runnable),
         "maintenance_count": len(maintenance),
