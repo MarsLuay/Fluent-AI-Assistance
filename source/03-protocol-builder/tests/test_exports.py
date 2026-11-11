@@ -38,6 +38,51 @@ def _ok_finalization_report() -> FinalizationReport:
     )
 
 
+class FullZeiaCopyFlagNativeTests(unittest.TestCase):
+    def test_opt_in_flag_uses_native_ascii_casefold_with_python_fallback(self):
+        values = ["1", " true ", "YES", "On", "0", "Straße", "ſ", ""]
+
+        def evaluate(disabled: bool) -> list[bool]:
+            results = []
+            with mock.patch.dict(
+                os.environ,
+                {"TECAN_DISABLE_RUST_ACCELERATION": "1" if disabled else "0"},
+            ):
+                for value in values:
+                    with mock.patch.dict(
+                        os.environ, {"TECAN_PACKAGE_FULL_ZEIA_COPY": value}
+                    ):
+                        results.append(exports._force_full_zeia_copy())
+            return results
+
+        expected = evaluate(disabled=True)
+        self.assertEqual(expected, [True, True, True, True, False, False, False, False])
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = []
+                for value in values:
+                    with mock.patch.dict(
+                        os.environ, {"TECAN_PACKAGE_FULL_ZEIA_COPY": value}
+                    ):
+                        actual.append(exports._force_full_zeia_copy())
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+        self.assertIsNone(native_acceleration.ascii_casefold_trim("Straße"))
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_ascii_casefold_trim",
+                return_value=None,
+            ):
+                self.assertEqual(evaluate(disabled=False), expected)
+
+
 class SourcePathWhitespaceNativeTests(unittest.TestCase):
     def test_source_path_collapses_whitespace_with_native_helper_and_fallback(self):
         source = "result = choose(\n    alpha,  \n    beta\n)"

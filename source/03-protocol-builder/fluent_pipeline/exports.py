@@ -2744,12 +2744,10 @@ def _write_project_import_archives(
 
 def _force_full_zeia_copy() -> bool:
     """Opt-in full source ZEIA copy. Default packaging is script-scoped (Fluent or portable)."""
-    return str(os.environ.get("TECAN_PACKAGE_FULL_ZEIA_COPY") or "").strip().casefold() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+    value = str(os.environ.get("TECAN_PACKAGE_FULL_ZEIA_COPY") or "").strip()
+    native = _native_ascii_casefold_trim(value)
+    normalized = native if native is not None else value.casefold()
+    return normalized in {"1", "true", "yes", "on"}
 
 
 def _write_generated_project_archive(
