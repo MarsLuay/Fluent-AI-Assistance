@@ -499,6 +499,67 @@ class LiquidClassesExportTests(unittest.TestCase):
             )
         self.assertEqual(native_fallback, fallback)
 
+    def test_detection_pair_scan_uses_native_selector_with_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "xml_elements_by_name"
+        ):
+            self.skipTest("optional Rust XML selector is not built")
+        root = liquid_classes_export.ET.fromstring(
+            "<Detection><SelectedPlld><Container>"
+            "<liquidclassvaluevariablenamepair><VariableName>SelectedPlld</VariableName>"
+            "<Value>false</Value></liquidclassvaluevariablenamepair>"
+            "<LiquidClassValueVariableNamePair>"
+            "<VariableName>SelectedPlld</VariableName><Value>true</Value>"
+            "</LiquidClassValueVariableNamePair>"
+            "</Container></SelectedPlld></Detection>"
+        )
+        selected = list(root)[0]
+        selected_container = list(selected)[0]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = liquid_classes_export._detection_set_fields(selected)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                liquid_classes_export,
+                "_native_xml_elements_by_name",
+                wraps=native_acceleration.xml_elements_by_name,
+            ) as native_call:
+                actual = liquid_classes_export._detection_set_fields(selected)
+                native_call.assert_called_once_with(
+                    selected_container,
+                    ("LiquidClassValueVariableNamePair",),
+                    liquid_classes_export.ET.Element,
+                )
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, {"plld": True})
+
+        fallback_root = liquid_classes_export.ET.Element("Detection")
+        fallback_selected = liquid_classes_export.ET.SubElement(
+            fallback_root, "SelectedPlld"
+        )
+        fallback_container = liquid_classes_export.ET.SubElement(
+            fallback_selected, "Container"
+        )
+        fallback_container.append(liquid_classes_export.ET.Comment("fallback"))
+        pair = liquid_classes_export.ET.SubElement(
+            fallback_container, "LiquidClassValueVariableNamePair"
+        )
+        liquid_classes_export.ET.SubElement(pair, "VariableName").text = "SelectedPlld"
+        liquid_classes_export.ET.SubElement(pair, "Value").text = "true"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback = liquid_classes_export._detection_set_fields(fallback_selected)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                liquid_classes_export._native_xml_elements_by_name(
+                    fallback_container,
+                    ("LiquidClassValueVariableNamePair",),
+                    liquid_classes_export.ET.Element,
+                )
+            )
+            native_fallback = liquid_classes_export._detection_set_fields(
+                fallback_selected
+            )
+        self.assertEqual(native_fallback, fallback)
+
     def test_parse_xlqc_uses_filename_guid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             guid = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"

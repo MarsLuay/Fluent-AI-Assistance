@@ -826,11 +826,9 @@ def _detection_set_fields(elem: ET.Element) -> dict[str, Any]:
             continue
         parent_key = _DPS_FIELD_ALIASES.get(folded) or _FIELD_ALIASES.get(folded)
         # Prefer VariableName/Value pairs (Fluent DetectionAndPositioning).
-        for pair in child.iter():
-            if not isinstance(pair.tag, str):
-                continue
-            if _local_name(pair.tag) != "LiquidClassValueVariableNamePair":
-                continue
+        for pair in _elements_by_local_name(
+            child, "LiquidClassValueVariableNamePair"
+        ):
             var_name = ""
             value = ""
             for part in list(pair):
@@ -1119,6 +1117,19 @@ def _coerce_scalar(text: str) -> Any:
         return int(raw)
     except ValueError:
         return raw
+
+
+def _elements_by_local_name(
+    root: ET.Element, local_name: str
+) -> list[ET.Element]:
+    elements = _native_xml_elements_by_name(root, (local_name,), ET.Element)
+    if elements is not None:
+        return elements
+    return [
+        element
+        for element in root.iter()
+        if isinstance(element.tag, str) and _local_name(element.tag) == local_name
+    ]
 
 
 def _direct_elements_by_local_name(
