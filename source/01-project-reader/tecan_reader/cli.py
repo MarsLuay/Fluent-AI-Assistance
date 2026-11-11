@@ -193,10 +193,18 @@ def _most_common_counts(counter: Counter[str], limit: int | None = None) -> dict
     return dict(counter.most_common(limit))
 
 
+def _lower_suffix(suffix: str) -> str:
+    if type(suffix) is str and suffix.strip() == suffix:
+        native = native_acceleration.ascii_casefold_trim(suffix)
+        if native is not None:
+            return native
+    return suffix.lower()
+
+
 def inspect_path(path: Path, *, script_limit: int | None, object_limit: int | None) -> dict[str, Any]:
     if path.is_dir():
         return _inspect_directory(path, script_limit=script_limit, object_limit=object_limit)
-    suffix = path.suffix.lower()
+    suffix = _lower_suffix(path.suffix)
     if suffix == ".zeia":
         return inspect_archive(path, script_limit=script_limit, object_limit=object_limit)
     if suffix == ".xscr":
@@ -209,7 +217,7 @@ def inspect_path(path: Path, *, script_limit: int | None, object_limit: int | No
 def _inspect_directory(path: Path, *, script_limit: int | None, object_limit: int | None) -> dict[str, Any]:
     files = [
         item for item in path.rglob("*")
-        if item.is_file() and item.suffix.lower() in TECAN_EXTENSIONS
+        if item.is_file() and _lower_suffix(item.suffix) in TECAN_EXTENSIONS
     ]
     items = []
     script_names = []
@@ -218,7 +226,7 @@ def _inspect_directory(path: Path, *, script_limit: int | None, object_limit: in
     warnings: Counter[str] = Counter()
     for file_path in files:
         try:
-            suffix = file_path.suffix.lower()
+            suffix = _lower_suffix(file_path.suffix)
             if suffix == ".xscr":
                 item = inspect_xscr(file_path)
                 items.append(item)

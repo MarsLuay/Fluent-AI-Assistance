@@ -11,6 +11,45 @@ from tecan_reader import cli
 
 
 class ProjectReaderCliTests(unittest.TestCase):
+    def test_suffix_lowering_uses_rust_with_exact_python_fallback(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "ascii_casefold_trim"
+        ):
+            self.skipTest("optional Rust ASCII lowercase helper is not built")
+
+        class LowerSubclass(str):
+            def lower(self) -> str:
+                return "custom-lower"
+
+        values = (".XSCR", ".XſSCR", " .XSCR ", LowerSubclass(".GWL"))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [cli._lower_suffix(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                cli.native_acceleration,
+                "ascii_casefold_trim",
+                wraps=native_acceleration.ascii_casefold_trim,
+            ) as native_call:
+                actual = [cli._lower_suffix(value) for value in values]
+                self.assertEqual(native_call.call_count, 2)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, [".xscr", ".xſscr", " .xscr ", "custom-lower"])
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                cli.native_acceleration, "ascii_casefold_trim", return_value=None
+            ):
+                fallback = [cli._lower_suffix(value) for value in values]
+        self.assertEqual(fallback, expected)
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(cli, "inspect_xscr", return_value={"kind": "script"}) as inspect:
+                result = cli.inspect_path(
+                    Path("synthetic.XSCR"), script_limit=None, object_limit=None
+                )
+        inspect.assert_called_once()
+        self.assertEqual(result, {"kind": "script"})
+
     def test_directory_counter_aggregation_uses_native_with_python_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "most_common_string_counts"
