@@ -1634,6 +1634,42 @@ class WorklistSemanticsTests(unittest.TestCase):
                     self.assertEqual(native_call.call_count, 1)
             self.assertEqual(actual, expected)
 
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.worklist_window_properties(
+                    [[]], [], [True], ["explicit"], [1]
+                )
+            )
+            self.assertIsNone(
+                native_acceleration.worklist_window_properties(
+                    [[]], [[]], [True], ["explicit"], [True]
+                )
+            )
+
+            class UnitLike:
+                source_key = ("source",)
+                destination_key = ("destination",)
+                tip_selection = parse_tip_selection("1")
+
+                @property
+                def tip_channel(self):
+                    return self.tip_selection.channel
+
+            with patch.object(
+                native_acceleration,
+                "worklist_window_properties",
+                side_effect=AssertionError("unsupported objects must use Python"),
+            ):
+                self.assertEqual(
+                    _window_properties([UnitLike()]),
+                    (
+                        True,
+                        True,
+                        (1,),
+                        "independent explicit-tip units may be interleaved deterministically",
+                    ),
+                )
+
     def test_optimizer_interleaves_only_independent_explicit_units(self):
         records = []
         for index, tip in ((1, "1"), (2, "1"), (3, "2"), (4, "2")):
