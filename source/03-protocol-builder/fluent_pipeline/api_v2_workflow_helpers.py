@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from tecan_common.native_acceleration import (
+    ascii_casefold_equals as _native_ascii_casefold_equals,
     ascii_casefold_trim as _native_ascii_casefold_trim,
 )
 
@@ -44,6 +45,11 @@ def _normalize_initialize_selection(value: Any) -> str:
     return selection if selection in {"workspace", "method"} else "workspace"
 
 
+def _casefold_equal(left: str, right: str) -> bool:
+    native = _native_ascii_casefold_equals(left, right)
+    return native if native is not None else left.casefold() == right.casefold()
+
+
 def build_initialize_steps(
     config: FluentContextCheckConfig,
     *,
@@ -64,7 +70,7 @@ def build_initialize_steps(
     if not init_only and plan and plan.primary_init_worktable:
         init_only = plan.primary_init_worktable
     steps: list[FluentInitializeContext] = []
-    if init_only and script and init_only.casefold() != script.casefold():
+    if init_only and script and not _casefold_equal(init_only, script):
         steps.append(
             FluentInitializeContext(
                 selection=selection,
@@ -78,7 +84,7 @@ def build_initialize_steps(
             )
         )
     target = script or init_only
-    if target and (not steps or steps[-1].name.casefold() != target.casefold()):
+    if target and (not steps or not _casefold_equal(steps[-1].name, target)):
         steps.append(
             FluentInitializeContext(
                 selection=selection,

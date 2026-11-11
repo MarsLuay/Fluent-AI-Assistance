@@ -107,6 +107,60 @@ class InitializationWorktableTests(unittest.TestCase):
                 ]
         self.assertEqual(unsupported_fallback, expected)
 
+    def test_worktable_name_comparison_uses_native_ascii_and_unicode_fallback(self):
+        pairs = [
+            ("Initialize", "initialize"),
+            ("workspace", "WORKSPACE"),
+            ("workſpace", "WORKSPACE"),
+            ("Straße", "STRASSE"),
+            ("", ""),
+        ]
+        expected = [left.casefold() == right.casefold() for left, right in pairs]
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback = [workflow_helpers._casefold_equal(*pair) for pair in pairs]
+        self.assertEqual(fallback, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                workflow_helpers,
+                "_native_ascii_casefold_equals",
+                wraps=native_acceleration.ascii_casefold_equals,
+            ) as native_call:
+                actual = [workflow_helpers._casefold_equal(*pair) for pair in pairs]
+                self.assertEqual(native_call.call_count, len(pairs))
+        self.assertEqual(actual, expected)
+
+        with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                workflow_helpers,
+                "_native_ascii_casefold_equals",
+                return_value=None,
+            ):
+                unsupported_fallback = [
+                    workflow_helpers._casefold_equal(*pair) for pair in pairs
+                ]
+        self.assertEqual(unsupported_fallback, expected)
+
+        for initialize_workspace, script_workspace in (
+            ("WORKSPACE", "workspace"),
+            ("workſpace", "WORKSPACE"),
+        ):
+            with patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    workflow_helpers,
+                    "_native_ascii_casefold_equals",
+                    wraps=native_acceleration.ascii_casefold_equals,
+                ) as native_call:
+                    steps = build_initialize_steps(
+                        FluentContextCheckConfig(
+                            initialize_workspace=initialize_workspace,
+                            script_workspace=script_workspace,
+                        )
+                    )
+                    self.assertEqual(native_call.call_count, 1)
+            self.assertEqual([step.name for step in steps], [script_workspace])
+
     def test_detect_candidates_prefers_spec_init_worktable(self):
         manifest = _sample_manifest()
         ir = {
