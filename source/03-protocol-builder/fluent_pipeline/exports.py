@@ -23,6 +23,7 @@ from fluentcoder.expressions import (
     expression_inventory_from_xscr_text,
 )
 from tecan_common.native_acceleration import (
+    collapse_ascii_whitespace as _native_collapse_ascii_whitespace,
     ascii_case_insensitive_substring_match_groups as _native_ascii_substring_match_groups,
     ascii_lower_alnum_compact as _native_ascii_lower_alnum_compact,
     xml_clean_text as _native_xml_clean_text,
@@ -5202,7 +5203,9 @@ def _first_xml_text_from_text(text: str, name: str) -> str:
     match = re.search(rf"<{re.escape(name)}>(.*?)</{re.escape(name)}>", text, flags=re.DOTALL)
     if not match:
         return ""
-    return re.sub(r"\s+", " ", match.group(1)).strip()
+    raw = match.group(1)
+    native = _native_collapse_ascii_whitespace(raw)
+    return native if native is not None else re.sub(r"\s+", " ", raw).strip()
 
 
 def _decode_xml_bytes(data: bytes) -> str:

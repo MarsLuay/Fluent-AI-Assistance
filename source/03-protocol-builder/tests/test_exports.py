@@ -116,6 +116,36 @@ class TouchToolsRequestTests(unittest.TestCase):
 
 
 class XscrPromptSelectorTests(unittest.TestCase):
+    def test_first_xml_text_uses_native_whitespace_collapse_and_fallback(self):
+        text = "<ObjectName>\x1cExample\u2003 Name \t\x1f</ObjectName>"
+        expected = "Example Name"
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            self.assertEqual(
+                exports._first_xml_text_from_text(text, "ObjectName"), expected
+            )
+            self.assertEqual(
+                exports._first_xml_text_from_text(text, "Missing"), ""
+            )
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_collapse_ascii_whitespace",
+                wraps=native_acceleration.collapse_ascii_whitespace,
+            ) as native_call:
+                actual = exports._first_xml_text_from_text(text, "ObjectName")
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+
+        with mock.patch.dict(os.environ, {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with mock.patch.object(
+                exports,
+                "_native_collapse_ascii_whitespace",
+                return_value=None,
+            ):
+                fallback = exports._first_xml_text_from_text(text, "ObjectName")
+        self.assertEqual(fallback, expected)
+
     def test_local_name_uses_native_helper_and_custom_python_fallback(self):
         tag = "{urn:example}RUPScreenTitle"
         with mock.patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
