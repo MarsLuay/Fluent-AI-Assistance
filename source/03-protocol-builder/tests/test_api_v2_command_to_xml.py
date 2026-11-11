@@ -374,6 +374,49 @@ class ApiV2CommandSerializerTests(unittest.TestCase):
         self.assertEqual(fallback_actual, fallback_expected)
         self.assertEqual(fallback_actual, [{"target": "fallback", "source": "7"}])
 
+    def test_descendant_text_uses_native_first_selector_and_fallback(self):
+        root = ET.fromstring(
+            '<Root xmlns:x="urn:test"><x:Name> </x:Name><Name>later</Name></Root>'
+        )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = commands_module._descendant_text(root, "Name", "default")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                commands_module,
+                "_native_xml_first_element_by_name",
+                wraps=native_acceleration.xml_first_element_by_name,
+            ) as native_call:
+                actual = commands_module._descendant_text(root, "Name", "default")
+                self.assertEqual(native_call.call_count, 1)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, "")
+        self.assertEqual(
+            commands_module._descendant_text(object(), "Name", "default"),
+            "default",
+        )
+
+        class StringTag(str):
+            pass
+
+        custom_root = ET.Element("Root")
+        ET.SubElement(custom_root, StringTag("Name")).text = "Custom"
+        ET.SubElement(custom_root, "Name").text = "Later"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            fallback_expected = commands_module._descendant_text(
+                custom_root, "Name", "default"
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            self.assertIsNone(
+                native_acceleration.xml_first_element_by_name(
+                    custom_root, "Name", ET.Element
+                )
+            )
+            fallback_actual = commands_module._descendant_text(
+                custom_root, "Name", "default"
+            )
+        self.assertEqual(fallback_actual, fallback_expected)
+        self.assertEqual(fallback_actual, "Custom")
+
     def test_query_limit_double_scan_uses_native_direct_selector_and_fallback(self):
         root = ET.fromstring(
             "<Root><Minimum><double> </double><double>2.5</double></Minimum></Root>"

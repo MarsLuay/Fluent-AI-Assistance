@@ -11,6 +11,7 @@ from tecan_common.native_acceleration import (
     xml_direct_elements_by_name as _native_xml_direct_elements_by_name,
     xml_elements_by_name as _native_xml_elements_by_name,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
+    xml_first_element_by_name as _native_xml_first_element_by_name,
 )
 
 from fluentcoder.expressions import (
@@ -767,6 +768,10 @@ def _descendant_text(element: Any, name: str, default: str = "") -> str:
 
     if not isinstance(element, ET.Element):
         return default
+    selection = _native_xml_first_element_by_name(element, name, ET.Element)
+    if selection is not None:
+        _, node = selection
+        return (node.text or "").strip() if node is not None else default
     for node in element.iter():
         tag = str(node.tag)
         local = tag.rsplit("}", 1)[-1] if "}" in tag else tag
