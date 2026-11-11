@@ -91,6 +91,36 @@ class AddLabwareValidateTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [True, True, True, False, False, False, True])
 
+    def test_bracket_variable_names_use_shared_native_scanner(self):
+        values = [
+            "[A] [b_2] [A] [] [_x] [9bad] [with-dash] [[nested]] [é] [Aé]",
+            "before [name9] after",
+            "unicode [é] [Aé] [okay_1]",
+            "",
+            None,
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected = [
+                add_labware_validate._bracket_variable_names(value)
+                for value in values
+            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                add_labware_validate,
+                "_native_bracket_variable_names",
+                wraps=native_acceleration.bracket_variable_names,
+            ) as native_call:
+                actual = [
+                    add_labware_validate._bracket_variable_names(value)
+                    for value in values
+                ]
+                self.assertEqual(native_call.call_count, len(values))
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual[0], {"A", "b_2", "_x", "nested"})
+        self.assertEqual(actual[1], {"name9"})
+        self.assertEqual(actual[2], {"okay_1"})
+        self.assertEqual(actual[3:], [set(), set()])
+
     def test_add_labware_descendant_lookup_uses_native_selector_and_fallback(self):
         command = _CommandStub(
             payload_xml=(

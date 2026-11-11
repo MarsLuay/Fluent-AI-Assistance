@@ -14,6 +14,7 @@ from typing import Any, Callable, Mapping, Protocol, Sequence
 
 from tecan_common.native_acceleration import (
     ascii_collapse_casefold_whitespace as _native_ascii_collapse_casefold_whitespace,
+    bracket_variable_names as _native_bracket_variable_names,
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
     xml_local_name as _native_xml_local_name,
@@ -446,7 +447,14 @@ def _looks_like_placeholder(value: str) -> bool:
 
 
 def _bracket_variable_names(value: str) -> set[str]:
-    return {match.group(1) for match in re.finditer(r"\[([A-Za-z_][A-Za-z0-9_]*)\]", str(value or ""))}
+    text = str(value or "")
+    native = _native_bracket_variable_names(text)
+    if native is not None:
+        return native
+    return {
+        match.group(1)
+        for match in re.finditer(r"\[([A-Za-z_][A-Za-z0-9_]*)\]", text)
+    }
 
 
 def _find_descendant(element: ET.Element, name: str) -> ET.Element | None:
