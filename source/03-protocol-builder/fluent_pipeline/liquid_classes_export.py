@@ -750,7 +750,12 @@ def _direct_or_nested_text(elem: ET.Element, local_name: str) -> str:
                 text = _text(grand)
                 if text:
                     return text
-    for node in elem.iter():
+    nodes = _native_xml_elements_by_ascii_casefolded_name(
+        elem, (wanted,), ET.Element
+    )
+    if nodes is None:
+        nodes = list(elem.iter())
+    for node in nodes:
         if node is elem or not isinstance(node.tag, str):
             continue
         if _local_name(node.tag).casefold() != wanted:
