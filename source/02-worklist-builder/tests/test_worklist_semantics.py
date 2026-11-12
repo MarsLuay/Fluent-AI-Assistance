@@ -779,11 +779,11 @@ class WorklistSemanticsTests(unittest.TestCase):
                 parse_gwl_text("A;short", name="error")
         self.assertEqual(str(native_error.exception), str(python_error.exception))
 
-    def test_native_gwl_file_parser_matches_python_newline_and_bom_behavior(self):
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "worklist_read_gwl_records"
-        ):
-            self.skipTest("optional Rust GWL file reader is not built")
+    def test_required_rust_gwl_file_parser_preserves_python_file_semantics(self):
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(
+            hasattr(native_acceleration._native, "worklist_read_gwl_records")
+        )
         cases = [
             (b"\xef\xbb\xbfC;first\r\nC;second\rW1;\n", False, True),
             (b"C;one\rC;two\r", False, True),
@@ -796,21 +796,39 @@ class WorklistSemanticsTests(unittest.TestCase):
             for content, permissive, native_supported in cases:
                 path.write_bytes(content)
                 with self.subTest(content=content, permissive=permissive):
-                    with patch.dict(
-                        "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
-                    ):
-                        expected = parse_gwl(path, permissive=permissive)
+                    with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                        with patch.object(
+                            native_acceleration,
+                            "worklist_read_gwl_records_required",
+                            return_value=None,
+                        ), patch.object(
+                            native_acceleration,
+                            "worklist_parse_gwl_text_records_required",
+                            return_value=None,
+                        ), patch.object(
+                            native_acceleration,
+                            "worklist_parse_gwl_records_required",
+                            return_value=None,
+                        ):
+                            expected = parse_gwl(path, permissive=permissive)
                     with patch.dict(
                         "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
                     ):
-                        native = native_acceleration.worklist_read_gwl_records(
+                        optional_native = native_acceleration.worklist_read_gwl_records(
                             path, permissive
                         )
                         if native_supported:
-                            self.assertIsNotNone(native)
+                            self.assertIsNotNone(optional_native)
                         else:
-                            self.assertIsNone(native)
-                        actual = parse_gwl(path, permissive=permissive)
+                            self.assertIsNone(optional_native)
+                    with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                        with patch.object(
+                            native_acceleration._native,
+                            "worklist_read_gwl_records",
+                            wraps=native_acceleration._native.worklist_read_gwl_records,
+                        ) as rust_reader:
+                            actual = parse_gwl(path, permissive=permissive)
+                            rust_reader.assert_called_once()
                     self.assertEqual(actual.name, expected.name)
                     self.assertEqual(actual.to_text(), expected.to_text())
                     self.assertEqual(actual.counts(), expected.counts())
@@ -823,10 +841,22 @@ class WorklistSemanticsTests(unittest.TestCase):
 
             path.write_bytes(b"A;short\n")
             with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-                with self.assertRaises(ValueError) as python_error:
-                    parse_gwl(path)
-            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-                self.assertIsNone(native_acceleration.worklist_read_gwl_records(path, False))
+                with patch.object(
+                    native_acceleration,
+                    "worklist_read_gwl_records_required",
+                    return_value=None,
+                ), patch.object(
+                    native_acceleration,
+                    "worklist_parse_gwl_text_records_required",
+                    return_value=None,
+                ), patch.object(
+                    native_acceleration,
+                    "worklist_parse_gwl_records_required",
+                    return_value=None,
+                ):
+                    with self.assertRaises(ValueError) as python_error:
+                        parse_gwl(path)
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
                 with self.assertRaises(ValueError) as native_error:
                     parse_gwl(path)
             self.assertEqual(str(native_error.exception), str(python_error.exception))

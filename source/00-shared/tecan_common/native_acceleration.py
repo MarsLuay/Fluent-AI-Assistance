@@ -4330,6 +4330,19 @@ def worklist_read_gwl_records(
         return None
 
 
+def worklist_read_gwl_records_required(
+    path: str | Path, permissive: Any
+) -> list[dict[str, Any]] | None:
+    """Use Rust for supported GWL files while preserving Python file-read fallback."""
+    if type(permissive) is not bool:
+        return None
+    try:
+        encoded = _native.worklist_read_gwl_records(str(path), permissive)
+        return _decode_worklist_record_payload(encoded)
+    except (OSError, TypeError, ValueError, UnicodeError, OverflowError, RecursionError):
+        return None
+
+
 def worklist_format_volume(value: Any) -> str | None:
     """Format supported exact numeric GWL volumes natively, or request fallback."""
     if not enabled() or type(value) not in (str, int, float):
