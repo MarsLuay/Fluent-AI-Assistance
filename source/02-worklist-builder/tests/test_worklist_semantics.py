@@ -392,11 +392,12 @@ class WorklistSemanticsTests(unittest.TestCase):
                 self.assertEqual(non_string_types.counts(), {7: 1})
             native_call.assert_not_called()
 
-    def test_native_gwl_field_cleaner_matches_python_fallback(self):
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "worklist_clean_field"
-        ):
-            self.skipTest("optional Rust GWL field cleaner is not built")
+    def test_gwl_field_cleaner_uses_required_rust_with_python_parity(self):
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(
+            hasattr(native_acceleration._native, "worklist_clean_field")
+        )
+
         class StringSubclass(str):
             pass
 
@@ -407,30 +408,39 @@ class WorklistSemanticsTests(unittest.TestCase):
             "\t plate\r\n",
             "café",
             "\x1c edge ",
+            "\x1d edge ",
+            "\x1e edge ",
+            "\x1f edge ",
             StringSubclass("  subclass  "),
             42,
         ]
         for value in values:
             with self.subTest(value_type=type(value).__name__):
-                with patch.dict(
-                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
-                ):
-                    expected = clean_gwl_field(value)
-                with patch.dict(
-                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
-                ):
-                    native = native_acceleration.worklist_clean_field(value)
-                    if value is None or (
-                        type(value) is str
-                        and value.isascii()
-                        and not any(0x1C <= ord(character) <= 0x1F for character in value)
-                    ):
-                        self.assertIsNotNone(native)
-                    else:
-                        self.assertIsNone(native)
-                    self.assertEqual(clean_gwl_field(value), expected)
-                    if native is not None:
-                        self.assertEqual(native, expected)
+                expected = "" if value is None else str(value).strip()
+                native_supported = value is None or (
+                    type(value) is str
+                    and value.isascii()
+                    and not any(0x1C <= ord(character) <= 0x1F for character in value)
+                )
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                    with patch.object(
+                        native_acceleration._native,
+                        "worklist_clean_field",
+                        wraps=native_acceleration._native.worklist_clean_field,
+                    ) as rust_cleaner:
+                        actual = clean_gwl_field(value)
+                        if native_supported:
+                            rust_cleaner.assert_called_once_with(value)
+                        else:
+                            rust_cleaner.assert_not_called()
+                self.assertEqual(actual, expected)
+
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                    optional = native_acceleration.worklist_clean_field(value)
+                if native_supported:
+                    self.assertEqual(optional, expected)
+                else:
+                    self.assertIsNone(optional)
 
     def test_native_gwl_volume_formatter_matches_python_fallback(self):
         if not native_acceleration.available() or not hasattr(

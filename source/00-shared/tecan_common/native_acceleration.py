@@ -4358,6 +4358,23 @@ def worklist_clean_field(value: Any) -> str | None:
         return None
 
 
+def worklist_clean_field_required(value: Any) -> str:
+    """Trim supported ASCII GWL fields in Rust, retaining Python edge semantics."""
+    if value is not None and (
+        type(value) is not str
+        or not value.isascii()
+        or any(0x1C <= ord(character) <= 0x1F for character in value)
+    ):
+        return str(value).strip()
+    try:
+        result = _native.worklist_clean_field(value)
+    except UnicodeError:
+        return "" if value is None else value.strip()
+    if type(result) is not str:
+        raise RuntimeError("required Rust GWL field cleaner returned no result")
+    return result
+
+
 def worklist_ascii_uppercase(value: Any) -> str | None:
     """Uppercase exact ASCII strings natively, preserving Unicode fallback."""
     if not enabled() or type(value) is not str or not value.isascii():

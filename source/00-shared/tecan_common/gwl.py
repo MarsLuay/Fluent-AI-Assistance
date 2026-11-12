@@ -25,12 +25,7 @@ class Record(Protocol):
 
 
 def _clean(value: object) -> str:
-    native = native_acceleration.worklist_clean_field(value)
-    if native is not None:
-        return native
-    if value is None:
-        return ""
-    return str(value).strip()
+    return native_acceleration.worklist_clean_field_required(value)
 
 
 SUPPORTED_SIMPLE_TIP_CHANNELS = 8
