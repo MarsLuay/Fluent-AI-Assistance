@@ -9,10 +9,12 @@ from collections import (
 )
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
 _PathType = type(Path())
+_FLUENT_INSTANCE_SUFFIX_RE = re.compile(r"\[\s*[^\]]+\s*\]\s*$")
 
 from tecan_native import _native
 
@@ -2865,6 +2867,17 @@ def delimited_row_fields(
         return None
     except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
         return None
+
+
+def strip_fluent_instance_suffix(value: Any) -> str:
+    """Strip suffixes in Rust; preserve lone-surrogate strings via Python regex."""
+    try:
+        return _native.strip_fluent_instance_suffix(value)
+    except UnicodeError:
+        text = str(value or "").strip()
+        if not text:
+            return ""
+        return _FLUENT_INSTANCE_SUFFIX_RE.sub("", text).strip() or text
 
 
 def label_base_ascii_text(value: Any) -> str | None:

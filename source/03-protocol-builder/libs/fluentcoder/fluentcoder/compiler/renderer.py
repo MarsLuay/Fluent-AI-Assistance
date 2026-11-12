@@ -12,7 +12,7 @@ import uuid
 import warnings
 import yaml
 
-_LIQUID_CLASS_INSTANCE_SUFFIX_RE = re.compile(r"\[\s*[^\]]+\s*\]\s*$")
+from tecan_common.native_acceleration import strip_fluent_instance_suffix
 
 
 def sanitize_text(text: str) -> str:
@@ -36,7 +36,7 @@ def liquid_class_guid_from_catalog_entries(name: str, entries) -> str:
     text = str(name or "").strip()
     if not text:
         return ""
-    bare = _LIQUID_CLASS_INSTANCE_SUFFIX_RE.sub("", text).strip() or text
+    bare = strip_fluent_instance_suffix(text)
     wanted = {text.casefold(), bare.casefold()}
     for entry in entries or []:
         if not isinstance(entry, dict):

@@ -16,6 +16,8 @@ use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
+mod fluent_naming;
+
 struct ElementFrame {
     node: Py<PyAny>,
     last_child: Option<Py<PyAny>>,
@@ -7969,6 +7971,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(ascii_safe_filesystem_key, module)?)?;
     module.add_function(wrap_pyfunction!(ascii_word_boundary_contains, module)?)?;
     module.add_function(wrap_pyfunction!(label_base_ascii_text, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        fluent_naming::strip_fluent_instance_suffix,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(is_guid_text, module)?)?;
     module.add_function(wrap_pyfunction!(non_guid_text, module)?)?;
     module.add_function(wrap_pyfunction!(format_site_path, module)?)?;

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -45,10 +46,34 @@ class LabwareCatalogExportTests(unittest.TestCase):
                 fallback = [labware_catalog_export._norm(value) for value in values]
         self.assertEqual(fallback, expected)
 
-    def test_strip_instance_suffix(self):
-        self.assertEqual(strip_fluent_instance_suffix("Runner[001]"), "Runner")
-        self.assertEqual(strip_fluent_instance_suffix("FilterDWP[platecount]"), "FilterDWP")
-        self.assertEqual(strip_fluent_instance_suffix("Plain"), "Plain")
+    def test_strip_instance_suffix_matches_python_regex_behavior(self):
+        suffix = re.compile(r"\[\s*[^\]]+\s*\]\s*$")
+        values = [
+            "Runner[001]",
+            "  Runner [alias]  ",
+            "A [one] [two]",
+            "Name [ ]",
+            "Name[]",
+            "Name [line\nbreak]",
+            "\x1cRunner [alias]\x1f",
+            "\u2003Runner [alias]\u2003",
+            "Straße [alias]",
+            "\ud800Runner [alias]",
+            "Runner [ali\ud800as]",
+            "[alias]",
+            "Plain",
+            None,
+            False,
+            0,
+            ["value"],
+        ]
+        for value in values:
+            text = str(value or "").strip()
+            if text:
+                expected = suffix.sub("", text).strip() or text
+            else:
+                expected = ""
+            self.assertEqual(strip_fluent_instance_suffix(value), expected, repr(value))
 
     def test_build_catalog_from_geometry_uses_exact_component_names(self):
         geometry = {

@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
-INSTANCE_SUFFIX_RE = re.compile(r"\[\s*[^\]]+\s*\]\s*$")
+from tecan_common.native_acceleration import (
+    strip_fluent_instance_suffix as _strip_fluent_instance_suffix,
+)
 
 
 def strip_fluent_instance_suffix(value: Any) -> str:
-    """Strip Fluent instance suffixes such as ``[001]`` or ``[platecount]``."""
-    text = str(value or "").strip()
-    if not text:
-        return ""
-    return INSTANCE_SUFFIX_RE.sub("", text).strip() or text
+    """Strip a terminal Fluent instance suffix using the Rust implementation."""
+    return _strip_fluent_instance_suffix(value)

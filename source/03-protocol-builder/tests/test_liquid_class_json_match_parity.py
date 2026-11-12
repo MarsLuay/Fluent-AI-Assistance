@@ -26,6 +26,8 @@ class LiquidClassJsonMatchParityTests(unittest.TestCase):
         for query in (
             "Water Free Single",
             "Water Free Single [1]",
+            "Water Free Single [\u20031]",
+            "Water Free Single [\x1c1]",
             "WFS",
             "wfs",
         ):
