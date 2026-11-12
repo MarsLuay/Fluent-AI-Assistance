@@ -1869,6 +1869,10 @@ class ReaderTests(unittest.TestCase):
                 native_acceleration,
                 "extension_counts_required",
                 return_value=None,
+            ), patch.object(
+                native_acceleration,
+                "ascii_lower_required",
+                return_value=None,
             ):
                 expected = extension_counts(names)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
@@ -1917,7 +1921,7 @@ class ReaderTests(unittest.TestCase):
             with patch.object(
                 reader_common,
                 "_native_ascii_lower",
-                wraps=native_acceleration.ascii_lower,
+                wraps=native_acceleration.ascii_lower_required,
             ) as lower_call:
                 self.assertEqual(extension_counts(["café.txt"]), {".txt": 1})
                 self.assertEqual(

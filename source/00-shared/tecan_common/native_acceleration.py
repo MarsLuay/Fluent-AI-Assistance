@@ -3061,6 +3061,19 @@ def ascii_lower(value: Any) -> str | None:
         return None
 
 
+def ascii_lower_required(value: Any) -> str | None:
+    """Lowercase supported exact ASCII text in Rust, retaining Unicode fallback."""
+    if type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.ascii_lower(value)
+    except UnicodeError:
+        return None
+    if type(result) is not str:
+        raise RuntimeError("required Rust ASCII lowercase returned invalid data")
+    return result
+
+
 def ascii_casefold_trim(value: Any) -> str | None:
     """Trim and lowercase exact ASCII text, or request Python fallback."""
     if not enabled() or type(value) is not str or not value.isascii():

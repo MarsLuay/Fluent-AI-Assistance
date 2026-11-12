@@ -19,7 +19,7 @@ from tecan_common.native_acceleration import (
     compact_list as _native_compact_list,
     extension_counts_required as _native_extension_counts,
     path_suffixes_required as _native_path_suffixes,
-    ascii_lower as _native_ascii_lower,
+    ascii_lower_required as _native_ascii_lower,
     ascii_casefold_trim as _native_ascii_casefold_trim,
     ascii_variable_name_is_valid as _native_ascii_variable_name_is_valid,
 )

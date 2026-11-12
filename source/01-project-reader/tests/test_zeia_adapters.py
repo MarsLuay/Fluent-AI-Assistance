@@ -727,21 +727,26 @@ class ZeiaAdapterTests(unittest.TestCase):
             ]
 
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = classifications()
+            with patch.object(
+                native_acceleration,
+                "ascii_lower_required",
+                return_value=None,
+            ):
+                expected = classifications()
         self.assertEqual(expected, ["malformed", "parser_failure"])
 
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
                 zeia_adapters_module,
                 "_native_ascii_lower",
-                wraps=native_acceleration.ascii_lower,
+                wraps=native_acceleration.ascii_lower_required,
             ) as native_call:
                 actual = classifications()
             native_call.assert_any_call("ExampleParseError")
             native_call.assert_any_call("PärseError")
         self.assertEqual(actual, expected)
 
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
                 zeia_adapters_module, "_native_ascii_lower", return_value=None
             ):
