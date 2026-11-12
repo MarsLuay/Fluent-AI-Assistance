@@ -4402,6 +4402,16 @@ def worklist_ascii_uppercase(value: Any) -> str | None:
         return None
 
 
+def worklist_ascii_uppercase_required(value: Any) -> str | None:
+    """Uppercase supported ASCII in Rust; preserve Python Unicode semantics."""
+    if type(value) is not str or not value.isascii():
+        return None
+    result = _native.worklist_ascii_uppercase(value)
+    if type(result) is not str:
+        raise RuntimeError("required Rust ASCII uppercaser returned no result")
+    return result
+
+
 def worklist_wash_type(scheme: Any) -> str | None:
     """Format exact integer or ``None`` wash schemes natively, or request fallback."""
     if not enabled() or (scheme is not None and type(scheme) is not int):

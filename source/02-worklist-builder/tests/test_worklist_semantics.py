@@ -69,29 +69,47 @@ def _transfer(index: int, *, tip: str, source: int | None = None, destination: i
 
 
 class WorklistSemanticsTests(unittest.TestCase):
-    def test_pipette_operation_normalization_matches_python(self):
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "worklist_ascii_uppercase"
-        ):
-            self.skipTest("optional Rust operation normalizer is not built")
+    def test_pipette_operation_normalization_uses_rust_with_python_parity(self):
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(
+            hasattr(native_acceleration._native, "worklist_ascii_uppercase")
+        )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertEqual(native_acceleration.worklist_ascii_uppercase("ad"), "AD")
             self.assertEqual(native_acceleration.worklist_ascii_uppercase(""), "")
             self.assertIsNone(native_acceleration.worklist_ascii_uppercase("ſ"))
 
-        for operation in (" a ", "d", "X", "ſ", " "):
-            outcomes = []
+        def outcome_for(operation):
+            try:
+                return Pipette(operation, "Rack", "Plate", 1, 1).type_character
+            except ValueError as error:
+                return type(error), str(error)
+
+        for operation in (" a ", "d", "X", "ſ", "aß", " "):
+            with patch.object(
+                native_acceleration,
+                "worklist_ascii_uppercase_required",
+                return_value=None,
+            ):
+                expected = outcome_for(operation)
+
+            normalized = operation.strip()
+            rust_supported = normalized.isascii()
             for disabled in ("1", "0"):
                 with patch.dict(
                     "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": disabled}
                 ):
-                    try:
-                        outcomes.append(
-                            Pipette(operation, "Rack", "Plate", 1, 1).type_character
-                        )
-                    except ValueError as error:
-                        outcomes.append((type(error), str(error)))
-            self.assertEqual(outcomes[0], outcomes[1], operation)
+                    with patch.object(
+                        native_acceleration._native,
+                        "worklist_ascii_uppercase",
+                        wraps=native_acceleration._native.worklist_ascii_uppercase,
+                    ) as rust_uppercaser:
+                        actual = outcome_for(operation)
+                        if rust_supported:
+                            rust_uppercaser.assert_called_once_with(normalized)
+                        else:
+                            rust_uppercaser.assert_not_called()
+                self.assertEqual(actual, expected, (operation, disabled))
 
     def test_wash_scheme_normalization_uses_rust_with_python_parity(self):
         self.assertTrue(native_acceleration.available())
