@@ -3713,6 +3713,30 @@ def unique_ascii_tuple_indices(rows: Any) -> list[int] | None:
         return None
 
 
+def unique_ascii_tuple_indices_required(rows: Any) -> list[int] | None:
+    """Keep first supported exact three-string tuples in Rust."""
+    if type(rows) not in (list, tuple) or not all(
+        type(row) is tuple
+        and len(row) == 3
+        and all(type(value) is str for value in row)
+        for row in rows
+    ):
+        return None
+    try:
+        result = _native.unique_ascii_tuple_indices(list(rows))
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+    if result is None:
+        return None
+    if (
+        type(result) is not list
+        or not all(type(index) is int and 0 <= index < len(rows) for index in result)
+        or result != sorted(set(result))
+    ):
+        raise RuntimeError("required Rust tuple deduplicator returned invalid indices")
+    return result
+
+
 def sorted_unique_strings(groups: Any) -> list[str] | None:
     """Sort and deduplicate exact built-in Unicode string groups."""
     if (

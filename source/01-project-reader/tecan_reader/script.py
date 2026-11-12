@@ -183,7 +183,7 @@ def _variable_declarations(root: ET.Element) -> list[dict[str, str]]:
             candidates.append((el, name, scope, variable_type))
 
     keys = [(name, scope, variable_type) for _, name, scope, variable_type in candidates]
-    unique_indices = native_acceleration.unique_ascii_tuple_indices(keys)
+    unique_indices = native_acceleration.unique_ascii_tuple_indices_required(keys)
     if unique_indices is None:
         unique_indices = []
         seen: set[tuple[str, str, str]] = set()

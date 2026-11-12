@@ -374,16 +374,32 @@ class ScriptTests(unittest.TestCase):
         )
         root = script.parse_xml_text(source)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = script._variable_declarations(root)
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
+                "unique_ascii_tuple_indices_required",
+                return_value=None,
+            ):
+                expected = script._variable_declarations(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
                 "unique_ascii_tuple_indices",
-                wraps=native_acceleration.unique_ascii_tuple_indices,
-            ) as native_call:
+                wraps=native_acceleration._native.unique_ascii_tuple_indices,
+            ) as rust_call:
                 actual = script._variable_declarations(root)
-                native_call.assert_called_once()
+                rust_call.assert_called_once()
+                self.assertEqual(
+                    rust_call.call_args.args[0],
+                    [
+                        ("Sample", "Script", "String"),
+                        ("Sample", "Script", "String"),
+                        ("Sample", "Script", "Number"),
+                        ("Sample", "Project", "String"),
+                    ],
+                )
         self.assertEqual(actual, expected)
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(script._variable_declarations(root), expected)
         self.assertEqual(len(actual), 3)
         self.assertEqual(actual[0]["query_on_startup"], "first")
         self.assertEqual(
@@ -424,7 +440,20 @@ class ScriptTests(unittest.TestCase):
                     [(chr(0xD800), "Script", "String")]
                 )
             )
-            unicode_actual = script._variable_declarations(unicode_root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "unique_ascii_tuple_indices",
+                wraps=native_acceleration._native.unique_ascii_tuple_indices,
+            ) as rust_call:
+                unicode_actual = script._variable_declarations(unicode_root)
+                rust_call.assert_called_once_with(
+                    [
+                        ("é", "Script", "String"),
+                        ("é", "Script", "String"),
+                        ("e\u0301", "Script", "String"),
+                    ]
+                )
         self.assertEqual(
             unicode_actual,
             [
@@ -444,6 +473,30 @@ class ScriptTests(unittest.TestCase):
                 },
             ],
         )
+
+        surrogate_root = script.ET.Element("Root")
+        for value in ("\ud800", "\ud800"):
+            element = script.ET.SubElement(
+                surrogate_root, "anyType", {"Type": "VariableDefinitionHelper"}
+            )
+            script.ET.SubElement(element, "Name").text = value
+            script.ET.SubElement(element, "TypeName").text = "String"
+            script.ET.SubElement(element, "Scope").text = "Script"
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration, "unique_ascii_tuple_indices_required", return_value=None
+            ):
+                expected_surrogate = script._variable_declarations(surrogate_root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "unique_ascii_tuple_indices",
+                wraps=native_acceleration._native.unique_ascii_tuple_indices,
+            ) as rust_call:
+                actual_surrogate = script._variable_declarations(surrogate_root)
+                rust_call.assert_called_once()
+        self.assertEqual(actual_surrogate, expected_surrogate)
+        self.assertEqual(len(actual_surrogate), 1)
 
     def test_startup_variable_values_use_native_with_unicode_text(self) -> None:
         if not native_acceleration.available() or not all(
