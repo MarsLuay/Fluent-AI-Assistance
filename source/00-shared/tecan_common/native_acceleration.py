@@ -4327,6 +4327,19 @@ def worklist_comment_line(text: Any) -> str | None:
         return None
 
 
+def worklist_comment_line_required(text: Any) -> str:
+    """Serialize comments in Rust while retaining subclass/surrogate semantics."""
+    if type(text) is not str:
+        return "C;" + text.replace("\n", "\\n")
+    try:
+        result = _native.worklist_comment_line(text)
+    except UnicodeError:
+        return "C;" + text.replace("\n", "\\n")
+    if type(result) is not str:
+        raise RuntimeError("required Rust GWL comment serializer returned no result")
+    return result
+
+
 def worklist_clean_field(value: Any) -> str | None:
     """Trim supported ASCII GWL fields natively, preserving Python fallback cases."""
     if not enabled() or (
@@ -4378,6 +4391,19 @@ def worklist_record_type_line(type_character: Any) -> str | None:
         return None
 
 
+def worklist_record_type_line_required(type_character: Any) -> str:
+    """Format supported record types in Rust, preserving unusual Python values."""
+    if type(type_character) is not str:
+        return f"{type_character};"
+    try:
+        result = _native.worklist_record_type_line(type_character)
+    except UnicodeError:
+        return f"{type_character};"
+    if type(result) is not str:
+        raise RuntimeError("required Rust GWL record formatter returned no result")
+    return result
+
+
 def worklist_join_gwl_fields(fields: Any) -> str | None:
     """Join exact-text GWL fields natively, or request Python fallback."""
     if (
@@ -4397,6 +4423,38 @@ def worklist_join_gwl_fields(fields: Any) -> str | None:
         OverflowError,
     ):
         return None
+
+
+def worklist_join_gwl_fields_required(fields: Any) -> str:
+    """Join GWL fields in Rust; preserve Python semantics for subclasses."""
+    if (
+        type(fields) not in (list, tuple)
+        or not all(type(field) is str for field in fields)
+    ):
+        return ";".join(fields)
+    try:
+        result = _native.worklist_join_gwl_fields(_encode_json(fields))
+    except UnicodeError:
+        return ";".join(fields)
+    if type(result) is not str:
+        raise RuntimeError("required Rust GWL field joiner returned no result")
+    return result
+
+
+def worklist_serialize_gwl_lines_required(lines: Any) -> str:
+    """Serialize GWL lines in Rust, falling back only for unsupported values."""
+    if (
+        type(lines) not in (list, tuple)
+        or not all(type(line) is str for line in lines)
+    ):
+        return "\n".join(lines) + "\n"
+    try:
+        result = _native.worklist_serialize_gwl_lines(_encode_json(lines))
+    except UnicodeError:
+        return "\n".join(lines) + "\n"
+    if type(result) is not str:
+        raise RuntimeError("required Rust GWL serializer returned no result")
+    return result
 
 
 def worklist_serialize_gwl_lines(lines: Any) -> str | None:

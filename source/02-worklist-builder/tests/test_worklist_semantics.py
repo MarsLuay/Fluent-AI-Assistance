@@ -496,23 +496,22 @@ class WorklistSemanticsTests(unittest.TestCase):
             with self.assertRaises(OverflowError):
                 format_gwl_volume(oversized_integer)
 
-    def test_native_gwl_type_only_records_match_python_fallback(self):
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "worklist_record_type_line"
-        ):
-            self.skipTest("optional Rust GWL record-type formatter is not built")
+    def test_gwl_record_type_formatting_uses_required_rust_with_python_parity(self):
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(
+            hasattr(native_acceleration._native, "worklist_record_type_line")
+        )
         records = [Wash(), Wash(scheme=2), Wash(scheme=4), Break(), Break("ignored")]
+        expected = ["W;", "W2;", "W4;", "B;", "B;"]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = [record.to_line() for record in records]
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
-                native_acceleration,
+                native_acceleration._native,
                 "worklist_record_type_line",
-                wraps=native_acceleration.worklist_record_type_line,
-            ) as native_call:
+                wraps=native_acceleration._native.worklist_record_type_line,
+            ) as rust_formatter:
                 actual = [record.to_line() for record in records]
+                self.assertEqual(rust_formatter.call_count, len(records))
             self.assertEqual(actual, expected)
-            self.assertEqual(native_call.call_count, len(records))
 
         class TypeCharacter(str):
             pass
@@ -522,11 +521,11 @@ class WorklistSemanticsTests(unittest.TestCase):
                 native_acceleration.worklist_record_type_line(TypeCharacter("W"))
             )
 
-    def test_native_gwl_comment_serializer_matches_python_fallback(self):
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "worklist_comment_line"
-        ):
-            self.skipTest("optional Rust GWL comment serializer is not built")
+    def test_gwl_comment_serializer_uses_required_rust_with_python_parity(self):
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(
+            hasattr(native_acceleration._native, "worklist_comment_line")
+        )
         texts = [
             "",
             "plain text",
@@ -539,17 +538,20 @@ class WorklistSemanticsTests(unittest.TestCase):
         ]
         for text in texts:
             with self.subTest(text=text):
-                with patch.dict(
-                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
-                ):
-                    expected = Comment(text).to_line()
-                with patch.dict(
-                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
-                ):
-                    native = native_acceleration.worklist_comment_line(text)
-                    actual = Comment(text).to_line()
-                self.assertEqual(native, expected)
+                expected = "C;" + text.replace("\n", "\\n")
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                    with patch.object(
+                        native_acceleration._native,
+                        "worklist_comment_line",
+                        wraps=native_acceleration._native.worklist_comment_line,
+                    ) as rust_serializer:
+                        actual = Comment(text).to_line()
+                        rust_serializer.assert_called_once_with(text)
                 self.assertEqual(actual, expected)
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                    self.assertEqual(
+                        native_acceleration.worklist_comment_line(text), expected
+                    )
 
         class TextSubclass(str):
             def replace(self, old, new):
@@ -559,13 +561,15 @@ class WorklistSemanticsTests(unittest.TestCase):
             self.assertIsNone(
                 native_acceleration.worklist_comment_line(TextSubclass("text"))
             )
-            self.assertEqual(Comment(TextSubclass("text")).to_line(), "C;custom replacement")
+            self.assertEqual(
+                Comment(TextSubclass("text")).to_line(), "C;custom replacement"
+            )
 
-    def test_native_gwl_record_field_join_matches_python_fallback(self):
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "worklist_join_gwl_fields"
-        ):
-            self.skipTest("optional Rust GWL field joiner is not built")
+    def test_gwl_field_join_uses_required_rust_with_python_parity(self):
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(
+            hasattr(native_acceleration._native, "worklist_join_gwl_fields")
+        )
         records = [
             Pipette(
                 "A",
@@ -581,41 +585,37 @@ class WorklistSemanticsTests(unittest.TestCase):
             SetDiTiType(parameters=("\tA\r", " one\n two ")),
             Flush(raw_line="F; raw ;line "),
         ]
-        with patch.dict(
-            "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
-        ):
-            expected = [record.to_line() for record in records]
+        expected = [
+            "A;Source;R1;plàte;A1;;10;;; 01 ;forced",
+            "F;alpha;;β;tail",
+            "S;A;one\n two",
+            "F; raw ;line ",
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "worklist_join_gwl_fields",
+                wraps=native_acceleration._native.worklist_join_gwl_fields,
+            ) as rust_joiner:
+                actual = [record.to_line() for record in records]
+                self.assertEqual(rust_joiner.call_count, 3)
+            self.assertEqual(actual, expected)
+
         class FieldText(str):
             pass
 
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            with patch.object(
-                native_acceleration,
-                "worklist_join_gwl_fields",
-                wraps=native_acceleration.worklist_join_gwl_fields,
-            ) as native_call:
-                actual = [record.to_line() for record in records]
-            self.assertEqual(actual, expected)
-            self.assertEqual(native_call.call_count, 3)
             self.assertIsNone(
                 native_acceleration.worklist_join_gwl_fields(["F", FieldText("value")])
             )
-
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected_subclass = Flush(
-                parameters=(" field ",), type_character=FieldText("F")
-            ).to_line()
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            actual_subclass = Flush(
-                parameters=(" field ",), type_character=FieldText("F")
-            ).to_line()
-        self.assertEqual(actual_subclass, expected_subclass)
+        subclass_record = Flush(parameters=(" field ",), type_character=FieldText("F"))
+        self.assertEqual(subclass_record.to_line(), "F;field")
 
     def test_native_gwl_serializer_matches_python_output(self):
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "worklist_serialize_gwl_lines"
-        ):
-            self.skipTest("optional Rust GWL serializer is not built")
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(
+            hasattr(native_acceleration._native, "worklist_serialize_gwl_lines")
+        )
         records = [
             Pipette("A", " Source ", "Plate", 1, 10, rack_id="R1", tip_mask=" 01 "),
             Comment("first line\nsecond line"),
@@ -625,20 +625,22 @@ class WorklistSemanticsTests(unittest.TestCase):
             SetDiTiType(("type", "42"), raw_line="S;type;42"),
             RawRecord("X", "X;opaque;field"),
         ]
-        with patch.dict(
-            "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
-        ):
-            expected = serialize_gwl(records)
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            expected_lines = [record.to_line() for record in records]
+            expected = "\n".join(expected_lines) + "\n"
             with patch.object(
-                native_acceleration,
+                native_acceleration._native,
                 "worklist_serialize_gwl_lines",
-                wraps=native_acceleration.worklist_serialize_gwl_lines,
-            ) as native_call:
+                wraps=native_acceleration._native.worklist_serialize_gwl_lines,
+            ) as rust_serializer:
                 actual = serialize_gwl(records)
+                rust_serializer.assert_called_once()
             self.assertEqual(actual, expected)
-            native_call.assert_called_once()
             self.assertEqual(serialize_gwl([]), "\n")
+
+            surrogate_comment = Comment("lone \ud800")
+            surrogate_expected = surrogate_comment.to_line() + "\n"
+            self.assertEqual(serialize_gwl([surrogate_comment]), surrogate_expected)
 
     def test_native_gwl_text_parser_preserves_python_splitlines_behavior(self):
         if not native_acceleration.available() or not hasattr(

@@ -164,10 +164,7 @@ class Pipette:
         # (including intentional surrounding whitespace) while normalizing the
         # other structured fields as before.
         serialized[9] = "" if self.tip_mask is None else str(self.tip_mask)
-        native = native_acceleration.worklist_join_gwl_fields(serialized)
-        if native is not None:
-            return native
-        return ";".join(serialized)
+        return native_acceleration.worklist_join_gwl_fields_required(serialized)
 
     @property
     def tip_selection(self) -> TipSelection:
@@ -192,10 +189,9 @@ class Wash:
         object.__setattr__(self, "type_character", f"W{self.scheme}")
 
     def to_line(self) -> str:
-        native = native_acceleration.worklist_record_type_line(self.type_character)
-        if native is not None:
-            return native
-        return f"{self.type_character};"
+        return native_acceleration.worklist_record_type_line_required(
+            self.type_character
+        )
 
 
 @dataclass(frozen=True)
@@ -203,10 +199,7 @@ class Break:
     type_character: str = "B"
 
     def to_line(self) -> str:
-        native = native_acceleration.worklist_record_type_line("B")
-        if native is not None:
-            return native
-        return "B;"
+        return native_acceleration.worklist_record_type_line_required("B")
 
 
 @dataclass(frozen=True)
@@ -215,10 +208,7 @@ class Comment:
     type_character: str = "C"
 
     def to_line(self) -> str:
-        native = native_acceleration.worklist_comment_line(self.text)
-        if native is not None:
-            return native
-        return "C;" + self.text.replace("\n", "\\n")
+        return native_acceleration.worklist_comment_line_required(self.text)
 
 
 @dataclass(frozen=True)
@@ -233,10 +223,7 @@ class Flush:
         if self.raw_line is not None:
             return self.raw_line
         fields = (self.type_character, *(_clean(value) for value in self.parameters))
-        native = native_acceleration.worklist_join_gwl_fields(fields)
-        if native is not None:
-            return native
-        return ";".join(fields)
+        return native_acceleration.worklist_join_gwl_fields_required(fields)
 
 
 @dataclass(frozen=True)
@@ -251,10 +238,7 @@ class SetDiTiType:
         if self.raw_line is not None:
             return self.raw_line
         fields = (self.type_character, *(_clean(value) for value in self.parameters))
-        native = native_acceleration.worklist_join_gwl_fields(fields)
-        if native is not None:
-            return native
-        return ";".join(fields)
+        return native_acceleration.worklist_join_gwl_fields_required(fields)
 
 
 @dataclass
@@ -294,10 +278,7 @@ class Worklist:
 
 def serialize_gwl(records: Iterable[Record]) -> str:
     lines = [record.to_line() for record in records]
-    native = native_acceleration.worklist_serialize_gwl_lines(lines)
-    if native is not None:
-        return native
-    return "\n".join(lines) + "\n"
+    return native_acceleration.worklist_serialize_gwl_lines_required(lines)
 
 
 def parse_gwl(path: str | Path, *, permissive: bool = False) -> Worklist:
