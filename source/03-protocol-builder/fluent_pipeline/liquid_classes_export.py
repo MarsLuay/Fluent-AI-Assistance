@@ -27,10 +27,10 @@ from tecan_common.native_acceleration import (
     xml_first_direct_child_by_name as _native_xml_first_direct_child_by_name,
     xml_first_element_by_name as _native_xml_first_element_by_name,
     xml_local_name as _native_xml_local_name,
+    strip_fluent_instance_suffix,
 )
 
 from . import xml_compat as ET
-from .fluent_naming import strip_fluent_instance_suffix
 from .runner import write_json
 
 LIQUID_CLASSES_SCHEMA_VERSION = "tecan.liquid_classes.v3"

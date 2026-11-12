@@ -13,9 +13,9 @@ from typing import Any, Mapping
 
 from tecan_common.native_acceleration import (
     ascii_casefold_trim as _native_ascii_casefold_trim,
+    strip_fluent_instance_suffix,
 )
 
-from .fluent_naming import strip_fluent_instance_suffix
 from .runner import write_json
 from .worktable_datastore import (
     discover_worktable_datastore,

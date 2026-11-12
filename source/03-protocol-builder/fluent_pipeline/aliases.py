@@ -7,11 +7,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-from tecan_common.native_acceleration import ascii_casefold_trim as _native_ascii_casefold_trim
-from tecan_common.native_acceleration import ascii_lower as _native_ascii_lower
+from tecan_common.native_acceleration import (
+    ascii_casefold_trim as _native_ascii_casefold_trim,
+    ascii_lower as _native_ascii_lower,
+    strip_fluent_instance_suffix,
+)
 
 from .config import PROJECT_DIR
-from .fluent_naming import strip_fluent_instance_suffix
 
 DEFAULT_ALIAS_DIR = PROJECT_DIR / "config" / "aliases"
 ALIAS_FILES = {
