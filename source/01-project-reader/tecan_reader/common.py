@@ -15,7 +15,7 @@ from tecan_common.native_acceleration import (
     to_jsonable_containers as _native_to_jsonable_containers,
     decode_text_bytes as _native_decode_text_bytes,
     read_text_file_required as _native_read_text_file,
-    command_short_name as _native_command_short_name,
+    command_short_name_required as _native_command_short_name,
     compact_list as _native_compact_list,
     extension_counts_required as _native_extension_counts,
     path_suffixes_required as _native_path_suffixes,

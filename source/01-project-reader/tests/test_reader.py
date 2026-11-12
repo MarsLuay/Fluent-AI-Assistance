@@ -196,11 +196,9 @@ PATTERN_XSCR = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ReaderTests(unittest.TestCase):
-    def test_native_command_short_name_matches_regex_fallback(self) -> None:
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "command_short_name"
-        ):
-            self.skipTest("optional Rust command-name helper is not built")
+    def test_required_rust_command_short_name_matches_regex_fallback(self) -> None:
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(hasattr(native_acceleration._native, "command_short_name"))
         cases = [
             ("Tecan.Core.LihaAspirateCommandDataV5", "LihaAspirateCommand"),
             ("ScriptCommandDataV3", "ScriptCommand"),
@@ -214,23 +212,31 @@ class ReaderTests(unittest.TestCase):
         ]
         for type_name, expected in cases:
             with self.subTest(type_name=type_name):
-                with patch.dict(
-                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
-                ):
-                    python_result = command_short_name(type_name)
-                with patch.dict(
-                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
-                ):
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                    with patch.object(
+                        native_acceleration,
+                        "command_short_name_required",
+                        return_value=None,
+                    ):
+                        python_result = command_short_name(type_name)
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
                     if type_name.isascii():
                         with patch.object(
                             reader_common,
                             "_native_command_short_name",
-                            wraps=native_acceleration.command_short_name,
-                        ) as native_call:
+                            wraps=native_acceleration.command_short_name_required,
+                        ) as native_call, patch.object(
+                            native_acceleration._native,
+                            "command_short_name",
+                            wraps=native_acceleration._native.command_short_name,
+                        ) as rust_call:
                             actual = command_short_name(type_name)
-                        native_call.assert_called_once()
+                            native_call.assert_called_once_with(type_name)
+                            rust_call.assert_called_once_with(type_name)
                     else:
-                        self.assertIsNone(native_acceleration.command_short_name(type_name))
+                        self.assertIsNone(
+                            native_acceleration.command_short_name_required(type_name)
+                        )
                         actual = command_short_name(type_name)
                 self.assertEqual(python_result, expected)
                 self.assertEqual(actual, expected)

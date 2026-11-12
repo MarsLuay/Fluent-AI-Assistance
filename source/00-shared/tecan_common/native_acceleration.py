@@ -2521,10 +2521,23 @@ def compact_list(values: Any, limit: Any = 20) -> list[str] | None:
 
 
 def path_suffixes(paths: Any) -> list[str] | None:
-    """Use the optional native Path suffix extractor, or request fallback."""
-    if not enabled():
+    """Extract ASCII Path suffixes natively for exact strings and Paths."""
+    if (
+        not enabled()
+        or type(paths) not in (list, tuple)
+        or not all(type(path) in (str, _PathType) for path in paths)
+    ):
         return None
-    return path_suffixes_required(paths)
+    path_strings = [str(path) for path in paths]
+    if any(not path.isascii() for path in path_strings):
+        return None
+    try:
+        result = _native.path_suffixes(path_strings)
+        if type(result) is list and all(type(suffix) is str for suffix in result):
+            return result
+        return None
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
 
 
 def path_suffixes_required(paths: Any) -> list[str] | None:
@@ -2547,10 +2560,32 @@ def path_suffixes_required(paths: Any) -> list[str] | None:
 
 
 def extension_counts(suffixes: Any) -> dict[str, int] | None:
-    """Use the optional native suffix counter, or request Python fallback."""
-    if not enabled():
+    """Count exact string suffixes natively and return them in sorted order."""
+    if (
+        not enabled()
+        or type(suffixes) not in (list, tuple)
+        or not all(type(suffix) is str for suffix in suffixes)
+    ):
         return None
-    return extension_counts_required(suffixes)
+    try:
+        pairs = _native.extension_counts(list(suffixes))
+        if type(pairs) is not list:
+            return None
+        counts: dict[str, int] = {}
+        for pair in pairs:
+            if (
+                type(pair) is not tuple
+                or len(pair) != 2
+                or type(pair[0]) is not str
+                or type(pair[1]) is not int
+                or pair[1] < 0
+                or pair[0] in counts
+            ):
+                return None
+            counts[pair[0]] = pair[1]
+        return counts
+    except (AttributeError, TypeError, ValueError, OverflowError, UnicodeError):
+        return None
 
 
 def extension_counts_required(suffixes: Any) -> dict[str, int] | None:
@@ -3624,6 +3659,19 @@ def command_short_name(type_name: Any) -> str | None:
         return result if isinstance(result, str) else None
     except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
         return None
+
+
+def command_short_name_required(type_name: Any) -> str | None:
+    """Shorten supported exact ASCII command names in Rust, retaining fallback."""
+    if type(type_name) is not str or not type_name.isascii():
+        return None
+    try:
+        result = _native.command_short_name(type_name)
+    except UnicodeError:
+        return None
+    if type(result) is not str:
+        raise RuntimeError("required Rust command-name helper returned invalid data")
+    return result
 
 
 def catalog_source_paths(install_path: str | Path, include_all_connectors: bool) -> list[str] | None:
