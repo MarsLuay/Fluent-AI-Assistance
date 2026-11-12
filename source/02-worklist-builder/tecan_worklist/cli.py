@@ -123,7 +123,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
 def _cmd_summarize(args: argparse.Namespace) -> int:
     with performance_marker("worklist.gwl_parse") as metrics:
-        native = native_acceleration.worklist_parse_gwl(args.gwl)
+        native = native_acceleration.worklist_parse_gwl_required(args.gwl)
         if native is None:
             worklist = parse_gwl(args.gwl)
             counts = worklist.counts()

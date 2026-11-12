@@ -1491,11 +1491,9 @@ class WorklistSemanticsTests(unittest.TestCase):
                     )
                 )
 
-    def test_native_gwl_summary_matches_python_and_preserves_splitlines_fallback(self):
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "worklist_parse_gwl"
-        ):
-            self.skipTest("optional Rust GWL parser kernel is not built")
+    def test_required_rust_gwl_summary_matches_python_and_preserves_splitlines_fallback(self):
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(hasattr(native_acceleration._native, "worklist_parse_gwl"))
         with tempfile.TemporaryDirectory() as raw:
             source = Path(raw) / "synthetic.gwl"
             text = (
@@ -1515,15 +1513,20 @@ class WorklistSemanticsTests(unittest.TestCase):
                     "TECAN_PERFORMANCE_MARKERS": "0",
                 },
             ):
-                with contextlib.redirect_stdout(fallback_stdout):
-                    self.assertEqual(main(arguments), 0)
+                with patch.object(
+                    native_acceleration,
+                    "worklist_parse_gwl_required",
+                    return_value=None,
+                ):
+                    with contextlib.redirect_stdout(fallback_stdout):
+                        self.assertEqual(main(arguments), 0)
 
             native_stdout = io.StringIO()
             marker_output = io.StringIO()
             with patch.dict(
                 "os.environ",
                 {
-                    "TECAN_DISABLE_RUST_ACCELERATION": "0",
+                    "TECAN_DISABLE_RUST_ACCELERATION": "1",
                     "TECAN_PERFORMANCE_MARKERS": "1",
                 },
             ):
@@ -1534,9 +1537,9 @@ class WorklistSemanticsTests(unittest.TestCase):
                             side_effect=AssertionError("native parser fell back to Python"),
                         ) as python_fallback:
                             with patch.object(
-                                native_acceleration,
+                                native_acceleration._native,
                                 "worklist_parse_gwl",
-                                wraps=native_acceleration.worklist_parse_gwl,
+                                wraps=native_acceleration._native.worklist_parse_gwl,
                             ) as native_call:
                                 self.assertEqual(main(arguments), 0)
             native_call.assert_called_once()

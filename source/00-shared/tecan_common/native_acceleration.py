@@ -4064,9 +4064,14 @@ def worklist_build_schedule(
 
 
 def worklist_parse_gwl(path: str | Path) -> dict[str, Any] | None:
-    """Parse a strict GWL file natively, or request the Python fallback."""
+    """Use the optional strict GWL summary kernel, or request Python fallback."""
     if not enabled():
         return None
+    return worklist_parse_gwl_required(path)
+
+
+def worklist_parse_gwl_required(path: str | Path) -> dict[str, Any] | None:
+    """Use Rust for supported strict GWL summaries, preserving fallback cases."""
     try:
         encoded = _native.worklist_parse_gwl(str(path))
         if encoded is None:
