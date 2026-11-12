@@ -327,7 +327,7 @@ def _dependencies(root: ET.Element) -> dict[str, list[str]]:
         grouped.get("SubRoutine", []),
     )
     locations = grouped.get("Location", [])
-    pin_matches = native_acceleration.ascii_case_insensitive_substring_match_values(
+    pin_matches = native_acceleration.ascii_case_insensitive_substring_match_values_required(
         locations, "pin"
     )
     if pin_matches is None:

@@ -60,16 +60,29 @@ class ScriptTests(unittest.TestCase):
         )
         root = script.parse_xml_text(source)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = script._dependencies(root)
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
+                "ascii_case_insensitive_substring_match_values_required",
+                return_value=None,
+            ), patch.object(
+                native_acceleration, "ascii_casefold_trim_required", return_value=None
+            ):
+                expected = script._dependencies(root)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
                 "ascii_case_insensitive_substring_match_values",
-                wraps=native_acceleration.ascii_case_insensitive_substring_match_values,
-            ) as native_call:
+                wraps=(
+                    native_acceleration._native.ascii_case_insensitive_substring_match_values
+                ),
+            ) as rust_call:
                 actual = script._dependencies(root)
-                native_call.assert_called_once()
+                rust_call.assert_called_once_with(
+                    ["Pin rack", "spindle", "pin shelf"], "pin"
+                )
         self.assertEqual(actual, expected)
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(script._dependencies(root), expected)
         self.assertEqual(
             actual["worktable_pin_locations"], ["Pin rack", "pin shelf", "spindle"]
         )
@@ -79,6 +92,10 @@ class ScriptTests(unittest.TestCase):
         )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
+                native_acceleration,
+                "ascii_case_insensitive_substring_match_values_required",
+                return_value=None,
+            ), patch.object(
                 native_acceleration, "ascii_casefold_trim_required", return_value=None
             ):
                 unicode_expected = script._dependencies(unicode_root)
@@ -90,11 +107,18 @@ class ScriptTests(unittest.TestCase):
             )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
+                native_acceleration,
+                "ascii_case_insensitive_substring_match_values_required",
+                wraps=(
+                    native_acceleration.ascii_case_insensitive_substring_match_values_required
+                ),
+            ) as required_match, patch.object(
                 native_acceleration._native,
                 "ascii_casefold_trim",
                 wraps=native_acceleration._native.ascii_casefold_trim,
             ) as rust_fold:
                 unicode_actual = script._dependencies(unicode_root)
+                required_match.assert_called_once_with(["Pin café", "spindle"], "pin")
                 rust_fold.assert_called_once_with("spindle")
         self.assertEqual(unicode_actual, unicode_expected)
         self.assertEqual(
