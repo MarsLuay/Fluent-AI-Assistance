@@ -174,7 +174,7 @@ class ProjectModelTests(unittest.TestCase):
                 native_acceleration.most_common_string_counts({chr(0xD800): 1})
             )
 
-    def test_model_json_uses_native_compact_serializer_with_python_fallback(self) -> None:
+    def test_model_json_compact_rust_and_python_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
             native_acceleration._native, "canonical_json_compact"
         ):
@@ -190,22 +190,29 @@ class ProjectModelTests(unittest.TestCase):
             source_metadata={"nested": {"z": 1, "a": "μ"}},
         )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = json.dumps(
-                model.to_dict(),
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 project_model,
                 "_native_canonical_json_compact",
-                wraps=native_acceleration.canonical_json_compact,
-            ) as native_call:
+                return_value=None,
+            ):
+                expected = json.dumps(
+                    model.to_dict(),
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "canonical_json_compact",
+                wraps=native_acceleration._native.canonical_json_compact,
+            ) as rust_call:
                 actual = model.to_json()
-                native_call.assert_called_once()
+                rust_call.assert_called_once()
         self.assertEqual(actual, expected)
         self.assertNotIn(": ", actual)
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(model.to_json(), expected)
 
         nonfinite_model = CanonicalProjectModel(
             source_archive="input.zeia",
@@ -218,19 +225,31 @@ class ProjectModelTests(unittest.TestCase):
             source_metadata={},
         )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            nonfinite_expected = json.dumps(
-                nonfinite_model.to_dict(),
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )
+            with patch.object(
+                project_model,
+                "_native_canonical_json_compact",
+                return_value=None,
+            ):
+                nonfinite_expected = json.dumps(
+                    nonfinite_model.to_dict(),
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(
                 native_acceleration.canonical_json_compact(
                     nonfinite_model.to_dict()
                 )
             )
-            self.assertEqual(nonfinite_model.to_json(), nonfinite_expected)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "canonical_json_compact",
+                wraps=native_acceleration._native.canonical_json_compact,
+            ) as rust_call:
+                self.assertEqual(nonfinite_model.to_json(), nonfinite_expected)
+                rust_call.assert_called_once()
 
     def test_native_project_model_entry_path_matches_selection_and_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(

@@ -2605,6 +2605,17 @@ def canonical_json_compact(value: Any) -> str | None:
         return None
 
 
+def canonical_json_compact_required(value: Any) -> str | None:
+    """Serialize supported values compactly in Rust, retaining Python fallback."""
+    try:
+        result = _native.canonical_json_compact(value)
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+    if type(result) is not str:
+        raise RuntimeError("required Rust compact JSON helper returned invalid data")
+    return result
+
+
 def compact_list(values: Any, limit: Any = 20) -> list[str] | None:
     """Deduplicate exact string sequences natively, preserving order and limit rules."""
     if (
