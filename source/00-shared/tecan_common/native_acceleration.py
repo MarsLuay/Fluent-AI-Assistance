@@ -2509,6 +2509,21 @@ def readiness_kind_token(value: Any) -> str | None:
         return None
 
 
+def readiness_kind_token_required(value: Any) -> str | None:
+    """Normalize supported ASCII readiness tokens in Rust, retaining fallback."""
+    if value is not None and (type(value) is not str or not value.isascii()):
+        return None
+    try:
+        result = _native.readiness_kind_token(value)
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+    if result is None:
+        return None
+    if type(result) is not str or not result.isascii():
+        raise RuntimeError("required Rust readiness token normalizer returned invalid data")
+    return result
+
+
 def readiness_candidate(record: Any) -> dict[str, str] | None:
     """Project supported exact-string readiness records to candidate summaries."""
     if not enabled() or type(record) is not dict:

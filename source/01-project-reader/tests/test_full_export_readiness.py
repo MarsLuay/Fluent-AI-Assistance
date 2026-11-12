@@ -411,15 +411,22 @@ class FullExportReadinessTests(unittest.TestCase):
             *(chr(value) for value in range(128)),
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = [readiness_module._kind_token(value) for value in ascii_values]
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 readiness_module.native_acceleration,
+                "readiness_kind_token_required",
+                return_value=None,
+            ):
+                expected = [
+                    readiness_module._kind_token(value) for value in ascii_values
+                ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
                 "readiness_kind_token",
-                wraps=native_acceleration.readiness_kind_token,
-            ) as native_call:
+                wraps=native_acceleration._native.readiness_kind_token,
+            ) as rust_call:
                 actual = [readiness_module._kind_token(value) for value in ascii_values]
-                self.assertEqual(native_call.call_count, len(ascii_values))
+                self.assertEqual(rust_call.call_count, len(ascii_values))
         self.assertEqual(actual, expected)
         self.assertEqual(actual[2], "worktableworkspace")
         self.assertEqual(actual[3], "worktableworkspace")
@@ -432,11 +439,21 @@ class FullExportReadinessTests(unittest.TestCase):
         class StringSubclass(str):
             pass
 
-        fallback_values = ["Straße", "é", "İ", "中", 0, False, StringSubclass("A-B")]
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(readiness_module._kind_token("A-B"), "ab")
+
+        fallback_values = [
+            "Straße", "é", "İ", "中", 0, False, StringSubclass("A-B"), "\ud800"
+        ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected_fallback = [
-                readiness_module._kind_token(value) for value in fallback_values
-            ]
+            with patch.object(
+                readiness_module.native_acceleration,
+                "readiness_kind_token_required",
+                return_value=None,
+            ):
+                expected_fallback = [
+                    readiness_module._kind_token(value) for value in fallback_values
+                ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertTrue(
                 all(
@@ -444,12 +461,19 @@ class FullExportReadinessTests(unittest.TestCase):
                     for value in fallback_values
                 )
             )
-            actual_fallback = [
-                readiness_module._kind_token(value) for value in fallback_values
-            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "readiness_kind_token",
+                wraps=native_acceleration._native.readiness_kind_token,
+            ) as rust_call:
+                actual_fallback = [
+                    readiness_module._kind_token(value) for value in fallback_values
+                ]
+                rust_call.assert_not_called()
         self.assertEqual(actual_fallback, expected_fallback)
         self.assertEqual(actual_fallback[:4], ["strasse", "é", "i", "中"])
-        self.assertEqual(actual_fallback[4:], ["", "", "ab"])
+        self.assertEqual(actual_fallback[4:], ["", "", "ab", ""])
 
     def test_native_readiness_candidate_projection_matches_python_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
