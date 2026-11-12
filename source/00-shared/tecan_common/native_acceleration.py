@@ -2501,6 +2501,23 @@ def sha256_text(value: Any) -> str | None:
         return None
 
 
+def sha256_text_required(value: Any) -> str | None:
+    """Hash exact Unicode text in Rust, retaining Python encoding fallback."""
+    if type(value) is not str:
+        return None
+    try:
+        result = _native.sha256_text(value)
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+    if (
+        type(result) is not str
+        or len(result) != 64
+        or any(character not in "0123456789abcdef" for character in result)
+    ):
+        raise RuntimeError("required Rust SHA-256 helper returned invalid data")
+    return result
+
+
 def sha256_file(path: Any) -> str | None:
     """Stream-hash exact ``Path`` values, or request the Python fallback."""
     if not enabled() or type(path) is not _PathType:

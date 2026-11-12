@@ -1102,19 +1102,29 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             {"unicode": "µ 🧪", "linebreak": "first\nsecond", "float": -1e-7},
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = [worktable_geometry._stable_fingerprint(value) for value in values]
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
-                native_acceleration,
+                native_acceleration, "sha256_text_required", return_value=None
+            ):
+                expected = [
+                    worktable_geometry._stable_fingerprint(value) for value in values
+                ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
                 "sha256_text",
-                wraps=native_acceleration.sha256_text,
-            ) as native_call:
-                actual = [worktable_geometry._stable_fingerprint(value) for value in values]
-                self.assertEqual(native_call.call_count, len(values))
-            self.assertEqual(
-                native_acceleration.sha256_text("µ 🧪"),
-                worktable_geometry.hashlib.sha256("µ 🧪".encode("utf-8")).hexdigest(),
-            )
+                wraps=native_acceleration._native.sha256_text,
+            ) as rust_call:
+                actual = [
+                    worktable_geometry._stable_fingerprint(value) for value in values
+                ]
+                self.assertEqual(rust_call.call_count, len(values))
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                self.assertEqual(
+                    native_acceleration.sha256_text("µ 🧪"),
+                    worktable_geometry.hashlib.sha256(
+                        "µ 🧪".encode("utf-8")
+                    ).hexdigest(),
+                )
             with self.assertRaises(UnicodeEncodeError):
                 worktable_geometry._stable_fingerprint({"surrogate": "\ud800"})
         self.assertEqual(actual, expected)

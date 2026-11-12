@@ -774,7 +774,7 @@ def _site_index_sort_key(value: str) -> tuple[int, str]:
 
 def _stable_fingerprint(value: Mapping[str, Any]) -> str:
     payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    native = native_acceleration.sha256_text(payload)
+    native = native_acceleration.sha256_text_required(payload)
     return native if native is not None else hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
