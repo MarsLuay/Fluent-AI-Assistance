@@ -16,7 +16,7 @@ from tecan_common.native_acceleration import (
     decode_text_bytes as _native_decode_text_bytes,
     read_text_file_required as _native_read_text_file,
     command_short_name_required as _native_command_short_name,
-    compact_list as _native_compact_list,
+    compact_list_required as _native_compact_list,
     extension_counts_required as _native_extension_counts,
     path_suffixes_required as _native_path_suffixes,
     ascii_lower_required as _native_ascii_lower,

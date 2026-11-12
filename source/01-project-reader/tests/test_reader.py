@@ -287,43 +287,49 @@ class ReaderTests(unittest.TestCase):
                     ]
         self.assertEqual(fallback, expected)
 
-    def test_native_compact_list_matches_python_order_and_limit_behavior(self) -> None:
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "compact_list"
-        ):
-            self.skipTest("optional Rust compact-list helper is not built")
+    def test_required_rust_compact_list_matches_python_order_and_limits(self) -> None:
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(hasattr(native_acceleration._native, "compact_list"))
         cases = [
             (["alpha", "", "beta", "alpha", "gamma"], 2, ["alpha", "beta"]),
             (("alpha", "beta", "alpha"), 20, ["alpha", "beta"]),
             (["alpha", "beta"], 0, ["alpha"]),
             (["", "alpha"], 0, []),
             (["alpha", "alpha", "beta"], -1, ["alpha"]),
+            (["café", "café", "éclair"], 2, ["café", "éclair"]),
+            (["\ud800", "\ud800"], 20, ["\ud800"]),
             ([], 0, []),
         ]
         for values, limit, expected in cases:
             with self.subTest(limit=limit, count=len(values)):
-                with patch.dict(
-                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
-                ):
-                    python_result = compact_list(values, limit=limit)
-                with patch.dict(
-                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
-                ):
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                    with patch.object(
+                        native_acceleration,
+                        "compact_list_required",
+                        return_value=None,
+                    ):
+                        python_result = compact_list(values, limit=limit)
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
                     with patch.object(
                         reader_common,
                         "_native_compact_list",
-                        wraps=native_acceleration.compact_list,
-                    ) as native_call:
+                        wraps=native_acceleration.compact_list_required,
+                    ) as native_call, patch.object(
+                        native_acceleration._native,
+                        "compact_list",
+                        wraps=native_acceleration._native.compact_list,
+                    ) as rust_call:
                         actual = compact_list(values, limit=limit)
-                    native_call.assert_called_once()
+                        native_call.assert_called_once()
+                        rust_call.assert_called_once()
                 self.assertEqual(python_result, expected)
                 self.assertEqual(actual, expected)
 
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
                 reader_common,
                 "_native_compact_list",
-                wraps=native_acceleration.compact_list,
+                wraps=native_acceleration.compact_list_required,
             ) as native_call:
                 self.assertEqual(compact_list(iter(["alpha", "alpha", "beta"])), ["alpha", "beta"])
                 self.assertEqual(compact_list(["alpha", "beta"], limit=True), ["alpha"])

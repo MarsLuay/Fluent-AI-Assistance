@@ -2520,6 +2520,23 @@ def compact_list(values: Any, limit: Any = 20) -> list[str] | None:
         return None
 
 
+def compact_list_required(values: Any, limit: Any = 20) -> list[str] | None:
+    """Deduplicate supported exact string sequences in Rust, preserving fallback."""
+    if (
+        type(values) not in (list, tuple)
+        or not all(type(value) is str for value in values)
+        or type(limit) is not int
+    ):
+        return None
+    try:
+        result = _native.compact_list(list(values), limit)
+    except UnicodeError:
+        return None
+    if type(result) is not list or not all(type(value) is str for value in result):
+        raise RuntimeError("required Rust compact-list helper returned invalid data")
+    return result
+
+
 def path_suffixes(paths: Any) -> list[str] | None:
     """Extract ASCII Path suffixes natively for exact strings and Paths."""
     if (
