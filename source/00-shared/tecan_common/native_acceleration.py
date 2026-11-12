@@ -2477,6 +2477,25 @@ def project_record_fingerprint(record: Any) -> tuple[str, ...] | None:
         return None
 
 
+def project_record_fingerprint_required(record: Any) -> tuple[str, ...] | None:
+    """Fingerprint supported exact-string records in Rust, retaining fallback."""
+    if type(record) is not dict:
+        return None
+    try:
+        result = _native.project_record_fingerprint(record)
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+    if result is None:
+        return None
+    if (
+        type(result) is not tuple
+        or len(result) != 6
+        or not all(type(value) is str for value in result)
+    ):
+        raise RuntimeError("required Rust project-record fingerprint returned invalid data")
+    return result
+
+
 def readiness_kind_token(value: Any) -> str | None:
     """Normalize ASCII readiness kind tokens, or request Python Unicode fallback."""
     if not enabled() or (value is not None and type(value) is not str):

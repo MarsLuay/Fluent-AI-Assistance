@@ -230,16 +230,29 @@ class FullExportReadinessTests(unittest.TestCase):
             },
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = [readiness_module._record_fingerprint(record) for record in records]
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 readiness_module.native_acceleration,
+                "project_record_fingerprint_required",
+                return_value=None,
+            ):
+                expected = [
+                    readiness_module._record_fingerprint(record) for record in records
+                ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
                 "project_record_fingerprint",
-                wraps=native_acceleration.project_record_fingerprint,
-            ) as native_call:
-                actual = [readiness_module._record_fingerprint(record) for record in records]
-                self.assertEqual(native_call.call_count, len(records))
+                wraps=native_acceleration._native.project_record_fingerprint,
+            ) as rust_call:
+                actual = [
+                    readiness_module._record_fingerprint(record) for record in records
+                ]
+                self.assertEqual(rust_call.call_count, len(records))
         self.assertEqual(actual, expected)
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(
+                readiness_module._record_fingerprint(records[1]), expected[1]
+            )
         self.assertEqual(actual[1][0:4], ("workspace", "strasse", "worktable", "a,a,ss,z,ä"))
         self.assertEqual(actual[1][4], "e\\u0301,omega,é,ωmega")
         self.assertEqual(actual[1][5], "i̇stanbul")
@@ -258,19 +271,30 @@ class FullExportReadinessTests(unittest.TestCase):
             {"guids": ["known", 42]},
             {"names": [StringSubclass("subclass")]},
             {"functional_group": {"custom": "value"}},
+            {"object_name": "\ud800"},
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = [readiness_module._record_fingerprint(record) for record in records]
+            with patch.object(
+                readiness_module.native_acceleration,
+                "project_record_fingerprint_required",
+                return_value=None,
+            ):
+                expected = [
+                    readiness_module._record_fingerprint(record) for record in records
+                ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             for record in records:
                 self.assertIsNone(native_acceleration.project_record_fingerprint(record))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
-                readiness_module.native_acceleration,
+                native_acceleration._native,
                 "project_record_fingerprint",
-                wraps=native_acceleration.project_record_fingerprint,
-            ) as native_call:
-                actual = [readiness_module._record_fingerprint(record) for record in records]
-                self.assertEqual(native_call.call_count, len(records))
+                wraps=native_acceleration._native.project_record_fingerprint,
+            ) as rust_call:
+                actual = [
+                    readiness_module._record_fingerprint(record) for record in records
+                ]
+                self.assertEqual(rust_call.call_count, len(records))
         self.assertEqual(actual, expected)
 
     def test_casefold_text_uses_rust_with_exact_python_fallback(self) -> None:
