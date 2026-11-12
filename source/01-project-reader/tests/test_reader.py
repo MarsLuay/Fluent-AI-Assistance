@@ -2251,11 +2251,11 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(report["pipette_examples"][0]["rack_label"], "Source")
         self.assertEqual(report["line_count"], 3)
 
-    def test_inspect_gwl_fallback_uses_native_record_type_counts(self) -> None:
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "worklist_count_record_types"
-        ):
-            self.skipTest("optional Rust record-type counter is not built")
+    def test_inspect_gwl_fallback_uses_required_rust_record_type_counts(self) -> None:
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(
+            hasattr(native_acceleration._native, "worklist_count_record_types")
+        )
         lines = [
             "C;comment;é",
             "A;Source;;96 Well Flat;1;;20;Water Free Single;;;",
@@ -2263,17 +2263,43 @@ class ReaderTests(unittest.TestCase):
             "C;comment;é",
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = inspect_gwl_lines(lines, source_name="sample.gwl")
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_count_record_types_required",
+                return_value=None,
+            ):
+                expected = inspect_gwl_lines(lines, source_name="sample.gwl")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
                 reader_gwl,
                 "_native_worklist_count_record_types",
                 wraps=reader_gwl._native_worklist_count_record_types,
-            ) as native_counter:
+            ) as native_counter, patch.object(
+                native_acceleration._native,
+                "worklist_count_record_types",
+                wraps=native_acceleration._native.worklist_count_record_types,
+            ) as rust_counter:
                 actual = inspect_gwl_lines(lines, source_name="sample.gwl")
                 native_counter.assert_called_once_with(["C", "A", "D", "C"])
+                rust_counter.assert_called_once()
         self.assertEqual(actual, expected)
         self.assertEqual(actual["record_counts"], {"C": 2, "A": 1, "D": 1})
+
+        surrogate_lines = ["\ud800;opaque"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_count_record_types_required",
+                return_value=None,
+            ):
+                expected_surrogate = inspect_gwl_lines(
+                    surrogate_lines, source_name="surrogate.gwl"
+                )
+            actual_surrogate = inspect_gwl_lines(
+                surrogate_lines, source_name="surrogate.gwl"
+            )
+        self.assertEqual(actual_surrogate, expected_surrogate)
+        self.assertEqual(actual_surrogate["record_counts"], {"\ud800": 1})
 
     def test_inspect_gwl_file_uses_required_rust_utf8_sig_read_with_fallback(self) -> None:
         self.assertTrue(native_acceleration.available())
