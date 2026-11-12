@@ -555,8 +555,10 @@ def _warnings(commands: list[dict[str, Any]]) -> list[str]:
         ("worklist",),
         ("touchtools", ".rup."),
     )
-    matches = native_acceleration.ascii_case_insensitive_substring_match_groups(
-        raw_types, search_groups
+    matches = (
+        native_acceleration.ascii_case_insensitive_substring_match_groups_required(
+            raw_types, search_groups
+        )
     )
     if matches is None:
         lowered_types = [_lower_text(raw_type) for raw_type in raw_types]
@@ -581,8 +583,10 @@ def _warnings(commands: list[dict[str, Any]]) -> list[str]:
     ]
     pin_match = None
     if all(type(value) is str and value.isascii() for value in field_values):
-        pin_match = native_acceleration.ascii_case_insensitive_substring_match_groups(
-            field_values, (("pin",),)
+        pin_match = (
+            native_acceleration.ascii_case_insensitive_substring_match_groups_required(
+                field_values, (("pin",),)
+            )
         )
     contains_pin = (
         pin_match[0]

@@ -3667,6 +3667,40 @@ def ascii_case_insensitive_substring_match_groups(
         return None
 
 
+def ascii_case_insensitive_substring_match_groups_required(
+    values: Any, groups: Any
+) -> list[bool] | None:
+    """Match supported ASCII substring groups with required Rust dispatch."""
+    if (
+        type(values) not in (list, tuple)
+        or type(groups) not in (list, tuple)
+        or not all(type(value) is str and value.isascii() for value in values)
+        or not all(
+            type(group) in (list, tuple)
+            and all(type(needle) is str and needle.isascii() for needle in group)
+            for group in groups
+        )
+    ):
+        return None
+    try:
+        result = _native.ascii_case_insensitive_substring_match_groups(
+            list(values), [list(group) for group in groups]
+        )
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+    if result is None:
+        return None
+    if (
+        type(result) is not list
+        or len(result) != len(groups)
+        or not all(type(matched) is bool for matched in result)
+    ):
+        raise RuntimeError(
+            "required Rust substring-group matcher returned invalid data"
+        )
+    return result
+
+
 def any_ascii_casefold_in(values: Any, candidates: Any) -> bool | None:
     """Check ASCII strings against a Python-owned case-folded candidate set."""
     if (

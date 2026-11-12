@@ -605,26 +605,35 @@ class ScriptTests(unittest.TestCase):
             },
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = script._warnings(commands)
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
+                "ascii_case_insensitive_substring_match_groups_required",
+                return_value=None,
+            ):
+                expected = script._warnings(commands)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
                 "ascii_case_insensitive_substring_match_groups",
-                wraps=native_acceleration.ascii_case_insensitive_substring_match_groups,
-            ) as native_matcher:
+                wraps=(
+                    native_acceleration._native.ascii_case_insensitive_substring_match_groups
+                ),
+            ) as rust_matcher:
                 actual = script._warnings(commands)
-                self.assertEqual(native_matcher.call_count, 2)
-                native_matcher.assert_any_call(
+                self.assertEqual(rust_matcher.call_count, 2)
+                rust_matcher.assert_any_call(
                     [command["raw_type"] for command in commands],
-                    (
-                        ("subroutine",),
-                        ("executevbscript", "executeapplication"),
-                        ("worklist",),
-                        ("touchtools", ".rup."),
-                    ),
+                    [
+                        ["subroutine"],
+                        ["executevbscript", "executeapplication"],
+                        ["worklist"],
+                        ["touchtools", ".rup."],
+                    ],
                 )
-                native_matcher.assert_any_call(["PIN-2"], (("pin",),))
+                rust_matcher.assert_any_call(["PIN-2"], [["pin"]])
         self.assertEqual(actual, expected)
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(script._warnings(commands), expected)
         self.assertEqual(
             actual,
             [
@@ -646,7 +655,9 @@ class ScriptTests(unittest.TestCase):
             },
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            with patch.object(native_acceleration, "ascii_lower_required", return_value=None):
+            with patch.object(
+                native_acceleration, "ascii_lower_required", return_value=None
+            ):
                 unicode_expected = script._warnings(unicode_commands)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             raw_types = [command["raw_type"] for command in unicode_commands]
@@ -672,28 +683,30 @@ class ScriptTests(unittest.TestCase):
             }
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            with patch.object(native_acceleration, "ascii_lower_required", return_value=None):
-                unicode_field_expected = script._warnings(unicode_field_commands)
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
-                native_acceleration,
-                "ascii_case_insensitive_substring_match_groups",
-                wraps=native_acceleration.ascii_case_insensitive_substring_match_groups,
-            ) as native_matcher:
-                self.assertEqual(
-                    script._warnings(unicode_field_commands), unicode_field_expected
-                )
-                native_matcher.assert_called_once()
+                native_acceleration, "ascii_lower_required", return_value=None
+            ):
+                unicode_field_expected = script._warnings(unicode_field_commands)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
                 native_acceleration._native,
-                "ascii_lower",
-                wraps=native_acceleration._native.ascii_lower,
-            ) as rust_lower:
+                "ascii_case_insensitive_substring_match_groups",
+                wraps=(
+                    native_acceleration._native.ascii_case_insensitive_substring_match_groups
+                ),
+            ) as rust_matcher:
                 self.assertEqual(
                     script._warnings(unicode_field_commands), unicode_field_expected
                 )
-                rust_lower.assert_called_once_with("FcaPipette")
+                rust_matcher.assert_called_once_with(
+                    ["FcaPipette"],
+                    [
+                        ["subroutine"],
+                        ["executevbscript", "executeapplication"],
+                        ["worklist"],
+                        ["touchtools", ".rup."],
+                    ],
+                )
         self.assertIn(
             "Contains pin-controlled or pin-located hardware references.",
             unicode_field_expected,
