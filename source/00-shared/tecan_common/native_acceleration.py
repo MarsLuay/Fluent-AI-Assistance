@@ -3120,6 +3120,19 @@ def ascii_casefold_trim(value: Any) -> str | None:
         return None
 
 
+def ascii_casefold_trim_required(value: Any) -> str | None:
+    """Normalize supported exact ASCII text in Rust, retaining Unicode fallback."""
+    if type(value) is not str or not value.isascii():
+        return None
+    try:
+        result = _native.ascii_casefold_trim(value)
+    except UnicodeError:
+        return None
+    if type(result) is not str:
+        raise RuntimeError("required Rust ASCII casefold helper returned invalid data")
+    return result
+
+
 def ascii_collapse_casefold_whitespace(value: Any) -> str | None:
     """Collapse Python whitespace runs and lowercase ASCII text, or fallback."""
     if not enabled() or type(value) is not str or not value.isascii():

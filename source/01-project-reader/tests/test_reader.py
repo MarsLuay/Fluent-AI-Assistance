@@ -241,11 +241,11 @@ class ReaderTests(unittest.TestCase):
                 self.assertEqual(python_result, expected)
                 self.assertEqual(actual, expected)
 
-    def test_command_family_ascii_lowercase_uses_rust_and_python_fallback(self) -> None:
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "ascii_casefold_trim"
-        ):
-            self.skipTest("optional Rust ASCII lowercase helper is not built")
+    def test_command_family_uses_required_rust_ascii_casefold(self) -> None:
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(
+            hasattr(native_acceleration._native, "ascii_casefold_trim")
+        )
         cases = [
             ("Synthetic.LiHa.Command", "LiHa/FCA"),
             ("CaféMCA384", "MCA384"),
@@ -254,20 +254,30 @@ class ReaderTests(unittest.TestCase):
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(reader_common, "registry_command_family", return_value=None):
-                expected = [reader_common.command_family(value) for value, _ in cases]
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                with patch.object(
+                    native_acceleration,
+                    "ascii_casefold_trim_required",
+                    return_value=None,
+                ):
+                    expected = [reader_common.command_family(value) for value, _ in cases]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(reader_common, "registry_command_family", return_value=None):
                 with patch.object(
                     reader_common,
                     "_native_ascii_casefold_trim",
-                    wraps=native_acceleration.ascii_casefold_trim,
-                ) as native_call:
+                    wraps=native_acceleration.ascii_casefold_trim_required,
+                ) as native_call, patch.object(
+                    native_acceleration._native,
+                    "ascii_casefold_trim",
+                    wraps=native_acceleration._native.ascii_casefold_trim,
+                ) as rust_call:
                     actual = [reader_common.command_family(value) for value, _ in cases]
                     self.assertEqual(native_call.call_count, 3)
+                    self.assertEqual(rust_call.call_count, 2)
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [expected_family for _, expected_family in cases])
 
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(reader_common, "registry_command_family", return_value=None):
                 with patch.object(
                     reader_common, "_native_ascii_casefold_trim", return_value=None
