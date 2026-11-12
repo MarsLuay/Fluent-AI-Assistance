@@ -4279,6 +4279,19 @@ def worklist_parse_gwl_text_records(
         return None
 
 
+def worklist_parse_gwl_text_records_required(
+    text: Any, permissive: Any
+) -> list[dict[str, Any]] | None:
+    """Use Rust for supported GWL text while retaining parser fallback cases."""
+    if type(text) is not str or type(permissive) is not bool:
+        return None
+    try:
+        encoded = _native.worklist_parse_gwl_text_records(text, permissive)
+        return _decode_worklist_record_payload(encoded)
+    except (TypeError, ValueError, UnicodeError, OverflowError, RecursionError):
+        return None
+
+
 def worklist_read_gwl_records(
     path: str | Path, permissive: bool
 ) -> list[dict[str, Any]] | None:

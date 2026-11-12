@@ -291,7 +291,9 @@ def parse_gwl(path: str | Path, *, permissive: bool = False) -> Worklist:
 
 def parse_gwl_text(text: str, *, name: str = "worklist", permissive: bool = False) -> Worklist:
     if type(text) is str and type(permissive) is bool:
-        native = native_acceleration.worklist_parse_gwl_text_records(text, permissive)
+        native = native_acceleration.worklist_parse_gwl_text_records_required(
+            text, permissive
+        )
         if native is not None:
             return _worklist_from_native_gwl_records(native, name)
     return parse_gwl_lines(text.splitlines(), name=name, permissive=permissive)

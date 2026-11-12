@@ -716,11 +716,11 @@ class WorklistSemanticsTests(unittest.TestCase):
             surrogate_expected = surrogate_comment.to_line() + "\n"
             self.assertEqual(serialize_gwl([surrogate_comment]), surrogate_expected)
 
-    def test_native_gwl_text_parser_preserves_python_splitlines_behavior(self):
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "worklist_parse_gwl_text_records"
-        ):
-            self.skipTest("optional Rust GWL text parser is not built")
+    def test_gwl_text_parser_uses_rust_and_preserves_python_splitlines(self):
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(
+            hasattr(native_acceleration._native, "worklist_parse_gwl_text_records")
+        )
         cases = [
             ("C;first\r\nC;second\nW1;\n", False, True),
             ("A;src;;plate;1;;10;;;1;\nD;dst;;plate;2;;10;;;1;", False, True),
@@ -735,27 +735,34 @@ class WorklistSemanticsTests(unittest.TestCase):
         ]
         for text, permissive, native_supported in cases:
             with self.subTest(permissive=permissive, length=len(text)):
-                with patch.dict(
-                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                with patch.object(
+                    native_acceleration,
+                    "worklist_parse_gwl_text_records_required",
+                    return_value=None,
                 ):
                     expected = parse_gwl_text(
                         text, name="text-parse", permissive=permissive
                     )
-                with patch.dict(
-                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
-                ):
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                    with patch.object(
+                        native_acceleration._native,
+                        "worklist_parse_gwl_text_records",
+                        wraps=native_acceleration._native.worklist_parse_gwl_text_records,
+                    ) as rust_parser:
+                        actual = parse_gwl_text(
+                            text, name="text-parse", permissive=permissive
+                        )
+                        rust_parser.assert_called_once_with(text, permissive)
+                self.assertEqual(actual, expected)
+                self.assertEqual(actual.to_text(), expected.to_text())
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
                     native_payload = native_acceleration.worklist_parse_gwl_text_records(
                         text, permissive
                     )
-                    if native_supported:
-                        self.assertIsNotNone(native_payload)
-                    else:
-                        self.assertIsNone(native_payload)
-                    actual = parse_gwl_text(
-                        text, name="text-parse", permissive=permissive
-                    )
-                self.assertEqual(actual, expected)
-                self.assertEqual(actual.to_text(), expected.to_text())
+                if native_supported:
+                    self.assertIsNotNone(native_payload)
+                else:
+                    self.assertIsNone(native_payload)
 
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(
@@ -763,7 +770,11 @@ class WorklistSemanticsTests(unittest.TestCase):
             )
             with self.assertRaises(ValueError) as native_error:
                 parse_gwl_text("A;short", name="error")
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        with patch.object(
+            native_acceleration,
+            "worklist_parse_gwl_text_records_required",
+            return_value=None,
+        ):
             with self.assertRaises(ValueError) as python_error:
                 parse_gwl_text("A;short", name="error")
         self.assertEqual(str(native_error.exception), str(python_error.exception))
