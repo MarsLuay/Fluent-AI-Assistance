@@ -4183,6 +4183,23 @@ def worklist_parse_gwl_records(
         return None
 
 
+def worklist_parse_gwl_records_required(
+    lines: Any, permissive: Any
+) -> list[dict[str, Any]] | None:
+    """Use Rust for supported GWL line collections; retain Python fallback cases."""
+    if (
+        type(lines) not in (list, tuple)
+        or type(permissive) is not bool
+        or not all(type(line) is str for line in lines)
+    ):
+        return None
+    try:
+        encoded = _native.worklist_parse_gwl_records(_encode_json(lines), permissive)
+        return _decode_worklist_record_payload(encoded)
+    except (TypeError, ValueError, UnicodeError, OverflowError, RecursionError):
+        return None
+
+
 def worklist_inspect_gwl_lines(lines: Any) -> dict[str, Any] | None:
     """Summarize supported ASCII GWL lines natively, or request Python fallback."""
     if (

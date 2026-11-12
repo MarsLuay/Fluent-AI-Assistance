@@ -917,11 +917,11 @@ class WorklistSemanticsTests(unittest.TestCase):
                 parse_gwl_line("A;short", line_no=9)
         self.assertEqual(str(native_error.exception), str(python_error.exception))
 
-    def test_native_gwl_parser_matches_typed_python_records(self):
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "worklist_parse_gwl_records"
-        ):
-            self.skipTest("optional Rust GWL parser is not built")
+    def test_gwl_line_collection_parser_uses_rust_with_python_parity(self):
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(
+            hasattr(native_acceleration._native, "worklist_parse_gwl_records")
+        )
         inputs = [
             (
                 [
@@ -951,24 +951,24 @@ class WorklistSemanticsTests(unittest.TestCase):
         ]
         for lines, permissive in inputs:
             with self.subTest(permissive=permissive):
-                with patch.dict(
-                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                with patch.object(
+                    native_acceleration,
+                    "worklist_parse_gwl_records_required",
+                    return_value=None,
                 ):
                     expected = parse_gwl_lines(
                         lines, name="typed-parse", permissive=permissive
                     )
-                with patch.dict(
-                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
-                ):
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
                     with patch.object(
-                        native_acceleration,
+                        native_acceleration._native,
                         "worklist_parse_gwl_records",
-                        wraps=native_acceleration.worklist_parse_gwl_records,
-                    ) as native_call:
+                        wraps=native_acceleration._native.worklist_parse_gwl_records,
+                    ) as rust_parser:
                         actual = parse_gwl_lines(
                             lines, name="typed-parse", permissive=permissive
                         )
-                native_call.assert_called_once()
+                        rust_parser.assert_called_once()
                 self.assertEqual(actual, expected)
                 self.assertEqual(actual.to_text(), expected.to_text())
                 self.assertEqual(actual.counts(), expected.counts())
@@ -978,12 +978,28 @@ class WorklistSemanticsTests(unittest.TestCase):
             self.assertIsNone(
                 native_acceleration.worklist_parse_gwl_records(invalid_lines, False)
             )
-            with self.assertRaises(ValueError) as expected_error:
+            with self.assertRaises(ValueError) as native_error:
                 parse_gwl_lines(invalid_lines, name="invalid")
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        with patch.object(
+            native_acceleration,
+            "worklist_parse_gwl_records_required",
+            return_value=None,
+        ):
             with self.assertRaises(ValueError) as python_error:
                 parse_gwl_lines(invalid_lines, name="invalid")
-        self.assertEqual(str(expected_error.exception), str(python_error.exception))
+        self.assertEqual(str(native_error.exception), str(python_error.exception))
+
+        surrogate_lines = ["C;lone \ud800"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_parse_gwl_records_required",
+                return_value=None,
+            ):
+                expected = parse_gwl_lines(surrogate_lines)
+            actual = parse_gwl_lines(surrogate_lines)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual.to_text(), "C;lone \ud800\n")
 
     def test_csv_tip_mask_validation_rejects_non_one_hot(self):
         valid = Transfer("S", "Plate", 1, "D", "Plate", 1, 10, tip_mask="4")
