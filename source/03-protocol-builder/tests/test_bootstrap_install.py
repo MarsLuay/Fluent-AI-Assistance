@@ -60,6 +60,20 @@ def test_clean_environment_bootstrap_smoke(tmp_path: Path, capfd) -> None:
         )
 
 
+def test_wheelhouse_install_requires_native_extension(tmp_path: Path) -> None:
+    wheelhouse = tmp_path / "wheelhouse"
+    wheelhouse.mkdir()
+
+    try:
+        bootstrap.install_workspace_from_wheelhouse(
+            Path(sys.executable), wheelhouse, cwd=tmp_path
+        )
+    except bootstrap.PipelineError as exc:
+        assert "required Rust extension wheel is missing" in str(exc)
+    else:
+        raise AssertionError("install accepted a wheelhouse without tecan-native")
+
+
 def test_wheel_build_and_non_editable_install_smoke(tmp_path: Path, capfd) -> None:
     build_python = _create_venv(tmp_path / "wheel-build")
     wheelhouse = tmp_path / "wheelhouse"
@@ -73,14 +87,16 @@ def test_wheel_build_and_non_editable_install_smoke(tmp_path: Path, capfd) -> No
         bootstrap.install_workspace_from_wheelhouse(install_python, wheelhouse, cwd=offline_cwd)
         bootstrap.run_pip_check(install_python, cwd=offline_cwd)
 
-    native_built = any(wheelhouse.glob("tecan_native-*.whl"))
-    for package in bootstrap.workspace_packages(include_native=native_built):
-        requires_dist = (
+    assert any(wheelhouse.glob("tecan_native-*.whl"))
+    for package in bootstrap.workspace_packages():
+        requires_dist = [
             line
             for line in _wheel_metadata(wheelhouse, package.distribution).splitlines()
             if line.startswith("Requires-Dist:")
-        )
+        ]
         assert all("file:" not in requirement for requirement in requires_dist)
+        if package.distribution == "tecan-common":
+            assert "Requires-Dist: tecan-native==0.1.0" in requires_dist
 
     env = dict(os.environ)
     env["FLUENTCODER_PYTHON"] = str(install_python)

@@ -1,4 +1,4 @@
-"""Optional, fail-safe access to the compiled Rust acceleration kernels."""
+"""Required Rust kernels with narrow Python compatibility adapters."""
 
 from __future__ import annotations
 
@@ -14,10 +14,7 @@ from typing import Any
 
 _PathType = type(Path())
 
-try:
-    from tecan_native import _native
-except (ImportError, OSError):  # pragma: no cover - depends on optional wheel
-    _native = None
+from tecan_native import _native
 
 
 def enabled() -> bool:

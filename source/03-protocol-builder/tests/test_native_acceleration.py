@@ -14,17 +14,16 @@ from tecan_common import xml_compat as ET
 
 
 class NativeAccelerationTests(unittest.TestCase):
-    def test_native_bootstrap_is_optional_without_cargo(self) -> None:
+    def test_native_bootstrap_requires_rust_and_rejects_disable_setting(self) -> None:
         from fluent_pipeline import bootstrap
 
         with patch.dict("os.environ", {"TECAN_RUST_ACCELERATION": "auto"}, clear=False):
-            with patch("fluent_pipeline.bootstrap.shutil.which", return_value=None):
-                packages = bootstrap.workspace_packages()
-        self.assertNotIn("tecan-native", {package.distribution for package in packages})
-
-        with patch.dict("os.environ", {"TECAN_RUST_ACCELERATION": "1"}, clear=False):
             packages = bootstrap.workspace_packages()
-        self.assertIn("tecan-native", {package.distribution for package in packages})
+        self.assertEqual(packages[0].distribution, "tecan-native")
+
+        with patch.dict("os.environ", {"TECAN_RUST_ACCELERATION": "0"}, clear=False):
+            with self.assertRaisesRegex(bootstrap.PipelineError, "tecan-native is required"):
+                bootstrap.workspace_packages()
 
     def test_ascii_lower_preserves_whitespace_and_uses_unicode_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(

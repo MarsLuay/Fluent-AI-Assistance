@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
-description = "Optional Rust acceleration kernels for Fluent AI-Assistance"
+description = "Required Rust-native kernels for Fluent AI-Assistance"
 
 [lib]
 name = "_native"

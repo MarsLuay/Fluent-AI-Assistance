@@ -67,25 +67,16 @@ class WorkspacePackage:
         return _requirement_spec(self.distribution, self.extras)
 
 
-def _native_acceleration_requested(default: bool) -> bool:
-    setting = os.environ.get("TECAN_RUST_ACCELERATION", "auto").strip().lower()
-    if setting in {"", "auto"}:
-        return default
-    return setting in {"1", "true", "yes", "on", "enabled"}
-
-
-def _native_acceleration_required() -> bool:
-    setting = os.environ.get("TECAN_RUST_ACCELERATION", "auto").strip().lower()
-    return setting in {"1", "true", "yes", "on", "enabled"}
-
-
-def workspace_packages(
-    *, include_native: bool | None = None
-) -> tuple[WorkspacePackage, ...]:
-    """Return the local install graph, optionally including the Rust extension."""
-    if include_native is None:
-        include_native = _native_acceleration_requested(shutil.which("cargo") is not None)
-
+def workspace_packages() -> tuple[WorkspacePackage, ...]:
+    """Return the required local install graph, including the Rust extension."""
+    setting = os.environ.get("TECAN_RUST_ACCELERATION", "").strip().lower()
+    if setting not in {"", "auto", "1", "true", "yes", "on", "enabled"}:
+        raise PipelineError(
+            "tecan-native is required; TECAN_RUST_ACCELERATION cannot disable Rust."
+        )
+    native_package = WorkspacePackage(
+        "tecan-native", TECAN_AI_DIR / "source" / "00-shared" / "tecan-native"
+    )
     packages = (
         WorkspacePackage("tecan-common", TECAN_AI_DIR / "source" / "00-shared"),
         WorkspacePackage(
@@ -111,10 +102,7 @@ def workspace_packages(
             dependencies=("fluentcoder", "tecan-protocol-builder"),
         ),
     )
-    native_package = WorkspacePackage(
-        "tecan-native", TECAN_AI_DIR / "source" / "00-shared" / "tecan-native"
-    )
-    return ((native_package,) if include_native else ()) + packages
+    return (native_package,) + packages
 
 
 def bootstrap_workspace(
@@ -141,15 +129,10 @@ def install_editable_workspace(python: Path, *, cwd: Path = PROJECT_DIR) -> None
     packages = workspace_packages()
     _validate_workspace_package_order(packages)
     for package in packages:
-        try:
-            _run_setup_command(
-                [str(python), "-m", "pip", "install", "-e", package.editable_requirement()],
-                cwd=cwd,
-            )
-        except PipelineError as exc:
-            if package.distribution != "tecan-native" or _native_acceleration_required():
-                raise
-            print(f"Warning: optional Rust acceleration was not installed: {exc}", file=sys.stderr)
+        _run_setup_command(
+            [str(python), "-m", "pip", "install", "-e", package.editable_requirement()],
+            cwd=cwd,
+        )
 
 
 def build_workspace_wheelhouse(python: Path, wheelhouse: Path, *, cwd: Path = PROJECT_DIR) -> None:
@@ -168,26 +151,21 @@ def build_workspace_wheelhouse(python: Path, wheelhouse: Path, *, cwd: Path = PR
         stage_root = Path(raw_stage_root)
         for index, package in enumerate(packages, start=1):
             staged_package = _stage_wheel_source(package.path, stage_root, index=index)
-            try:
-                _run_setup_command(
-                    [
-                        str(python),
-                        "-m",
-                        "pip",
-                        "wheel",
-                        "--no-cache-dir",
-                        "--wheel-dir",
-                        str(wheelhouse),
-                        "--find-links",
-                        str(wheelhouse),
-                        _requirement_spec(staged_package, package.extras),
-                    ],
-                    cwd=cwd,
-                )
-            except PipelineError as exc:
-                if package.distribution != "tecan-native" or _native_acceleration_required():
-                    raise
-                print(f"Warning: optional Rust wheel was not built: {exc}", file=sys.stderr)
+            _run_setup_command(
+                [
+                    str(python),
+                    "-m",
+                    "pip",
+                    "wheel",
+                    "--no-cache-dir",
+                    "--wheel-dir",
+                    str(wheelhouse),
+                    "--find-links",
+                    str(wheelhouse),
+                    _requirement_spec(staged_package, package.extras),
+                ],
+                cwd=cwd,
+            )
 
 
 def _stage_wheel_source(source: Path, stage_root: Path, *, index: int) -> Path:
@@ -242,30 +220,25 @@ def install_workspace_from_wheelhouse(
 ) -> None:
     if not wheelhouse.exists():
         raise PipelineError(f"workspace wheelhouse does not exist: {wheelhouse}")
-    has_native_wheel = any(wheelhouse.glob("tecan_native-*.whl"))
-    include_native = _native_acceleration_requested(has_native_wheel)
-    packages = workspace_packages(include_native=include_native)
+    if not any(wheelhouse.glob("tecan_native-*.whl")):
+        raise PipelineError(f"required Rust extension wheel is missing from {wheelhouse}")
+    packages = workspace_packages()
     _validate_workspace_package_order(packages)
     for package in packages:
-        try:
-            _run_setup_command(
-                [
-                    str(python),
-                    "-m",
-                    "pip",
-                    "install",
-                    "--no-cache-dir",
-                    "--no-index",
-                    "--find-links",
-                    str(wheelhouse),
-                    package.wheel_requirement(),
-                ],
-                cwd=cwd,
-            )
-        except PipelineError as exc:
-            if package.distribution != "tecan-native" or _native_acceleration_required():
-                raise
-            print(f"Warning: optional Rust wheel was not installed: {exc}", file=sys.stderr)
+        _run_setup_command(
+            [
+                str(python),
+                "-m",
+                "pip",
+                "install",
+                "--no-cache-dir",
+                "--no-index",
+                "--find-links",
+                str(wheelhouse),
+                package.wheel_requirement(),
+            ],
+            cwd=cwd,
+        )
 
 
 def install_desktop_automation_dependencies(python: Path, *, cwd: Path = PROJECT_DIR) -> None:
@@ -451,7 +424,17 @@ def _run_setup_command(command: list[str], *, cwd: Path) -> None:
         subprocess.list2cmdline(command) if os.name == "nt" else " ".join(shlex.quote(part) for part in command)
     )
     print(f"$ {command_line}", flush=True)
-    process = subprocess.Popen(command, cwd=cwd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    env = os.environ.copy()
+    executable_directory = str(Path(command[0]).resolve().parent)
+    env["PATH"] = os.pathsep.join((executable_directory, env.get("PATH", "")))
+    process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
     started_at = time.monotonic()
     while True:
         elapsed = time.monotonic() - started_at
