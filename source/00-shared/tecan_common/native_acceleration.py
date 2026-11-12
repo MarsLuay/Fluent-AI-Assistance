@@ -2504,6 +2504,17 @@ def canonical_json(value: Any) -> str | None:
         return None
 
 
+def canonical_json_required(value: Any) -> str | None:
+    """Serialize supported values with Rust, retaining Python JSON fallback."""
+    try:
+        result = _native.canonical_json(value)
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+    if type(result) is not str:
+        raise RuntimeError("required Rust canonical JSON helper returned invalid data")
+    return result
+
+
 def canonical_json_compact(value: Any) -> str | None:
     """Serialize JSON-compatible values with compact separators, or fall back."""
     if not enabled():

@@ -1019,6 +1019,18 @@ class NativeAccelerationTests(unittest.TestCase):
         )
         from tecan_reader.common import fast_json_dumps
 
+        expected = json.dumps(value, ensure_ascii=False, sort_keys=True)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "canonical_json",
+                wraps=native_acceleration._native.canonical_json,
+            ) as rust_call:
+                self.assertEqual(fast_json_dumps(value), expected)
+                rust_call.assert_called_once()
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(fast_json_dumps(value), expected)
+
         edge_values = {"small": 1e-7, "large": 1e16}
         self.assertEqual(
             fast_json_dumps(edge_values),
