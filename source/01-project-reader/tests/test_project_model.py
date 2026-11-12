@@ -264,16 +264,23 @@ class ProjectModelTests(unittest.TestCase):
             {"entry": "", "source": ""},
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = [project_model._entry_path(record) for record in records]
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
-                project_model,
-                "_native_project_model_entry_path",
-                wraps=native_acceleration.project_model_entry_path,
-            ) as native_call:
+                project_model, "_native_project_model_entry_path", return_value=None
+            ):
+                expected = [project_model._entry_path(record) for record in records]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "project_model_entry_path",
+                wraps=native_acceleration._native.project_model_entry_path,
+            ) as rust_call:
                 actual = [project_model._entry_path(record) for record in records]
-                self.assertEqual(native_call.call_count, len(records))
+                self.assertEqual(rust_call.call_count, len(records))
         self.assertEqual(actual, expected)
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(
+                [project_model._entry_path(record) for record in records], expected
+            )
         self.assertEqual(
             actual,
             [
@@ -295,7 +302,12 @@ class ProjectModelTests(unittest.TestCase):
             {"entry": Path("Scripts\\path.xscr")},
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected_fallback = [project_model._entry_path(record) for record in unsupported]
+            with patch.object(
+                project_model, "_native_project_model_entry_path", return_value=None
+            ):
+                expected_fallback = [
+                    project_model._entry_path(record) for record in unsupported
+                ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertTrue(
                 all(
@@ -303,9 +315,16 @@ class ProjectModelTests(unittest.TestCase):
                     for record in unsupported
                 )
             )
-            actual_fallback = [
-                project_model._entry_path(record) for record in unsupported
-            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "project_model_entry_path",
+                wraps=native_acceleration._native.project_model_entry_path,
+            ) as rust_call:
+                actual_fallback = [
+                    project_model._entry_path(record) for record in unsupported
+                ]
+                self.assertEqual(rust_call.call_count, len(unsupported))
         self.assertEqual(actual_fallback, expected_fallback)
         self.assertEqual(
             actual_fallback,

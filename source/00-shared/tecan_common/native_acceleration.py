@@ -2445,6 +2445,21 @@ def project_model_entry_path(record: Any) -> str | None:
         return None
 
 
+def project_model_entry_path_required(record: Any) -> str | None:
+    """Select supported project-model paths in Rust, retaining fallback."""
+    if type(record) is not dict:
+        return None
+    try:
+        result = _native.project_model_entry_path(record)
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+    if result is None:
+        return None
+    if type(result) is not str:
+        raise RuntimeError("required Rust project-model path selector returned invalid data")
+    return result
+
+
 def project_record_fingerprint(record: Any) -> tuple[str, ...] | None:
     """Normalize supported readiness identity fields using Python casefold semantics."""
     if not enabled() or type(record) is not dict:
