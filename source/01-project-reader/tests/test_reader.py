@@ -1863,6 +1863,10 @@ class ReaderTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
                 native_acceleration,
+                "path_suffixes_required",
+                return_value=None,
+            ), patch.object(
+                native_acceleration,
                 "extension_counts_required",
                 return_value=None,
             ):
@@ -1870,15 +1874,25 @@ class ReaderTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
                 reader_common,
+                "_native_path_suffixes",
+                wraps=native_acceleration.path_suffixes_required,
+            ) as suffix_call, patch.object(
+                reader_common,
                 "_native_extension_counts",
                 wraps=native_acceleration.extension_counts_required,
-            ) as native_call, patch.object(
+            ) as count_call, patch.object(
+                native_acceleration._native,
+                "path_suffixes",
+                wraps=native_acceleration._native.path_suffixes,
+            ) as rust_suffixes, patch.object(
                 native_acceleration._native,
                 "extension_counts",
                 wraps=native_acceleration._native.extension_counts,
             ) as rust_counter:
                 actual = extension_counts(names)
-                native_call.assert_called_once()
+                suffix_call.assert_called_once_with(names)
+                count_call.assert_called_once()
+                rust_suffixes.assert_called_once()
                 rust_counter.assert_called_once()
         self.assertEqual(actual, expected)
         self.assertEqual(

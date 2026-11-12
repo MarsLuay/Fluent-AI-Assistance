@@ -2521,10 +2521,16 @@ def compact_list(values: Any, limit: Any = 20) -> list[str] | None:
 
 
 def path_suffixes(paths: Any) -> list[str] | None:
-    """Extract ASCII Path suffixes natively for exact strings and Paths."""
+    """Use the optional native Path suffix extractor, or request fallback."""
+    if not enabled():
+        return None
+    return path_suffixes_required(paths)
+
+
+def path_suffixes_required(paths: Any) -> list[str] | None:
+    """Extract supported ASCII Path suffixes in Rust, preserving fallback cases."""
     if (
-        not enabled()
-        or type(paths) not in (list, tuple)
+        type(paths) not in (list, tuple)
         or not all(type(path) in (str, _PathType) for path in paths)
     ):
         return None
@@ -2533,11 +2539,11 @@ def path_suffixes(paths: Any) -> list[str] | None:
         return None
     try:
         result = _native.path_suffixes(path_strings)
-        if type(result) is list and all(type(suffix) is str for suffix in result):
-            return result
+    except UnicodeError:
         return None
-    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
-        return None
+    if type(result) is not list or not all(type(suffix) is str for suffix in result):
+        raise RuntimeError("required Rust Path suffix extractor returned invalid data")
+    return result
 
 
 def extension_counts(suffixes: Any) -> dict[str, int] | None:
