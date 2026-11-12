@@ -33,15 +33,19 @@ class ProjectModelTests(unittest.TestCase):
             "oversized_members": ("zeta", "alpha", "zeta"),
         }
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = build_completeness_metadata(**arguments)
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
-                project_model,
-                "_native_sort_string_keys",
-                wraps=native_acceleration.sort_string_keys,
-            ) as native_call:
+                project_model, "_native_sort_string_keys", return_value=None
+            ):
+                expected = build_completeness_metadata(**arguments)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "sort_string_keys",
+                wraps=native_acceleration._native.sort_string_keys,
+            ) as rust_call:
                 actual = build_completeness_metadata(**arguments)
-                self.assertEqual(native_call.call_count, 2)
+                self.assertEqual(rust_call.call_count, 2)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 project_model,
                 "_native_sorted_unique_strings",
@@ -100,10 +104,33 @@ class ProjectModelTests(unittest.TestCase):
         self.assertEqual(list(actual), list(expected))
         self.assertEqual(actual, expected)
         self.assertIs(actual["𝄞"], marker)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "sort_string_keys",
+                wraps=native_acceleration._native.sort_string_keys,
+            ) as rust_call:
+                required_actual = project_model._sorted_string_mapping(mapping)
+                rust_call.assert_called_once_with(mapping)
+        self.assertEqual(list(required_actual), list(expected))
+        self.assertIs(required_actual["𝄞"], marker)
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(project_model._sorted_string_mapping(mapping), expected)
 
         surrogate_mapping = {chr(0xD800): "surrogate", "a": "ascii"}
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(native_acceleration.sort_string_keys(surrogate_mapping))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "sort_string_keys",
+                wraps=native_acceleration._native.sort_string_keys,
+            ) as rust_call:
+                surrogate_actual = project_model._sorted_string_mapping(
+                    surrogate_mapping
+                )
+                rust_call.assert_called_once_with(surrogate_mapping)
+        self.assertEqual(surrogate_actual, dict(sorted(surrogate_mapping.items())))
 
     def test_inspection_counter_aggregation_uses_native_stable_order(self) -> None:
         if not native_acceleration.available() or not hasattr(

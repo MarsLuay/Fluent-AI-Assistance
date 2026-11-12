@@ -3777,6 +3777,21 @@ def sort_string_keys(mapping: Any) -> dict[str, Any] | None:
         return None
 
 
+def sort_string_keys_required(mapping: Any) -> dict[str, Any] | None:
+    """Sort supported exact string-key dictionaries in Rust, retaining fallback."""
+    if type(mapping) is not dict or not all(type(key) is str for key in mapping):
+        return None
+    try:
+        result = _native.sort_string_keys(mapping)
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+    if result is None:
+        return None
+    if type(result) is not dict or not all(type(key) is str for key in result):
+        raise RuntimeError("required Rust string-key sorter returned invalid data")
+    return result
+
+
 def asset_reference_names(values: Any) -> list[str] | None:
     """Extract and deduplicate ASCII path basenames natively."""
     if (
