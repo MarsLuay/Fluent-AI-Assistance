@@ -2343,6 +2343,17 @@ def clean_empty_containers(value: Any) -> tuple[bool, Any] | None:
         return None
 
 
+def clean_empty_containers_required(value: Any) -> tuple[bool, Any] | None:
+    """Remove empty supported containers in Rust, retaining Python fallback."""
+    try:
+        supported, result = _native.clean_empty_containers(value)
+    except (AttributeError, TypeError, ValueError, OverflowError, UnicodeError):
+        return None
+    if type(supported) is bool and supported:
+        return True, result
+    return None
+
+
 def to_jsonable_containers(value: Any) -> tuple[bool, Any] | None:
     """Convert supported exact JSON containers natively, or request Python fallback."""
     if not enabled():

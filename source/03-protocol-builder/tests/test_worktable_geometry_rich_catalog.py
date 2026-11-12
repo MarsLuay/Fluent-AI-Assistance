@@ -1148,18 +1148,23 @@ class WorktableGeometryRichCatalogTests(unittest.TestCase):
             "list-subclass": ListSubclass(["", [], 4]),
         }
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = worktable_geometry._clean(source)
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
+                "clean_empty_containers_required",
+                return_value=None,
+            ):
+                expected = worktable_geometry._clean(source)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
                 "clean_empty_containers",
-                wraps=native_acceleration.clean_empty_containers,
-            ) as native_call:
+                wraps=native_acceleration._native.clean_empty_containers,
+            ) as rust_call:
                 actual = worktable_geometry._clean(source)
                 self.assertEqual(worktable_geometry._clean(None), None)
                 self.assertEqual(worktable_geometry._clean({}), {})
                 self.assertEqual(worktable_geometry._clean([]), [])
-                self.assertGreater(native_call.call_count, 1)
+                self.assertGreater(rust_call.call_count, 1)
         self.assertEqual(list(actual), list(expected))
         actual_without_nan = dict(actual)
         expected_without_nan = dict(expected)

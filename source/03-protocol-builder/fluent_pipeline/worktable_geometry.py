@@ -1558,7 +1558,7 @@ def _format_vec(vec: dict[str, Any]) -> str:
 
 
 def _clean(value: Any) -> Any:
-    native = native_acceleration.clean_empty_containers(value)
+    native = native_acceleration.clean_empty_containers_required(value)
     if native is not None:
         return native[1]
     if isinstance(value, dict):
