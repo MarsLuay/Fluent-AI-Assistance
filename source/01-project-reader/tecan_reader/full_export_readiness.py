@@ -38,7 +38,7 @@ def _contains_casefold(value: str, needle: str) -> bool:
 
 def _casefold_text(value: str) -> str:
     if type(value) is str and value.strip() == value:
-        native = native_acceleration.ascii_casefold_trim(value)
+        native = native_acceleration.ascii_casefold_trim_required(value)
         if native is not None:
             return native
     return value.casefold()

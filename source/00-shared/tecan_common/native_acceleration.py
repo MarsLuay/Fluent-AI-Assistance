@@ -3353,7 +3353,7 @@ def ascii_casefold_trim_required(value: Any) -> str | None:
         return None
     try:
         result = _native.ascii_casefold_trim(value)
-    except UnicodeError:
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
         return None
     if type(result) is not str:
         raise RuntimeError("required Rust ASCII casefold helper returned invalid data")
