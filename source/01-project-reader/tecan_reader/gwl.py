@@ -8,7 +8,7 @@ from typing import Any
 
 from tecan_common.gwl import Pipette, parse_gwl_line, parse_gwl_lines
 from tecan_common.native_acceleration import (
-    read_utf8_sig_file as _native_read_utf8_sig_file,
+    read_utf8_sig_file_required as _native_read_utf8_sig_file,
     worklist_count_record_types as _native_worklist_count_record_types,
     worklist_inspect_gwl_lines_required as _native_worklist_inspect_gwl_lines,
 )

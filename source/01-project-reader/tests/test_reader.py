@@ -2275,11 +2275,9 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(actual["record_counts"], {"C": 2, "A": 1, "D": 1})
 
-    def test_inspect_gwl_file_uses_native_utf8_sig_read_with_fallback(self) -> None:
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "read_utf8_sig_file"
-        ):
-            self.skipTest("optional Rust UTF-8-sig file reader is not built")
+    def test_inspect_gwl_file_uses_required_rust_utf8_sig_read_with_fallback(self) -> None:
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(hasattr(native_acceleration._native, "read_utf8_sig_file"))
         with tempfile.TemporaryDirectory() as raw_directory:
             path = Path(raw_directory) / "fixture.gwl"
             payload = (
@@ -2288,16 +2286,35 @@ class ReaderTests(unittest.TestCase):
             ).encode("utf-8")
             path.write_bytes(payload)
             with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-                expected = inspect_gwl(path, source_name="fixture.gwl")
-            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                self.assertIsNone(native_acceleration.read_utf8_sig_file(path))
+                with patch.object(
+                    native_acceleration,
+                    "read_utf8_sig_file_required",
+                    return_value=None,
+                ):
+                    expected = inspect_gwl(path, source_name="fixture.gwl")
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
                 with patch.object(
                     Path,
                     "read_text",
                     side_effect=AssertionError("native file reader should be used"),
-                ):
+                ), patch.object(
+                    native_acceleration._native,
+                    "read_utf8_sig_file",
+                    wraps=native_acceleration._native.read_utf8_sig_file,
+                ) as rust_reader:
                     actual = inspect_gwl(path, source_name="fixture.gwl")
+                    rust_reader.assert_called_once()
             self.assertEqual(actual, expected)
             self.assertEqual(actual["line_count"], 4)
+
+            path.write_bytes(b"\xff")
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                self.assertIsNone(
+                    native_acceleration.read_utf8_sig_file_required(path)
+                )
+                with self.assertRaises(UnicodeDecodeError):
+                    inspect_gwl(path, source_name="fixture.gwl")
 
     def test_inspect_gwl_lines_uses_required_rust_summary_with_ordered_examples(self) -> None:
         self.assertTrue(native_acceleration.available())

@@ -2293,8 +2293,15 @@ def read_text_file(path: str | Path) -> str | None:
 
 
 def read_utf8_sig_file(path: str | Path) -> str | None:
-    """Read strict UTF-8 with BOM removal and universal newlines, or fall back."""
-    if not enabled() or not isinstance(path, (str, Path)):
+    """Use the optional strict UTF-8-sig reader, or request Python fallback."""
+    if not enabled():
+        return None
+    return read_utf8_sig_file_required(path)
+
+
+def read_utf8_sig_file_required(path: str | Path) -> str | None:
+    """Read supported UTF-8-sig files natively, preserving Python fallback."""
+    if not isinstance(path, (str, Path)):
         return None
     try:
         result = _native.read_utf8_sig_file(str(path))
