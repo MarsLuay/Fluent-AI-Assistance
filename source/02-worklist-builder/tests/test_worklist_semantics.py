@@ -93,11 +93,9 @@ class WorklistSemanticsTests(unittest.TestCase):
                         outcomes.append((type(error), str(error)))
             self.assertEqual(outcomes[0], outcomes[1], operation)
 
-    def test_wash_scheme_normalization_matches_python(self):
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "worklist_wash_type"
-        ):
-            self.skipTest("optional Rust wash formatter is not built")
+    def test_wash_scheme_normalization_uses_rust_with_python_parity(self):
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(hasattr(native_acceleration._native, "worklist_wash_type"))
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertEqual(native_acceleration.worklist_wash_type(None), "W")
             self.assertEqual(native_acceleration.worklist_wash_type(1), "W1")
@@ -108,17 +106,39 @@ class WorklistSemanticsTests(unittest.TestCase):
         class IntegerScheme(int):
             pass
 
-        for scheme in (None, 1, 4, 0, 5, True, False, 1.0, 2.0, IntegerScheme(3)):
-            outcomes = []
+        def outcome_for(scheme):
+            try:
+                return Wash(scheme).type_character
+            except ValueError as error:
+                return type(error), str(error)
+
+        schemes = (None, 1, 4, 0, 5, True, False, 1.0, 2.0, IntegerScheme(3))
+        for scheme in schemes:
+            with patch.object(
+                native_acceleration,
+                "worklist_wash_type_required",
+                return_value=None,
+            ):
+                expected = outcome_for(scheme)
+
+            native_supported = scheme is None or (
+                type(scheme) is int and scheme in {1, 2, 3, 4}
+            )
             for disabled in ("1", "0"):
                 with patch.dict(
                     "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": disabled}
                 ):
-                    try:
-                        outcomes.append(Wash(scheme).type_character)
-                    except ValueError as error:
-                        outcomes.append((type(error), str(error)))
-            self.assertEqual(outcomes[0], outcomes[1], repr(scheme))
+                    with patch.object(
+                        native_acceleration._native,
+                        "worklist_wash_type",
+                        wraps=native_acceleration._native.worklist_wash_type,
+                    ) as rust_formatter:
+                        actual = outcome_for(scheme)
+                        if native_supported:
+                            rust_formatter.assert_called_once_with(scheme)
+                        else:
+                            rust_formatter.assert_not_called()
+                self.assertEqual(actual, expected, (repr(scheme), disabled))
 
     def test_transfer_boolean_parser_matches_python_and_falls_back(self):
         if not native_acceleration.available() or not hasattr(

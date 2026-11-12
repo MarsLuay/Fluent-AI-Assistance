@@ -4413,6 +4413,18 @@ def worklist_wash_type(scheme: Any) -> str | None:
         return None
 
 
+def worklist_wash_type_required(scheme: Any) -> str | None:
+    """Format only supported wash schemes in Rust; leave validation to Python."""
+    if scheme is not None and (
+        type(scheme) is not int or scheme not in {1, 2, 3, 4}
+    ):
+        return None
+    result = _native.worklist_wash_type(scheme)
+    if type(result) is not str:
+        raise RuntimeError("required Rust wash formatter returned no result")
+    return result
+
+
 def worklist_record_type_line(type_character: Any) -> str | None:
     """Format exact-string GWL record types natively, or request fallback."""
     if not enabled() or type(type_character) is not str:
