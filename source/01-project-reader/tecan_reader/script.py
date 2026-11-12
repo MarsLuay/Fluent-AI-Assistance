@@ -278,7 +278,7 @@ def _interesting_fields(el: ET.Element) -> dict[str, str]:
 
 
 def _sorted_unique_strings(*groups: list[str]) -> list[str]:
-    native = native_acceleration.sorted_unique_strings(groups)
+    native = native_acceleration.sorted_unique_strings_required(groups)
     if native is not None:
         return native
     return sorted({value for group in groups for value in group})

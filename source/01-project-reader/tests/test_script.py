@@ -287,15 +287,18 @@ class ScriptTests(unittest.TestCase):
             self.skipTest("optional Rust string sorter is not built")
         groups = (["zeta", "alpha", "zeta"], ["Alpha", "beta", "alpha"])
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected_values = script._sorted_unique_strings(*groups)
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
-                native_acceleration,
+                native_acceleration, "sorted_unique_strings_required", return_value=None
+            ):
+                expected_values = script._sorted_unique_strings(*groups)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
                 "sorted_unique_strings",
-                wraps=native_acceleration.sorted_unique_strings,
-            ) as native_call:
+                wraps=native_acceleration._native.sorted_unique_strings,
+            ) as rust_call:
                 actual_values = script._sorted_unique_strings(*groups)
-                native_call.assert_called_once_with(groups)
+                rust_call.assert_called_once_with([list(group) for group in groups])
         self.assertEqual(actual_values, expected_values)
         self.assertEqual(actual_values, ["Alpha", "alpha", "beta", "zeta"])
 
@@ -317,17 +320,37 @@ class ScriptTests(unittest.TestCase):
             self.assertIsNone(
                 native_acceleration.sorted_unique_strings(([chr(0xD800)],))
             )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "sorted_unique_strings",
+                wraps=native_acceleration._native.sorted_unique_strings,
+            ) as rust_call:
+                required_unicode = script._sorted_unique_strings(*unicode_groups)
+                rust_call.assert_called_once_with(
+                    [list(group) for group in unicode_groups]
+                )
+        self.assertEqual(required_unicode, expected_unicode)
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(script._sorted_unique_strings(*groups), expected_values)
+        surrogate_group = ["\ud800"]
+        self.assertEqual(
+            script._sorted_unique_strings(surrogate_group), sorted(set(surrogate_group))
+        )
 
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected_report = inspect_xscr_text(SAMPLE_XSCR, source_name="deps.xscr")
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
-                native_acceleration,
+                native_acceleration, "sorted_unique_strings_required", return_value=None
+            ):
+                expected_report = inspect_xscr_text(SAMPLE_XSCR, source_name="deps.xscr")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
                 "sorted_unique_strings",
-                wraps=native_acceleration.sorted_unique_strings,
-            ) as native_call:
+                wraps=native_acceleration._native.sorted_unique_strings,
+            ) as rust_call:
                 actual_report = inspect_xscr_text(SAMPLE_XSCR, source_name="deps.xscr")
-                self.assertGreater(native_call.call_count, 0)
+                self.assertGreater(rust_call.call_count, 0)
         self.assertEqual(actual_report, expected_report)
 
     def test_variable_declaration_dedup_uses_rust_for_unicode_with_surrogate_fallback(self) -> None:
