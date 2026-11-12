@@ -340,51 +340,77 @@ class TestSearchProjectIndex(unittest.TestCase):
         self.assertEqual(result["result_count"], 1)
         self.assertEqual(result["results"][0]["name"], "Water")
 
-    def test_kind_filter_normalization_uses_rust_with_unicode_fallback(self):
+    def test_kind_filter_normalization_uses_required_rust_with_unicode_fallback(self):
         values = (" Liquid-Class ", "Café-Kind", "\u217c", "", None)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = [project_index._normalize_kind_filter(value) for value in values]
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration, "ascii_casefold_trim_required", return_value=None
+            ):
+                expected = [
+                    project_index._normalize_kind_filter(value) for value in values
+                ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
                 native_acceleration,
+                "ascii_casefold_trim_required",
+                wraps=native_acceleration.ascii_casefold_trim_required,
+            ) as required_call, patch.object(
+                native_acceleration._native,
                 "ascii_casefold_trim",
-                wraps=native_acceleration.ascii_casefold_trim,
-            ) as native_call:
+                wraps=native_acceleration._native.ascii_casefold_trim,
+            ) as rust_call:
                 actual = [project_index._normalize_kind_filter(value) for value in values]
-                self.assertEqual(native_call.call_count, 3)
+                self.assertEqual(required_call.call_count, 3)
+                self.assertEqual(rust_call.call_count, 1)
         self.assertEqual(actual, expected)
         self.assertEqual(
             actual, ["liquid_class", "café_kind", "\u217c", None, None]
         )
 
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            with patch.object(native_acceleration, "ascii_casefold_trim", return_value=None):
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_casefold_trim_required",
+                return_value=None,
+            ):
                 fallback = [
                     project_index._normalize_kind_filter(value) for value in values
                 ]
         self.assertEqual(fallback, expected)
 
-    def test_lower_text_uses_rust_and_preserves_python_fallback(self):
+    def test_lower_text_uses_required_rust_and_preserves_python_fallback(self):
         class LowerSubclass(str):
             def lower(self) -> str:
                 return "custom-lower"
 
         values = ("Worktable", " Café ", "\u217c", LowerSubclass("ABC"))
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = [project_index._lower_text(value) for value in values]
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration, "ascii_casefold_trim_required", return_value=None
+            ):
+                expected = [project_index._lower_text(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
                 native_acceleration,
+                "ascii_casefold_trim_required",
+                wraps=native_acceleration.ascii_casefold_trim_required,
+            ) as required_call, patch.object(
+                native_acceleration._native,
                 "ascii_casefold_trim",
-                wraps=native_acceleration.ascii_casefold_trim,
-            ) as native_call:
+                wraps=native_acceleration._native.ascii_casefold_trim,
+            ) as rust_call:
                 actual = [project_index._lower_text(value) for value in values]
-                self.assertEqual(native_call.call_count, 2)
+                self.assertEqual(required_call.call_count, 2)
+                self.assertEqual(rust_call.call_count, 1)
         self.assertEqual(actual, expected)
         self.assertEqual(actual, ["worktable", " café ", "\u217c", "custom-lower"])
 
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            with patch.object(native_acceleration, "ascii_casefold_trim", return_value=None):
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_casefold_trim_required",
+                return_value=None,
+            ):
                 fallback = [project_index._lower_text(value) for value in values]
         self.assertEqual(fallback, expected)
 
@@ -403,30 +429,42 @@ class TestSearchProjectIndex(unittest.TestCase):
         )
 
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = [
-                find_entity_candidates(self.db_path, identifier, kind=kind)
-                for identifier, kind in queries
-            ]
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
+                "ascii_casefold_trim_required",
+                return_value=None,
+            ):
+                expected = [
+                    find_entity_candidates(self.db_path, identifier, kind=kind)
+                    for identifier, kind in queries
+                ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration,
+                "ascii_casefold_trim_required",
+                wraps=native_acceleration.ascii_casefold_trim_required,
+            ) as required_call, patch.object(
+                native_acceleration._native,
                 "ascii_casefold_trim",
-                wraps=native_acceleration.ascii_casefold_trim,
-            ) as native_call:
+                wraps=native_acceleration._native.ascii_casefold_trim,
+            ) as rust_call:
                 actual = [
                     find_entity_candidates(self.db_path, identifier, kind=kind)
                     for identifier, kind in queries
                 ]
-                self.assertEqual(native_call.call_count, 5)
+                self.assertEqual(required_call.call_count, 5)
+                self.assertEqual(rust_call.call_count, 4)
         self.assertEqual(actual, expected)
         self.assertEqual(
             [result["status"] for result in actual],
             ["unique", "unique", "missing"],
         )
 
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
-                native_acceleration, "ascii_casefold_trim", return_value=None
+                native_acceleration,
+                "ascii_casefold_trim_required",
+                return_value=None,
             ):
                 fallback = [
                     find_entity_candidates(self.db_path, identifier, kind=kind)

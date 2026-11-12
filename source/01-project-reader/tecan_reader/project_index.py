@@ -30,7 +30,7 @@ SCHEMA_VERSION = "2"
 
 def _lower_text(value: str) -> str:
     if type(value) is str and value.strip() == value:
-        native = native_acceleration.ascii_casefold_trim(value)
+        native = native_acceleration.ascii_casefold_trim_required(value)
         if native is not None:
             return native
     return value.lower()
@@ -382,7 +382,7 @@ def find_entity_candidates(
     try:
         raw_identifier = str(identifier)
         native_needle = (
-            native_acceleration.ascii_casefold_trim(raw_identifier)
+            native_acceleration.ascii_casefold_trim_required(raw_identifier)
             if (
                 type(raw_identifier) is str
                 and raw_identifier.strip() == raw_identifier
