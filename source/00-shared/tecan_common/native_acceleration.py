@@ -3633,6 +3633,25 @@ def sorted_unique_strings(groups: Any) -> list[str] | None:
         return None
 
 
+def sorted_unique_strings_required(groups: Any) -> list[str] | None:
+    """Sort supported exact Unicode string groups in Rust, retaining fallback."""
+    if type(groups) not in (list, tuple) or not all(
+        type(group) in (list, tuple)
+        and all(type(value) is str for value in group)
+        for group in groups
+    ):
+        return None
+    try:
+        result = _native.sorted_unique_strings([list(group) for group in groups])
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+    if result is None:
+        return None
+    if type(result) is not list or not all(type(value) is str for value in result):
+        raise RuntimeError("required Rust unique-string sorter returned invalid data")
+    return result
+
+
 def most_common_string_counts(
     mapping: Any, limit: Any = None
 ) -> dict[str, int] | None:

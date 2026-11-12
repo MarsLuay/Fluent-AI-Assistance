@@ -21,7 +21,7 @@ from tecan_common.native_acceleration import (
     project_model_entry_path_required as _native_project_model_entry_path,
     project_model_identifiers_required as _native_project_model_identifiers,
     sort_string_keys_required as _native_sort_string_keys,
-    sorted_unique_strings as _native_sorted_unique_strings,
+    sorted_unique_strings_required as _native_sorted_unique_strings,
 )
 
 

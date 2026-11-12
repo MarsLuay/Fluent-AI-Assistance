@@ -35,6 +35,8 @@ class ProjectModelTests(unittest.TestCase):
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
                 project_model, "_native_sort_string_keys", return_value=None
+            ), patch.object(
+                project_model, "_native_sorted_unique_strings", return_value=None
             ):
                 expected = build_completeness_metadata(**arguments)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
@@ -42,17 +44,16 @@ class ProjectModelTests(unittest.TestCase):
                 native_acceleration._native,
                 "sort_string_keys",
                 wraps=native_acceleration._native.sort_string_keys,
-            ) as rust_call:
+            ) as rust_call, patch.object(
+                native_acceleration._native,
+                "sorted_unique_strings",
+                wraps=native_acceleration._native.sorted_unique_strings,
+            ) as unique_rust_call:
                 actual = build_completeness_metadata(**arguments)
                 self.assertEqual(rust_call.call_count, 2)
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            with patch.object(
-                project_model,
-                "_native_sorted_unique_strings",
-                wraps=native_acceleration.sorted_unique_strings,
-            ) as unique_call:
-                actual = build_completeness_metadata(**arguments)
-                unique_call.assert_called_once()
+                unique_rust_call.assert_called_once_with(
+                    [list(arguments["oversized_members"])]
+                )
         self.assertEqual(actual, expected)
         self.assertEqual(actual["oversized_members"], ["alpha", "zeta"])
         self.assertEqual(
@@ -80,6 +81,39 @@ class ProjectModelTests(unittest.TestCase):
                 unicode_result["eligible_member_counts"], {"a": 2, "é": 1}
             )
             self.assertEqual(unicode_result["oversized_members"], ["a", "é"])
+
+    def test_required_unique_string_sort_retains_unsupported_fallbacks(self) -> None:
+        if not native_acceleration.available() or not hasattr(
+            native_acceleration._native, "sorted_unique_strings"
+        ):
+            self.skipTest("optional Rust unique-string sorter is not built")
+        values = ["zeta", "alpha", "zeta"]
+        expected = sorted(set(values))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "sorted_unique_strings",
+                wraps=native_acceleration._native.sorted_unique_strings,
+            ) as rust_call:
+                actual = project_model._sorted_unique_strings(values)
+                rust_call.assert_called_once_with([values])
+        self.assertEqual(actual, expected)
+
+        surrogate_values = ["\ud800", "a", "a"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "sorted_unique_strings",
+                wraps=native_acceleration._native.sorted_unique_strings,
+            ) as rust_call:
+                surrogate_actual = project_model._sorted_unique_strings(
+                    surrogate_values
+                )
+                rust_call.assert_called_once_with([surrogate_values])
+        self.assertEqual(surrogate_actual, sorted(set(surrogate_values)))
+
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(project_model._sorted_unique_strings(values), expected)
 
     def test_native_string_key_sort_matches_python_unicode_order(self) -> None:
         if not native_acceleration.available() or not hasattr(
