@@ -181,16 +181,27 @@ class TestProjectIndexFileHash(unittest.TestCase):
             ]
             for path, expected in cases:
                 with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-                    python_result = project_index._sha256(path)
+                    with patch.object(
+                        native_acceleration, "sha256_file_required", return_value=None
+                    ):
+                        python_result = project_index._sha256(path)
                 with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
                     self.assertEqual(native_acceleration.sha256_file(path), expected)
-                    native_result = project_index._sha256(path)
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                    with patch.object(
+                        native_acceleration._native,
+                        "sha256_file",
+                        wraps=native_acceleration._native.sha256_file,
+                    ) as rust_call:
+                        native_result = project_index._sha256(path)
+                        rust_call.assert_called_once()
                 self.assertEqual(python_result, expected)
                 self.assertEqual(native_result, python_result)
 
             missing_path = Path(tmp) / "missing.bin"
             with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
                 self.assertIsNone(native_acceleration.sha256_file(missing_path))
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
                 with self.assertRaises(FileNotFoundError):
                     project_index._sha256(missing_path)
 

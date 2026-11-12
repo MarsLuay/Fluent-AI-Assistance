@@ -2535,6 +2535,25 @@ def sha256_file(path: Any) -> str | None:
         return None
 
 
+def sha256_file_required(path: Any) -> str | None:
+    """Stream-hash exact Path values in Rust, preserving file-error fallback."""
+    if type(path) is not _PathType:
+        return None
+    try:
+        result = _native.sha256_file(str(path))
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+    if result is None:
+        return None
+    if (
+        type(result) is not str
+        or len(result) != 64
+        or any(character not in "0123456789abcdef" for character in result)
+    ):
+        raise RuntimeError("required Rust file SHA-256 helper returned invalid data")
+    return result
+
+
 def canonical_json(value: Any) -> str | None:
     """Serialize JSON-compatible values with sorted keys, or request fallback."""
     if not enabled():

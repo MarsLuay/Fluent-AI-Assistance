@@ -1296,7 +1296,7 @@ def _count(conn: sqlite3.Connection, table: str) -> int:
 
 
 def _sha256(path: Path) -> str:
-    native = native_acceleration.sha256_file(path)
+    native = native_acceleration.sha256_file_required(path)
     if native is not None:
         return native
     digest = hashlib.sha256()
