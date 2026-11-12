@@ -110,15 +110,20 @@ class TestProjectIndexResultDeduplication(unittest.TestCase):
             {**first, "name": "é", "payload": "unicode duplicate"},
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = project_index._dedupe_results(results)
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
-                project_index.native_acceleration,
+                native_acceleration,
+                "project_index_dedupe_indices_required",
+                return_value=None,
+            ):
+                expected = project_index._dedupe_results(results)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
                 "project_index_dedupe_indices",
-                wraps=native_acceleration.project_index_dedupe_indices,
-            ) as native_call:
+                wraps=native_acceleration._native.project_index_dedupe_indices,
+            ) as rust_call:
                 actual = project_index._dedupe_results(results)
-                native_call.assert_called_once_with(results)
+                rust_call.assert_called_once_with(results)
         self.assertEqual(actual, expected)
         self.assertEqual(actual, [first, results[2], results[3], results[4], results[6]])
         self.assertIs(actual[0], first)
@@ -141,10 +146,22 @@ class TestProjectIndexResultDeduplication(unittest.TestCase):
             {"kind": StringSubclass("entity"), "name": "subclass"},
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = project_index._dedupe_results(unsupported)
+            with patch.object(
+                native_acceleration,
+                "project_index_dedupe_indices_required",
+                return_value=None,
+            ):
+                expected = project_index._dedupe_results(unsupported)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(native_acceleration.project_index_dedupe_indices(unsupported))
-            actual = project_index._dedupe_results(unsupported)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "project_index_dedupe_indices",
+                wraps=native_acceleration._native.project_index_dedupe_indices,
+            ) as rust_call:
+                actual = project_index._dedupe_results(unsupported)
+                rust_call.assert_called_once_with(unsupported)
         self.assertEqual(actual, expected)
         self.assertEqual(len(actual), 4)
         self.assertIs(actual[1], unsupported[1])

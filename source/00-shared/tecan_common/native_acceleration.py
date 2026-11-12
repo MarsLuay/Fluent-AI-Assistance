@@ -2484,6 +2484,25 @@ def project_index_dedupe_indices(results: Any) -> list[int] | None:
         return None
 
 
+def project_index_dedupe_indices_required(results: Any) -> list[int] | None:
+    """Deduplicate supported project-index rows in Rust, retaining fallback."""
+    if type(results) is not list:
+        return None
+    try:
+        indices = _native.project_index_dedupe_indices(results)
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+    if indices is None:
+        return None
+    if (
+        type(indices) is not list
+        or not all(type(index) is int and 0 <= index < len(results) for index in indices)
+        or not all(left < right for left, right in zip(indices, indices[1:]))
+    ):
+        raise RuntimeError("required Rust project-index deduplicator returned invalid data")
+    return indices
+
+
 def sha256_text(value: Any) -> str | None:
     """Hash exact Unicode text natively, or request the Python hashing fallback."""
     if not enabled() or type(value) is not str:
