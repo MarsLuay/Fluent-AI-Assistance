@@ -3840,6 +3840,25 @@ def ordered_string_counts(values: Any) -> dict[str, int] | None:
         return None
 
 
+def ordered_string_counts_required(values: Any) -> dict[str, int] | None:
+    """Count supported exact strings in Rust, retaining Python fallback."""
+    if type(values) not in (list, tuple) or not all(
+        type(value) is str for value in values
+    ):
+        return None
+    try:
+        result = _native.ordered_string_counts(list(values))
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+    if result is None:
+        return None
+    if type(result) is not dict or not all(
+        type(key) is str and type(count) is int for key, count in result.items()
+    ):
+        raise RuntimeError("required Rust ordered counter returned invalid data")
+    return result
+
+
 def pattern_specification_groups(groups: Any) -> dict[str, list[str]] | None:
     """Normalize and deduplicate exact ASCII pattern specification groups."""
     if (

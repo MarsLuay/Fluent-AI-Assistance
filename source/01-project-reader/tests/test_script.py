@@ -1,3 +1,4 @@
+from collections import Counter
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -535,15 +536,18 @@ class ScriptTests(unittest.TestCase):
             self.skipTest("optional Rust ordered counter is not built")
         values = ["Zeta", "Alpha", "Zeta", "Beta", "Alpha", "Gamma"]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected_counts = script._ordered_counts(values)
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
-                native_acceleration,
+                native_acceleration, "ordered_string_counts_required", return_value=None
+            ):
+                expected_counts = script._ordered_counts(values)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
                 "ordered_string_counts",
-                wraps=native_acceleration.ordered_string_counts,
-            ) as native_call:
+                wraps=native_acceleration._native.ordered_string_counts,
+            ) as rust_call:
                 actual_counts = script._ordered_counts(values)
-                native_call.assert_called_once_with(values)
+                rust_call.assert_called_once_with(values)
         self.assertEqual(list(actual_counts.items()), list(expected_counts.items()))
         self.assertEqual(
             list(actual_counts.items()),
@@ -552,7 +556,10 @@ class ScriptTests(unittest.TestCase):
 
         unicode_values = ["É", "A", "É", "A", "Ω"]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected_unicode_counts = script._ordered_counts(unicode_values)
+            with patch.object(
+                native_acceleration, "ordered_string_counts_required", return_value=None
+            ):
+                expected_unicode_counts = script._ordered_counts(unicode_values)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             native_unicode_counts = native_acceleration.ordered_string_counts(
                 unicode_values
@@ -562,22 +569,59 @@ class ScriptTests(unittest.TestCase):
                 list(native_unicode_counts.items()),
                 list(expected_unicode_counts.items()),
             )
-            self.assertEqual(
-                script._ordered_counts(unicode_values), expected_unicode_counts
-            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "ordered_string_counts",
+                wraps=native_acceleration._native.ordered_string_counts,
+            ) as rust_call:
+                required_unicode_counts = script._ordered_counts(unicode_values)
+                rust_call.assert_called_once_with(unicode_values)
+        self.assertEqual(required_unicode_counts, expected_unicode_counts)
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(script._ordered_counts(values), expected_counts)
+
+        surrogate_values = ["\ud800", "a", "a"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "ordered_string_counts",
+                wraps=native_acceleration._native.ordered_string_counts,
+            ) as rust_call:
+                surrogate_counts = script._ordered_counts(surrogate_values)
+                rust_call.assert_called_once_with(surrogate_values)
+        self.assertEqual(surrogate_counts, dict(Counter(surrogate_values).most_common()))
+
+        unsupported_values = ["a", 1, "a"]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "ordered_string_counts",
+                wraps=native_acceleration._native.ordered_string_counts,
+            ) as rust_call:
+                unsupported_counts = script._ordered_counts(unsupported_values)
+                rust_call.assert_not_called()
+        self.assertEqual(
+            unsupported_counts, dict(Counter(unsupported_values).most_common())
+        )
 
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected_report = inspect_xscr_text(SAMPLE_XSCR, source_name="test.xscr")
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
-                native_acceleration,
+                native_acceleration, "ordered_string_counts_required", return_value=None
+            ):
+                expected_report = inspect_xscr_text(
+                    SAMPLE_XSCR, source_name="test.xscr"
+                )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
                 "ordered_string_counts",
-                wraps=native_acceleration.ordered_string_counts,
-            ) as native_call:
+                wraps=native_acceleration._native.ordered_string_counts,
+            ) as rust_call:
                 actual_report = inspect_xscr_text(
                     SAMPLE_XSCR, source_name="test.xscr"
                 )
-                self.assertEqual(native_call.call_count, 2)
+                self.assertEqual(rust_call.call_count, 2)
         self.assertEqual(actual_report, expected_report)
 
     def test_inspect_xscr_uses_explicit_source_name(self) -> None:
