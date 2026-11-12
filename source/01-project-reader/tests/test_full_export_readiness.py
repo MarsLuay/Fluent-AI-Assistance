@@ -135,16 +135,30 @@ class FullExportReadinessTests(unittest.TestCase):
             )
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = [readiness_module._unresolved_diagnostic(item) for item in items]
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
+                "ascii_case_insensitive_substring_match_values_required",
+                return_value=None,
+            ):
+                expected = [
+                    readiness_module._unresolved_diagnostic(item) for item in items
+                ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
                 "ascii_case_insensitive_substring_match_values",
-                wraps=native_acceleration.ascii_case_insensitive_substring_match_values,
-            ) as native_call:
+                wraps=(
+                    native_acceleration._native.ascii_case_insensitive_substring_match_values
+                ),
+            ) as rust_call:
                 actual = [readiness_module._unresolved_diagnostic(item) for item in items]
-                self.assertEqual(native_call.call_count, 3)
+                self.assertEqual(rust_call.call_count, 2)
         self.assertEqual(actual, expected)
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(
+                [readiness_module._unresolved_diagnostic(item) for item in items],
+                expected,
+            )
         self.assertEqual(
             [item["code"] for item in actual],
             [

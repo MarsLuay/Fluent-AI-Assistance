@@ -3588,6 +3588,34 @@ def ascii_case_insensitive_substring_match_values(
         return None
 
 
+def ascii_case_insensitive_substring_match_values_required(
+    values: Any, needle: Any
+) -> list[bool] | None:
+    """Match supported ASCII strings in Rust, retaining unsupported fallback."""
+    if (
+        type(values) not in (list, tuple)
+        or type(needle) is not str
+        or not needle.isascii()
+        or not all(type(value) is str and value.isascii() for value in values)
+    ):
+        return None
+    try:
+        result = _native.ascii_case_insensitive_substring_match_values(
+            list(values), needle
+        )
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+    if result is None:
+        return None
+    if (
+        type(result) is not list
+        or len(result) != len(values)
+        or not all(type(matched) is bool for matched in result)
+    ):
+        raise RuntimeError("required Rust ASCII substring matcher returned invalid data")
+    return result
+
+
 def ascii_case_insensitive_substring_match_groups(
     values: Any, groups: Any
 ) -> list[bool] | None:

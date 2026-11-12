@@ -28,7 +28,7 @@ def _casefold_equals(value: str, expected: str) -> bool:
 
 
 def _contains_casefold(value: str, needle: str) -> bool:
-    native = native_acceleration.ascii_case_insensitive_substring_match_values(
+    native = native_acceleration.ascii_case_insensitive_substring_match_values_required(
         [value], needle
     )
     if native is not None:
