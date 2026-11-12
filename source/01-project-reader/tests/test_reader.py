@@ -2299,11 +2299,11 @@ class ReaderTests(unittest.TestCase):
             self.assertEqual(actual, expected)
             self.assertEqual(actual["line_count"], 4)
 
-    def test_inspect_gwl_lines_uses_native_summary_with_ordered_examples(self) -> None:
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "worklist_inspect_gwl_lines"
-        ):
-            self.skipTest("optional Rust GWL summary is not built")
+    def test_inspect_gwl_lines_uses_required_rust_summary_with_ordered_examples(self) -> None:
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(
+            hasattr(native_acceleration._native, "worklist_inspect_gwl_lines")
+        )
         lines = [
             "",
             "W5;",
@@ -2321,15 +2321,25 @@ class ReaderTests(unittest.TestCase):
         )
         lines.append("D;Destination;;Plate;1;;20;Water;;;")
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = inspect_gwl_lines(lines, source_name="sample.gwl")
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            with patch.object(
+                native_acceleration,
+                "worklist_inspect_gwl_lines_required",
+                return_value=None,
+            ):
+                expected = inspect_gwl_lines(lines, source_name="sample.gwl")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
                 reader_gwl,
                 "_native_worklist_inspect_gwl_lines",
                 wraps=reader_gwl._native_worklist_inspect_gwl_lines,
-            ) as native_parser:
+            ) as native_parser, patch.object(
+                native_acceleration._native,
+                "worklist_inspect_gwl_lines",
+                wraps=native_acceleration._native.worklist_inspect_gwl_lines,
+            ) as rust_summary:
                 actual = inspect_gwl_lines(lines, source_name="sample.gwl")
                 native_parser.assert_called_once()
+                rust_summary.assert_called_once()
         self.assertEqual(actual, expected)
         self.assertEqual(
             actual["record_counts"],
@@ -2348,9 +2358,15 @@ class ReaderTests(unittest.TestCase):
     def test_inspect_gwl_lines_falls_back_for_unsupported_unicode(self) -> None:
         lines = ["\x1c", "C;µ", "A;Räck;;Plate;1;;20;Water;;;"]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = inspect_gwl_lines(lines, source_name="unicode.gwl")
+            with patch.object(
+                native_acceleration,
+                "worklist_inspect_gwl_lines_required",
+                return_value=None,
+            ):
+                expected = inspect_gwl_lines(lines, source_name="unicode.gwl")
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(native_acceleration.worklist_inspect_gwl_lines(lines))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
                 reader_gwl,
                 "_native_worklist_inspect_gwl_lines",

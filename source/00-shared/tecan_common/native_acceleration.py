@@ -4206,16 +4206,19 @@ def worklist_parse_gwl_records_required(
 
 
 def worklist_inspect_gwl_lines(lines: Any) -> dict[str, Any] | None:
-    """Summarize supported ASCII GWL lines natively, or request Python fallback."""
-    if (
-        not enabled()
-        or type(lines) is not list
-        or not all(
-            type(line) is str
-            and line.isascii()
-            and not any(0x1C <= ord(character) <= 0x1F for character in line)
-            for line in lines
-        )
+    """Use the optional ASCII GWL summary kernel, or request Python fallback."""
+    if not enabled():
+        return None
+    return worklist_inspect_gwl_lines_required(lines)
+
+
+def worklist_inspect_gwl_lines_required(lines: Any) -> dict[str, Any] | None:
+    """Use Rust for supported ASCII GWL summaries, preserving fallback cases."""
+    if type(lines) is not list or not all(
+        type(line) is str
+        and line.isascii()
+        and not any(0x1C <= ord(character) <= 0x1F for character in line)
+        for line in lines
     ):
         return None
     try:
