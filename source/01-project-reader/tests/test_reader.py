@@ -1841,11 +1841,9 @@ class ReaderTests(unittest.TestCase):
                 xml_helpers.all_text_values(surrogate_root), [chr(0xD800)]
             )
 
-    def test_native_extension_counts_match_path_suffix_fallback(self) -> None:
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "extension_counts"
-        ):
-            self.skipTest("optional Rust extension counter is not built")
+    def test_required_rust_extension_counts_match_path_suffix_fallback(self) -> None:
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(hasattr(native_acceleration._native, "extension_counts"))
         names = [
             Path("script.XSCR"),
             "archive.tar.GZ",
@@ -1863,26 +1861,25 @@ class ReaderTests(unittest.TestCase):
             Path("C:\\"),
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = extension_counts(names)
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            expected_suffixes = [Path(name).suffix.lower() or "<none>" for name in names]
-            self.assertEqual(
-                native_acceleration.path_suffixes(names), expected_suffixes
-            )
             with patch.object(
-                reader_common,
-                "_native_path_suffixes",
-                wraps=native_acceleration.path_suffixes,
-            ) as suffix_call:
-                extension_counts(names)
-                suffix_call.assert_called_once()
+                native_acceleration,
+                "extension_counts_required",
+                return_value=None,
+            ):
+                expected = extension_counts(names)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
                 reader_common,
                 "_native_extension_counts",
-                wraps=native_acceleration.extension_counts,
-            ) as native_call:
+                wraps=native_acceleration.extension_counts_required,
+            ) as native_call, patch.object(
+                native_acceleration._native,
+                "extension_counts",
+                wraps=native_acceleration._native.extension_counts,
+            ) as rust_counter:
                 actual = extension_counts(names)
-            native_call.assert_called_once()
+                native_call.assert_called_once()
+                rust_counter.assert_called_once()
         self.assertEqual(actual, expected)
         self.assertEqual(
             list(actual.items()),
@@ -1898,6 +1895,10 @@ class ReaderTests(unittest.TestCase):
         )
 
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+            expected_suffixes = [Path(name).suffix.lower() or "<none>" for name in names]
+            self.assertEqual(
+                native_acceleration.path_suffixes(names), expected_suffixes
+            )
             self.assertIsNone(native_acceleration.path_suffixes(["café.txt"]))
             with patch.object(
                 reader_common,
@@ -1919,6 +1920,9 @@ class ReaderTests(unittest.TestCase):
                     extension_counts(iter(["a.X", "b.X", "c.Y"])),
                     {".x": 2, ".y": 1},
                 )
+
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            self.assertEqual(extension_counts(["file.\ud800"]), {".\ud800": 1})
 
     def test_native_reader_text_decode_matches_python_encoding_order(self) -> None:
         if (

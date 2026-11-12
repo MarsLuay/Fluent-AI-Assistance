@@ -2541,32 +2541,37 @@ def path_suffixes(paths: Any) -> list[str] | None:
 
 
 def extension_counts(suffixes: Any) -> dict[str, int] | None:
-    """Count exact string suffixes natively and return them in sorted order."""
-    if (
-        not enabled()
-        or type(suffixes) not in (list, tuple)
-        or not all(type(suffix) is str for suffix in suffixes)
+    """Use the optional native suffix counter, or request Python fallback."""
+    if not enabled():
+        return None
+    return extension_counts_required(suffixes)
+
+
+def extension_counts_required(suffixes: Any) -> dict[str, int] | None:
+    """Count supported exact string suffixes in Rust, retaining fallback cases."""
+    if type(suffixes) not in (list, tuple) or not all(
+        type(suffix) is str for suffix in suffixes
     ):
         return None
     try:
         pairs = _native.extension_counts(list(suffixes))
-        if type(pairs) is not list:
-            return None
-        counts: dict[str, int] = {}
-        for pair in pairs:
-            if (
-                type(pair) is not tuple
-                or len(pair) != 2
-                or type(pair[0]) is not str
-                or type(pair[1]) is not int
-                or pair[1] < 0
-                or pair[0] in counts
-            ):
-                return None
-            counts[pair[0]] = pair[1]
-        return counts
-    except (AttributeError, TypeError, ValueError, OverflowError, UnicodeError):
+    except UnicodeError:
         return None
+    if type(pairs) is not list:
+        raise RuntimeError("required Rust extension counter returned no result")
+    counts: dict[str, int] = {}
+    for pair in pairs:
+        if (
+            type(pair) is not tuple
+            or len(pair) != 2
+            or type(pair[0]) is not str
+            or type(pair[1]) is not int
+            or pair[1] < 0
+            or pair[0] in counts
+        ):
+            raise RuntimeError("required Rust extension counter returned invalid data")
+        counts[pair[0]] = pair[1]
+    return counts
 
 
 def diagnostic_sort_indices(keys: Any) -> list[int] | None:
