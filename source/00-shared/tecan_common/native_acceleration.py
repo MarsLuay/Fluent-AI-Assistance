@@ -3681,6 +3681,42 @@ def most_common_string_counts(
         return None
 
 
+def most_common_string_counts_required(
+    mapping: Any, limit: Any = None
+) -> dict[str, int] | None:
+    """Order supported exact string counts in Rust, retaining fallback."""
+    if (
+        type(mapping) is not dict
+        or (
+            limit is not None
+            and (type(limit) is not int or not 0 <= limit < (1 << 63))
+        )
+        or not all(
+            type(key) is str
+            and type(count) is int
+            and -(1 << 63) <= count < (1 << 63)
+            for key, count in mapping.items()
+        )
+    ):
+        return None
+    try:
+        result = _native.most_common_string_counts(mapping, limit)
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+    if result is None:
+        return None
+    if (
+        type(result) is not dict
+        or not all(
+            type(key) is str and type(count) is int
+            for key, count in result.items()
+        )
+        or (limit is not None and len(result) > limit)
+    ):
+        raise RuntimeError("required Rust Counter sorter returned invalid data")
+    return result
+
+
 def ordered_string_counts(values: Any) -> dict[str, int] | None:
     """Count exact string values in stable ``Counter.most_common`` order."""
     if (

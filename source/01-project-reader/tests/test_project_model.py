@@ -197,15 +197,18 @@ class ProjectModelTests(unittest.TestCase):
             source_metadata={},
         )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = model.inspection_report()
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
-                project_model,
-                "_native_most_common_string_counts",
-                wraps=native_acceleration.most_common_string_counts,
-            ) as native_call:
+                project_model, "_native_most_common_string_counts", return_value=None
+            ):
+                expected = model.inspection_report()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "most_common_string_counts",
+                wraps=native_acceleration._native.most_common_string_counts,
+            ) as rust_call:
                 actual = model.inspection_report()
-                self.assertEqual(native_call.call_count, 3)
+                self.assertEqual(rust_call.call_count, 3)
         self.assertEqual(actual, expected)
         self.assertEqual(
             list(actual["family_counts"].items()),
@@ -227,13 +230,36 @@ class ProjectModelTests(unittest.TestCase):
                 list(native_unicode_counts.items()),
                 list(unicode_counts.most_common()),
             )
+            self.assertIsNone(
+                native_acceleration.most_common_string_counts({chr(0xD800): 1})
+            )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "most_common_string_counts",
+                wraps=native_acceleration._native.most_common_string_counts,
+            ) as rust_call:
+                required_unicode_counts = project_model._most_common_counts(
+                    unicode_counts
+                )
+                rust_call.assert_called_once_with(dict(unicode_counts), None)
+        self.assertEqual(required_unicode_counts, dict(unicode_counts.most_common()))
+        with patch.object(native_acceleration, "_native", None):
             self.assertEqual(
                 project_model._most_common_counts(unicode_counts),
                 dict(unicode_counts.most_common()),
             )
-            self.assertIsNone(
-                native_acceleration.most_common_string_counts({chr(0xD800): 1})
-            )
+
+        surrogate_counts = Counter({chr(0xD800): 1, "a": 1})
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "most_common_string_counts",
+                wraps=native_acceleration._native.most_common_string_counts,
+            ) as rust_call:
+                surrogate_actual = project_model._most_common_counts(surrogate_counts)
+                rust_call.assert_called_once_with(dict(surrogate_counts), None)
+        self.assertEqual(surrogate_actual, dict(surrogate_counts.most_common()))
 
     def test_model_json_compact_rust_and_python_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
