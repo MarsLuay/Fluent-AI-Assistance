@@ -428,7 +428,7 @@ def parse_gwl_line(raw_line: str, *, line_no: int | None = None, permissive: boo
 
 
 def _format_volume(value: float | int | str) -> str:
-    native = native_acceleration.worklist_format_volume(value)
+    native = native_acceleration.worklist_format_volume_required(value)
     if native is not None:
         return native
     if isinstance(value, str):

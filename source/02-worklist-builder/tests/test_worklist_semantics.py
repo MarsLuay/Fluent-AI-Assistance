@@ -442,11 +442,12 @@ class WorklistSemanticsTests(unittest.TestCase):
                 else:
                     self.assertIsNone(optional)
 
-    def test_native_gwl_volume_formatter_matches_python_fallback(self):
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "worklist_format_volume"
-        ):
-            self.skipTest("optional Rust GWL volume formatter is not built")
+    def test_gwl_volume_formatter_uses_required_rust_with_python_parity(self):
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(
+            hasattr(native_acceleration._native, "worklist_format_volume")
+        )
+
         class StringSubclass(str):
             pass
 
@@ -475,34 +476,53 @@ class WorklistSemanticsTests(unittest.TestCase):
         ]
         for value in values:
             with self.subTest(value_type=type(value).__name__, value=str(value)[:20]):
-                with patch.dict(
-                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                with patch.object(
+                    native_acceleration,
+                    "worklist_format_volume_required",
+                    return_value=None,
                 ):
                     expected = format_gwl_volume(value)
-                with patch.dict(
-                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
-                ):
-                    native = native_acceleration.worklist_format_volume(value)
-                    if type(value) in (int, float):
-                        self.assertIsNotNone(native)
-                    elif type(value) is str and value.strip() in {
-                        "12.5",
-                        "1e2",
-                        ".5",
-                        "1.",
-                        "1e999",
-                    }:
-                        self.assertIsNotNone(native)
-                    else:
-                        self.assertIsNone(native)
-                    actual = format_gwl_volume(value)
+
+                rust_attempted = type(value) in (str, int, float) and (
+                    type(value) is not str
+                    or (
+                        value.isascii()
+                        and not any(
+                            0x1C <= ord(character) <= 0x1F for character in value
+                        )
+                    )
+                )
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                    with patch.object(
+                        native_acceleration._native,
+                        "worklist_format_volume",
+                        wraps=native_acceleration._native.worklist_format_volume,
+                    ) as rust_formatter:
+                        actual = format_gwl_volume(value)
+                        if rust_attempted:
+                            rust_formatter.assert_called_once_with(value)
+                        else:
+                            rust_formatter.assert_not_called()
                 self.assertEqual(actual, expected)
+
+                with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+                    native = native_acceleration.worklist_format_volume(value)
+                if type(value) in (int, float) or (
+                    type(value) is str
+                    and value.strip()
+                    in {"12.5", "1e2", ".5", "1.", "1e999"}
+                ):
+                    self.assertIsNotNone(native)
+                else:
+                    self.assertIsNone(native)
                 if native is not None:
                     self.assertEqual(native, expected)
 
         oversized_integer = 10**400
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            self.assertIsNone(native_acceleration.worklist_format_volume(oversized_integer))
+            self.assertIsNone(
+                native_acceleration.worklist_format_volume(oversized_integer)
+            )
             with self.assertRaises(OverflowError):
                 format_gwl_volume(oversized_integer)
 

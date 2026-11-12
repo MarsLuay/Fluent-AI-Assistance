@@ -4316,6 +4316,22 @@ def worklist_format_volume(value: Any) -> str | None:
         return None
 
 
+def worklist_format_volume_required(value: Any) -> str | None:
+    """Use Rust for supported volume inputs; let callers preserve Python fallback."""
+    if type(value) not in (str, int, float):
+        return None
+    if type(value) is str and (
+        not value.isascii()
+        or any(0x1C <= ord(character) <= 0x1F for character in value)
+    ):
+        return None
+    try:
+        result = _native.worklist_format_volume(value)
+    except (TypeError, ValueError, OverflowError, UnicodeError):
+        return None
+    return result if type(result) is str else None
+
+
 def worklist_comment_line(text: Any) -> str | None:
     """Serialize exact-string GWL comments natively, or request Python fallback."""
     if not enabled() or type(text) is not str:
