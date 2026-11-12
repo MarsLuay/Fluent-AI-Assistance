@@ -336,16 +336,21 @@ class ProjectModelTests(unittest.TestCase):
             "extra": "ignored",
         }
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = project_model._identifiers(record)
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
-                project_model,
-                "_native_project_model_identifiers",
-                wraps=native_acceleration.project_model_identifiers,
-            ) as native_call:
+                project_model, "_native_project_model_identifiers", return_value=None
+            ):
+                expected = project_model._identifiers(record)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "project_model_identifiers",
+                wraps=native_acceleration._native.project_model_identifiers,
+            ) as rust_call:
                 actual = project_model._identifiers(record)
-                native_call.assert_called_once_with(record)
+                rust_call.assert_called_once_with(record)
         self.assertEqual(actual, expected)
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(project_model._identifiers(record), expected)
         self.assertEqual(
             list(actual),
             [
@@ -373,13 +378,14 @@ class ProjectModelTests(unittest.TestCase):
         }
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(native_acceleration.project_model_identifiers(unsupported))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
-                project_model,
-                "_native_project_model_identifiers",
-                wraps=native_acceleration.project_model_identifiers,
-            ) as native_call:
+                native_acceleration._native,
+                "project_model_identifiers",
+                wraps=native_acceleration._native.project_model_identifiers,
+            ) as rust_call:
                 fallback = project_model._identifiers(unsupported)
-                native_call.assert_called_once_with(unsupported)
+                rust_call.assert_called_once_with(unsupported)
         self.assertEqual(
             fallback,
             {

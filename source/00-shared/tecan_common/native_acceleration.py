@@ -2416,6 +2416,24 @@ def project_model_identifiers(record: Any) -> dict[str, str] | None:
         return None
 
 
+def project_model_identifiers_required(record: Any) -> dict[str, str] | None:
+    """Select supported project-model identifiers in Rust, retaining fallback."""
+    if type(record) is not dict:
+        return None
+    try:
+        result = _native.project_model_identifiers(record)
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+    if result is None:
+        return None
+    if type(result) is not dict or not all(
+        type(key) is str and type(value) is str
+        for key, value in result.items()
+    ):
+        raise RuntimeError("required Rust project-model identifier selector returned invalid data")
+    return result
+
+
 def project_model_entry_path(record: Any) -> str | None:
     """Select and normalize an exact-string record path, or request fallback."""
     if not enabled() or type(record) is not dict:
