@@ -614,20 +614,25 @@ class FullExportReadinessTests(unittest.TestCase):
             ],
         )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = resolve_full_export_readiness(model).to_dict()
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
-                native_acceleration,
+                native_acceleration, "ascii_casefold_equals_required", return_value=None
+            ):
+                expected = resolve_full_export_readiness(model).to_dict()
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
                 "ascii_casefold_equals",
-                wraps=native_acceleration.ascii_casefold_equals,
-            ) as native_call:
+                wraps=native_acceleration._native.ascii_casefold_equals,
+            ) as rust_call:
                 actual = resolve_full_export_readiness(model).to_dict()
-                self.assertGreaterEqual(native_call.call_count, 4)
+                self.assertGreaterEqual(rust_call.call_count, 4)
         self.assertEqual(actual, expected)
         self.assertEqual(actual["status"], ReadinessStatus.COMPLETE_WITH_WARNINGS.value)
         self.assertIsNone(
             native_acceleration.ascii_casefold_equals("warníng", "warning")
         )
+        with patch.object(native_acceleration, "_native", None):
+            self.assertTrue(readiness_module._casefold_equals("WARNING", "warning"))
 
     def test_legacy_reference_id_uses_native_ascii_comparison_with_unicode_fallback(self) -> None:
         if not native_acceleration.available() or not hasattr(
@@ -644,15 +649,18 @@ class FullExportReadinessTests(unittest.TestCase):
             )
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = [readiness_module._legacy_reference_id(item) for item in items]
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
-                native_acceleration,
+                native_acceleration, "ascii_casefold_equals_required", return_value=None
+            ):
+                expected = [readiness_module._legacy_reference_id(item) for item in items]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
                 "ascii_casefold_equals",
-                wraps=native_acceleration.ascii_casefold_equals,
-            ) as native_call:
+                wraps=native_acceleration._native.ascii_casefold_equals,
+            ) as rust_call:
                 actual = [readiness_module._legacy_reference_id(item) for item in items]
-                self.assertEqual(native_call.call_count, 6)
+                self.assertEqual(rust_call.call_count, 5)
         self.assertEqual(actual, expected)
         self.assertEqual(
             actual,

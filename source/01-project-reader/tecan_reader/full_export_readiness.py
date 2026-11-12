@@ -21,7 +21,7 @@ from .zeia_adapters import ZeiaFormatError, ingest_zeia
 
 
 def _casefold_equals(value: str, expected: str) -> bool:
-    native = native_acceleration.ascii_casefold_equals(value, expected)
+    native = native_acceleration.ascii_casefold_equals_required(value, expected)
     if native is not None:
         return native
     return value.casefold() == expected

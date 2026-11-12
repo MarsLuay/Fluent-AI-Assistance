@@ -3312,6 +3312,26 @@ def ascii_casefold_equals(value: Any, expected: Any) -> bool | None:
         return None
 
 
+def ascii_casefold_equals_required(value: Any, expected: Any) -> bool | None:
+    """Compare supported ASCII strings in Rust, retaining fallback otherwise."""
+    if (
+        type(value) is not str
+        or type(expected) is not str
+        or not value.isascii()
+        or not expected.isascii()
+    ):
+        return None
+    try:
+        result = _native.ascii_casefold_equals(value, expected)
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+    if result is None:
+        return None
+    if type(result) is not bool:
+        raise RuntimeError("required Rust ASCII casefold comparison returned invalid data")
+    return result
+
+
 def ascii_lower(value: Any) -> str | None:
     """Lowercase exact ASCII text without trimming, or request Python fallback."""
     if not enabled() or type(value) is not str or not value.isascii():
