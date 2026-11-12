@@ -4573,6 +4573,42 @@ def worklist_count_record_types(types: Any) -> dict[str, int] | None:
         return None
 
 
+def worklist_count_record_types_required(types: Any) -> dict[str, int] | None:
+    """Count supported record types in Rust, retaining Python fallback cases."""
+    if (
+        type(types) not in (list, tuple)
+        or not all(type(record_type) is str for record_type in types)
+    ):
+        return None
+    try:
+        encoded = _native.worklist_count_record_types(_encode_json(types))
+    except UnicodeError:
+        return None
+    if type(encoded) is not str:
+        raise RuntimeError("required Rust record counter returned no result")
+    try:
+        pairs = json.loads(encoded)
+    except (TypeError, ValueError) as error:
+        raise RuntimeError(
+            "required Rust record counter returned invalid JSON"
+        ) from error
+    if type(pairs) is not list:
+        raise RuntimeError("required Rust record counter returned invalid data")
+    counts: dict[str, int] = {}
+    for pair in pairs:
+        if (
+            type(pair) is not list
+            or len(pair) != 2
+            or type(pair[0]) is not str
+            or type(pair[1]) is not int
+            or pair[1] < 0
+            or pair[0] in counts
+        ):
+            raise RuntimeError("required Rust record counter returned invalid data")
+        counts[pair[0]] = pair[1]
+    return counts
+
+
 def worklist_window_properties(
     source_keys: Any,
     destination_keys: Any,

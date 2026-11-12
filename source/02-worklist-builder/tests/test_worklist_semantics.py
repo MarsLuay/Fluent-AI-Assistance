@@ -391,11 +391,11 @@ class WorklistSemanticsTests(unittest.TestCase):
         self.assertIsInstance(worklist.records[2], RawRecord)
         self.assertEqual(worklist.to_text(), "\n".join(lines) + "\n")
 
-    def test_native_worklist_counts_preserve_first_seen_order(self):
-        if not native_acceleration.available() or not hasattr(
-            native_acceleration._native, "worklist_count_record_types"
-        ):
-            self.skipTest("optional Rust record counter is not built")
+    def test_worklist_counts_use_required_rust_and_preserve_fallbacks(self):
+        self.assertTrue(native_acceleration.available())
+        self.assertTrue(
+            hasattr(native_acceleration._native, "worklist_count_record_types")
+        )
         worklist = Worklist(
             records=[
                 Comment("note"),
@@ -407,28 +407,34 @@ class WorklistSemanticsTests(unittest.TestCase):
                 RawRecord("X", "X;opaque"),
             ]
         )
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+        with patch.object(
+            native_acceleration,
+            "worklist_count_record_types_required",
+            return_value=None,
+        ):
             expected = worklist.counts()
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
-                native_acceleration,
+                native_acceleration._native,
                 "worklist_count_record_types",
-                wraps=native_acceleration.worklist_count_record_types,
-            ) as native_call:
+                wraps=native_acceleration._native.worklist_count_record_types,
+            ) as rust_counter:
                 actual = worklist.counts()
-        native_call.assert_called_once()
+                rust_counter.assert_called_once()
         self.assertEqual(list(actual.items()), list(expected.items()))
         self.assertEqual(actual, {"C": 2, "A": 1, "D": 1, "W": 1, "B": 1, "X": 1})
 
         non_string_types = Worklist(records=[Comment("note", type_character=7)])
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
-            with patch.object(
-                native_acceleration,
-                "worklist_count_record_types",
-                side_effect=AssertionError("non-string record types must stay on Python"),
-            ) as native_call:
-                self.assertEqual(non_string_types.counts(), {7: 1})
-            native_call.assert_not_called()
+        with patch.object(
+            native_acceleration._native,
+            "worklist_count_record_types",
+            side_effect=AssertionError("non-string record types must stay on Python"),
+        ) as rust_counter:
+            self.assertEqual(non_string_types.counts(), {7: 1})
+        rust_counter.assert_not_called()
+
+        surrogate_type = Worklist(records=[Comment("note", type_character="C\ud800")])
+        self.assertEqual(surrogate_type.counts(), {"C\ud800": 1})
 
     def test_gwl_field_cleaner_uses_required_rust_with_python_parity(self):
         self.assertTrue(native_acceleration.available())

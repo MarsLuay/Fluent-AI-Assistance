@@ -257,12 +257,12 @@ class Worklist:
 
     def counts(self) -> dict[str, int]:
         native_record_types = (Pipette, Wash, Break, Comment, Flush, SetDiTiType, RawRecord)
-        if native_acceleration.enabled() and all(
-            type(record) in native_record_types for record in self.records
-        ):
+        if all(type(record) in native_record_types for record in self.records):
             record_types = [record.type_character for record in self.records]
             if all(type(record_type) is str for record_type in record_types):
-                native = native_acceleration.worklist_count_record_types(record_types)
+                native = native_acceleration.worklist_count_record_types_required(
+                    record_types
+                )
                 if native is not None:
                     return native
         counts: dict[str, int] = {}
