@@ -634,7 +634,7 @@ def _kind_token(value: Any) -> str:
 
 
 def _candidate(record: Mapping[str, Any]) -> dict[str, Any]:
-    native = native_acceleration.readiness_candidate(record)
+    native = native_acceleration.readiness_candidate_required(record)
     if native is not None:
         return native
     provenance = record.get("provenance") or {}

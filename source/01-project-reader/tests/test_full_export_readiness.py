@@ -505,15 +505,20 @@ class FullExportReadinessTests(unittest.TestCase):
             },
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = [readiness_module._candidate(record) for record in records]
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 readiness_module.native_acceleration,
+                "readiness_candidate_required",
+                return_value=None,
+            ):
+                expected = [readiness_module._candidate(record) for record in records]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
                 "readiness_candidate",
-                wraps=native_acceleration.readiness_candidate,
-            ) as native_call:
+                wraps=native_acceleration._native.readiness_candidate,
+            ) as rust_call:
                 actual = [readiness_module._candidate(record) for record in records]
-                self.assertEqual(native_call.call_count, len(records))
+                self.assertEqual(rust_call.call_count, len(records))
         self.assertEqual(actual, expected)
         self.assertEqual(
             list(actual[0]),
@@ -531,6 +536,8 @@ class FullExportReadinessTests(unittest.TestCase):
         self.assertEqual(actual[1]["source_entry"], "Objects/Worktable.xml")
         self.assertEqual(actual[2]["source_entry"], "Objects/fallback.xml")
         self.assertEqual(actual[3]["source_entry"], "Scripts/β.xscr")
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(readiness_module._candidate(records[1]), expected[1])
 
         class DictSubclass(dict):
             pass
@@ -539,12 +546,18 @@ class FullExportReadinessTests(unittest.TestCase):
             {"kind": 42, "object_name": "Object"},
             {"provenance": {"source_archive": 42}},
             {"entry": ["preserve", "list"]},
+            {"object_name": "\ud800"},
             DictSubclass({"kind": "subclass"}),
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected_fallback = [
-                readiness_module._candidate(record) for record in unsupported
-            ]
+            with patch.object(
+                readiness_module.native_acceleration,
+                "readiness_candidate_required",
+                return_value=None,
+            ):
+                expected_fallback = [
+                    readiness_module._candidate(record) for record in unsupported
+                ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertTrue(
                 all(
@@ -552,9 +565,16 @@ class FullExportReadinessTests(unittest.TestCase):
                     for record in unsupported
                 )
             )
-            actual_fallback = [
-                readiness_module._candidate(record) for record in unsupported
-            ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "readiness_candidate",
+                wraps=native_acceleration._native.readiness_candidate,
+            ) as rust_call:
+                actual_fallback = [
+                    readiness_module._candidate(record) for record in unsupported
+                ]
+                self.assertEqual(rust_call.call_count, len(unsupported) - 1)
         self.assertEqual(actual_fallback, expected_fallback)
         self.assertEqual(actual_fallback[0]["kind"], 42)
         self.assertEqual(actual_fallback[1]["source_archive"], 42)

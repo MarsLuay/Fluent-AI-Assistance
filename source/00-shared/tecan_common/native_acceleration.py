@@ -2542,6 +2542,27 @@ def readiness_candidate(record: Any) -> dict[str, str] | None:
         return None
 
 
+def readiness_candidate_required(record: Any) -> dict[str, str] | None:
+    """Project supported readiness records in Rust, retaining fallback."""
+    if type(record) is not dict:
+        return None
+    try:
+        result = _native.readiness_candidate(record)
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
+        return None
+    if result is None:
+        return None
+    expected_keys = {"source_archive", "source_entry", "kind", "object_name"}
+    if (
+        type(result) is not dict
+        or set(result) != expected_keys
+        or not all(type(key) is str for key in result)
+        or not all(type(value) is str for value in result.values())
+    ):
+        raise RuntimeError("required Rust readiness candidate projection returned invalid data")
+    return result
+
+
 def project_index_dedupe_indices(results: Any) -> list[int] | None:
     """Return stable result indices for supported project-index row mappings."""
     if not enabled() or type(results) is not list:
