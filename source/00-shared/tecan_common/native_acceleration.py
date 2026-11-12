@@ -2282,8 +2282,15 @@ def decode_text_bytes(data: Any) -> str | None:
 
 
 def read_text_file(path: str | Path) -> str | None:
-    """Read and decode a text file natively, or request the Python fallback."""
-    if not enabled() or not isinstance(path, (str, Path)):
+    """Use the optional native text-file reader, or request Python fallback."""
+    if not enabled():
+        return None
+    return read_text_file_required(path)
+
+
+def read_text_file_required(path: str | Path) -> str | None:
+    """Read supported text files natively, preserving the decoder fallback."""
+    if not isinstance(path, (str, Path)):
         return None
     try:
         result = _native.read_text_file(str(path))
