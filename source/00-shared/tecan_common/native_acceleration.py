@@ -2281,6 +2281,19 @@ def decode_text_bytes(data: Any) -> str | None:
         return None
 
 
+def decode_text_bytes_required(data: Any) -> str | None:
+    """Decode exact byte buffers in Rust, retaining Python compatibility fallback."""
+    if type(data) is not bytes:
+        return None
+    try:
+        result = _native.decode_text_bytes(data)
+    except (AttributeError, UnicodeError):
+        return None
+    if type(result) is not str:
+        raise RuntimeError("required Rust text decoder returned invalid data")
+    return result
+
+
 def read_text_file(path: str | Path) -> str | None:
     """Use the optional native text-file reader, or request Python fallback."""
     if not enabled():

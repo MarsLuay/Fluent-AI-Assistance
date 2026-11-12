@@ -2028,6 +2028,15 @@ class ReaderTests(unittest.TestCase):
                 ) as rust_reader:
                     self.assertEqual(read_text(path), "native reader ✓")
                     rust_reader.assert_called_once()
+            with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+                with patch.object(reader_common, "_native_read_text_file", return_value=None):
+                    with patch.object(
+                        native_acceleration._native,
+                        "decode_text_bytes",
+                        wraps=native_acceleration._native.decode_text_bytes,
+                    ) as rust_decoder:
+                        self.assertEqual(read_text(path), "native reader ✓")
+                        rust_decoder.assert_called_once()
             with patch.object(native_acceleration, "_native", None):
                 self.assertEqual(read_text(path), "native reader ✓")
             with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
