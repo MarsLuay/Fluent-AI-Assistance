@@ -2358,6 +2358,19 @@ def to_jsonable_containers(value: Any) -> tuple[bool, Any] | None:
         return None
 
 
+def to_jsonable_containers_required(value: Any) -> tuple[bool, Any] | None:
+    """Convert supported exact JSON containers in Rust, retaining fallback."""
+    try:
+        supported, result = _native.to_jsonable_containers(
+            value, _Counter, _PathType, _DefaultDict, _OrderedDict
+        )
+    except (AttributeError, TypeError, ValueError, OverflowError, UnicodeError):
+        return None
+    if type(supported) is bool and supported:
+        return True, result
+    return None
+
+
 def deepcopy_json(value: Any) -> Any | None:
     """Clone JSON-like containers natively, or request ``copy.deepcopy`` fallback."""
     if not enabled():

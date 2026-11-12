@@ -2131,13 +2131,27 @@ class ReaderTests(unittest.TestCase):
                 with patch.dict(
                     "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
                 ):
-                    python_result = to_jsonable(value)
+                    with patch.object(
+                        reader_common,
+                        "_native_to_jsonable_containers",
+                        return_value=None,
+                    ):
+                        python_result = to_jsonable(value)
                 with patch.dict(
                     "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}
                 ):
                     native = native_acceleration.to_jsonable_containers(value)
                     self.assertIsNotNone(native)
-                    actual = to_jsonable(value)
+                with patch.dict(
+                    "os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}
+                ):
+                    with patch.object(
+                        native_acceleration._native,
+                        "to_jsonable_containers",
+                        wraps=native_acceleration._native.to_jsonable_containers,
+                    ) as rust_call:
+                        actual = to_jsonable(value)
+                        rust_call.assert_called_once()
                 self.assertEqual(python_result, expected)
                 self.assertEqual(actual, expected)
         self.assertEqual(default_factory_calls, 0)
