@@ -1477,8 +1477,8 @@ class ReaderTests(unittest.TestCase):
             with patch.object(native_acceleration, "entry_object_guid", return_value=None):
                 with patch.object(
                     native_acceleration,
-                    "ascii_casefold_trim",
-                    wraps=native_acceleration.ascii_casefold_trim,
+                    "ascii_lower_required",
+                    wraps=native_acceleration.ascii_lower_required,
                 ) as native_lower:
                     fallback_guid = reader_script._entry_object_guid(
                         f"C:\\Data\\{guid.upper()}.XSCR"

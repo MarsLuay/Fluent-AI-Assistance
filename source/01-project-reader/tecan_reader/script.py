@@ -373,7 +373,7 @@ def _all_text_values(root: ET.Element) -> list[str]:
 
 def _lower_text(value: str) -> str:
     if type(value) is str and value.strip() == value:
-        native = native_acceleration.ascii_casefold_trim(value)
+        native = native_acceleration.ascii_lower_required(value)
         if native is not None:
             return native
     return value.lower()
@@ -381,14 +381,14 @@ def _lower_text(value: str) -> str:
 
 def _casefold_text(value: str) -> str:
     if type(value) is str and value.strip() == value:
-        native = native_acceleration.ascii_casefold_trim(value)
+        native = native_acceleration.ascii_casefold_trim_required(value)
         if native is not None:
             return native
     return value.casefold()
 
 
 def _casefold_equals(value: str, expected: str) -> bool:
-    native = native_acceleration.ascii_casefold_equals(value, expected)
+    native = native_acceleration.ascii_casefold_equals_required(value, expected)
     if native is not None:
         return native
     return value.casefold() == expected

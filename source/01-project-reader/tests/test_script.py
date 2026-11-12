@@ -78,21 +78,24 @@ class ScriptTests(unittest.TestCase):
             "<Root><Location>Pin café</Location><Location>spindle</Location></Root>"
         )
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            unicode_expected = script._dependencies(unicode_root)
+            with patch.object(
+                native_acceleration, "ascii_casefold_trim_required", return_value=None
+            ):
+                unicode_expected = script._dependencies(unicode_root)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             self.assertIsNone(
                 native_acceleration.ascii_case_insensitive_substring_match_values(
                     ["Pin café"], "pin"
                 )
             )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
-                native_acceleration,
+                native_acceleration._native,
                 "ascii_casefold_trim",
-                wraps=native_acceleration.ascii_casefold_trim,
-            ) as native_fold:
+                wraps=native_acceleration._native.ascii_casefold_trim,
+            ) as rust_fold:
                 unicode_actual = script._dependencies(unicode_root)
-                native_fold.assert_any_call("Pin café")
-                native_fold.assert_any_call("spindle")
+                rust_fold.assert_called_once_with("spindle")
         self.assertEqual(unicode_actual, unicode_expected)
         self.assertEqual(
             unicode_actual["worktable_pin_locations"], ["Pin café", "spindle"],
@@ -101,17 +104,73 @@ class ScriptTests(unittest.TestCase):
     def test_ascii_casefold_text_preserves_python_unicode_semantics(self) -> None:
         values = ("PIN", "AſB", " café ")
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = [script._casefold_text(value) for value in values]
-        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
-                native_acceleration,
+                native_acceleration, "ascii_casefold_trim_required", return_value=None
+            ):
+                expected = [script._casefold_text(value) for value in values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
                 "ascii_casefold_trim",
-                wraps=native_acceleration.ascii_casefold_trim,
-            ) as native_fold:
+                wraps=native_acceleration._native.ascii_casefold_trim,
+            ) as rust_fold:
                 actual = [script._casefold_text(value) for value in values]
-                self.assertEqual(native_fold.call_count, 2)
+                rust_fold.assert_called_once_with("PIN")
         self.assertEqual(actual, expected)
         self.assertEqual(actual, ["pin", "asb", " café "])
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(
+                [script._casefold_text(value) for value in values], expected
+            )
+
+    def test_ascii_lower_and_casefold_equals_use_required_rust(self) -> None:
+        class StringSubclass(str):
+            pass
+
+        lower_values = ("MiXeD", "İ", " padded ", StringSubclass("LaBeL"))
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(native_acceleration, "ascii_lower_required", return_value=None):
+                expected_lower = [script._lower_text(value) for value in lower_values]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "ascii_lower",
+                wraps=native_acceleration._native.ascii_lower,
+            ) as rust_lower:
+                actual_lower = [script._lower_text(value) for value in lower_values]
+                rust_lower.assert_called_once_with("MiXeD")
+        self.assertEqual(actual_lower, expected_lower)
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(
+                [script._lower_text(value) for value in lower_values], expected_lower
+            )
+
+        pairs = [
+            ("TRUE", "true"),
+            ("Straße", "strasse"),
+            ("Straße", "STRASSE"),
+            (StringSubclass("TRUE"), "true"),
+            ("TRUE ", "true"),
+        ]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration, "ascii_casefold_equals_required", return_value=None
+            ):
+                expected_equal = [script._casefold_equals(*pair) for pair in pairs]
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "ascii_casefold_equals",
+                wraps=native_acceleration._native.ascii_casefold_equals,
+            ) as rust_equals:
+                actual_equal = [script._casefold_equals(*pair) for pair in pairs]
+                self.assertEqual(rust_equals.call_count, 2)
+        self.assertEqual(actual_equal, expected_equal)
+        self.assertEqual(actual_equal, [True, True, False, True, False])
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(
+                [script._casefold_equals(*pair) for pair in pairs], expected_equal
+            )
 
     def test_interesting_field_fallback_uses_native_xml_selection(self) -> None:
         from tecan_common import xml_helpers
@@ -354,20 +413,23 @@ class ScriptTests(unittest.TestCase):
         )
         root = script.parse_xml_text(source)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            expected = script._startup_variables(root)
+            with patch.object(
+                native_acceleration, "ascii_casefold_equals_required", return_value=None
+            ):
+                expected = script._startup_variables(root)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
                 "xml_container_child_texts",
                 wraps=native_acceleration.xml_container_child_texts,
             ) as native_call, patch.object(
-                native_acceleration,
+                native_acceleration._native,
                 "ascii_casefold_equals",
-                wraps=native_acceleration.ascii_casefold_equals,
-            ) as native_bool_call:
+                wraps=native_acceleration._native.ascii_casefold_equals,
+            ) as rust_bool_call:
                 actual = script._startup_variables(root)
                 native_call.assert_called_once()
-                self.assertEqual(native_bool_call.call_count, 2)
+                self.assertEqual(rust_bool_call.call_count, 2)
         self.assertEqual(actual, expected)
         self.assertEqual(actual[0]["default_values"], ["first", "second", "first"])
         self.assertTrue(actual[0]["query_on_startup"])
@@ -484,7 +546,8 @@ class ScriptTests(unittest.TestCase):
             },
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            unicode_expected = script._warnings(unicode_commands)
+            with patch.object(native_acceleration, "ascii_lower_required", return_value=None):
+                unicode_expected = script._warnings(unicode_commands)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             raw_types = [command["raw_type"] for command in unicode_commands]
             self.assertIsNone(
@@ -492,13 +555,14 @@ class ScriptTests(unittest.TestCase):
                     raw_types, [("subroutine",), ("executeapplication",)]
                 )
             )
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
             with patch.object(
-                native_acceleration,
-                "ascii_casefold_trim",
-                wraps=native_acceleration.ascii_casefold_trim,
-            ) as native_lower:
+                native_acceleration._native,
+                "ascii_lower",
+                wraps=native_acceleration._native.ascii_lower,
+            ) as rust_lower:
                 self.assertEqual(script._warnings(unicode_commands), unicode_expected)
-                native_lower.assert_any_call("Vendor.ExecuteApplication")
+                rust_lower.assert_called_once_with("Vendor.ExecuteApplication")
 
         unicode_field_commands = [
             {
@@ -508,22 +572,28 @@ class ScriptTests(unittest.TestCase):
             }
         ]
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
-            unicode_field_expected = script._warnings(unicode_field_commands)
+            with patch.object(native_acceleration, "ascii_lower_required", return_value=None):
+                unicode_field_expected = script._warnings(unicode_field_commands)
         with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "0"}):
             with patch.object(
                 native_acceleration,
                 "ascii_case_insensitive_substring_match_groups",
                 wraps=native_acceleration.ascii_case_insensitive_substring_match_groups,
-            ) as native_matcher, patch.object(
-                native_acceleration,
-                "ascii_casefold_trim",
-                wraps=native_acceleration.ascii_casefold_trim,
-            ) as native_lower:
+            ) as native_matcher:
                 self.assertEqual(
                     script._warnings(unicode_field_commands), unicode_field_expected
                 )
                 native_matcher.assert_called_once()
-                native_lower.assert_called_once_with("İPIN-controlled")
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "ascii_lower",
+                wraps=native_acceleration._native.ascii_lower,
+            ) as rust_lower:
+                self.assertEqual(
+                    script._warnings(unicode_field_commands), unicode_field_expected
+                )
+                rust_lower.assert_called_once_with("FcaPipette")
         self.assertIn(
             "Contains pin-controlled or pin-located hardware references.",
             unicode_field_expected,

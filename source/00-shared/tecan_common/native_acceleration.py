@@ -3349,7 +3349,7 @@ def ascii_lower_required(value: Any) -> str | None:
         return None
     try:
         result = _native.ascii_lower(value)
-    except UnicodeError:
+    except (AttributeError, TypeError, ValueError, UnicodeError, OverflowError):
         return None
     if type(result) is not str:
         raise RuntimeError("required Rust ASCII lowercase returned invalid data")
