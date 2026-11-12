@@ -16,7 +16,7 @@ from typing import Any, Mapping
 
 from tecan_common.native_acceleration import (
     canonical_json_compact_required as _native_canonical_json_compact,
-    deepcopy_json as _native_deepcopy_json,
+    deepcopy_json_required as _native_deepcopy_json,
     most_common_string_counts as _native_most_common_string_counts,
     project_model_entry_path as _native_project_model_entry_path,
     project_model_identifiers as _native_project_model_identifiers,

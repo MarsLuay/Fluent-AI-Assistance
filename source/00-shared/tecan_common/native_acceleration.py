@@ -2392,6 +2392,14 @@ def deepcopy_json(value: Any) -> Any | None:
         return None
 
 
+def deepcopy_json_required(value: Any) -> Any | None:
+    """Clone supported exact containers in Rust, retaining deepcopy fallback."""
+    try:
+        return _native.deepcopy_json(value)
+    except (AttributeError, ValueError, TypeError, UnicodeError, OverflowError):
+        return None
+
+
 def project_model_identifiers(record: Any) -> dict[str, str] | None:
     """Select project-model identifier strings from an exact built-in record."""
     if not enabled() or type(record) is not dict:

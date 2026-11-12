@@ -903,6 +903,28 @@ class NativeAccelerationTests(unittest.TestCase):
         )
         self.assertIs(copied_tuple_key[tuple_key], tuple_key)
 
+    def test_project_deepcopy_requires_rust_for_supported_containers(self) -> None:
+        if not native_acceleration.available():
+            self.skipTest("optional Rust extension is not built")
+        from tecan_reader.project_model import deepcopy as project_deepcopy
+
+        shared = [{"value": 4}]
+        original = {"left": shared, "right": shared}
+        expected = copy.deepcopy(original)
+        with patch.dict("os.environ", {"TECAN_DISABLE_RUST_ACCELERATION": "1"}):
+            with patch.object(
+                native_acceleration._native,
+                "deepcopy_json",
+                wraps=native_acceleration._native.deepcopy_json,
+            ) as rust_call:
+                copied = project_deepcopy(original)
+                rust_call.assert_called_once_with(original)
+        self.assertEqual(copied, expected)
+        self.assertIs(copied["left"], copied["right"])
+        self.assertIsNot(copied["left"], shared)
+        with patch.object(native_acceleration, "_native", None):
+            self.assertEqual(project_deepcopy(original), expected)
+
     def test_native_deepcopy_cycles_fall_back_to_python(self) -> None:
         if not native_acceleration.available():
             self.skipTest("optional Rust extension is not built")
